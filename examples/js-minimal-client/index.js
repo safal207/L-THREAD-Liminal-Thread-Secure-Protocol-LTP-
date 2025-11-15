@@ -5,6 +5,53 @@
 
 const { LtpClient } = require('../../sdk/js/dist/index');
 
+/**
+ * Send evening reflection sample - demonstrates LTP+LRI integration
+ * This shows how semantic LRI data flows through LTP transport layer
+ */
+function sendEveningReflectionSample(client) {
+  console.log('→ Sending evening reflection (LTP+LRI example)...');
+
+  // This uses the LTP client's sendMessage method with custom meta fields
+  // The client will automatically add type, thread_id, session_id, timestamp
+  client.sendMessage({
+    type: 'state_update',
+    meta: {
+      // LRI-specific meta fields
+      affect: {
+        valence: 0.2,   // slightly positive
+        arousal: -0.3   // low energy
+      },
+      context_tag: 'evening_reflection'
+    },
+    payload: {
+      kind: 'lri_envelope_v1',
+      data: {
+        actor: 'user:self',
+        intent: 'reflect_on_day',
+        summary: 'Slightly tired, but feeling a sense of quiet progress.',
+        highlights: [
+          'played with kids',
+          'advanced LTP protocol',
+          'less anxiety about the future'
+        ],
+        inner_state: {
+          energy: 0.4,
+          clarity: 0.7,
+          stress: 0.3
+        },
+        resonance_hooks: [
+          'family',
+          'creator_path',
+          'long_horizon'
+        ]
+      }
+    }
+  });
+
+  console.log('  ✓ Evening reflection sent (see spec section 9 for details)\n');
+}
+
 async function main() {
   console.log('=== LTP Minimal Client Example ===\n');
 
@@ -38,6 +85,11 @@ async function main() {
             energy_level: 0.8,
           },
         });
+
+        // Send evening reflection sample after 1 second
+        setTimeout(() => {
+          sendEveningReflectionSample(client);
+        }, 1000);
 
         // Send a test event after 2 seconds
         setTimeout(() => {

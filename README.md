@@ -118,6 +118,83 @@ await client.send_event('user_action', {
 })
 ```
 
+## Example Scenario: Evening Reflection
+
+LTP is designed to carry **semantic intent** (via LRI) through a **secure transport** layer. Here's a real-world example:
+
+### The Scenario
+
+> At the end of the day, a user opens their liminal client to reflect on their state. They note their energy, clarity, stress, and key highlights. This creates a "thread of the day" that flows into LIMINAL OS.
+
+### The Message (LTP + LRI)
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "4f3c9e2a-8b21-4c71-9d3f-1a9b12345678",
+  "session_id": "b42a6f10-91a7-4ce2-8b7e-9d5f98765432",
+  "timestamp": 1731700000,
+  "meta": {
+    "client_id": "android-liminal-001",
+    "trace_id": "evt-2025-11-15-001",
+    "affect": {
+      "valence": 0.2,
+      "arousal": -0.3
+    },
+    "context_tag": "evening_reflection"
+  },
+  "payload": {
+    "kind": "lri_envelope_v1",
+    "data": {
+      "actor": "user:self",
+      "intent": "reflect_on_day",
+      "summary": "Slightly tired, but feeling a sense of quiet progress.",
+      "highlights": [
+        "played with kids",
+        "advanced LTP protocol",
+        "less anxiety about the future"
+      ],
+      "inner_state": {
+        "energy": 0.4,
+        "clarity": 0.7,
+        "stress": 0.3
+      },
+      "resonance_hooks": [
+        "family",
+        "creator_path",
+        "long_horizon"
+      ]
+    }
+  }
+}
+```
+
+### Layer Breakdown
+
+**LTP (Transport/Meta):**
+- `type`, `thread_id`, `session_id`, `timestamp` - routing and session
+- `meta.client_id`, `meta.trace_id` - infrastructure metadata
+
+**LRI (Semantic):**
+- `meta.affect` - emotional state (valence/arousal)
+- `meta.context_tag` - semantic context label
+- `payload.data.*` - all semantic content (intent, state, resonance)
+
+### Server Processing
+
+When the server receives this message:
+
+```
+LTP[4f3c9e2a.../b42a6f10...] ctx=evening_reflection affect={0.2,-0.3} intent=reflect_on_day
+```
+
+The server can then:
+1. **LTP layer** - Route message, maintain session context
+2. **LRI layer** - Extract intent, match resonance hooks, update RINSE (Resonance INner State Engine)
+3. **Response** - Send back resonance score and insights
+
+See `specs/LTP-message-format.md` section 9 for full details.
+
 ## Repository Structure
 
 ```

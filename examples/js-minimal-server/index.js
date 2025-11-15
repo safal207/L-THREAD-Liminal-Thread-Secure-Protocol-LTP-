@@ -90,6 +90,23 @@ function handleMessage(ws, message, sessionData) {
       console.log('  Kind:', message.payload.kind);
       console.log('  Data:', JSON.stringify(message.payload.data, null, 2));
 
+      // Log LRI-enhanced format (LTP + LRI integration)
+      const threadShort = message.thread_id.substring(0, 8);
+      const sessionShort = message.session_id.substring(0, 8);
+      const contextTag = message.meta?.context_tag || 'none';
+      const affect = message.meta?.affect;
+      const intent = message.payload?.data?.intent || 'none';
+
+      let ltpLog = `LTP[${threadShort}.../${sessionShort}...] ctx=${contextTag}`;
+
+      if (affect) {
+        ltpLog += ` affect={${affect.valence},${affect.arousal}}`;
+      }
+
+      ltpLog += ` intent=${intent}`;
+
+      console.log(`  ${ltpLog}`);
+
       // Echo back a server state update (optional)
       const serverStateUpdate = {
         type: 'state_update',
