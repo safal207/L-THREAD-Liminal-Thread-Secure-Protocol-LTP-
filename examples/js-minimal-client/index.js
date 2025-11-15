@@ -6,17 +6,30 @@
 const { LtpClient } = require('../../sdk/js/dist/index');
 
 /**
- * Send evening reflection sample - demonstrates LTP + LRI integration
- * This shows how a real-world "evening reflection" scenario would flow through the protocol
+ * Send evening reflection sample - demonstrates LTP+LRI integration
+ * This shows how semantic LRI data flows through LTP transport layer
  */
 function sendEveningReflectionSample(client) {
-  client.sendStateUpdate(
-    {
+  console.log('→ Sending evening reflection (LTP+LRI example)...');
+
+  // This uses the LTP client's sendMessage method with custom meta fields
+  // The client will automatically add type, thread_id, session_id, timestamp
+  client.sendMessage({
+    type: 'state_update',
+    meta: {
+      // LRI-specific meta fields
+      affect: {
+        valence: 0.2,   // slightly positive
+        arousal: -0.3   // low energy
+      },
+      context_tag: 'evening_reflection'
+    },
+    payload: {
       kind: 'lri_envelope_v1',
       data: {
         actor: 'user:self',
         intent: 'reflect_on_day',
-        summary: 'Slightly tired, but there\'s a sense of quiet progress.',
+        summary: 'Slightly tired, but feeling a sense of quiet progress.',
         highlights: [
           'played with kids',
           'advanced LTP protocol',
@@ -33,15 +46,10 @@ function sendEveningReflectionSample(client) {
           'long_horizon'
         ]
       }
-    },
-    {
-      affect: {
-        valence: 0.2,   // Slightly positive
-        arousal: -0.3   // Calm/relaxed
-      },
-      contextTag: 'evening_reflection'
     }
-  );
+  });
+
+  console.log('  ✓ Evening reflection sent (see spec section 9 for details)\n');
 }
 
 async function main() {
@@ -87,7 +95,12 @@ async function main() {
           }
         );
 
-        // Send a test event with explicit context tag after 2 seconds
+        // Send evening reflection sample after 1 second
+        setTimeout(() => {
+          sendEveningReflectionSample(client);
+        }, 1000);
+
+        // Send a test event after 2 seconds
         setTimeout(() => {
           console.log('→ Sending test event with context_tag...');
           client.sendEvent(

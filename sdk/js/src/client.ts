@@ -187,6 +187,31 @@ export class LtpClient {
   }
 
   /**
+   * Send custom LTP message with full control over meta and payload
+   * Useful for LRI integration and advanced use cases
+   * @param message Partial message (type, meta, payload). thread_id, session_id, timestamp will be added automatically.
+   */
+  public sendMessage(message: {
+    type: string;
+    meta?: Record<string, unknown>;
+    payload: Record<string, unknown>;
+  }): void {
+    const fullMessage = {
+      type: message.type as any,  // Allow custom types for extensibility
+      thread_id: this.threadId!,
+      session_id: this.sessionId!,
+      timestamp: this.getTimestamp(),
+      payload: message.payload,
+      meta: {
+        client_id: this.options.clientId,
+        ...message.meta,
+      },
+    } as LtpEnvelope;
+
+    this.send(fullMessage);
+  }
+
+  /**
    * Get current thread ID
    */
   public getThreadId(): string | null {

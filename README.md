@@ -193,17 +193,13 @@ await client.send_event('user_action', {
 
 ## Example Scenario: Evening Reflection
 
-### The Use Case
+LTP is designed to carry **semantic intent** (via LRI) through a **secure transport** layer. Here's a real-world example:
 
-A user opens a liminal-aware app at the end of their day to briefly reflect on their inner state. This creates a "thread of the day" that flows through the entire LIMINAL stack.
+### The Scenario
 
-### Message Flow
+> At the end of the day, a user opens their liminal client to reflect on their state. They note their energy, clarity, stress, and key highlights. This creates a "thread of the day" that flows into LIMINAL OS.
 
-```
-Human → Client → LTP → LRI → LIMINAL OS
-```
-
-### Complete Message Example
+### The Message (LTP + LRI)
 
 ```json
 {
@@ -213,9 +209,10 @@ Human → Client → LTP → LRI → LIMINAL OS
   "timestamp": 1731700000,
   "meta": {
     "client_id": "android-liminal-001",
+    "trace_id": "evt-2025-11-15-001",
     "affect": {
-      "valence": 0.2,   // Slightly positive
-      "arousal": -0.3   // Calm/relaxed
+      "valence": 0.2,
+      "arousal": -0.3
     },
     "context_tag": "evening_reflection"
   },
@@ -224,7 +221,7 @@ Human → Client → LTP → LRI → LIMINAL OS
     "data": {
       "actor": "user:self",
       "intent": "reflect_on_day",
-      "summary": "Slightly tired, but there's a sense of quiet progress.",
+      "summary": "Slightly tired, but feeling a sense of quiet progress.",
       "highlights": [
         "played with kids",
         "advanced LTP protocol",
@@ -245,60 +242,31 @@ Human → Client → LTP → LRI → LIMINAL OS
 }
 ```
 
-### What Happens at Each Layer
+### Layer Breakdown
 
-**LTP (Transport):**
-- Ensures reliable delivery with thread/session context
-- Carries `affect` and `context_tag` metadata
-- Does NOT interpret semantic meaning
+**LTP (Transport/Meta):**
+- `type`, `thread_id`, `session_id`, `timestamp` - routing and session
+- `meta.client_id`, `meta.trace_id` - infrastructure metadata
 
 **LRI (Semantic):**
-- Interprets the `intent`: "reflect_on_day"
-- Analyzes `inner_state` metrics
-- Matches `resonance_hooks` against patterns
-- Stores in memory graph
-
-**LIMINAL OS:**
-- Updates user's liminal thread
-- Triggers resonance pattern matching
-- May generate insights or suggestions
-- Preserves context for future interactions
-
-### Code Example
-
-```typescript
-// Send evening reflection
-client.sendStateUpdate(
-  {
-    kind: 'lri_envelope_v1',
-    data: {
-      actor: 'user:self',
-      intent: 'reflect_on_day',
-      summary: 'Slightly tired, but there\'s a sense of quiet progress.',
-      highlights: ['played with kids', 'advanced LTP protocol'],
-      inner_state: { energy: 0.4, clarity: 0.7, stress: 0.3 },
-      resonance_hooks: ['family', 'creator_path', 'long_horizon']
-    }
-  },
-  {
-    affect: { valence: 0.2, arousal: -0.3 },
-    contextTag: 'evening_reflection'
-  }
-);
-```
+- `meta.affect` - emotional state (valence/arousal)
+- `meta.context_tag` - semantic context label
+- `payload.data.*` - all semantic content (intent, state, resonance)
 
 ### Server Processing
 
+When the server receives this message:
+
 ```
-← [LTP] state_update
-  LTP[4f3c9e2a/b42a6f10] ctx=evening_reflection affect={valence=0.2,arousal=-0.3} intent=reflect_on_day
-  [LRI] Processing semantic content:
-    Summary: Slightly tired, but there's a sense of quiet progress.
-    Inner state: {"energy":0.4,"clarity":0.7,"stress":0.3}
-    Resonance hooks: family, creator_path, long_horizon
+LTP[4f3c9e2a.../b42a6f10...] ctx=evening_reflection affect={0.2,-0.3} intent=reflect_on_day
 ```
 
-This demonstrates how LTP provides the transport foundation while LRI adds semantic meaning - clean separation of concerns.
+The server can then:
+1. **LTP layer** - Route message, maintain session context
+2. **LRI layer** - Extract intent, match resonance hooks, update RINSE (Resonance INner State Engine)
+3. **Response** - Send back resonance score and insights
+
+See `specs/LTP-message-format.md` section 9 for full details.
 
 ## Repository Structure
 
