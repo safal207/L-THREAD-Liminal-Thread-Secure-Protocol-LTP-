@@ -19,6 +19,40 @@ The Liminal Thread Protocol (LTP) is a transport-level protocol designed to esta
 - Multi-device session synchronization (planned for v0.3+)
 - Binary protocol format (JSON-only in v0.1)
 
+## LTP v0.2 Changes
+
+### Continuity of Thread
+
+v0.2 formalizes the idea that a liminal thread can survive transport failures. Clients MUST support two handshake paths:
+
+- **`handshake_init`** — start a brand new thread. Used when no prior `thread_id` is known.
+- **`handshake_resume`** — attempt to re-enter an existing thread using a previously issued `thread_id`.
+
+When resuming, the client submits the known `thread_id`. The server either:
+
+1. Confirms the thread exists, issues a fresh `session_id`, and marks the acknowledgment with `resumed: true`; or
+2. Rejects the resume attempt (`handshake_reject`) so the client can fall back to `handshake_init`.
+
+Servers SHOULD treat thread continuity as the default, and clients SHOULD persist `thread_id` across app restarts so reconnections feel seamless.
+
+### Heartbeat & Reconnect Strategy
+
+Heartbeat is now an explicit resilience requirement. Clients MUST:
+
+- Send `ping` frames on the cadence provided by `heartbeat_interval_ms`.
+- Expect `pong` replies and treat missing responses within a configurable timeout as a liveness failure.
+- Apply an exponential backoff when reconnecting after failures (default suggestion: base delay 1s, doubling up to 30s, max 5 retries before surfacing a permanent failure condition).
+
+Servers MAY close sessions that stop heartbeating, but SHOULD accept `handshake_resume` requests for a grace period so the thread survives transient outages.
+
+### Security Skeleton
+
+While v0.2 still does not ship full cryptography, it introduces structural hooks:
+
+- Every envelope may carry a `nonce` (unique per message, at least per session) and a placeholder `signature` string.
+- Future releases will define how to compute the signature; for now SDKs populate deterministic placeholders so downstream systems can experiment.
+- Documentation now REQUIRES running LTP atop TLS/WSS (a `recommended_env` note) to prevent clear-text transport while the cryptographic layer matures.
+
 ## 2. Protocol Position in Stack
 
 LTP operates between standard transport protocols (WebSocket/TCP/QUIC) and application-level semantic protocols (LRI):
