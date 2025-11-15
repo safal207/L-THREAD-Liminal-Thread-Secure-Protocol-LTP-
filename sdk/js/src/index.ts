@@ -1,0 +1,29 @@
+/**
+ * LTP (Liminal Thread Protocol) SDK
+ * Version 0.1
+ *
+ * Entry point for the LTP client library
+ */
+
+export { LtpClient } from './client';
+
+export type {
+  SupportedMessageType,
+  LtpMeta,
+  LtpEnvelope,
+  HandshakeInitMessage,
+  HandshakeAckMessage,
+  PingPayload,
+  PongPayload,
+  StateUpdatePayload,
+  EventPayload,
+  ErrorPayload,
+  PingMessage,
+  PongMessage,
+  StateUpdateMessage,
+  EventMessage,
+  ErrorMessage,
+  LtpMessage,
+  LtpClientOptions,
+  LtpClientEvents,
+} from './types';

@@ -1,0 +1,20 @@
+{
+  "name": "ltp-minimal-server-example",
+  "version": "0.1.0",
+  "description": "Minimal LTP server example",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "ltp",
+    "example",
+    "server"
+  ],
+  "author": "LIMINAL Team",
+  "license": "MIT",
+  "dependencies": {
+    "uuid": "^9.0.1",
+    "ws": "^8.16.0"
+  }
+}

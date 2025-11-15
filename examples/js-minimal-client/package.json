@@ -1,0 +1,19 @@
+{
+  "name": "ltp-minimal-client-example",
+  "version": "0.1.0",
+  "description": "Minimal LTP client example",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "keywords": [
+    "ltp",
+    "example",
+    "client"
+  ],
+  "author": "LIMINAL Team",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.16.0"
+  }
+}

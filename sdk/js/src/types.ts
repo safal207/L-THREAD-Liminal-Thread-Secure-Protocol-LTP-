@@ -1,0 +1,184 @@
+/**
+ * LTP (Liminal Thread Protocol) TypeScript Types
+ * Version 0.1
+ */
+
+/**
+ * Supported LTP message types
+ */
+export type SupportedMessageType =
+  | 'handshake_init'
+  | 'handshake_ack'
+  | 'ping'
+  | 'pong'
+  | 'state_update'
+  | 'event'
+  | 'error';
+
+/**
+ * Base metadata for all LTP messages
+ */
+export interface LtpMeta {
+  client_id?: string;
+  trace_id?: string;
+  parent_span_id?: string;
+  user_agent?: string;
+  signature?: string; // Reserved for v0.2+
+  [key: string]: unknown; // Allow custom metadata
+}
+
+/**
+ * Base envelope for all LTP messages (except handshake)
+ */
+export interface LtpEnvelope<T = unknown> {
+  type: SupportedMessageType;
+  thread_id: string;
+  session_id: string;
+  timestamp: number;
+  payload: T;
+  meta?: LtpMeta;
+}
+
+/**
+ * Handshake Init Message (Client → Server)
+ */
+export interface HandshakeInitMessage {
+  type: 'handshake_init';
+  ltp_version: string;
+  client_id: string;
+  device_fingerprint?: string;
+  intent?: string;
+  capabilities?: string[];
+  metadata?: {
+    sdk_version?: string;
+    platform?: string;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Handshake Acknowledgment Message (Server → Client)
+ */
+export interface HandshakeAckMessage {
+  type: 'handshake_ack';
+  ltp_version: string;
+  thread_id: string;
+  session_id: string;
+  server_capabilities: string[];
+  heartbeat_interval_ms: number;
+  metadata?: {
+    server_version?: string;
+    region?: string;
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Ping Message Payload
+ */
+export interface PingPayload {
+  // Empty or minimal
+  [key: string]: unknown;
+}
+
+/**
+ * Pong Message Payload
+ */
+export interface PongPayload {
+  // Empty or echo
+  [key: string]: unknown;
+}
+
+/**
+ * State Update Message Payload
+ */
+export interface StateUpdatePayload {
+  kind: 'minimal' | 'full' | 'delta';
+  data: {
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Event Message Payload
+ */
+export interface EventPayload {
+  event_type: string;
+  data: {
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Error Message Payload
+ */
+export interface ErrorPayload {
+  error_code: string;
+  error_message: string;
+  details?: {
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * Ping message type
+ */
+export type PingMessage = LtpEnvelope<PingPayload>;
+
+/**
+ * Pong message type
+ */
+export type PongMessage = LtpEnvelope<PongPayload>;
+
+/**
+ * State update message type
+ */
+export type StateUpdateMessage = LtpEnvelope<StateUpdatePayload>;
+
+/**
+ * Event message type
+ */
+export type EventMessage = LtpEnvelope<EventPayload>;
+
+/**
+ * Error message type
+ */
+export type ErrorMessage = LtpEnvelope<ErrorPayload>;
+
+/**
+ * Union type for all LTP messages
+ */
+export type LtpMessage =
+  | HandshakeInitMessage
+  | HandshakeAckMessage
+  | PingMessage
+  | PongMessage
+  | StateUpdateMessage
+  | EventMessage
+  | ErrorMessage;
+
+/**
+ * LTP Client options
+ */
+export interface LtpClientOptions {
+  clientId?: string;
+  deviceFingerprint?: string;
+  intent?: string;
+  capabilities?: string[];
+  metadata?: {
+    [key: string]: unknown;
+  };
+}
+
+/**
+ * LTP Client event handlers
+ */
+export interface LtpClientEvents {
+  onConnected?: (threadId: string, sessionId: string) => void;
+  onDisconnected?: () => void;
+  onError?: (error: ErrorPayload) => void;
+  onStateUpdate?: (payload: StateUpdatePayload) => void;
+  onEvent?: (payload: EventPayload) => void;
+  onPong?: () => void;
+  onMessage?: (message: LtpMessage) => void;
+}
