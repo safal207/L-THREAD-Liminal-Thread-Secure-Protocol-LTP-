@@ -94,9 +94,68 @@ All LTP messages (except raw handshake) use a unified JSON envelope structure:
 
 See `LTP-message-format.md` for detailed specification.
 
-## 4. Protocol Flow
+## 4. Relation to LRI (Liminal Resonance Interface)
 
-### 4.1 Connection Establishment
+### 4.1 Layer Separation
+
+LTP and LRI serve distinct but complementary roles:
+
+- **LTP (this protocol):** Transport layer that ensures secure, context-preserving message delivery
+- **LRI:** Semantic layer that interprets intent, affect, and resonance patterns
+
+LTP provides the foundation upon which LRI operates, but does not itself interpret semantic meaning.
+
+### 4.2 LRI-Ready Metadata
+
+LTP's message envelope includes optional metadata fields designed to support higher-level semantic protocols like LRI:
+
+**Affect Metadata:**
+- `meta.affect.valence`: Emotional valence (-1 to 1, negative to positive)
+- `meta.affect.arousal`: Arousal level (-1 to 1, calm to excited)
+
+**Context Tagging:**
+- `meta.context_tag`: String identifier for the interaction context (e.g., "focus_session", "evening_reflection")
+
+These fields are optional in v0.1 and provide hooks for future semantic layers without imposing specific interpretation requirements on LTP implementations.
+
+### 4.3 Example: LRI-Aware Message
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "session_id": "a8f5f167-d5a1-4c42-9e12-3d8f72e6b5c1",
+  "timestamp": 1731600000,
+  "payload": {
+    "kind": "minimal",
+    "data": {
+      "focus_level": 0.8
+    }
+  },
+  "meta": {
+    "client_id": "client-123",
+    "affect": {
+      "valence": 0.3,
+      "arousal": -0.2
+    },
+    "context_tag": "evening_reflection"
+  }
+}
+```
+
+### 4.4 Implementation Guidance
+
+LTP implementations:
+- MUST support `meta.affect` and `meta.context_tag` as optional fields
+- MUST NOT interpret or validate the semantic meaning of these fields
+- MUST preserve these fields when forwarding messages
+- MAY ignore these fields if not needed
+
+LRI or other semantic layers built on LTP will interpret these fields according to their own specifications.
+
+## 5. Protocol Flow
+
+### 5.1 Connection Establishment
 
 ```
 Client                                    Server
@@ -111,7 +170,7 @@ Client                                    Server
   |        (connection established)         |
 ```
 
-### 4.2 Active Session
+### 5.2 Active Session
 
 ```
 Client                                    Server
@@ -125,16 +184,16 @@ Client                                    Server
   |                                         |
 ```
 
-### 4.3 Heartbeat Mechanism
+### 5.3 Heartbeat Mechanism
 
 - Server specifies `heartbeat_interval_ms` in `handshake_ack`
 - Client should send `ping` at this interval
 - Server responds with `pong`
 - If no `ping` received within `2 × heartbeat_interval_ms`, server may close connection
 
-## 5. Security Considerations (v0.1)
+## 6. Security Considerations (v0.1)
 
-### 5.1 Current State
+### 6.1 Current State
 
 v0.1 provides **protocol structure** for security, not actual cryptographic implementation:
 
@@ -142,7 +201,7 @@ v0.1 provides **protocol structure** for security, not actual cryptographic impl
 - No key exchange
 - No message encryption beyond transport layer (WSS)
 
-### 5.2 Security Hooks
+### 6.2 Security Hooks
 
 The protocol reserves fields for future security:
 
@@ -150,15 +209,15 @@ The protocol reserves fields for future security:
 - `handshake_ack.nonce`: Challenge for future crypto handshake
 - `meta.signature`: Reserved for message signing
 
-### 5.3 Recommendations for v0.1
+### 6.3 Recommendations for v0.1
 
 - Use WSS (WebSocket Secure) for transport encryption
 - Implement authentication at application layer
 - Treat v0.1 as trusted network only
 
-## 6. Error Handling
+## 7. Error Handling
 
-### 6.1 Protocol Errors
+### 7.1 Protocol Errors
 
 If server receives malformed LTP message:
 
@@ -171,7 +230,7 @@ If server receives malformed LTP message:
 }
 ```
 
-### 6.2 Error Codes
+### 7.2 Error Codes
 
 - `MALFORMED_MESSAGE`: Invalid message structure
 - `UNKNOWN_THREAD`: `thread_id` not recognized
@@ -179,15 +238,15 @@ If server receives malformed LTP message:
 - `UNSUPPORTED_VERSION`: LTP version not supported
 - `RATE_LIMIT_EXCEEDED`: Too many messages (future)
 
-## 7. Extensibility
+## 8. Extensibility
 
-### 7.1 Forward Compatibility
+### 8.1 Forward Compatibility
 
 - Clients/servers MUST ignore unknown fields in messages
 - New message types can be added without breaking existing implementations
 - Version negotiation via `ltp_version` field
 
-### 7.2 Custom Message Types
+### 8.2 Custom Message Types
 
 Higher-layer protocols can define custom message types:
 
@@ -206,9 +265,9 @@ Higher-layer protocols can define custom message types:
 
 Type prefix convention: `namespace:type` (e.g., `lri:`, `custom:`)
 
-## 8. Implementation Notes
+## 9. Implementation Notes
 
-### 8.1 WebSocket Subprotocol
+### 9.1 WebSocket Subprotocol
 
 LTP should use WebSocket subprotocol identifier: `ltp.v0.1`
 
@@ -216,14 +275,14 @@ LTP should use WebSocket subprotocol identifier: `ltp.v0.1`
 const ws = new WebSocket('wss://example.com', 'ltp.v0.1');
 ```
 
-### 8.2 Message Size Limits
+### 9.2 Message Size Limits
 
 Recommended limits (implementer-defined):
 
 - Maximum message size: 1 MB (v0.1)
 - Maximum `payload` nesting depth: 10 levels
 
-### 8.3 Timestamp Format
+### 9.3 Timestamp Format
 
 All timestamps are Unix epoch time in seconds (integer).
 
@@ -231,7 +290,7 @@ All timestamps are Unix epoch time in seconds (integer).
 "timestamp": 1731600000
 ```
 
-## 9. Compliance
+## 10. Compliance
 
 An LTP v0.1 implementation is compliant if:
 
@@ -242,7 +301,7 @@ An LTP v0.1 implementation is compliant if:
 5. It ignores unknown fields without error
 6. It rejects messages missing required fields with appropriate error
 
-## 10. Future Directions
+## 11. Future Directions
 
 ### v0.2
 - Real cryptographic handshake (ECDH key exchange, Ed25519 signatures)

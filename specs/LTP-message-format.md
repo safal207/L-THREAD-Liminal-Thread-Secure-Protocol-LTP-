@@ -47,6 +47,11 @@ The `meta` object is optional but recommended for production systems:
     "trace_id": "string",
     "parent_span_id": "string",
     "user_agent": "string",
+    "affect": {
+      "valence": 0.3,
+      "arousal": -0.2
+    },
+    "context_tag": "evening_reflection",
     "signature": "base64-string (future)"
   }
 }
@@ -58,7 +63,16 @@ The `meta` object is optional but recommended for production systems:
 | `trace_id` | string | No | Distributed tracing ID |
 | `parent_span_id` | string | No | Parent span for distributed tracing |
 | `user_agent` | string | No | Client user agent string |
+| `affect` | object | No | Emotional state metadata (for LRI and semantic layers) |
+| `affect.valence` | number | No | Emotional valence: -1 (negative) to 1 (positive) |
+| `affect.arousal` | number | No | Arousal level: -1 (calm) to 1 (excited) |
+| `context_tag` | string | No | Context identifier (e.g., "focus_session", "relax") |
 | `signature` | string | No | Message signature (reserved for v0.2+) |
+
+**Note on Liminal Metadata:**
+- `affect` and `context_tag` are optional fields designed for higher-level semantic protocols like LRI
+- LTP implementations MUST support these fields but MUST NOT interpret their meaning
+- These fields provide hooks for future semantic layers without imposing specific requirements
 
 ## 3. Message Types (v0.1)
 

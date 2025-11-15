@@ -16,6 +16,16 @@ export type SupportedMessageType =
   | 'error';
 
 /**
+ * Affect metadata for liminal/emotional state
+ */
+export interface LtpAffect {
+  /** Emotional valence: -1 (negative) to 1 (positive) */
+  valence: number;
+  /** Arousal level: -1 (calm) to 1 (excited) */
+  arousal: number;
+}
+
+/**
  * Base metadata for all LTP messages
  */
 export interface LtpMeta {
@@ -23,6 +33,10 @@ export interface LtpMeta {
   trace_id?: string;
   parent_span_id?: string;
   user_agent?: string;
+  /** Emotional state metadata (for LRI and semantic layers) */
+  affect?: LtpAffect;
+  /** Context identifier (e.g., "focus_session", "evening_reflection") */
+  context_tag?: string;
   signature?: string; // Reserved for v0.2+
   [key: string]: unknown; // Allow custom metadata
 }
@@ -165,6 +179,10 @@ export interface LtpClientOptions {
   deviceFingerprint?: string;
   intent?: string;
   capabilities?: string[];
+  /** Default context tag to apply to all messages if not specified */
+  defaultContextTag?: string;
+  /** Default affect to apply to all messages if not specified */
+  defaultAffect?: LtpAffect;
   metadata?: {
     [key: string]: unknown;
   };

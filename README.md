@@ -40,7 +40,80 @@ LTP operates as a dedicated layer in the LIMINAL stack:
 - **Thread Session Model:** Unique `thread_id` + `session_id` tracking
 - **Unified Message Envelope:** JSON-based format for all message types
 - **Context Preservation:** Metadata fields for client state and trace tracking
+- **Liminal Metadata:** Optional affect and context tags for semantic layers
 - **Message Types:** `handshake`, `ping`, `state_update`, `event`
+
+## Liminal Metadata
+
+LTP supports optional metadata fields designed for higher-level semantic protocols like LRI (Liminal Resonance Interface):
+
+### Affect Metadata
+
+Emotional state indicators for each message:
+
+- **`valence`**: Emotional valence from -1 (negative) to 1 (positive)
+- **`arousal`**: Arousal level from -1 (calm) to 1 (excited)
+
+```typescript
+{
+  affect: {
+    valence: 0.3,   // Slightly positive
+    arousal: -0.2   // Slightly calm
+  }
+}
+```
+
+### Context Tags
+
+String identifiers for the interaction context:
+
+```typescript
+context_tag: "focus_session"  // or "evening_reflection", "work_mode", etc.
+```
+
+### Usage in SDK
+
+**Default metadata for all messages:**
+
+```typescript
+const client = new LtpClient('ws://localhost:8080', {
+  clientId: 'my-device',
+  defaultContextTag: 'dev_playground',
+  defaultAffect: {
+    valence: 0.0,
+    arousal: 0.0
+  }
+});
+```
+
+**Per-message overrides:**
+
+```typescript
+// State update with explicit affect
+client.sendStateUpdate(
+  {
+    kind: 'minimal',
+    data: { focus_level: 0.8 }
+  },
+  {
+    affect: { valence: 0.5, arousal: -0.3 }
+  }
+);
+
+// Event with explicit context
+client.sendEvent(
+  'user_action',
+  { action: 'started_session' },
+  { contextTag: 'focus_session' }
+);
+```
+
+**Important Notes:**
+
+- These fields are **optional** and designed for future semantic layers
+- LTP implementations **do not interpret** these values
+- They provide hooks for LRI and other higher-level protocols
+- Use them to enrich your application's contextual awareness
 
 ## Quick Start
 

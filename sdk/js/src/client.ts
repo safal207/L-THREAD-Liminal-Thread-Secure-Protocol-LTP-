@@ -13,6 +13,7 @@ import {
   EventPayload,
   ErrorPayload,
   LtpMessage,
+  LtpAffect,
 } from './types';
 
 const LTP_VERSION = '0.1';
@@ -48,6 +49,8 @@ export class LtpClient {
       deviceFingerprint: options.deviceFingerprint,
       intent: options.intent || 'resonant_link',
       capabilities: options.capabilities || ['state-update', 'events', 'ping-pong'],
+      defaultContextTag: options.defaultContextTag,
+      defaultAffect: options.defaultAffect,
       metadata: {
         sdk_version: SDK_VERSION,
         platform: this.detectPlatform(),
@@ -117,8 +120,12 @@ export class LtpClient {
   /**
    * Send state update message
    * @param payload State update payload
+   * @param options Optional metadata overrides
    */
-  public sendStateUpdate(payload: StateUpdatePayload): void {
+  public sendStateUpdate(
+    payload: StateUpdatePayload,
+    options?: { affect?: LtpAffect; contextTag?: string }
+  ): void {
     this.send({
       type: 'state_update',
       thread_id: this.threadId!,
@@ -127,6 +134,8 @@ export class LtpClient {
       payload,
       meta: {
         client_id: this.options.clientId,
+        affect: options?.affect || this.options.defaultAffect,
+        context_tag: options?.contextTag || this.options.defaultContextTag,
       },
     });
   }
@@ -135,8 +144,13 @@ export class LtpClient {
    * Send event message
    * @param eventType Event type identifier
    * @param data Event data
+   * @param options Optional metadata overrides
    */
-  public sendEvent(eventType: string, data: Record<string, unknown>): void {
+  public sendEvent(
+    eventType: string,
+    data: Record<string, unknown>,
+    options?: { affect?: LtpAffect; contextTag?: string }
+  ): void {
     const payload: EventPayload = {
       event_type: eventType,
       data,
@@ -150,6 +164,8 @@ export class LtpClient {
       payload,
       meta: {
         client_id: this.options.clientId,
+        affect: options?.affect || this.options.defaultAffect,
+        context_tag: options?.contextTag || this.options.defaultContextTag,
       },
     });
   }

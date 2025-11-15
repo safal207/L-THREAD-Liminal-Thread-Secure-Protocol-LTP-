@@ -86,9 +86,34 @@ function handleMessage(ws, message, sessionData) {
       break;
 
     case 'state_update':
-      console.log('← Received state_update:');
+      // Compact LTP+LRI logging format
+      const threadShort = message.thread_id ? message.thread_id.substring(0, 8) : 'none';
+      const sessionShort = message.session_id ? message.session_id.substring(0, 8) : 'none';
+      const contextTag = message.meta?.context_tag || 'none';
+      const affectStr = message.meta?.affect
+        ? `valence=${message.meta.affect.valence},arousal=${message.meta.affect.arousal}`
+        : 'none';
+      const intent = message.payload?.data?.intent || 'none';
+
+      console.log(`← [LTP] state_update`);
+      console.log(`  LTP[${threadShort}/${sessionShort}] ctx=${contextTag} affect={${affectStr}} intent=${intent}`);
+
+      // Detailed payload logging
       console.log('  Kind:', message.payload.kind);
-      console.log('  Data:', JSON.stringify(message.payload.data, null, 2));
+      if (message.payload.kind === 'lri_envelope_v1') {
+        console.log('  [LRI] Processing semantic content:');
+        if (message.payload.data?.summary) {
+          console.log('    Summary:', message.payload.data.summary);
+        }
+        if (message.payload.data?.inner_state) {
+          console.log('    Inner state:', JSON.stringify(message.payload.data.inner_state));
+        }
+        if (message.payload.data?.resonance_hooks) {
+          console.log('    Resonance hooks:', message.payload.data.resonance_hooks.join(', '));
+        }
+      } else {
+        console.log('  Data:', JSON.stringify(message.payload.data, null, 2));
+      }
 
       // Log LRI-enhanced format (LTP + LRI integration)
       const threadShort = message.thread_id.substring(0, 8);
@@ -128,8 +153,22 @@ function handleMessage(ws, message, sessionData) {
 
     case 'event':
       console.log('← Received event:');
+      console.log('  Thread ID:', message.thread_id);
+      console.log('  Session ID:', message.session_id);
       console.log('  Event Type:', message.payload.event_type);
       console.log('  Data:', JSON.stringify(message.payload.data, null, 2));
+
+      // Log liminal metadata if present
+      if (message.meta) {
+        if (message.meta.affect) {
+          console.log('  Affect:');
+          console.log('    Valence:', message.meta.affect.valence);
+          console.log('    Arousal:', message.meta.affect.arousal);
+        }
+        if (message.meta.context_tag) {
+          console.log('  Context Tag:', message.meta.context_tag);
+        }
+      }
 
       // Send an acknowledgment event
       const ackEvent = {
