@@ -485,20 +485,178 @@ Unix epoch time in **seconds** (not milliseconds):
 }
 ```
 
-## 9. Future Enhancements
+## 9. Example: Evening Reflection Scenario
+
+### 9.1 Overview
+
+This example demonstrates how LTP (transport/meta) and LRI (semantic payload) work together in a real-world scenario: **evening reflection** - a user opening a liminal client at the end of the day to briefly note their state.
+
+### 9.2 Scenario Context
+
+**User Story:**
+> At the end of the day, a user opens their liminal client (mobile or desktop) to reflect on their state. They briefly note their inner condition - energy, clarity, stress - and key highlights of the day. This creates a "thread of the day" that flows into LIMINAL OS (RINSE, memory, resonance systems).
+
+**Communication Flow:**
+1. User opens client → `handshake_init`
+2. Server establishes thread → `handshake_ack`
+3. User submits evening reflection → `state_update` with LRI envelope
+
+### 9.3 Full LTP+LRI Message Example
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "4f3c9e2a-8b21-4c71-9d3f-1a9b12345678",
+  "session_id": "b42a6f10-91a7-4ce2-8b7e-9d5f98765432",
+  "timestamp": 1731700000,
+  "meta": {
+    "client_id": "android-liminal-001",
+    "trace_id": "evt-2025-11-15-001",
+    "affect": {
+      "valence": 0.2,
+      "arousal": -0.3
+    },
+    "context_tag": "evening_reflection"
+  },
+  "payload": {
+    "kind": "lri_envelope_v1",
+    "data": {
+      "actor": "user:self",
+      "intent": "reflect_on_day",
+      "summary": "Слегка устал, но есть чувство тихого продвижения.",
+      "highlights": [
+        "поиграл с детьми",
+        "продвинул LTP протокол",
+        "меньше тревоги о будущем"
+      ],
+      "inner_state": {
+        "energy": 0.4,
+        "clarity": 0.7,
+        "stress": 0.3
+      },
+      "resonance_hooks": [
+        "family",
+        "creator_path",
+        "long_horizon"
+      ]
+    }
+  }
+}
+```
+
+### 9.4 Layer Breakdown
+
+#### LTP (Transport/Meta) Fields
+
+These fields are handled by LTP itself - the protocol layer:
+
+| Field | Layer | Description |
+|-------|-------|-------------|
+| `type` | LTP | Message type: `state_update` |
+| `thread_id` | LTP | Unique liminal thread ID |
+| `session_id` | LTP | Current connection session ID |
+| `timestamp` | LTP | Unix epoch time (seconds) |
+| `meta.client_id` | LTP | Client device identifier |
+| `meta.trace_id` | LTP | Distributed tracing ID |
+
+**LTP Responsibility:** Routing, context preservation, session management
+
+#### LRI (Semantic) Fields
+
+These fields are interpreted by LRI (Liminal Resonance Interface) - the application layer:
+
+| Field | Layer | Description |
+|-------|-------|-------------|
+| `meta.affect` | LRI | Emotional valence/arousal coordinates |
+| `meta.context_tag` | LRI | Semantic context label |
+| `payload.kind` | LRI | Envelope format version |
+| `payload.data.*` | LRI | All semantic content (intent, state, resonance) |
+
+**LRI Responsibility:** Intent extraction, resonance matching, semantic processing
+
+### 9.5 Extended Meta Fields for LRI
+
+The `meta` object in evening reflection includes LRI-specific fields:
+
+```json
+{
+  "meta": {
+    "client_id": "android-liminal-001",      // LTP: device ID
+    "trace_id": "evt-2025-11-15-001",        // LTP: tracing
+    "affect": {                               // LRI: affective state
+      "valence": 0.2,                         // slightly positive
+      "arousal": -0.3                         // low energy
+    },
+    "context_tag": "evening_reflection"      // LRI: semantic tag
+  }
+}
+```
+
+**Why `affect` in `meta`?**
+- Affects message routing and priority
+- Cross-cutting concern like tracing
+- Used by both transport (LTP) and semantic (LRI) layers
+
+### 9.6 Server Processing Example
+
+When the server receives this message, it can:
+
+1. **LTP Layer** - Log transport context:
+   ```
+   LTP[4f3c9e2a.../b42a6f10...] ctx=evening_reflection affect={0.2,-0.3} intent=reflect_on_day
+   ```
+
+2. **LRI Layer** - Process semantic content:
+   - Extract `intent: "reflect_on_day"`
+   - Match `resonance_hooks: ["family", "creator_path", "long_horizon"]`
+   - Update RINSE (Resonance INner State Engine) with `inner_state` values
+   - Store highlights in memory graph
+   - Calculate resonance score based on affect + inner_state
+
+3. **Response** - Server might send back:
+   ```json
+   {
+     "type": "state_update",
+     "thread_id": "4f3c9e2a-8b21-4c71-9d3f-1a9b12345678",
+     "session_id": "b42a6f10-91a7-4ce2-8b7e-9d5f98765432",
+     "timestamp": 1731700001,
+     "payload": {
+       "kind": "lri_response_v1",
+       "data": {
+         "resonance_score": 0.85,
+         "insight": "Strong clarity with moderate stress - creator mode remains accessible",
+         "next_suggested_action": "light_reflection_tomorrow_morning"
+       }
+     },
+     "meta": {}
+   }
+   ```
+
+### 9.7 Implementation Note
+
+This example shows how LTP provides a **protocol-level foundation** while remaining **semantically neutral**. The LTP spec defines:
+- Message envelope structure (`type`, `thread_id`, `session_id`, etc.)
+- Transport metadata (`client_id`, `trace_id`)
+- Extensibility hooks (`meta`, `payload`)
+
+The **meaning** of `payload.data` is defined by higher layers (LRI, LIMINAL OS), not by LTP itself. This separation allows LTP to serve as a general-purpose liminal transport protocol.
+
+## 10. Future Enhancements
 
 ### v0.2
 - Binary encoding option (CBOR, MessagePack)
 - Message compression (zstd)
 - Digital signatures in `meta.signature`
+- Standardized `meta.affect` schema
 
 ### v0.3
 - Message sequence numbers for ordering
 - Acknowledgment mechanism for critical messages
 - Batch message support
+- LRI envelope versioning guidance
 
 ---
 
 **Document Version:** 0.1
-**Last Updated:** 2025-11-14
+**Last Updated:** 2025-11-15
 **Status:** Initial Draft
