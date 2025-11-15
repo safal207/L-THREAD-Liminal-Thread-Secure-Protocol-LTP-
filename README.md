@@ -191,6 +191,115 @@ await client.send_event('user_action', {
 })
 ```
 
+## Example Scenario: Evening Reflection
+
+### The Use Case
+
+A user opens a liminal-aware app at the end of their day to briefly reflect on their inner state. This creates a "thread of the day" that flows through the entire LIMINAL stack.
+
+### Message Flow
+
+```
+Human → Client → LTP → LRI → LIMINAL OS
+```
+
+### Complete Message Example
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "4f3c9e2a-8b21-4c71-9d3f-1a9b12345678",
+  "session_id": "b42a6f10-91a7-4ce2-8b7e-9d5f98765432",
+  "timestamp": 1731700000,
+  "meta": {
+    "client_id": "android-liminal-001",
+    "affect": {
+      "valence": 0.2,   // Slightly positive
+      "arousal": -0.3   // Calm/relaxed
+    },
+    "context_tag": "evening_reflection"
+  },
+  "payload": {
+    "kind": "lri_envelope_v1",
+    "data": {
+      "actor": "user:self",
+      "intent": "reflect_on_day",
+      "summary": "Slightly tired, but there's a sense of quiet progress.",
+      "highlights": [
+        "played with kids",
+        "advanced LTP protocol",
+        "less anxiety about the future"
+      ],
+      "inner_state": {
+        "energy": 0.4,
+        "clarity": 0.7,
+        "stress": 0.3
+      },
+      "resonance_hooks": [
+        "family",
+        "creator_path",
+        "long_horizon"
+      ]
+    }
+  }
+}
+```
+
+### What Happens at Each Layer
+
+**LTP (Transport):**
+- Ensures reliable delivery with thread/session context
+- Carries `affect` and `context_tag` metadata
+- Does NOT interpret semantic meaning
+
+**LRI (Semantic):**
+- Interprets the `intent`: "reflect_on_day"
+- Analyzes `inner_state` metrics
+- Matches `resonance_hooks` against patterns
+- Stores in memory graph
+
+**LIMINAL OS:**
+- Updates user's liminal thread
+- Triggers resonance pattern matching
+- May generate insights or suggestions
+- Preserves context for future interactions
+
+### Code Example
+
+```typescript
+// Send evening reflection
+client.sendStateUpdate(
+  {
+    kind: 'lri_envelope_v1',
+    data: {
+      actor: 'user:self',
+      intent: 'reflect_on_day',
+      summary: 'Slightly tired, but there\'s a sense of quiet progress.',
+      highlights: ['played with kids', 'advanced LTP protocol'],
+      inner_state: { energy: 0.4, clarity: 0.7, stress: 0.3 },
+      resonance_hooks: ['family', 'creator_path', 'long_horizon']
+    }
+  },
+  {
+    affect: { valence: 0.2, arousal: -0.3 },
+    contextTag: 'evening_reflection'
+  }
+);
+```
+
+### Server Processing
+
+```
+← [LTP] state_update
+  LTP[4f3c9e2a/b42a6f10] ctx=evening_reflection affect={valence=0.2,arousal=-0.3} intent=reflect_on_day
+  [LRI] Processing semantic content:
+    Summary: Slightly tired, but there's a sense of quiet progress.
+    Inner state: {"energy":0.4,"clarity":0.7,"stress":0.3}
+    Resonance hooks: family, creator_path, long_horizon
+```
+
+This demonstrates how LTP provides the transport foundation while LRI adds semantic meaning - clean separation of concerns.
+
 ## Repository Structure
 
 ```

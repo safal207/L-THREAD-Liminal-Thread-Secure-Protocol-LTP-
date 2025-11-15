@@ -5,6 +5,45 @@
 
 const { LtpClient } = require('../../sdk/js/dist/index');
 
+/**
+ * Send evening reflection sample - demonstrates LTP + LRI integration
+ * This shows how a real-world "evening reflection" scenario would flow through the protocol
+ */
+function sendEveningReflectionSample(client) {
+  client.sendStateUpdate(
+    {
+      kind: 'lri_envelope_v1',
+      data: {
+        actor: 'user:self',
+        intent: 'reflect_on_day',
+        summary: 'Slightly tired, but there\'s a sense of quiet progress.',
+        highlights: [
+          'played with kids',
+          'advanced LTP protocol',
+          'less anxiety about the future'
+        ],
+        inner_state: {
+          energy: 0.4,
+          clarity: 0.7,
+          stress: 0.3
+        },
+        resonance_hooks: [
+          'family',
+          'creator_path',
+          'long_horizon'
+        ]
+      }
+    },
+    {
+      affect: {
+        valence: 0.2,   // Slightly positive
+        arousal: -0.3   // Calm/relaxed
+      },
+      contextTag: 'evening_reflection'
+    }
+  );
+}
+
 async function main() {
   console.log('=== LTP Minimal Client Example ===\n');
 
@@ -76,12 +115,18 @@ async function main() {
           });
         }, 4000);
 
-        // Disconnect after 10 seconds
+        // Send evening reflection example after 6 seconds
+        setTimeout(() => {
+          console.log('\n→ Sending evening reflection (LRI-aware)...');
+          sendEveningReflectionSample(client);
+        }, 6000);
+
+        // Disconnect after 12 seconds
         setTimeout(() => {
           console.log('\n→ Disconnecting...');
           client.disconnect();
           process.exit(0);
-        }, 10000);
+        }, 12000);
       },
 
       onDisconnected: () => {

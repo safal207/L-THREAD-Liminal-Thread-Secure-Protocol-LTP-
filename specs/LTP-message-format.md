@@ -499,7 +499,132 @@ Unix epoch time in **seconds** (not milliseconds):
 }
 ```
 
-## 9. Future Enhancements
+## 9. Real-World Scenario: Evening Reflection
+
+### 9.1 Scenario Overview
+
+This example demonstrates how LTP and LRI work together in a real-world use case: a user reflecting on their day in the evening.
+
+**Scenario:** User opens a liminal-aware app at the end of the day to briefly note their state. This creates a "thread of the day" that flows through:
+- Human → Client (mobile/desktop)
+- LTP (transport layer - this protocol)
+- LRI (semantic layer - interprets meaning)
+- LIMINAL OS (RINSE, memory, resonance)
+
+### 9.2 Complete Message Example
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "4f3c9e2a-8b21-4c71-9d3f-1a9b12345678",
+  "session_id": "b42a6f10-91a7-4ce2-8b7e-9d5f98765432",
+  "timestamp": 1731700000,
+  "meta": {
+    "client_id": "android-liminal-001",
+    "trace_id": "evt-2025-11-15-001",
+    "affect": {
+      "valence": 0.2,
+      "arousal": -0.3
+    },
+    "context_tag": "evening_reflection"
+  },
+  "payload": {
+    "kind": "lri_envelope_v1",
+    "data": {
+      "actor": "user:self",
+      "intent": "reflect_on_day",
+      "summary": "Slightly tired, but there's a sense of quiet progress.",
+      "highlights": [
+        "played with kids",
+        "advanced LTP protocol",
+        "less anxiety about the future"
+      ],
+      "inner_state": {
+        "energy": 0.4,
+        "clarity": 0.7,
+        "stress": 0.3
+      },
+      "resonance_hooks": [
+        "family",
+        "creator_path",
+        "long_horizon"
+      ]
+    }
+  }
+}
+```
+
+### 9.3 Layer Breakdown
+
+**LTP Layer (Transport/Context):**
+- `type`: Message classification
+- `thread_id`: Persistent thread identifier
+- `session_id`: Current connection identifier
+- `timestamp`: Message timing
+- `meta`: Transport metadata
+  - `client_id`: Device identifier
+  - `trace_id`: Distributed tracing
+  - `affect`: Emotional state (valence/arousal)
+  - `context_tag`: Interaction context
+
+**LRI Layer (Semantic/Meaning):**
+- `payload.kind`: "lri_envelope_v1" indicates LRI-aware content
+- `payload.data`: Rich semantic content
+  - `actor`: Who is acting
+  - `intent`: What they're trying to do
+  - `summary`: Natural language description
+  - `highlights`: Key moments/achievements
+  - `inner_state`: Detailed psychological state
+  - `resonance_hooks`: Themes for pattern matching
+
+### 9.4 Implementation Notes
+
+**LTP Implementations:**
+- MUST transport all fields without modification
+- MUST preserve `meta.affect` and `meta.context_tag`
+- MUST NOT interpret `payload.data` contents
+- MAY log transport-level metadata for debugging
+
+**LRI/Application Layer:**
+- Interprets `payload.data` according to LRI specification
+- Uses `meta.affect` and `meta.context_tag` for context
+- Performs resonance matching on `resonance_hooks`
+- Stores state in LIMINAL OS persistence layer
+
+### 9.5 Server Processing Example
+
+When server receives this message, it processes at two levels:
+
+**LTP Level:**
+```
+[LTP] Received state_update
+  Thread ID: 4f3c9e2a-...
+  Session ID: b42a6f10-...
+  Context: evening_reflection
+  Affect: valence=0.2, arousal=-0.3
+  → Forward to LRI layer
+```
+
+**LRI Level:**
+```
+[LRI] Processing intent: reflect_on_day
+  Actor: user:self
+  Inner state: energy=0.4, clarity=0.7, stress=0.3
+  Resonance hooks: family, creator_path, long_horizon
+  → Store in memory graph
+  → Update resonance patterns
+  → Generate insights if needed
+```
+
+### 9.6 Benefits of This Separation
+
+1. **LTP** ensures reliable, context-preserving delivery
+2. **LRI** interprets meaning without worrying about transport
+3. Protocol can evolve independently at each layer
+4. Same LTP can carry different semantic protocols
+5. Clear boundaries make testing and debugging easier
+
+## 10. Future Enhancements
 
 ### v0.2
 - Binary encoding option (CBOR, MessagePack)
@@ -514,5 +639,5 @@ Unix epoch time in **seconds** (not milliseconds):
 ---
 
 **Document Version:** 0.1
-**Last Updated:** 2025-11-14
+**Last Updated:** 2025-11-15
 **Status:** Initial Draft
