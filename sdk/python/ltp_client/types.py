@@ -9,7 +9,9 @@ from typing import Any, Dict, List, Literal, Optional, Union
 # Message types
 MessageType = Literal[
     "handshake_init",
+    "handshake_resume",
     "handshake_ack",
+    "handshake_reject",
     "ping",
     "pong",
     "state_update",
@@ -27,7 +29,8 @@ class LtpMeta:
     trace_id: Optional[str] = None
     parent_span_id: Optional[str] = None
     user_agent: Optional[str] = None
-    signature: Optional[str] = None  # Reserved for v0.2+
+    context_tag: Optional[str] = None
+    affect: Optional[Dict[str, float]] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -41,8 +44,10 @@ class LtpMeta:
             result['parent_span_id'] = self.parent_span_id
         if self.user_agent:
             result['user_agent'] = self.user_agent
-        if self.signature:
-            result['signature'] = self.signature
+        if self.context_tag:
+            result['context_tag'] = self.context_tag
+        if self.affect:
+            result['affect'] = self.affect
         result.update(self.extra)
         return result
 
@@ -110,6 +115,8 @@ class LtpEnvelope:
     timestamp: int
     payload: Dict[str, Any] = field(default_factory=dict)
     meta: Optional[LtpMeta] = None
+    nonce: Optional[str] = None
+    signature: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -122,6 +129,10 @@ class LtpEnvelope:
         }
         if self.meta:
             result['meta'] = self.meta.to_dict()
+        if self.nonce:
+            result['nonce'] = self.nonce
+        if self.signature:
+            result['signature'] = self.signature
         return result
 
     @classmethod
@@ -136,7 +147,9 @@ class LtpEnvelope:
             session_id=data['session_id'],
             timestamp=data['timestamp'],
             payload=data.get('payload', {}),
-            meta=meta
+            meta=meta,
+            nonce=data.get('nonce'),
+            signature=data.get('signature')
         )
 
 

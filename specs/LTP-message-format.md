@@ -1,14 +1,15 @@
-# LTP Message Format Specification v0.1
+# LTP Message Format Specification v0.2
 
 ## 1. Overview
 
 All LTP messages (except handshake) use a unified JSON envelope format. This ensures consistent context propagation, tracing, and extensibility across all message types.
 
 **Design Principles:**
-- Simple JSON structure for v0.1
+- Simple JSON structure for v0.2
 - Every message carries session context (`thread_id`, `session_id`)
 - Extensible `payload` for message-specific data
-- `meta` field for cross-cutting concerns (tracing, signatures, etc.)
+- `meta` field for cross-cutting concerns (tracing, liminal metadata, etc.)
+- Optional security hooks (`nonce`, `signature`) attached to the envelope
 
 ## 2. Base Envelope Format
 
@@ -21,7 +22,9 @@ All LTP messages (except handshake) use a unified JSON envelope format. This ens
   "session_id": "uuid",
   "timestamp": 1731600000,
   "payload": {},
-  "meta": {}
+  "meta": {},
+  "nonce": "client-uuid-1699824000000-12345",
+  "signature": "v0-placeholder"
 }
 ```
 
@@ -34,7 +37,9 @@ All LTP messages (except handshake) use a unified JSON envelope format. This ens
 | `session_id` | string | Yes | UUID of the current connection |
 | `timestamp` | number | Yes | Unix epoch time in seconds (integer) |
 | `payload` | object | No | Message-specific data (structure varies by type) |
-| `meta` | object | No | Metadata for tracing, debugging, future security |
+| `meta` | object | No | Metadata for tracing, debugging, liminal context |
+| `nonce` | string | No | Client-provided unique value per message (at least per session) |
+| `signature` | string | No | Placeholder for future integrity/authentication |
 
 ### 2.3 Meta Field Structure
 
@@ -51,8 +56,7 @@ The `meta` object is optional but recommended for production systems:
       "valence": 0.3,
       "arousal": -0.2
     },
-    "context_tag": "evening_reflection",
-    "signature": "base64-string (future)"
+    "context_tag": "evening_reflection"
   }
 }
 ```
@@ -67,21 +71,28 @@ The `meta` object is optional but recommended for production systems:
 | `affect.valence` | number | No | Emotional valence: -1 (negative) to 1 (positive) |
 | `affect.arousal` | number | No | Arousal level: -1 (calm) to 1 (excited) |
 | `context_tag` | string | No | Context identifier (e.g., "focus_session", "relax") |
-| `signature` | string | No | Message signature (reserved for v0.2+) |
 
 **Note on Liminal Metadata:**
 - `affect` and `context_tag` are optional fields designed for higher-level semantic protocols like LRI
 - LTP implementations MUST support these fields but MUST NOT interpret their meaning
 - These fields provide hooks for future semantic layers without imposing specific requirements
 
-## 3. Message Types (v0.1)
+### 2.4 Security Hooks (v0.2 skeleton)
+
+- `nonce` MUST be unique per message at least within the active `session_id`. SDKs typically concatenate the `client_id`, timestamp, and a random suffix.
+- `signature` is reserved for future MAC/signature schemes. In v0.2 SDKs populate placeholder values so the field is always present when transport policies require it.
+- All LTP traffic SHOULD ride over TLS/WSS (`recommended_env`) until real cryptographic verification ships.
+
+## 3. Message Types (v0.2)
 
 ### 3.1 Message Type Registry
 
 | Type | Direction | Description |
 |------|-----------|-------------|
 | `handshake_init` | Client → Server | Initiate handshake (special format, see LTP-handshake.md) |
+| `handshake_resume` | Client → Server | Resume existing thread (special format) |
 | `handshake_ack` | Server → Client | Acknowledge handshake (special format, see LTP-handshake.md) |
+| `handshake_reject` | Server → Client | Resume attempt rejected (special format) |
 | `ping` | Client → Server | Heartbeat check |
 | `pong` | Server → Client | Heartbeat response |
 | `state_update` | Bidirectional | Update inner state |
@@ -369,7 +380,7 @@ Implementations MUST ignore unknown fields in messages (forward compatibility).
   "thread_id": "...",
   "session_id": "...",
   "timestamp": 1731600000,
-  "future_field": "will be ignored in v0.1",
+  "future_field": "will be ignored in v0.2",
   "payload": {}
 }
 ```

@@ -1,6 +1,6 @@
 # L-THREAD / LTP (Liminal Thread Protocol)
 
-**Version:** 0.1
+**Version:** 0.2
 **Status:** Initial Development
 
 ## Overview
@@ -42,6 +42,31 @@ LTP operates as a dedicated layer in the LIMINAL stack:
 - **Context Preservation:** Metadata fields for client state and trace tracking
 - **Liminal Metadata:** Optional affect and context tags for semantic layers
 - **Message Types:** `handshake`, `ping`, `state_update`, `event`
+
+## LTP v0.2 Overview
+
+- **Continuity of the thread:** Clients persist `thread_id` in local storage (browser `localStorage`, filesystem, etc.) and attempt `handshake_resume` before falling back to `handshake_init` so liminal state survives reconnects or app restarts.
+- **Heartbeat & reconnect strategy:** SDKs send timed `ping` frames, expect `pong` within a configurable timeout, and automatically reconnect with exponential backoff (default: start at 1s, cap at 30s, stop after 5 tries) before surfacing a permanent failure hook.
+- **Security skeleton:** Every envelope carries a unique `nonce` and a placeholder `signature`. Real crypto lands in v0.3+, but v0.2 now clearly documents that deployments MUST run over TLS/WSS and gives the hooks needed for experimental signing.
+
+Lifecycle (storage + resume + heartbeat):
+
+```
+[connect()]
+   |
+   v
+[storage has thread_id?] -- no --> [handshake_init] --> [store thread_id]
+   |
+  yes
+   v
+[handshake_resume] -- not found --> [handshake_init]
+          |
+        found
+          v
+[session established] -> [heartbeat loop] -> [reconnect on failure]
+```
+
+**Recommended environment:** Always use `wss://` (or HTTPS/TLS) endpoints until the upcoming signature/verification layer is finalized. Nonces plus TLS provide basic replay protection in the interim.
 
 ## Liminal Metadata
 

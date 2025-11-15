@@ -14,6 +14,8 @@ export type {
   LtpEnvelope,
   HandshakeInitMessage,
   HandshakeAckMessage,
+  HandshakeResumeMessage,
+  HandshakeRejectMessage,
   PingPayload,
   PongPayload,
   StateUpdatePayload,
@@ -27,4 +29,7 @@ export type {
   LtpMessage,
   LtpClientOptions,
   LtpClientEvents,
+  LtpStorage,
+  ReconnectStrategy,
+  HeartbeatOptions,
 } from './types';
