@@ -87,8 +87,22 @@ function handleMessage(ws, message, sessionData) {
 
     case 'state_update':
       console.log('← Received state_update:');
+      console.log('  Thread ID:', message.thread_id);
+      console.log('  Session ID:', message.session_id);
       console.log('  Kind:', message.payload.kind);
       console.log('  Data:', JSON.stringify(message.payload.data, null, 2));
+
+      // Log liminal metadata if present
+      if (message.meta) {
+        if (message.meta.affect) {
+          console.log('  Affect:');
+          console.log('    Valence:', message.meta.affect.valence);
+          console.log('    Arousal:', message.meta.affect.arousal);
+        }
+        if (message.meta.context_tag) {
+          console.log('  Context Tag:', message.meta.context_tag);
+        }
+      }
 
       // Echo back a server state update (optional)
       const serverStateUpdate = {
@@ -111,8 +125,22 @@ function handleMessage(ws, message, sessionData) {
 
     case 'event':
       console.log('← Received event:');
+      console.log('  Thread ID:', message.thread_id);
+      console.log('  Session ID:', message.session_id);
       console.log('  Event Type:', message.payload.event_type);
       console.log('  Data:', JSON.stringify(message.payload.data, null, 2));
+
+      // Log liminal metadata if present
+      if (message.meta) {
+        if (message.meta.affect) {
+          console.log('  Affect:');
+          console.log('    Valence:', message.meta.affect.valence);
+          console.log('    Arousal:', message.meta.affect.arousal);
+        }
+        if (message.meta.context_tag) {
+          console.log('  Context Tag:', message.meta.context_tag);
+        }
+      }
 
       // Send an acknowledgment event
       const ackEvent = {

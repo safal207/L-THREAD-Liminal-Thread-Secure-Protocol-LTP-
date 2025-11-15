@@ -9,6 +9,7 @@ export { LtpClient } from './client';
 
 export type {
   SupportedMessageType,
+  LtpAffect,
   LtpMeta,
   LtpEnvelope,
   HandshakeInitMessage,

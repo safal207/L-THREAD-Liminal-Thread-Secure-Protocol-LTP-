@@ -8,7 +8,7 @@ const { LtpClient } = require('../../sdk/js/dist/index');
 async function main() {
   console.log('=== LTP Minimal Client Example ===\n');
 
-  // Create LTP client
+  // Create LTP client with default context tag
   const client = new LtpClient(
     'ws://localhost:8080',
     {
@@ -16,6 +16,7 @@ async function main() {
       deviceFingerprint: 'node-example',
       intent: 'resonant_link',
       capabilities: ['state-update', 'events', 'ping-pong'],
+      defaultContextTag: 'dev_playground',  // Default context for all messages
       metadata: {
         example: true,
         version: '1.0.0',
@@ -28,30 +29,44 @@ async function main() {
         console.log(`  Thread ID:  ${threadId}`);
         console.log(`  Session ID: ${sessionId}\n`);
 
-        // Send initial state update
-        console.log('→ Sending initial state update...');
-        client.sendStateUpdate({
-          kind: 'minimal',
-          data: {
-            mood: 'curious',
-            focus: 'exploration',
-            energy_level: 0.8,
+        // Send initial state update with affect metadata
+        console.log('→ Sending initial state update with affect...');
+        client.sendStateUpdate(
+          {
+            kind: 'minimal',
+            data: {
+              mood: 'curious',
+              focus: 'exploration',
+              energy_level: 0.8,
+            },
           },
-        });
+          {
+            affect: {
+              valence: 0.2,   // Slightly positive
+              arousal: -0.1   // Slightly calm
+            }
+          }
+        );
 
-        // Send a test event after 2 seconds
+        // Send a test event with explicit context tag after 2 seconds
         setTimeout(() => {
-          console.log('→ Sending test event...');
-          client.sendEvent('user_action', {
-            action: 'button_click',
-            target: 'explore_mode',
-            screen: 'home',
-          });
+          console.log('→ Sending test event with context_tag...');
+          client.sendEvent(
+            'user_action',
+            {
+              action: 'button_click',
+              target: 'explore_mode',
+              screen: 'home',
+            },
+            {
+              contextTag: 'focus_session'  // Override default context
+            }
+          );
         }, 2000);
 
-        // Send another state update after 4 seconds
+        // Send another state update (will use default context_tag) after 4 seconds
         setTimeout(() => {
-          console.log('→ Sending state update...');
+          console.log('→ Sending state update (with default context_tag)...');
           client.sendStateUpdate({
             kind: 'delta',
             data: {
