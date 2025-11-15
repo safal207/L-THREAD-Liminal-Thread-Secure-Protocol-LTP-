@@ -167,7 +167,9 @@ function startServer() {
     port: PORT,
     handleProtocols: (protocols, request) => {
       // Accept ltp.v0.1 subprotocol
-      if (protocols.includes('ltp.v0.1')) {
+      // protocols can be a Set or Array depending on ws version
+      const protocolList = Array.isArray(protocols) ? protocols : Array.from(protocols);
+      if (protocolList.includes('ltp.v0.1')) {
         return 'ltp.v0.1';
       }
       return false;
