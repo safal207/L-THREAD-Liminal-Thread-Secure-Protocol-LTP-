@@ -1,0 +1,42 @@
+{
+  "name": "@liminal/ltp-client",
+  "version": "0.1.0",
+  "description": "LTP (Liminal Thread Protocol) client SDK for JavaScript/TypeScript",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "lint": "echo \"Lint not configured yet\"",
+    "test": "echo \"Tests not configured yet\""
+  },
+  "keywords": [
+    "ltp",
+    "liminal",
+    "protocol",
+    "websocket",
+    "thread",
+    "resonance"
+  ],
+  "author": "LIMINAL Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.10",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "ws": "^8.16.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/liminal/ltp-protocol.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
