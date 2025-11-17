@@ -128,6 +128,10 @@ defmodule LTP.Client do
       {:ok, connection_pid} ->
         {:ok, %{state | connection_pid: connection_pid}}
 
+      {:error, {:already_started, _pid}} ->
+        # Connection already exists, continue with existing pid
+        {:ok, state}
+
       {:error, reason} ->
         Logger.error("[LTP] Failed to start connection: #{inspect(reason)}")
         {:stop, reason}
