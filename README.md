@@ -263,6 +263,21 @@ client.sendEvent(
 
 You should see the handshake exchange, ping-pong messages, and state updates flowing through the liminal thread.
 
+## SDK Ecosystem
+
+LTP provides **multi-language SDK support** for seamless integration across different platforms and use cases:
+
+| SDK | Version | Status | Best For |
+|-----|---------|--------|----------|
+| **JavaScript/TypeScript** | v0.3.0 | ✅ Production | Web browsers, Node.js apps |
+| **Python** | v0.3.0 | ✅ Production | ML/AI pipelines, scripting |
+| **Elixir** | v0.1.0 | ✅ Production | Real-time backends, high concurrency |
+| **Rust** | v0.1.0 | ✅ Production | Edge computing, crypto, low-latency |
+
+All SDKs are **100% protocol-compatible** and can communicate seamlessly. A client written in one language can connect to a server written in another, as long as both implement the LTP v0.3 specification.
+
+📖 **See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed comparison, architecture overview, and deployment scenarios.**
+
 ## SDK Usage
 
 ### TypeScript/JavaScript
