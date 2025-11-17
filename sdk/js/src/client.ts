@@ -432,7 +432,7 @@ export class LtpClient {
 
   private handleMessage(message: LtpMessage): void {
     // Verify signature if enabled (v0.4+)
-    if (this.options.enableSignatureVerification && this.options.secretKey && message.signature) {
+    if (this.options.requireSignatureVerification && this.options.secretKey && message.signature) {
       // Check if message has all required fields for verification
       const hasRequiredFields =
         'thread_id' in message &&

@@ -1,7 +1,7 @@
 {
   "name": "@liminal/ltp-client",
-  "version": "0.4.0",
-  "description": "LTP (Liminal Thread Protocol) client SDK for JavaScript/TypeScript with HMAC-SHA256 signatures",
+  "version": "0.5.0-beta.1",
+  "description": "LTP (Liminal Thread Protocol) client SDK with ECDH key exchange and HKDF",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

@@ -210,11 +210,48 @@ export async function generateKeyPair(): Promise<{
 
 /**
  * Derive shared secret from ECDH key exchange
+ * Works in both browser and Node.js
  */
 export async function deriveSharedSecret(
   privateKey: string,
   peerPublicKey: string
 ): Promise<string> {
+  // Browser environment - Web Crypto API
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    try {
+      // Import private key (PKCS8 format)
+      const privateKeyBuffer = hexToBuffer(privateKey);
+      const cryptoPrivateKey = await window.crypto.subtle.importKey(
+        'pkcs8',
+        privateKeyBuffer,
+        { name: 'ECDH', namedCurve: 'P-256' },
+        false,
+        ['deriveBits']
+      );
+
+      // Import peer public key (raw format)
+      const publicKeyBuffer = hexToBuffer(peerPublicKey);
+      const cryptoPeerPublicKey = await window.crypto.subtle.importKey(
+        'raw',
+        publicKeyBuffer,
+        { name: 'ECDH', namedCurve: 'P-256' },
+        false,
+        []
+      );
+
+      // Derive shared secret
+      const sharedSecret = await window.crypto.subtle.deriveBits(
+        { name: 'ECDH', public: cryptoPeerPublicKey },
+        cryptoPrivateKey,
+        256 // P-256 produces 256 bits
+      );
+
+      return bufferToHex(new Uint8Array(sharedSecret));
+    } catch (error) {
+      throw new Error(`Failed to derive shared secret (Web Crypto): ${getErrorMessage(error)}`);
+    }
+  }
+
   // Node.js environment
   if (typeof require !== 'undefined') {
     try {
@@ -225,12 +262,110 @@ export async function deriveSharedSecret(
       const sharedSecret = ecdh.computeSecret(Buffer.from(peerPublicKey, 'hex'));
       return sharedSecret.toString('hex');
     } catch (error) {
-      throw new Error(`Failed to derive shared secret: ${getErrorMessage(error)}`);
+      throw new Error(`Failed to derive shared secret (Node.js): ${getErrorMessage(error)}`);
     }
   }
 
-  // Browser environment would require more complex implementation
-  throw new Error('ECDH key derivation only supported in Node.js environment for now');
+  throw new Error('No cryptographic implementation available');
+}
+
+/**
+ * HKDF (HMAC-based Key Derivation Function) - RFC 5869
+ * Derives multiple keys from shared secret with proper key separation
+ */
+export async function hkdf(
+  sharedSecret: string,
+  salt: string,
+  info: string,
+  keyLength: number = 32
+): Promise<string> {
+  // Browser environment - Web Crypto API
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    try {
+      const encoder = new TextEncoder();
+
+      // Import shared secret as key material
+      const keyMaterial = await window.crypto.subtle.importKey(
+        'raw',
+        hexToBuffer(sharedSecret),
+        'HKDF',
+        false,
+        ['deriveBits']
+      );
+
+      // Derive key using HKDF
+      const derivedBits = await window.crypto.subtle.deriveBits(
+        {
+          name: 'HKDF',
+          hash: 'SHA-256',
+          salt: encoder.encode(salt),
+          info: encoder.encode(info),
+        },
+        keyMaterial,
+        keyLength * 8 // Convert bytes to bits
+      );
+
+      return bufferToHex(new Uint8Array(derivedBits));
+    } catch (error) {
+      throw new Error(`Failed HKDF (Web Crypto): ${getErrorMessage(error)}`);
+    }
+  }
+
+  // Node.js environment - Manual HKDF implementation
+  if (typeof require !== 'undefined') {
+    try {
+      const crypto = require('crypto');
+
+      // HKDF Extract
+      const hmacSalt = crypto.createHmac('sha256', salt || Buffer.alloc(32));
+      hmacSalt.update(Buffer.from(sharedSecret, 'hex'));
+      const prk = hmacSalt.digest();
+
+      // HKDF Expand
+      const infoBuffer = Buffer.from(info, 'utf8');
+      const n = Math.ceil(keyLength / 32);
+      let t = Buffer.alloc(0);
+      let okm = Buffer.alloc(0);
+
+      for (let i = 0; i < n; i++) {
+        const hmac = crypto.createHmac('sha256', prk);
+        hmac.update(t);
+        hmac.update(infoBuffer);
+        hmac.update(Buffer.from([i + 1]));
+        t = hmac.digest();
+        okm = Buffer.concat([okm, t]);
+      }
+
+      return okm.slice(0, keyLength).toString('hex');
+    } catch (error) {
+      throw new Error(`Failed HKDF (Node.js): ${getErrorMessage(error)}`);
+    }
+  }
+
+  throw new Error('No cryptographic implementation available');
+}
+
+/**
+ * Derive session keys from ECDH shared secret using HKDF
+ * Returns separate keys for encryption, MAC, and IV
+ */
+export async function deriveSessionKeys(
+  sharedSecret: string,
+  sessionId: string
+): Promise<{
+  encryptionKey: string;
+  macKey: string;
+  ivKey: string;
+}> {
+  const salt = `ltp-v0.5-${sessionId}`;
+
+  const [encryptionKey, macKey, ivKey] = await Promise.all([
+    hkdf(sharedSecret, salt, 'ltp-encryption-key', 32),
+    hkdf(sharedSecret, salt, 'ltp-mac-key', 32),
+    hkdf(sharedSecret, salt, 'ltp-iv-key', 16),
+  ]);
+
+  return { encryptionKey, macKey, ivKey };
 }
 
 /**

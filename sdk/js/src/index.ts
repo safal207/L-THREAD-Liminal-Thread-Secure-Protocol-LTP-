@@ -43,6 +43,8 @@ export {
   verifySignature,
   generateKeyPair,
   deriveSharedSecret,
+  hkdf,
+  deriveSessionKeys,
   encryptPayload,
   decryptPayload,
 } from './crypto';

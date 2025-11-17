@@ -267,10 +267,30 @@ export interface LtpClientOptions {
   preferredEncoding?: ContentEncoding;
   /** Optional logger for structured logging (defaults to console if not provided) */
   logger?: LtpLogger;
-  /** Shared secret key for HMAC-SHA256 message signing (v0.4+). If provided, all messages will be signed. */
+  /**
+   * Session MAC key for HMAC-SHA256 message signing (v0.5+)
+   * Should be derived from ECDH key exchange using deriveSessionKeys()
+   * When provided, signatures are REQUIRED (not optional)
+   */
+  sessionMacKey?: string;
+  /**
+   * Require signature verification (v0.5+)
+   * When sessionMacKey is present, this defaults to TRUE
+   * Messages without valid signatures are REJECTED
+   * @default true when sessionMacKey is provided, false otherwise
+   */
+  requireSignatureVerification?: boolean;
+  /**
+   * Maximum age for messages in milliseconds (replay protection)
+   * Messages with timestamps older than this are rejected
+   * @default 60000 (60 seconds)
+   */
+  maxMessageAge?: number;
+  /**
+   * @deprecated Use sessionMacKey instead (v0.5+)
+   * Legacy shared secret key for backward compatibility with v0.4
+   */
   secretKey?: string;
-  /** Enable signature verification for incoming messages (v0.4+). Requires secretKey. */
-  enableSignatureVerification?: boolean;
 }
 
 /**

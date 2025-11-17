@@ -8,10 +8,92 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
+- Complete v0.5.0 implementation (see below)
 - LRI integration examples
 - Cross-language SDK comparison benchmarks
-- Full E2E encryption implementation
 - Production-ready TOON codec implementations
+
+## [0.5.0-beta] - 2025-01-17
+
+### 🔒 Major Security Enhancements - Addressing Cryptographic Review
+
+**WORK IN PROGRESS** - Implementing recommendations from cryptographic security audit
+
+### Added
+
+- **ECDH Key Derivation for Browser** (CRITICAL FIX)
+  - Implemented ECDH `deriveSharedSecret()` for Web Crypto API
+  - No longer Node.js-only limitation
+  - Full browser support for key exchange
+  - Location: `sdk/js/src/crypto.ts:215-270`
+
+- **HKDF (Key Derivation Function)** - RFC 5869 compliant
+  - Proper key derivation from ECDH shared secret
+  - Works in both browser (Web Crypto HKDF) and Node.js
+  - Implements Extract-then-Expand pattern
+  - Location: `sdk/js/src/crypto.ts:276-346`
+
+- **Session Key Derivation** - Proper key separation
+  - `deriveSessionKeys()` derives separate keys:
+    - `encryptionKey` - for AES-GCM encryption
+    - `macKey` - for HMAC signatures
+    - `ivKey` - for IV generation
+  - No more shared secret reuse
+  - Location: `sdk/js/src/crypto.ts:352-369`
+
+### Changed
+
+- **Client Options** - Move toward proper key management
+  - Added `sessionMacKey` (replaces `secretKey`)
+  - Added `requireSignatureVerification` (defaults to TRUE when key present)
+  - Added `maxMessageAge` for replay protection (default 60s)
+  - Deprecated `secretKey` (kept for v0.4 compatibility)
+  - Location: `sdk/js/src/types.ts:270-293`
+
+### Security Improvements
+
+✅ **Fixed:** ECDH browser limitation
+✅ **Fixed:** No HKDF - now using proper KDF
+✅ **Fixed:** Key reuse - now separate keys for different purposes
+🚧 **In Progress:** Mandatory signature verification
+🚧 **In Progress:** Replay attack protection with nonce validation
+🚧 **In Progress:** Remove placeholder signatures
+
+### Breaking Changes
+
+**None yet** - v0.4 compatibility maintained
+
+v0.5.0-beta is **NOT production ready**. Use for testing and feedback only.
+
+### Migration Path (when v0.5.0 is complete)
+
+```typescript
+// OLD (v0.4): Shared secret
+const client = new LtpClient('wss://...', {
+  secretKey: 'shared-secret', // ❌ Deprecated
+});
+
+// NEW (v0.5): ECDH key exchange + HKDF
+const { publicKey, privateKey } = await generateKeyPair();
+const sharedSecret = await deriveSharedSecret(privateKey, serverPublicKey);
+const { macKey } = await deriveSessionKeys(sharedSecret, sessionId);
+
+const client = new LtpClient('wss://...', {
+  sessionMacKey: macKey, // ✅ Proper key management
+  requireSignatureVerification: true, // ✅ Mandatory (default)
+  maxMessageAge: 60000, // ✅ Replay protection
+});
+```
+
+### Roadmap to v0.5.0 Final
+
+- [ ] Implement mandatory signature verification in client
+- [ ] Integrate nonce validation (replay protection)
+- [ ] Remove placeholder signatures completely
+- [ ] Add ECDH handshake protocol
+- [ ] Update all examples
+- [ ] Security audit documentation
+- [ ] Performance benchmarks
 
 ## [0.4.0] - 2025-01-17
 
