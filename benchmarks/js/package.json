@@ -1,0 +1,12 @@
+{
+  "name": "ltp-benchmarks-js",
+  "version": "0.1.0",
+  "description": "LTP JavaScript benchmarks",
+  "main": "index.js",
+  "scripts": {
+    "json-vs-toon": "node json-vs-toon.js",
+    "throughput": "node throughput.js"
+  },
+  "private": true
+}
+

@@ -299,6 +299,27 @@ These examples demonstrate:
 - ✅ Structured logging and observability
 - ✅ Graceful shutdown and resource management
 
+## Performance Benchmarks
+
+Performance benchmarks are available to compare encoding strategies, throughput, and latency:
+
+- **[Benchmarks Overview](./benchmarks/README.md)** - Complete benchmark documentation
+- **JSON vs TOON** - Size reduction and encoding performance comparison
+- **Throughput** - Message sending performance metrics
+
+**Quick start:**
+```bash
+# JavaScript benchmarks
+cd benchmarks/js
+node json-vs-toon.js
+
+# Python benchmarks
+cd benchmarks/python
+python json_vs_toon.py
+```
+
+See [benchmarks/README.md](./benchmarks/README.md) for detailed results and interpretation guidelines.
+
 ## SDK Ecosystem
 
 LTP provides **multi-language SDK support** for seamless integration across different platforms and use cases:
@@ -494,6 +515,9 @@ See `specs/LTP-message-format.md` section 9 for full details.
 ├── ARCHITECTURE.md              # Ecosystem architecture overview
 ├── DEPLOYMENT.md                # Deployment guide
 ├── API.md                       # API reference documentation
+├── benchmarks/                  # Performance benchmarks
+│   ├── js/                      # JavaScript benchmarks
+│   └── python/                  # Python benchmarks
 ├── specs/
 │   ├── LTP-core.md              # Core protocol architecture
 │   ├── LTP-handshake.md         # Handshake protocol
