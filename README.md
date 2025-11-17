@@ -1,6 +1,6 @@
 # L-THREAD / LTP (Liminal Thread Protocol)
 
-**Version:** 0.1
+**Version:** 0.3
 **Status:** Initial Development
 
 ## Overview
@@ -42,6 +42,80 @@ LTP operates as a dedicated layer in the LIMINAL stack:
 - **Context Preservation:** Metadata fields for client state and trace tracking
 - **Liminal Metadata:** Optional affect and context tags for semantic layers
 - **Message Types:** `handshake`, `ping`, `state_update`, `event`
+
+## LTP v0.2 Overview
+
+- **Continuity of the thread:** Clients persist `thread_id` in local storage (browser `localStorage`, filesystem, etc.) and attempt `handshake_resume` before falling back to `handshake_init` so liminal state survives reconnects or app restarts.
+- **Heartbeat & reconnect strategy:** SDKs send timed `ping` frames, expect `pong` within a configurable timeout, and automatically reconnect with exponential backoff (default: start at 1s, cap at 30s, stop after 5 tries) before surfacing a permanent failure hook.
+- **Security skeleton:** Every envelope carries a unique `nonce` and a placeholder `signature`. Real crypto lands in v0.3+, but v0.2 now clearly documents that deployments MUST run over TLS/WSS and gives the hooks needed for experimental signing.
+
+Lifecycle (storage + resume + heartbeat):
+
+```
+[connect()]
+   |
+   v
+[storage has thread_id?] -- no --> [handshake_init] --> [store thread_id]
+   |
+  yes
+   v
+[handshake_resume] -- not found --> [handshake_init]
+          |
+        found
+          v
+[session established] -> [heartbeat loop] -> [reconnect on failure]
+```
+
+**Recommended environment:** Always use `wss://` (or HTTPS/TLS) endpoints until the upcoming signature/verification layer is finalized. Nonces plus TLS provide basic replay protection in the interim.
+
+## LTP v0.3: TOON-aware payloads
+
+- **What is TOON?** Token-Oriented Object Notation — a compact, table-like string format that trims token counts for large arrays of similar objects (affect logs, batched events, telemetry).
+- **How LTP uses it:** The envelope stays JSON, but `content_encoding` can be set to `"toon"` to indicate that `payload.data` contains a TOON string. Default remains `"json"` for backward compatibility.
+- **Why it matters for LRI:** State/event logs shrink by 30–60% in prompt-token usage, making liminal transcripts cheaper to stream into LLMs.
+
+**JSON vs TOON (affect log):**
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "abc",
+  "session_id": "sess1",
+  "content_encoding": "json",
+  "payload": {
+    "kind": "affect_log_v1",
+    "data": [
+      { "t": 1, "valence": 0.2, "arousal": -0.1 },
+      { "t": 2, "valence": 0.3, "arousal": -0.2 }
+    ]
+  }
+}
+```
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "abc",
+  "session_id": "sess1",
+  "content_encoding": "toon",
+  "payload": {
+    "kind": "affect_log_v1",
+    "data": "affect_log[2]{t,valence,arousal}:\n  1,0.2,-0.1\n  2,0.3,-0.2\n"
+  }
+}
+```
+
+**Enable TOON mode in the JS SDK:**
+
+```javascript
+const client = new LtpClient('ws://localhost:8080', {
+  clientId: 'example-js',
+  codec: simpleToonCodec, // placeholder codec; swap with a real TOON implementation
+  preferredEncoding: 'toon',
+});
+```
+
+If no codec is provided or the data is not an array of uniform objects, the client falls back to standard JSON encoding.
 
 ## Liminal Metadata
 

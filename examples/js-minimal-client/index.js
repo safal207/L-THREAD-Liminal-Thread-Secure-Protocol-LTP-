@@ -4,6 +4,7 @@
  */
 
 const { LtpClient } = require('../../sdk/js/dist/index');
+const { simpleToonCodec } = require('../shared/simpleToonCodec');
 
 /**
  * Send evening reflection sample - demonstrates LTP+LRI integration
@@ -52,6 +53,23 @@ function sendEveningReflectionSample(client) {
   console.log('  ✓ Evening reflection sent (see spec section 9 for details)\n');
 }
 
+function sendEveningReflectionToonLog(client) {
+  console.log('→ Sending affect log using TOON encoding...');
+
+  const affectLog = [
+    { t: 1, valence: 0.2, arousal: -0.1 },
+    { t: 2, valence: 0.3, arousal: -0.2 },
+    { t: 3, valence: 0.1, arousal: 0.0 },
+  ];
+
+  client.sendStateUpdate({
+    kind: 'affect_log_v1',
+    data: affectLog,
+  });
+
+  console.log('  ✓ Affect log queued for TOON encoding by client\n');
+}
+
 async function main() {
   console.log('=== LTP Minimal Client Example ===\n');
 
@@ -68,6 +86,8 @@ async function main() {
         example: true,
         version: '1.0.0',
       },
+      codec: simpleToonCodec,
+      preferredEncoding: 'toon',
     },
     {
       // Event handlers
@@ -133,6 +153,11 @@ async function main() {
           console.log('\n→ Sending evening reflection (LRI-aware)...');
           sendEveningReflectionSample(client);
         }, 6000);
+
+        setTimeout(() => {
+          console.log('→ Sending TOON affect log (compact payload)...');
+          sendEveningReflectionToonLog(client);
+        }, 8000);
 
         // Disconnect after 12 seconds
         setTimeout(() => {

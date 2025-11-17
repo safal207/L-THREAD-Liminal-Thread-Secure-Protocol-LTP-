@@ -1,14 +1,14 @@
 {
   "name": "@liminal/ltp-client",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "LTP (Liminal Thread Protocol) client SDK for JavaScript/TypeScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "lint": "echo \"Lint not configured yet\"",
-    "test": "node tests/basic.test.js",
-    "test:watch": "echo \"Test watch not configured yet\""
+    "test": "npm run build && node tests/client.test.js",
+    "test:watch": "node tests/client.test.js"
   },
   "keywords": [
     "ltp",

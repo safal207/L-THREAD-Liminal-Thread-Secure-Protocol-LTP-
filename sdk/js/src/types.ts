@@ -8,7 +8,9 @@
  */
 export type SupportedMessageType =
   | 'handshake_init'
+  | 'handshake_resume'
   | 'handshake_ack'
+  | 'handshake_reject'
   | 'ping'
   | 'pong'
   | 'state_update'
@@ -37,7 +39,6 @@ export interface LtpMeta {
   affect?: LtpAffect;
   /** Context identifier (e.g., "focus_session", "evening_reflection") */
   context_tag?: string;
-  signature?: string; // Reserved for v0.2+
   [key: string]: unknown; // Allow custom metadata
 }
 
@@ -51,6 +52,16 @@ export interface LtpEnvelope<T = unknown> {
   timestamp: number;
   payload: T;
   meta?: LtpMeta;
+  content_encoding?: ContentEncoding;
+  nonce?: string;
+  signature?: string;
+}
+
+export type ContentEncoding = 'json' | 'toon';
+
+export interface LtpCodec {
+  encodeJsonToToon?(value: unknown): string;
+  decodeToonToJson?(toon: string): unknown;
 }
 
 /**
@@ -80,9 +91,28 @@ export interface HandshakeAckMessage {
   session_id: string;
   server_capabilities: string[];
   heartbeat_interval_ms: number;
+  resumed?: boolean;
   metadata?: {
     server_version?: string;
     region?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface HandshakeResumeMessage {
+  type: 'handshake_resume';
+  ltp_version: string;
+  client_id: string;
+  thread_id: string;
+  resume_reason?: string;
+}
+
+export interface HandshakeRejectMessage {
+  type: 'handshake_reject';
+  ltp_version: string;
+  reason: string;
+  suggest_new?: boolean;
+  metadata?: {
     [key: string]: unknown;
   };
 }
@@ -108,9 +138,7 @@ export interface PongPayload {
  */
 export interface StateUpdatePayload {
   kind: 'minimal' | 'full' | 'delta';
-  data: {
-    [key: string]: unknown;
-  };
+  data: unknown;
 }
 
 /**
@@ -118,9 +146,7 @@ export interface StateUpdatePayload {
  */
 export interface EventPayload {
   event_type: string;
-  data: {
-    [key: string]: unknown;
-  };
+  data: unknown;
 }
 
 /**
@@ -164,12 +190,32 @@ export type ErrorMessage = LtpEnvelope<ErrorPayload>;
  */
 export type LtpMessage =
   | HandshakeInitMessage
+  | HandshakeResumeMessage
   | HandshakeAckMessage
+  | HandshakeRejectMessage
   | PingMessage
   | PongMessage
   | StateUpdateMessage
   | EventMessage
   | ErrorMessage;
+
+export interface LtpStorage {
+  getItem(key: string): string | null;
+  setItem(key: string, value: string): void;
+  removeItem(key: string): void;
+}
+
+export interface ReconnectStrategy {
+  maxRetries?: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+}
+
+export interface HeartbeatOptions {
+  enabled?: boolean;
+  intervalMs?: number;
+  timeoutMs?: number;
+}
 
 /**
  * LTP Client options
@@ -186,6 +232,11 @@ export interface LtpClientOptions {
   metadata?: {
     [key: string]: unknown;
   };
+  storage?: LtpStorage;
+  reconnect?: ReconnectStrategy;
+  heartbeat?: HeartbeatOptions;
+  codec?: LtpCodec;
+  preferredEncoding?: ContentEncoding;
 }
 
 /**
@@ -199,4 +250,5 @@ export interface LtpClientEvents {
   onEvent?: (payload: EventPayload) => void;
   onPong?: () => void;
   onMessage?: (message: LtpMessage) => void;
+  onPermanentFailure?: (error: Error | string) => void;
 }

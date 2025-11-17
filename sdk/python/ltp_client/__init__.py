@@ -1,6 +1,6 @@
 """
 LTP (Liminal Thread Protocol) Python SDK
-Version 0.1
+Version 0.3
 
 Entry point for the LTP client library
 """
@@ -19,7 +19,7 @@ from .types import (
     LtpMessage,
 )
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 __all__ = [
     "LtpClient",
     "HandshakeInit",

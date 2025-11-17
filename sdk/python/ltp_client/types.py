@@ -1,6 +1,6 @@
 """
 LTP (Liminal Thread Protocol) Python Types
-Version 0.1
+Version 0.3
 """
 
 from dataclasses import dataclass, field
@@ -9,12 +9,14 @@ from typing import Any, Dict, List, Literal, Optional, Union
 # Message types
 MessageType = Literal[
     "handshake_init",
+    "handshake_resume",
     "handshake_ack",
+    "handshake_reject",
     "ping",
     "pong",
     "state_update",
     "event",
-    "error"
+    "error",
 ]
 
 StateUpdateKind = Literal["minimal", "full", "delta"]
@@ -27,7 +29,8 @@ class LtpMeta:
     trace_id: Optional[str] = None
     parent_span_id: Optional[str] = None
     user_agent: Optional[str] = None
-    signature: Optional[str] = None  # Reserved for v0.2+
+    context_tag: Optional[str] = None
+    affect: Optional[Dict[str, float]] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -41,8 +44,10 @@ class LtpMeta:
             result['parent_span_id'] = self.parent_span_id
         if self.user_agent:
             result['user_agent'] = self.user_agent
-        if self.signature:
-            result['signature'] = self.signature
+        if self.context_tag:
+            result['context_tag'] = self.context_tag
+        if self.affect:
+            result['affect'] = self.affect
         result.update(self.extra)
         return result
 
@@ -51,7 +56,7 @@ class LtpMeta:
 class HandshakeInit:
     """Handshake Init Message (Client → Server)"""
     type: Literal["handshake_init"] = "handshake_init"
-    ltp_version: str = "0.1"
+    ltp_version: str = "0.3"
     client_id: str = ""
     device_fingerprint: Optional[str] = None
     intent: Optional[str] = None
@@ -80,7 +85,7 @@ class HandshakeInit:
 class HandshakeAck:
     """Handshake Acknowledgment Message (Server → Client)"""
     type: Literal["handshake_ack"] = "handshake_ack"
-    ltp_version: str = "0.1"
+    ltp_version: str = "0.3"
     thread_id: str = ""
     session_id: str = ""
     server_capabilities: List[str] = field(default_factory=list)
@@ -110,6 +115,9 @@ class LtpEnvelope:
     timestamp: int
     payload: Dict[str, Any] = field(default_factory=dict)
     meta: Optional[LtpMeta] = None
+    content_encoding: str = "json"  # TOON support will land in a dedicated codec module
+    nonce: Optional[str] = None
+    signature: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -122,6 +130,12 @@ class LtpEnvelope:
         }
         if self.meta:
             result['meta'] = self.meta.to_dict()
+        if self.content_encoding:
+            result['content_encoding'] = self.content_encoding
+        if self.nonce:
+            result['nonce'] = self.nonce
+        if self.signature:
+            result['signature'] = self.signature
         return result
 
     @classmethod
@@ -136,7 +150,10 @@ class LtpEnvelope:
             session_id=data['session_id'],
             timestamp=data['timestamp'],
             payload=data.get('payload', {}),
-            meta=meta
+            meta=meta,
+            content_encoding=data.get('content_encoding', 'json'),
+            nonce=data.get('nonce'),
+            signature=data.get('signature')
         )
 
 
