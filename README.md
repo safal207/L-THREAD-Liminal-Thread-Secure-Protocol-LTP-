@@ -282,6 +282,23 @@ cargo run
 
 You should see the handshake exchange, ping-pong messages, and state updates flowing through the liminal thread. All servers are compatible with all clients!
 
+## Advanced Examples
+
+For production-ready patterns and advanced use cases, see the **advanced examples** directory:
+
+- **[JavaScript Advanced Examples](./examples/js-advanced/)** - Production client wrapper, event-driven architecture, metrics collection
+- **[Python Advanced Examples](./examples/python-advanced/)** - Async worker pools, production client with structured logging
+- **[Elixir Advanced Examples](./examples/elixir-advanced/)** - Supervised clients, GenServer patterns, batch operations
+- **[Rust Advanced Examples](./examples/rust-advanced/)** - Concurrent operations, production client with metrics
+
+These examples demonstrate:
+- ✅ Production-ready error handling and reconnection
+- ✅ Metrics collection and monitoring
+- ✅ Batch operations with TOON encoding
+- ✅ Event-driven architecture patterns
+- ✅ Structured logging and observability
+- ✅ Graceful shutdown and resource management
+
 ## SDK Ecosystem
 
 LTP provides **multi-language SDK support** for seamless integration across different platforms and use cases:
@@ -497,8 +514,12 @@ See `specs/LTP-message-format.md` section 9 for full details.
 └── examples/
     ├── js-minimal-client/       # JavaScript client example
     ├── js-minimal-server/       # JavaScript server example
+    ├── js-advanced/             # JavaScript advanced examples
+    ├── python-advanced/         # Python advanced examples
     ├── elixir-server/           # Elixir server example
-    └── rust-server/             # Rust server example
+    ├── elixir-advanced/        # Elixir advanced examples
+    ├── rust-server/             # Rust server example
+    └── rust-advanced/          # Rust advanced examples
 ```
 
 ## Roadmap

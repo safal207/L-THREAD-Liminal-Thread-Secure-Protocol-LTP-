@@ -1,0 +1,19 @@
+[package]
+name = "ltp-advanced-examples"
+version = "0.1.0"
+edition = "2021"
+
+[[example]]
+name = "production_client"
+path = "production_client.rs"
+
+[[example]]
+name = "concurrent_client"
+path = "concurrent_client.rs"
+
+[dependencies]
+ltp-client = { path = "../../sdk/rust/ltp-client" }
+tokio = { version = "1", features = ["full"] }
+serde_json = "1.0"
+chrono = "0.4"
+
