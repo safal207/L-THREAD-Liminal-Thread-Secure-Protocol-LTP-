@@ -149,7 +149,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "t": i,
                 "valence": 0.5 * (1.0 + (i % 10) as f64 / 10.0),
                 "arousal": 0.3 * (1.0 - (i % 10) as f64 / 10.0),
-                "timestamp": chrono::Utc::now().timestamp() + i,
+                "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64 + i as i64,
             })
         })
         .collect();

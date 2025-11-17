@@ -15,5 +15,4 @@ path = "concurrent_client.rs"
 ltp-client = { path = "../../sdk/rust/ltp-client" }
 tokio = { version = "1", features = ["full"] }
 serde_json = "1.0"
-chrono = "0.4"
 
