@@ -16,7 +16,8 @@ defmodule LTP.MixProject do
       docs: [
         main: "LTP",
         source_url: @source_url
-      ]
+      ],
+      test_paths: ["test"]
     ]
   end
 

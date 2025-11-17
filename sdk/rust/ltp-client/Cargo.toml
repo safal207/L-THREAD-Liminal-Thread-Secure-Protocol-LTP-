@@ -20,3 +20,7 @@ url = "2.5"
 [dev-dependencies]
 tokio-test = "0.4"
 
+[[test]]
+name = "integration_test"
+path = "tests/integration_test.rs"
+

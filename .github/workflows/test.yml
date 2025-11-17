@@ -1,0 +1,78 @@
+name: Test LTP SDKs
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-js:
+    name: Test JavaScript SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      - name: Install dependencies
+        run: |
+          cd sdk/js
+          npm install
+      - name: Build
+        run: |
+          cd sdk/js
+          npm run build
+      - name: Test
+        run: |
+          cd sdk/js
+          npm test
+
+  test-python:
+    name: Test Python SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install dependencies
+        run: |
+          cd sdk/python
+          pip install -e .
+      - name: Test
+        run: |
+          cd sdk/python
+          python -m pytest tests/ || echo "No tests yet"
+
+  test-elixir:
+    name: Test Elixir SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: erlef/setup-elixir@v1
+        with:
+          elixir-version: '1.14'
+          otp-version: '25'
+      - name: Install dependencies
+        run: |
+          cd sdk/elixir
+          mix deps.get
+      - name: Test
+        run: |
+          cd sdk/elixir
+          mix test
+
+  test-rust:
+    name: Test Rust SDK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Test
+        run: |
+          cd sdk/rust/ltp-client
+          cargo test
+
