@@ -19,9 +19,9 @@ defmodule LTP.ClientTest do
 
     test "requires url and client_id" do
       # Missing client_id triggers KeyError inside GenServer init.
-      # GenServer.start_link catches the exception and returns {:error, reason}
+      # GenServer.start_link catches the exception and returns {:error, {reason, stacktrace}}
       result = Client.start_link(%{url: "ws://localhost:8080"})
-      assert {:error, %KeyError{}} = result
+      assert {:error, {{:badkey, :client_id}, _stacktrace}} = result
     end
   end
 
