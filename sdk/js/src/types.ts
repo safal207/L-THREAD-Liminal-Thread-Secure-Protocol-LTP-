@@ -95,6 +95,8 @@ export interface HandshakeInitMessage {
     platform?: string;
     [key: string]: unknown;
   };
+  nonce?: string;
+  signature?: string;
 }
 
 /**
@@ -113,6 +115,10 @@ export interface HandshakeAckMessage {
     region?: string;
     [key: string]: unknown;
   };
+  nonce?: string;
+  signature?: string;
+  timestamp?: number;
+  payload?: any;
 }
 
 export interface HandshakeResumeMessage {
@@ -121,6 +127,8 @@ export interface HandshakeResumeMessage {
   client_id: string;
   thread_id: string;
   resume_reason?: string;
+  nonce?: string;
+  signature?: string;
 }
 
 export interface HandshakeRejectMessage {
@@ -131,6 +139,8 @@ export interface HandshakeRejectMessage {
   metadata?: {
     [key: string]: unknown;
   };
+  nonce?: string;
+  signature?: string;
 }
 
 /**

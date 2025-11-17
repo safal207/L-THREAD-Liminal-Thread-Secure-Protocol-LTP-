@@ -6,6 +6,16 @@
  */
 
 /**
+ * Helper to safely extract error message from unknown error
+ */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+/**
  * Generate HMAC-SHA256 signature for LTP message
  * Works in both browser (Web Crypto API) and Node.js (crypto module)
  */
@@ -52,7 +62,7 @@ export async function signMessage(
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
     } catch (error) {
-      throw new Error(`Failed to sign message (Web Crypto): ${error.message}`);
+      throw new Error(`Failed to sign message (Web Crypto): ${getErrorMessage(error)}`);
     }
   }
 
@@ -64,7 +74,7 @@ export async function signMessage(
       hmac.update(canonical);
       return hmac.digest('hex');
     } catch (error) {
-      throw new Error(`Failed to sign message (Node.js crypto): ${error.message}`);
+      throw new Error(`Failed to sign message (Node.js crypto): ${getErrorMessage(error)}`);
     }
   }
 
@@ -106,7 +116,7 @@ export async function verifySignature(
 
     return { valid: isValid };
   } catch (error) {
-    return { valid: false, error: error.message };
+    return { valid: false, error: getErrorMessage(error) };
   }
 }
 
@@ -175,7 +185,7 @@ export async function generateKeyPair(): Promise<{
         privateKey: privateKeyHex,
       };
     } catch (error) {
-      throw new Error(`Failed to generate key pair (Web Crypto): ${error.message}`);
+      throw new Error(`Failed to generate key pair (Web Crypto): ${getErrorMessage(error)}`);
     }
   }
 
@@ -191,7 +201,7 @@ export async function generateKeyPair(): Promise<{
         privateKey: ecdh.getPrivateKey('hex'),
       };
     } catch (error) {
-      throw new Error(`Failed to generate key pair (Node.js crypto): ${error.message}`);
+      throw new Error(`Failed to generate key pair (Node.js crypto): ${getErrorMessage(error)}`);
     }
   }
 
@@ -215,7 +225,7 @@ export async function deriveSharedSecret(
       const sharedSecret = ecdh.computeSecret(Buffer.from(peerPublicKey, 'hex'));
       return sharedSecret.toString('hex');
     } catch (error) {
-      throw new Error(`Failed to derive shared secret: ${error.message}`);
+      throw new Error(`Failed to derive shared secret: ${getErrorMessage(error)}`);
     }
   }
 
@@ -259,7 +269,7 @@ export async function encryptPayload(
         tag: tag.toString('hex'),
       };
     } catch (error) {
-      throw new Error(`Failed to encrypt payload: ${error.message}`);
+      throw new Error(`Failed to encrypt payload: ${getErrorMessage(error)}`);
     }
   }
 
@@ -300,7 +310,7 @@ export async function encryptPayload(
         tag: bufferToHex(tag),
       };
     } catch (error) {
-      throw new Error(`Failed to encrypt payload (Web Crypto): ${error.message}`);
+      throw new Error(`Failed to encrypt payload (Web Crypto): ${getErrorMessage(error)}`);
     }
   }
 
@@ -337,7 +347,7 @@ export async function decryptPayload(
 
       return decrypted;
     } catch (error) {
-      throw new Error(`Failed to decrypt payload: ${error.message}`);
+      throw new Error(`Failed to decrypt payload: ${getErrorMessage(error)}`);
     }
   }
 
@@ -371,7 +381,7 @@ export async function decryptPayload(
       const decoder = new TextDecoder();
       return decoder.decode(decrypted);
     } catch (error) {
-      throw new Error(`Failed to decrypt payload (Web Crypto): ${error.message}`);
+      throw new Error(`Failed to decrypt payload (Web Crypto): ${getErrorMessage(error)}`);
     }
   }
 

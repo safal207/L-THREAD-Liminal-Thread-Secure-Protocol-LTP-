@@ -433,18 +433,28 @@ export class LtpClient {
   private handleMessage(message: LtpMessage): void {
     // Verify signature if enabled (v0.4+)
     if (this.options.enableSignatureVerification && this.options.secretKey && message.signature) {
-      // Run verification asynchronously to not block message handling
-      verifySignature(message, this.options.secretKey).then((result) => {
-        if (!result.valid) {
-          this.logger.warn('Message signature verification failed', {
-            type: message.type,
-            error: result.error,
-          });
-          // Still process message for backward compatibility, but log warning
-        }
-      }).catch((error) => {
-        this.logger.error('Failed to verify message signature', error);
-      });
+      // Check if message has all required fields for verification
+      const hasRequiredFields =
+        'thread_id' in message &&
+        'timestamp' in message &&
+        'nonce' in message &&
+        'payload' in message;
+
+      if (hasRequiredFields) {
+        // Run verification asynchronously to not block message handling
+        const verifiableMessage = message as any; // Type assertion for verification
+        verifySignature(verifiableMessage, this.options.secretKey).then((result) => {
+          if (!result.valid) {
+            this.logger.warn('Message signature verification failed', {
+              type: message.type,
+              error: result.error,
+            });
+            // Still process message for backward compatibility, but log warning
+          }
+        }).catch((error) => {
+          this.logger.error('Failed to verify message signature', error);
+        });
+      }
     }
 
     if (this.events.onMessage) {
