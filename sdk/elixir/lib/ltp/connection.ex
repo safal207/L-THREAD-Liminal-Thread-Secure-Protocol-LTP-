@@ -167,7 +167,7 @@ defmodule LTP.Connection do
     thread_id = ack["thread_id"]
     session_id = ack["session_id"]
     resumed = ack["resumed"] || false
-    heartbeat_interval = ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms
+    heartbeat_interval_ms = ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms
 
     Logger.info("[LTP] Handshake acknowledged", %{
       thread_id: thread_id,
@@ -179,6 +179,7 @@ defmodule LTP.Connection do
       state
       | thread_id: thread_id,
         session_id: session_id,
+        heartbeat_interval_ms: heartbeat_interval_ms,
         is_handshake_complete: true,
         reconnect_attempts: 0,
         last_pong_time: System.system_time(:millisecond)
@@ -189,7 +190,7 @@ defmodule LTP.Connection do
       send(state.client_pid, {:ltp_connected, thread_id, session_id})
     end
 
-    start_heartbeat(new_state, heartbeat_interval)
+    start_heartbeat(new_state, heartbeat_interval_ms)
   end
 
   defp handle_message(%{"type" => "handshake_reject"} = reject, state) do
