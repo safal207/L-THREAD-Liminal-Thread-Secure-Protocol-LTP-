@@ -95,6 +95,8 @@ export interface HandshakeInitMessage {
     platform?: string;
     [key: string]: unknown;
   };
+  nonce?: string;
+  signature?: string;
 }
 
 /**
@@ -113,6 +115,10 @@ export interface HandshakeAckMessage {
     region?: string;
     [key: string]: unknown;
   };
+  nonce?: string;
+  signature?: string;
+  timestamp?: number;
+  payload?: any;
 }
 
 export interface HandshakeResumeMessage {
@@ -121,6 +127,8 @@ export interface HandshakeResumeMessage {
   client_id: string;
   thread_id: string;
   resume_reason?: string;
+  nonce?: string;
+  signature?: string;
 }
 
 export interface HandshakeRejectMessage {
@@ -131,6 +139,8 @@ export interface HandshakeRejectMessage {
   metadata?: {
     [key: string]: unknown;
   };
+  nonce?: string;
+  signature?: string;
 }
 
 /**
@@ -257,6 +267,30 @@ export interface LtpClientOptions {
   preferredEncoding?: ContentEncoding;
   /** Optional logger for structured logging (defaults to console if not provided) */
   logger?: LtpLogger;
+  /**
+   * Session MAC key for HMAC-SHA256 message signing (v0.5+)
+   * Should be derived from ECDH key exchange using deriveSessionKeys()
+   * When provided, signatures are REQUIRED (not optional)
+   */
+  sessionMacKey?: string;
+  /**
+   * Require signature verification (v0.5+)
+   * When sessionMacKey is present, this defaults to TRUE
+   * Messages without valid signatures are REJECTED
+   * @default true when sessionMacKey is provided, false otherwise
+   */
+  requireSignatureVerification?: boolean;
+  /**
+   * Maximum age for messages in milliseconds (replay protection)
+   * Messages with timestamps older than this are rejected
+   * @default 60000 (60 seconds)
+   */
+  maxMessageAge?: number;
+  /**
+   * @deprecated Use sessionMacKey instead (v0.5+)
+   * Legacy shared secret key for backward compatibility with v0.4
+   */
+  secretKey?: string;
 }
 
 /**

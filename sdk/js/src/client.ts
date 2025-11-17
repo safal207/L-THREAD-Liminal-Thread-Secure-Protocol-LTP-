@@ -1,8 +1,9 @@
 /**
  * LTP (Liminal Thread Protocol) Client
- * Version 0.3
+ * Version 0.4
  */
 
+import { signMessage, verifySignature } from './crypto';
 import {
   HandshakeInitMessage,
   HandshakeAckMessage,
@@ -143,6 +144,10 @@ export class LtpClient {
   private heartbeatConfig: NormalizedHeartbeatOptions;
   private logger: LtpLogger;
 
+  // Nonce cache for replay protection (v0.5+)
+  private seenNonces: Map<string, number> = new Map(); // Map<nonce, timestamp>
+  private nonceCacheCleanupTimer: NodeJS.Timeout | null = null;
+
   /**
    * Create a new LTP client
    * @param url WebSocket URL (ws:// or wss://)
@@ -151,6 +156,15 @@ export class LtpClient {
    */
   constructor(url: string, options: LtpClientOptions = {}, events: LtpClientEvents = {}) {
     this.url = url;
+
+    // Determine the MAC key (sessionMacKey takes precedence over deprecated secretKey)
+    const macKey = options.sessionMacKey || options.secretKey;
+
+    // Default requireSignatureVerification to true when a MAC key is present
+    const requireVerification = options.requireSignatureVerification !== undefined
+      ? options.requireSignatureVerification
+      : Boolean(macKey);
+
     this.options = {
       clientId: options.clientId || this.generateClientId(),
       deviceFingerprint: options.deviceFingerprint,
@@ -169,6 +183,10 @@ export class LtpClient {
       codec: options.codec,
       preferredEncoding: options.preferredEncoding || 'json',
       logger: options.logger,
+      sessionMacKey: options.sessionMacKey,
+      secretKey: options.secretKey,
+      requireSignatureVerification: requireVerification,
+      maxMessageAge: options.maxMessageAge || 60000, // Default 60 seconds
     };
     this.events = events;
     this.logger = this.options.logger || defaultLogger;
@@ -221,6 +239,8 @@ export class LtpClient {
     this.manualDisconnect = true;
     this.clearHeartbeatTimers();
     this.clearReconnectTimer();
+    this.stopNonceCleanup();
+    this.seenNonces.clear(); // Clear nonce cache on disconnect
 
     if (this.ws) {
       this.ws.close();
@@ -382,7 +402,10 @@ export class LtpClient {
     this.ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data) as LtpMessage;
-        this.handleMessage(message);
+        // Handle message asynchronously for signature verification
+        this.handleMessageAsync(message).catch((error) => {
+          this.logger.error('Failed to handle message', error);
+        });
       } catch (error) {
         this.logger.error('Failed to parse message', error);
       }
@@ -429,7 +452,133 @@ export class LtpClient {
     this.sendRaw(resume);
   }
 
-  private handleMessage(message: LtpMessage): void {
+  private async handleMessageAsync(message: LtpMessage): Promise<void> {
+    // Get the MAC key (sessionMacKey takes precedence over deprecated secretKey)
+    const macKey = this.options.sessionMacKey || this.options.secretKey;
+
+    // Mandatory signature verification (v0.5+)
+    if (this.options.requireSignatureVerification && macKey) {
+      // Check if message has all required fields for verification
+      const hasRequiredFields =
+        'thread_id' in message &&
+        'timestamp' in message &&
+        'nonce' in message &&
+        'payload' in message;
+
+      if (!hasRequiredFields) {
+        this.logger.error('Message missing required fields for signature verification', {
+          type: message.type,
+          hasThreadId: 'thread_id' in message,
+          hasTimestamp: 'timestamp' in message,
+          hasNonce: 'nonce' in message,
+          hasPayload: 'payload' in message,
+        });
+        this.handleError({
+          error_code: 'INVALID_MESSAGE',
+          error_message: 'Message missing required fields for signature verification',
+        });
+        return; // Reject message
+      }
+
+      if (!message.signature) {
+        this.logger.error('Message missing required signature', {
+          type: message.type,
+        });
+        this.handleError({
+          error_code: 'MISSING_SIGNATURE',
+          error_message: 'Message signature is required but missing',
+        });
+        return; // Reject message
+      }
+
+      // Verify signature (blocking - security critical)
+      try {
+        const verifiableMessage = message as any; // Type assertion for verification
+        const result = await verifySignature(verifiableMessage, macKey);
+
+        if (!result.valid) {
+          this.logger.error('Message signature verification failed - REJECTING', {
+            type: message.type,
+            error: result.error,
+          });
+          this.handleError({
+            error_code: 'INVALID_SIGNATURE',
+            error_message: `Signature verification failed: ${result.error}`,
+          });
+          return; // Reject message
+        }
+      } catch (error) {
+        this.logger.error('Failed to verify message signature - REJECTING', error);
+        this.handleError({
+          error_code: 'SIGNATURE_VERIFICATION_ERROR',
+          error_message: 'Failed to verify signature',
+        });
+        return; // Reject message
+      }
+
+      // Timestamp validation for replay protection
+      if ('timestamp' in message && typeof message.timestamp === 'number') {
+        const now = Date.now();
+        const messageAge = now - message.timestamp;
+
+        if (messageAge > (this.options.maxMessageAge || 60000)) {
+          this.logger.error('Message too old - possible replay attack', {
+            type: message.type,
+            messageAge,
+            maxAge: this.options.maxMessageAge,
+          });
+          this.handleError({
+            error_code: 'MESSAGE_TOO_OLD',
+            error_message: `Message timestamp too old (age: ${messageAge}ms)`,
+          });
+          return; // Reject message
+        }
+
+        // Also reject messages from the future (clock skew tolerance: 5 seconds)
+        if (messageAge < -5000) {
+          this.logger.error('Message from future - clock skew', {
+            type: message.type,
+            messageAge,
+          });
+          this.handleError({
+            error_code: 'INVALID_TIMESTAMP',
+            error_message: 'Message timestamp is in the future',
+          });
+          return; // Reject message
+        }
+      }
+
+      this.logger.debug('Message signature verified successfully', {
+        type: message.type,
+      });
+    }
+
+    // Nonce validation for replay protection (v0.5+)
+    if (this.options.requireSignatureVerification && macKey) {
+      const clientId = 'meta' in message && message.meta?.client_id
+        ? message.meta.client_id
+        : undefined;
+
+      const nonceError = this.validateNonce(message.nonce, clientId);
+      if (nonceError) {
+        this.logger.error('Nonce validation failed - REJECTING', {
+          type: message.type,
+          error: nonceError,
+          nonce: message.nonce,
+        });
+        this.handleError({
+          error_code: 'INVALID_NONCE',
+          error_message: `Nonce validation failed: ${nonceError}`,
+        });
+        return; // Reject message
+      }
+
+      this.logger.debug('Nonce validated successfully', {
+        type: message.type,
+        nonce: message.nonce,
+      });
+    }
+
     if (this.events.onMessage) {
       this.events.onMessage(message);
     }
@@ -485,6 +634,7 @@ export class LtpClient {
 
     this.clearReconnectTimer();
     this.startHeartbeat();
+    this.startNonceCleanup(); // Start replay protection cleanup
 
     if (this.events.onConnected) {
       this.events.onConnected(this.threadId, this.sessionId);
@@ -533,6 +683,7 @@ export class LtpClient {
     this.isConnected = false;
     this.isHandshakeComplete = false;
     this.clearHeartbeatTimers();
+    this.stopNonceCleanup(); // Stop replay protection cleanup
 
     if (this.events.onDisconnected) {
       this.events.onDisconnected();
@@ -605,13 +756,37 @@ export class LtpClient {
       return;
     }
 
-    const envelopeWithSecurity: LtpEnvelope = {
-      ...message,
-      nonce: this.generateNonce(),
-      signature: this.generateSignature(),
-    };
+    const nonce = this.generateNonce();
 
-    this.sendRaw(envelopeWithSecurity);
+    // Generate signature asynchronously
+    this.generateSignature(message, nonce).then((signature) => {
+      const envelopeWithSecurity: LtpEnvelope = {
+        ...message,
+        nonce,
+        signature,
+      };
+
+      this.sendRaw(envelopeWithSecurity);
+    }).catch((error) => {
+      // If signatures are required, don't send unsigned message
+      if (this.options.requireSignatureVerification) {
+        this.logger.error('Failed to generate required signature - message not sent', error);
+        this.handleError({
+          error_code: 'SIGNATURE_GENERATION_FAILED',
+          error_message: 'Failed to generate required message signature',
+        });
+        return;
+      }
+
+      // Backward compatibility: fallback to placeholder
+      this.logger.error('Failed to generate signature, sending with placeholder', error);
+      const envelopeWithSecurity: LtpEnvelope = {
+        ...message,
+        nonce,
+        signature: 'v0-placeholder',
+      };
+      this.sendRaw(envelopeWithSecurity);
+    });
   }
 
   private sendRaw(message: unknown): void {
@@ -803,8 +978,143 @@ export class LtpClient {
     return Boolean(this.threadId && this.sessionId);
   }
 
-  private generateSignature(): string {
-    return 'v0-placeholder';
+  /**
+   * Validate nonce for replay protection (v0.5+)
+   * @param nonce The nonce to validate
+   * @param clientId Expected client ID (from message meta)
+   * @returns Error message if invalid, null if valid
+   */
+  private validateNonce(nonce: string | undefined, clientId: string | undefined): string | null {
+    if (!nonce) {
+      return 'Missing nonce';
+    }
+
+    // Check if nonce has already been seen (replay attack)
+    if (this.seenNonces.has(nonce)) {
+      return 'Nonce already used (replay attack detected)';
+    }
+
+    // Parse nonce format: clientId-timestamp-randomHex
+    const parts = nonce.split('-');
+    if (parts.length !== 3) {
+      return 'Invalid nonce format';
+    }
+
+    const [nonceClientId, nonceTimestamp, randomHex] = parts;
+
+    // Verify client ID in nonce matches (if available in meta)
+    if (clientId && nonceClientId !== clientId) {
+      return `Nonce client ID mismatch (expected: ${clientId}, got: ${nonceClientId})`;
+    }
+
+    // Verify timestamp is reasonable (not too old, not in future)
+    const timestamp = parseInt(nonceTimestamp, 10);
+    if (isNaN(timestamp)) {
+      return 'Invalid nonce timestamp';
+    }
+
+    const now = Date.now();
+    const nonceAge = now - timestamp;
+
+    // Reject if nonce is older than max message age
+    if (nonceAge > (this.options.maxMessageAge || 60000)) {
+      return `Nonce too old (age: ${nonceAge}ms)`;
+    }
+
+    // Reject if nonce is from the future (with 5s clock skew tolerance)
+    if (nonceAge < -5000) {
+      return 'Nonce timestamp in future';
+    }
+
+    // Verify random component has sufficient entropy (at least 8 hex chars)
+    if (randomHex.length < 8) {
+      return 'Insufficient nonce entropy';
+    }
+
+    // Add to seen nonces cache
+    this.seenNonces.set(nonce, now);
+
+    return null; // Valid
+  }
+
+  /**
+   * Clean up expired nonces from cache
+   */
+  private cleanupExpiredNonces(): void {
+    const now = Date.now();
+    const maxAge = (this.options.maxMessageAge || 60000) * 2; // Keep for 2x max age
+
+    for (const [nonce, timestamp] of this.seenNonces.entries()) {
+      if (now - timestamp > maxAge) {
+        this.seenNonces.delete(nonce);
+      }
+    }
+
+    this.logger.debug('Cleaned up expired nonces', {
+      remaining: this.seenNonces.size,
+    });
+  }
+
+  /**
+   * Start periodic nonce cache cleanup
+   */
+  private startNonceCleanup(): void {
+    // Clean up every 60 seconds
+    this.nonceCacheCleanupTimer = setInterval(() => {
+      this.cleanupExpiredNonces();
+    }, 60000);
+  }
+
+  /**
+   * Stop nonce cache cleanup
+   */
+  private stopNonceCleanup(): void {
+    if (this.nonceCacheCleanupTimer) {
+      clearInterval(this.nonceCacheCleanupTimer);
+      this.nonceCacheCleanupTimer = null;
+    }
+  }
+
+  private async generateSignature(message: LtpEnvelope, nonce: string): Promise<string> {
+    // Get the MAC key (sessionMacKey takes precedence over deprecated secretKey)
+    const macKey = this.options.sessionMacKey || this.options.secretKey;
+
+    // If no MAC key and signatures not required, use placeholder (backward compatibility)
+    if (!macKey && !this.options.requireSignatureVerification) {
+      return 'v0-placeholder';
+    }
+
+    // If signatures are required but no key provided, this is a configuration error
+    if (!macKey && this.options.requireSignatureVerification) {
+      throw new Error('Signature verification required but no sessionMacKey or secretKey provided');
+    }
+
+    // Generate HMAC-SHA256 signature (v0.4+)
+    try {
+      const signature = await signMessage(
+        {
+          type: message.type,
+          thread_id: message.thread_id || '',
+          session_id: message.session_id,
+          timestamp: message.timestamp,
+          nonce,
+          payload: message.payload,
+        },
+        macKey!
+      );
+
+      return signature;
+    } catch (error) {
+      this.logger.error('Failed to sign message', error);
+
+      // If signatures are required, don't fallback to placeholder
+      if (this.options.requireSignatureVerification) {
+        throw error;
+      }
+
+      // Fallback to placeholder only for backward compatibility
+      return 'v0-placeholder';
+    }
   }
 
   private getTimestamp(): number {
