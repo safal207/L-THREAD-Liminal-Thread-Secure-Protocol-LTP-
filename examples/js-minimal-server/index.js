@@ -5,6 +5,7 @@
 
 const { WebSocketServer } = require('ws');
 const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const PORT = 8080;
 const LTP_VERSION = '0.3';
@@ -14,11 +15,51 @@ const THREAD_TTL_MS = 30 * 60 * 1000; // 30 minutes
 const sessions = new Map();
 // Thread continuity store
 const threads = new Map();
+// Rate limiting store
+const rateLimit = new Map();
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW_MS = 60000; // 1 minute
+const RATE_LIMIT_MAX_MESSAGES = 100; // 100 messages per minute per client
+
+/**
+ * Check if client has exceeded rate limit
+ * Returns true if allowed, false if rate limit exceeded
+ */
+function checkRateLimit(clientId) {
+  const now = Date.now();
+
+  if (!rateLimit.has(clientId)) {
+    rateLimit.set(clientId, { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  const clientLimit = rateLimit.get(clientId);
+
+  // Reset window if expired
+  if (now > clientLimit.resetAt) {
+    clientLimit.count = 0;
+    clientLimit.resetAt = now + RATE_LIMIT_WINDOW_MS;
+  }
+
+  // Check if limit exceeded
+  if (clientLimit.count >= RATE_LIMIT_MAX_MESSAGES) {
+    return false;
+  }
+
+  clientLimit.count++;
+  return true;
+}
+
+/**
+ * Attach cryptographically secure nonce and signature to message envelope
+ * Uses crypto.randomBytes() for secure random generation (not Math.random())
+ */
 function attachSecurity(envelope) {
+  const randomHex = crypto.randomBytes(8).toString('hex');
   return {
     ...envelope,
-    nonce: `server-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    nonce: `server-${Date.now()}-${randomHex}`,
     signature: 'v0-server-placeholder',
   };
 }
@@ -147,6 +188,22 @@ function handleHandshakeResume(ws, message) {
 
 function handleMessage(ws, message, sessionData) {
   const { type } = message;
+
+  // Rate limiting check (except for handshake_init which establishes clientId)
+  if (type !== 'handshake_init') {
+    const clientId = sessionData?.clientId || message.client_id || 'unknown';
+
+    if (!checkRateLimit(clientId)) {
+      console.log(`⚠️  Rate limit exceeded for client: ${clientId}`);
+      const error = createErrorMessage(
+        'RATE_LIMIT_EXCEEDED',
+        `Rate limit exceeded: max ${RATE_LIMIT_MAX_MESSAGES} messages per ${RATE_LIMIT_WINDOW_MS / 1000} seconds`,
+        { limit: RATE_LIMIT_MAX_MESSAGES, window_ms: RATE_LIMIT_WINDOW_MS }
+      );
+      ws.send(JSON.stringify(error));
+      return;
+    }
+  }
 
   switch (type) {
     case 'handshake_init':
@@ -363,12 +420,24 @@ function startServer() {
   });
 }
 
+// Cleanup inactive threads and rate limit entries
 setInterval(() => {
   const cutoff = Date.now() - THREAD_TTL_MS;
+
+  // Clean up inactive threads
   for (const [threadId, state] of threads.entries()) {
     if (state.lastSeen < cutoff) {
       threads.delete(threadId);
       console.log(`🧹 Removed inactive thread ${threadId}`);
+    }
+  }
+
+  // Clean up expired rate limit entries (expired > 5 minutes ago)
+  const rateLimitCutoff = Date.now() - (5 * 60 * 1000);
+  for (const [clientId, limit] of rateLimit.entries()) {
+    if (limit.resetAt < rateLimitCutoff) {
+      rateLimit.delete(clientId);
+      console.log(`🧹 Removed expired rate limit entry for client ${clientId}`);
     }
   }
 }, 60 * 1000);
