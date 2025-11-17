@@ -18,11 +18,10 @@ defmodule LTP.ClientTest do
     end
 
     test "requires url and client_id" do
-      # Missing client_id triggers KeyError inside GenServer init,
-      # which results in the process exiting. Verify that exit occurs.
-      reason = catch_exit(Client.start_link(%{url: "ws://localhost:8080"}))
-      # catch_exit returns the exit reason (not nil) if an exit occurred
-      assert reason != nil
+      # Missing client_id triggers KeyError inside GenServer init.
+      # GenServer.start_link catches the exception and returns {:error, reason}
+      result = Client.start_link(%{url: "ws://localhost:8080"})
+      assert {:error, %KeyError{}} = result
     end
   end
 
