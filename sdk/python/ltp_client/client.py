@@ -379,6 +379,7 @@ class LtpClient:
             timestamp=self._get_timestamp(),
             payload=payload,
             meta=meta,
+            content_encoding="json",  # Default to JSON; TOON support will be added in future
             nonce=self._generate_nonce(),
             signature="v0-placeholder",
         )

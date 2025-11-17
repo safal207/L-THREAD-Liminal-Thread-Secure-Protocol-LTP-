@@ -1,6 +1,6 @@
 # L-THREAD / LTP (Liminal Thread Protocol)
 
-**Version:** 0.2
+**Version:** 0.3
 **Status:** Initial Development
 
 ## Overview
@@ -67,6 +67,100 @@ Lifecycle (storage + resume + heartbeat):
 ```
 
 **Recommended environment:** Always use `wss://` (or HTTPS/TLS) endpoints until the upcoming signature/verification layer is finalized. Nonces plus TLS provide basic replay protection in the interim.
+
+## LTP v0.3: TOON-aware Payloads
+
+v0.3 introduces optional **TOON (Token-Oriented Object Notation)** support for compact payload encoding, especially useful for large arrays of similar objects (affect logs, event batches, telemetry).
+
+### What is TOON?
+
+TOON is a compact, table-like format designed to reduce token counts for LLM-centric workflows. It's particularly effective for:
+- **Affect logs** — arrays of emotional state measurements
+- **Event batches** — sequences of similar events
+- **Telemetry data** — time-series measurements
+
+**Benefits:**
+- **30–60% token reduction** for large arrays
+- **Better LLM prompt efficiency** — more data fits in context windows
+- **Compact representation** — especially for table-like data
+
+### How TOON Works in LTP
+
+LTP itself doesn't parse TOON — it only carries the `content_encoding` flag. The actual encoding/decoding is handled by application-layer codecs (or dedicated TOON libraries).
+
+**JSON payload (default):**
+```json
+{
+  "type": "state_update",
+  "thread_id": "abc",
+  "content_encoding": "json",
+  "payload": {
+    "kind": "affect_log",
+    "data": [
+      { "t": 1, "valence": 0.2, "arousal": -0.1 },
+      { "t": 2, "valence": 0.3, "arousal": -0.2 }
+    ]
+  }
+}
+```
+
+**TOON payload (compact):**
+```json
+{
+  "type": "state_update",
+  "thread_id": "abc",
+  "content_encoding": "toon",
+  "payload": {
+    "kind": "affect_log",
+    "data": "rows[2]{t,valence,arousal}:\n  1,0.2,-0.1\n  2,0.3,-0.2\n"
+  }
+}
+```
+
+### Enabling TOON in SDK
+
+**TypeScript/JavaScript:**
+
+```typescript
+import { LtpClient } from '@liminal/ltp-client';
+import { simpleToonCodec } from './simpleToonCodec';
+
+const client = new LtpClient('ws://localhost:8080', {
+  clientId: 'example-js',
+  codec: simpleToonCodec,           // TOON codec implementation
+  preferredEncoding: 'toon',        // Use TOON when possible
+});
+
+// Send affect log - automatically encoded as TOON
+client.sendStateUpdate({
+  kind: 'affect_log_v1',
+  data: [
+    { t: 1, valence: 0.2, arousal: -0.1 },
+    { t: 2, valence: 0.3, arousal: -0.2 },
+    { t: 3, valence: 0.1, arousal: 0.0 }
+  ]
+});
+```
+
+**When TOON is used:**
+- `preferredEncoding: 'toon'` is set
+- A `codec` with `encodeJsonToToon` is provided
+- Payload data is an array of similar objects
+
+**When JSON is used (fallback):**
+- `preferredEncoding` is `'json'` (default)
+- No codec provided
+- Payload is not an array or has mixed structure
+
+### TOON Codec Implementation
+
+LTP provides a **stub codec** (`simpleToonCodec`) for examples. For production:
+
+- Use a proper TOON library (when available)
+- Implement a full TOON codec per specification
+- The stub codec is **NOT production-ready** — it's for demonstration only
+
+See `specs/LTP-toon.md` for full TOON specification details.
 
 ## Liminal Metadata
 
@@ -328,12 +422,18 @@ See `specs/LTP-message-format.md` section 9 for full details.
 - [x] Minimal client/server examples
 - [ ] Basic documentation
 
-### v0.2 (Planned)
+### v0.3 (Current)
+- [x] TOON payload encoding support
+- [x] `content_encoding` field in message envelope
+- [x] TOON codec interface and stub implementation
+- [x] Automatic TOON encoding for arrays in JS SDK
+- [x] TOON-aware logging in examples
+
+### v0.4 (Planned)
 - [ ] Real cryptographic handshake (key exchange, signatures)
 - [ ] Enhanced inner state metadata schema
-- [ ] Compression support
-- [ ] Reconnection and session recovery
-- [ ] Binary message format option
+- [ ] Compression support (zstd)
+- [ ] Binary message format option (CBOR, MessagePack)
 - [ ] Rate limiting and flow control
 
 ### v0.3+ (Future)

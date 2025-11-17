@@ -1,15 +1,16 @@
-# LTP Message Format Specification v0.2
+# LTP Message Format Specification v0.3
 
 ## 1. Overview
 
 All LTP messages (except handshake) use a unified JSON envelope format. This ensures consistent context propagation, tracing, and extensibility across all message types.
 
 **Design Principles:**
-- Simple JSON structure for v0.2
+- Simple JSON structure for v0.3
 - Every message carries session context (`thread_id`, `session_id`)
 - Extensible `payload` for message-specific data
 - `meta` field for cross-cutting concerns (tracing, liminal metadata, etc.)
 - Optional security hooks (`nonce`, `signature`) attached to the envelope
+- Optional `content_encoding` field for TOON payload support (v0.3+)
 
 ## 2. Base Envelope Format
 
@@ -21,6 +22,7 @@ All LTP messages (except handshake) use a unified JSON envelope format. This ens
   "thread_id": "uuid",
   "session_id": "uuid",
   "timestamp": 1731600000,
+  "content_encoding": "json",
   "payload": {},
   "meta": {},
   "nonce": "client-uuid-1699824000000-12345",
@@ -36,6 +38,7 @@ All LTP messages (except handshake) use a unified JSON envelope format. This ens
 | `thread_id` | string | Yes | UUID of the liminal thread session |
 | `session_id` | string | Yes | UUID of the current connection |
 | `timestamp` | number | Yes | Unix epoch time in seconds (integer) |
+| `content_encoding` | string | No | Payload encoding: `"json"` (default) or `"toon"` (v0.3+) |
 | `payload` | object | No | Message-specific data (structure varies by type) |
 | `meta` | object | No | Metadata for tracing, debugging, liminal context |
 | `nonce` | string | No | Client-provided unique value per message (at least per session) |
@@ -77,7 +80,19 @@ The `meta` object is optional but recommended for production systems:
 - LTP implementations MUST support these fields but MUST NOT interpret their meaning
 - These fields provide hooks for future semantic layers without imposing specific requirements
 
-### 2.4 Security Hooks (v0.2 skeleton)
+### 2.4 Content Encoding (v0.3+)
+
+The `content_encoding` field specifies how to interpret `payload.data`:
+
+- **`"json"`** (default): `payload.data` is a standard JSON object or array. If `content_encoding` is omitted, JSON is assumed.
+- **`"toon"`**: `payload.data` is a TOON-formatted string. See `LTP-toon.md` for TOON specification.
+
+**Important Notes:**
+- LTP itself does NOT parse or validate TOON format; it only carries the encoding flag.
+- TOON parsing/encoding is the responsibility of the application layer (LRI) or a dedicated codec library.
+- When `content_encoding="toon"`, `payload.data` MUST be a string containing valid TOON syntax.
+
+### 2.5 Security Hooks (v0.2 skeleton)
 
 - `nonce` MUST be unique per message at least within the active `session_id`. SDKs typically concatenate the `client_id`, timestamp, and a random suffix.
 - `signature` is reserved for future MAC/signature schemes. In v0.2 SDKs populate placeholder values so the field is always present when transport policies require it.

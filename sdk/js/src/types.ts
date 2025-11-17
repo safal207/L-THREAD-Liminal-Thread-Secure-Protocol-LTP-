@@ -1,6 +1,6 @@
 /**
  * LTP (Liminal Thread Protocol) TypeScript Types
- * Version 0.1
+ * Version 0.3
  */
 
 /**
@@ -16,6 +16,29 @@ export type SupportedMessageType =
   | 'state_update'
   | 'event'
   | 'error';
+
+/**
+ * Content encoding types for payload data
+ */
+export type ContentEncoding = 'json' | 'toon';
+
+/**
+ * TOON codec interface for encoding/decoding payload data
+ */
+export interface LtpCodec {
+  /**
+   * Encode JSON value to TOON string
+   * @param value JSON value (typically array of objects)
+   * @returns TOON-formatted string
+   */
+  encodeJsonToToon?(value: unknown): string;
+  /**
+   * Decode TOON string to JSON value
+   * @param toon TOON-formatted string
+   * @returns JSON value
+   */
+  decodeToonToJson?(toon: string): unknown;
+}
 
 /**
  * Affect metadata for liminal/emotional state
@@ -50,6 +73,7 @@ export interface LtpEnvelope<T = unknown> {
   thread_id: string;
   session_id: string;
   timestamp: number;
+  content_encoding?: ContentEncoding;
   payload: T;
   meta?: LtpMeta;
   nonce?: string;
@@ -227,6 +251,10 @@ export interface LtpClientOptions {
   storage?: LtpStorage;
   reconnect?: ReconnectStrategy;
   heartbeat?: HeartbeatOptions;
+  /** TOON codec for encoding/decoding payload data (v0.3+) */
+  codec?: LtpCodec;
+  /** Preferred content encoding: "json" (default) or "toon" (v0.3+) */
+  preferredEncoding?: ContentEncoding;
 }
 
 /**

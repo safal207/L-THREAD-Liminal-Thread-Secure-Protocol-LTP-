@@ -7,7 +7,7 @@ const { WebSocketServer } = require('ws');
 const { v4: uuidv4 } = require('uuid');
 
 const PORT = 8080;
-const LTP_VERSION = '0.2';
+const LTP_VERSION = '0.3';
 const THREAD_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 // Connection-level session store
@@ -33,7 +33,7 @@ function createHandshakeAck(threadId, sessionId, resumed = false) {
     heartbeat_interval_ms: 15000,
     resumed,
     metadata: {
-      server_version: '0.2.0',
+      server_version: '0.3.0',
       region: 'local',
     },
   };
@@ -177,19 +177,35 @@ function handleMessage(ws, message, sessionData) {
       const intent = message.payload?.data?.intent || 'none';
       const encoding = message.content_encoding || 'json';
       const payloadData = message.payload?.data;
-      const payloadPreviewString =
-        typeof payloadData === 'string'
-          ? payloadData
-          : JSON.stringify(payloadData, null, 2);
-      const previewLines = payloadPreviewString.split('\n').slice(0, 3).join('\n');
-      const payloadLength = typeof payloadData === 'string'
-        ? payloadData.length
-        : payloadPreviewString.length;
-
-      console.log(`← [LTP] state_update`);
-      console.log(`  LTP[${threadShort}/${sessionShort}] ctx=${contextTag} affect={${affectStr}} intent=${intent}`);
-      console.log(`  content_encoding=${encoding} payload_chars=${payloadLength}`);
-      console.log(`  preview:\n${previewLines}`);
+      
+      // Handle TOON vs JSON payloads
+      let payloadPreviewString;
+      let payloadLength;
+      
+      if (encoding === 'toon' && typeof payloadData === 'string') {
+        // TOON payload: show first few lines
+        payloadPreviewString = payloadData;
+        payloadLength = payloadData.length;
+        const toonLines = payloadData.split('\n').slice(0, 3);
+        console.log(`← [LTP] state_update (TOON)`);
+        console.log(`  LTP[${threadShort}/${sessionShort}] ctx=${contextTag} affect={${affectStr}} intent=${intent}`);
+        console.log(`  content_encoding=toon payload_chars=${payloadLength}`);
+        console.log(`  TOON preview:\n${toonLines.map(l => `    ${l}`).join('\n')}`);
+      } else {
+        // JSON payload: show formatted JSON preview
+        payloadPreviewString =
+          typeof payloadData === 'string'
+            ? payloadData
+            : JSON.stringify(payloadData, null, 2);
+        payloadLength = typeof payloadData === 'string'
+          ? payloadData.length
+          : payloadPreviewString.length;
+        const previewLines = payloadPreviewString.split('\n').slice(0, 3).join('\n');
+        console.log(`← [LTP] state_update`);
+        console.log(`  LTP[${threadShort}/${sessionShort}] ctx=${contextTag} affect={${affectStr}} intent=${intent}`);
+        console.log(`  content_encoding=${encoding} payload_chars=${payloadLength}`);
+        console.log(`  preview:\n${previewLines}`);
+      }
 
       console.log('  Kind:', message.payload.kind);
       if (message.payload.kind === 'lri_envelope_v1') {
@@ -280,11 +296,14 @@ function startServer() {
   const wss = new WebSocketServer({
     port: PORT,
     handleProtocols: (protocols, request) => {
-      // Accept ltp.v0.2 subprotocol
+      // Accept ltp.v0.3 subprotocol (backward compatible with v0.2)
       // protocols can be a Set or Array depending on ws version
       const protocolList = Array.isArray(protocols) ? protocols : Array.from(protocols);
+      if (protocolList.includes('ltp.v0.3')) {
+        return 'ltp.v0.3';
+      }
       if (protocolList.includes('ltp.v0.2')) {
-        return 'ltp.v0.2';
+        return 'ltp.v0.2'; // Backward compatibility
       }
       return false;
     }
@@ -292,7 +311,7 @@ function startServer() {
 
   console.log('=== LTP Minimal Server ===\n');
   console.log(`✓ LTP server listening on ws://localhost:${PORT}`);
-  console.log('  Protocol: LTP v0.2');
+  console.log('  Protocol: LTP v0.3 (with TOON support)');
   console.log('  Waiting for connections...\n');
 
   wss.on('connection', (ws, request) => {

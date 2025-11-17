@@ -1,6 +1,6 @@
 /**
  * LTP (Liminal Thread Protocol) Client
- * Version 0.2
+ * Version 0.3
  */
 
 import {
@@ -21,11 +21,12 @@ import {
   LtpStorage,
   ReconnectStrategy,
   HeartbeatOptions,
+  ContentEncoding,
 } from './types';
 
-const LTP_VERSION = '0.2';
-const SDK_VERSION = '0.2.0';
-const SUBPROTOCOL = 'ltp.v0.2';
+const LTP_VERSION = '0.3';
+const SDK_VERSION = '0.3.0';
+const SUBPROTOCOL = 'ltp.v0.3';
 
 class MemoryStorage implements LtpStorage {
   private store = new Map<string, string>();
@@ -124,6 +125,8 @@ export class LtpClient {
       storage: options.storage,
       reconnect: options.reconnect,
       heartbeat: options.heartbeat,
+      codec: options.codec,
+      preferredEncoding: options.preferredEncoding || 'json',
     };
     this.events = events;
 
@@ -211,7 +214,14 @@ export class LtpClient {
       context_tag: options?.contextTag,
     };
 
-    const envelope = this.buildEnvelope('state_update', payload, metaOverrides);
+    // Prepare payload data with TOON encoding if needed
+    const { encoded, encoding } = this.preparePayloadData(payload.data);
+    const encodedPayload: StateUpdatePayload = {
+      ...payload,
+      data: encoded,
+    };
+
+    const envelope = this.buildEnvelope('state_update', encodedPayload, metaOverrides, encoding);
     this.send(envelope);
   }
 
@@ -231,9 +241,11 @@ export class LtpClient {
       return;
     }
 
+    // Prepare payload data with TOON encoding if needed
+    const { encoded, encoding } = this.preparePayloadData(data);
     const payload: EventPayload = {
       event_type: eventType,
-      data: prepared.encoded,
+      data: encoded as Record<string, unknown>,
     };
 
     const metaOverrides: LtpMeta = {
@@ -241,7 +253,7 @@ export class LtpClient {
       context_tag: options?.contextTag,
     };
 
-    this.send(this.buildEnvelope('event', payload, metaOverrides));
+    this.send(this.buildEnvelope('event', payload, metaOverrides, encoding));
   }
 
   /**
@@ -564,7 +576,8 @@ export class LtpClient {
   private buildEnvelope<T>(
     type: SupportedMessageType,
     payload: T,
-    metaOverrides?: LtpMeta
+    metaOverrides?: LtpMeta,
+    contentEncoding?: ContentEncoding
   ): LtpEnvelope<T> {
     if (!this.threadId || !this.sessionId) {
       throw new Error('Cannot build envelope without thread/session identifiers');
@@ -572,7 +585,7 @@ export class LtpClient {
 
     const meta = this.mergeMeta(metaOverrides);
 
-    return {
+    const envelope: LtpEnvelope<T> = {
       type,
       thread_id: this.threadId,
       session_id: this.sessionId,
@@ -580,6 +593,13 @@ export class LtpClient {
       payload,
       meta,
     };
+
+    // Only add content_encoding if it's not the default JSON
+    if (contentEncoding && contentEncoding !== 'json') {
+      envelope.content_encoding = contentEncoding;
+    }
+
+    return envelope;
   }
 
   private mergeMeta(overrides?: LtpMeta): LtpMeta | undefined {
@@ -689,5 +709,50 @@ export class LtpClient {
       return 'node';
     }
     return 'unknown';
+  }
+
+  /**
+   * Prepare payload data with optional TOON encoding
+   * @param data Original payload data
+   * @returns Object with encoded data and encoding type
+   */
+  private preparePayloadData(data: unknown): { encoded: unknown; encoding: ContentEncoding } {
+    // If TOON encoding is preferred and codec is available
+    if (
+      this.options.preferredEncoding === 'toon' &&
+      this.options.codec?.encodeJsonToToon &&
+      Array.isArray(data) &&
+      data.length > 0
+    ) {
+      // Check if it's an array of objects (typical TOON use case)
+      const firstElement = data[0];
+      if (
+        typeof firstElement === 'object' &&
+        firstElement !== null &&
+        !Array.isArray(firstElement)
+      ) {
+        // Check if all elements have similar structure (simple heuristic)
+        const firstKeys = Object.keys(firstElement);
+        const allSimilar = data.every(
+          (item) =>
+            typeof item === 'object' &&
+            item !== null &&
+            Object.keys(item).length === firstKeys.length &&
+            firstKeys.every((key) => key in item)
+        );
+
+        if (allSimilar) {
+          try {
+            const toonString = this.options.codec.encodeJsonToToon(data);
+            return { encoded: toonString, encoding: 'toon' };
+          } catch (error) {
+            console.warn('[LTP] TOON encoding failed, falling back to JSON:', error);
+          }
+        }
+      }
+    }
+
+    // Default: return as-is with JSON encoding
+    return { encoded: data, encoding: 'json' };
   }
 }
