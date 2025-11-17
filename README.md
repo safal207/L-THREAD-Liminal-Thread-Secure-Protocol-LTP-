@@ -16,6 +16,10 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the 
 - [Changelog](./CHANGELOG.md) - Version history and changes
 - [Security Policy](./.github/SECURITY.md) - Security reporting and best practices
 
+📊 **For Investors & Experts:**
+- [Investor Pitch](./INVESTOR_PITCH.md) - Executive summary, market opportunity, investment ask
+- [Technical Whitepaper](./WHITEPAPER.md) - Deep technical analysis and research paper
+
 ### What Makes LTP Different
 
 Unlike traditional HTTPS/WebSocket protocols that treat data as isolated transactions, LTP maintains a continuous **liminal thread session** that:
