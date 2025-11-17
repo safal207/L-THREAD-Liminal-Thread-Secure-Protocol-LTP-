@@ -81,7 +81,7 @@ global.WebSocket = MockWebSocket;
 function createAck(threadId, sessionId, resumed = false) {
   return {
     type: 'handshake_ack',
-    ltp_version: '0.3',
+    ltp_version: '0.2',
     thread_id: threadId,
     session_id: sessionId,
     server_capabilities: ['basic-state-update', 'ping-pong', 'events'],

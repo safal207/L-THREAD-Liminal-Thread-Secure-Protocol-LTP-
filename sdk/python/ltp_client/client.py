@@ -1,6 +1,6 @@
 """
 LTP (Liminal Thread Protocol) Python Client
-Version 0.3
+Version 0.2
 """
 
 import asyncio
@@ -28,9 +28,9 @@ from .types import (
     MessageType,
 )
 
-LTP_VERSION = "0.3"
-SDK_VERSION = "0.3.0"
-SUBPROTOCOL = "ltp.v0.3"
+LTP_VERSION = "0.2"
+SDK_VERSION = "0.2.0"
+SUBPROTOCOL = "ltp.v0.2"
 
 
 class ThreadStorage:

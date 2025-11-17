@@ -7,7 +7,7 @@ const { WebSocketServer } = require('ws');
 const { v4: uuidv4 } = require('uuid');
 
 const PORT = 8080;
-const LTP_VERSION = '0.3';
+const LTP_VERSION = '0.2';
 const THREAD_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
 // Connection-level session store
@@ -33,7 +33,7 @@ function createHandshakeAck(threadId, sessionId, resumed = false) {
     heartbeat_interval_ms: 15000,
     resumed,
     metadata: {
-      server_version: '0.3.0',
+      server_version: '0.2.0',
       region: 'local',
     },
   };
@@ -166,6 +166,7 @@ function handleMessage(ws, message, sessionData) {
 
     case 'state_update':
       updateThreadStateFromMessage(message);
+      // Compact LTP+LRI logging format
       const threadShort = message.thread_id ? message.thread_id.substring(0, 8) : 'none';
       const sessionShort = message.session_id ? message.session_id.substring(0, 8) : 'none';
       const contextTag = message.meta?.context_tag || 'none';
@@ -279,11 +280,11 @@ function startServer() {
   const wss = new WebSocketServer({
     port: PORT,
     handleProtocols: (protocols, request) => {
-      // Accept ltp.v0.3 subprotocol
+      // Accept ltp.v0.2 subprotocol
       // protocols can be a Set or Array depending on ws version
       const protocolList = Array.isArray(protocols) ? protocols : Array.from(protocols);
-      if (protocolList.includes('ltp.v0.3')) {
-        return 'ltp.v0.3';
+      if (protocolList.includes('ltp.v0.2')) {
+        return 'ltp.v0.2';
       }
       return false;
     }
@@ -291,7 +292,7 @@ function startServer() {
 
   console.log('=== LTP Minimal Server ===\n');
   console.log(`✓ LTP server listening on ws://localhost:${PORT}`);
-  console.log('  Protocol: LTP v0.3');
+  console.log('  Protocol: LTP v0.2');
   console.log('  Waiting for connections...\n');
 
   wss.on('connection', (ws, request) => {

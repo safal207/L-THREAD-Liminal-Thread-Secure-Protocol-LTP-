@@ -21,13 +21,11 @@ import {
   LtpStorage,
   ReconnectStrategy,
   HeartbeatOptions,
-  LtpCodec,
-  ContentEncoding,
 } from './types';
 
-const LTP_VERSION = '0.3';
-const SDK_VERSION = '0.3.0';
-const SUBPROTOCOL = 'ltp.v0.3';
+const LTP_VERSION = '0.2';
+const SDK_VERSION = '0.2.0';
+const SUBPROTOCOL = 'ltp.v0.2';
 
 class MemoryStorage implements LtpStorage {
   private store = new Map<string, string>();
@@ -102,8 +100,6 @@ export class LtpClient {
   private storageKeys: { thread: string; session: string };
   private reconnectConfig: NormalizedReconnectStrategy;
   private heartbeatConfig: NormalizedHeartbeatOptions;
-  private codec?: LtpCodec;
-  private preferredEncoding: ContentEncoding;
 
   /**
    * Create a new LTP client
@@ -128,8 +124,6 @@ export class LtpClient {
       storage: options.storage,
       reconnect: options.reconnect,
       heartbeat: options.heartbeat,
-      codec: options.codec,
-      preferredEncoding: options.preferredEncoding || 'json',
     };
     this.events = events;
 
@@ -148,8 +142,6 @@ export class LtpClient {
       ...DEFAULT_HEARTBEAT,
       ...(this.options.heartbeat || {}),
     };
-    this.codec = this.options.codec;
-    this.preferredEncoding = this.options.preferredEncoding || 'json';
   }
 
   /**
@@ -219,13 +211,7 @@ export class LtpClient {
       context_tag: options?.contextTag,
     };
 
-    const { encoded, encoding } = this.preparePayloadData(payload.data);
-    const envelope = this.buildEnvelope(
-      'state_update',
-      { ...payload, data: encoded },
-      metaOverrides,
-      encoding
-    );
+    const envelope = this.buildEnvelope('state_update', payload, metaOverrides);
     this.send(envelope);
   }
 
@@ -245,7 +231,6 @@ export class LtpClient {
       return;
     }
 
-    const prepared = this.preparePayloadData(data);
     const payload: EventPayload = {
       event_type: eventType,
       data: prepared.encoded,
@@ -256,7 +241,7 @@ export class LtpClient {
       context_tag: options?.contextTag,
     };
 
-    this.send(this.buildEnvelope('event', payload, metaOverrides, prepared.encoding));
+    this.send(this.buildEnvelope('event', payload, metaOverrides));
   }
 
   /**
@@ -579,8 +564,7 @@ export class LtpClient {
   private buildEnvelope<T>(
     type: SupportedMessageType,
     payload: T,
-    metaOverrides?: LtpMeta,
-    contentEncoding?: ContentEncoding
+    metaOverrides?: LtpMeta
   ): LtpEnvelope<T> {
     if (!this.threadId || !this.sessionId) {
       throw new Error('Cannot build envelope without thread/session identifiers');
@@ -595,53 +579,7 @@ export class LtpClient {
       timestamp: this.getTimestamp(),
       payload,
       meta,
-      content_encoding: contentEncoding,
     };
-  }
-
-  private preparePayloadData(data: unknown): { encoded: unknown; encoding: ContentEncoding } {
-    if (
-      this.preferredEncoding === 'toon' &&
-      this.codec?.encodeJsonToToon &&
-      this.looksLikeArrayOfRecords(data)
-    ) {
-      return { encoded: this.codec.encodeJsonToToon(data), encoding: 'toon' };
-    }
-    return { encoded: data, encoding: 'json' };
-  }
-
-  private looksLikeArrayOfRecords(value: unknown): value is Array<Record<string, unknown>> {
-    if (!Array.isArray(value) || value.length === 0) {
-      return false;
-    }
-
-    const sampleSize = Math.min(3, value.length);
-    const first = value[0];
-    if (!first || typeof first !== 'object') {
-      return false;
-    }
-    const baselineKeys = new Set(Object.keys(first as Record<string, unknown>));
-    if (!baselineKeys.size) {
-      return false;
-    }
-
-    for (let i = 1; i < sampleSize; i += 1) {
-      const item = value[i];
-      if (!item || typeof item !== 'object') {
-        return false;
-      }
-      const keys = Object.keys(item as Record<string, unknown>);
-      if (keys.length !== baselineKeys.size) {
-        return false;
-      }
-      for (const key of keys) {
-        if (!baselineKeys.has(key)) {
-          return false;
-        }
-      }
-    }
-
-    return true;
   }
 
   private mergeMeta(overrides?: LtpMeta): LtpMeta | undefined {

@@ -52,16 +52,8 @@ export interface LtpEnvelope<T = unknown> {
   timestamp: number;
   payload: T;
   meta?: LtpMeta;
-  content_encoding?: ContentEncoding;
   nonce?: string;
   signature?: string;
-}
-
-export type ContentEncoding = 'json' | 'toon';
-
-export interface LtpCodec {
-  encodeJsonToToon?(value: unknown): string;
-  decodeToonToJson?(toon: string): unknown;
 }
 
 /**
@@ -235,8 +227,6 @@ export interface LtpClientOptions {
   storage?: LtpStorage;
   reconnect?: ReconnectStrategy;
   heartbeat?: HeartbeatOptions;
-  codec?: LtpCodec;
-  preferredEncoding?: ContentEncoding;
 }
 
 /**

@@ -115,7 +115,6 @@ class LtpEnvelope:
     timestamp: int
     payload: Dict[str, Any] = field(default_factory=dict)
     meta: Optional[LtpMeta] = None
-    content_encoding: str = "json"  # TOON support will land in a dedicated codec module
     nonce: Optional[str] = None
     signature: Optional[str] = None
 
@@ -130,8 +129,6 @@ class LtpEnvelope:
         }
         if self.meta:
             result['meta'] = self.meta.to_dict()
-        if self.content_encoding:
-            result['content_encoding'] = self.content_encoding
         if self.nonce:
             result['nonce'] = self.nonce
         if self.signature:
@@ -151,7 +148,6 @@ class LtpEnvelope:
             timestamp=data['timestamp'],
             payload=data.get('payload', {}),
             meta=meta,
-            content_encoding=data.get('content_encoding', 'json'),
             nonce=data.get('nonce'),
             signature=data.get('signature')
         )
