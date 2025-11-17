@@ -325,6 +325,54 @@ await client.send_event('user_action', {
 })
 ```
 
+### Elixir
+
+```elixir
+{:ok, pid} = LTP.Client.start_link(%{
+  url: "ws://localhost:8080",
+  client_id: "elixir-example-1",
+  default_context_tag: "evening_reflection"
+})
+
+:ok = LTP.Client.send_state_update(pid, %{
+  kind: "affect_log_v1",
+  data: [
+    %{t: 1, valence: 0.2, arousal: -0.1},
+    %{t: 2, valence: 0.3, arousal: -0.2}
+  ]
+})
+
+:ok = LTP.Client.send_event(pid, "user_action", %{
+  action: "button_click",
+  target: "explore_mode"
+})
+```
+
+### Rust
+
+```rust
+use ltp_client::LtpClient;
+use serde_json::json;
+
+let mut client = LtpClient::new("ws://localhost:8080", "rust-example-1")
+    .with_default_context_tag("evening_reflection");
+
+client.connect().await?;
+
+client.send_state_update(
+    "affect_log_v1",
+    vec![
+        json!({"t": 1, "valence": 0.2, "arousal": -0.1}),
+        json!({"t": 2, "valence": 0.3, "arousal": -0.2}),
+    ],
+).await?;
+
+client.send_event(
+    "user_action",
+    json!({"action": "button_click", "target": "explore_mode"}),
+).await?;
+```
+
 ## Example Scenario: Evening Reflection
 
 LTP is designed to carry **semantic intent** (via LRI) through a **secure transport** layer. Here's a real-world example:
