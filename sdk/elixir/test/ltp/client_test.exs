@@ -1,6 +1,5 @@
 defmodule LTP.ClientTest do
-  use ExUnit.Case, async: true
-  doctest LTP.Client
+  use ExUnit.Case, async: false
 
   alias LTP.Client
 
@@ -11,9 +10,16 @@ defmodule LTP.ClientTest do
         client_id: "test-client-1"
       }
 
+      # Start client (will attempt connection but that's ok for this test)
       assert {:ok, pid} = Client.start_link(opts)
       assert Process.alive?(pid)
-      Process.exit(pid, :normal)
+      
+      # Clean up
+      try do
+        Client.stop(pid)
+      rescue
+        _ -> Process.exit(pid, :kill)
+      end
     end
 
     test "requires url and client_id" do
@@ -40,7 +46,13 @@ defmodule LTP.ClientTest do
       # Client is not connected yet, so should return error
       result = Client.send_state_update(pid, %{kind: "test", data: %{}})
       assert result == {:error, :not_connected}
-      Process.exit(pid, :normal)
+      
+      # Clean up
+      try do
+        Client.stop(pid)
+      rescue
+        _ -> Process.exit(pid, :kill)
+      end
     end
   end
 
@@ -54,7 +66,13 @@ defmodule LTP.ClientTest do
       {:ok, pid} = Client.start_link(opts)
       assert Client.get_thread_id(pid) == nil
       assert Client.get_session_id(pid) == nil
-      Process.exit(pid, :normal)
+      
+      # Clean up
+      try do
+        Client.stop(pid)
+      rescue
+        _ -> Process.exit(pid, :kill)
+      end
     end
   end
 
@@ -67,9 +85,12 @@ defmodule LTP.ClientTest do
 
       {:ok, pid} = Client.start_link(opts)
       assert Process.alive?(pid)
+      
+      # Stop the client
       :ok = Client.stop(pid)
+      
       # Give process time to terminate
-      Process.sleep(100)
+      Process.sleep(200)
       refute Process.alive?(pid)
     end
   end

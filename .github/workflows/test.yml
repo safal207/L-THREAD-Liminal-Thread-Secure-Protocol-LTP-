@@ -57,11 +57,15 @@ jobs:
       - name: Install dependencies
         run: |
           cd sdk/elixir
-          mix deps.get
+          mix deps.get --only test
+      - name: Compile
+        run: |
+          cd sdk/elixir
+          mix compile
       - name: Test
         run: |
           cd sdk/elixir
-          mix test
+          mix test --trace
 
   test-rust:
     name: Test Rust SDK

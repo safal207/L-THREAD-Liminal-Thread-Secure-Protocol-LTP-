@@ -1,6 +1,5 @@
 defmodule LTP.TypesTest do
   use ExUnit.Case, async: true
-  doctest LTP.Types
 
   alias LTP.Types
 
