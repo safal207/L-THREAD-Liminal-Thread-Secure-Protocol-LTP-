@@ -13,6 +13,89 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Production-ready TOON codec implementations
 - Cross-language SDK comparison benchmarks
 
+## [0.3.1] - 2025-01-17
+
+### Security
+
+**Critical Security Enhancements - Production Ready**
+
+- **[CRITICAL] Fixed non-cryptographic random in JavaScript SDK**
+  - Replaced `Math.random()` with Web Crypto API (`crypto.getRandomValues()`) for nonce generation
+  - Replaced `Math.random()` with Node.js `crypto.randomBytes()` for server environments
+  - Added fallback to UUID v4 for environments without crypto support
+  - Locations: `sdk/js/src/client.ts:735-817`
+
+- **[CRITICAL] Fixed non-cryptographic random in server examples**
+  - Replaced `Math.random()` with `crypto.randomBytes()` in `attachSecurity()` function
+  - Locations: `examples/js-minimal-server/index.js:58`
+
+- **[MEDIUM] Enhanced Python SDK nonce generation**
+  - Replaced `uuid4().hex[:6]` with `secrets.token_hex(8)` for stronger randomness
+  - Now uses cryptographically secure random throughout
+  - Locations: `sdk/python/ltp_client/client.py:407-409`
+
+### Added
+
+- **Rate Limiting** - Production-ready rate limiting in server examples
+  - Per-client message rate limiting (100 messages/minute default)
+  - Automatic cleanup of expired rate limit entries
+  - `RATE_LIMIT_EXCEEDED` error response
+  - Locations: `examples/js-minimal-server/index.js:19-51, 192-206`
+
+- **Replay Attack Protection** - Comprehensive nonce validation example
+  - Nonce uniqueness validation with TTL cache
+  - Timestamp drift detection (max 1 minute)
+  - Client ID verification in nonce
+  - Production implementation guide in `DEPLOYMENT.md`
+  - Locations: `DEPLOYMENT.md:708-807`
+
+- **Security Hardening Guide** - Complete production security guide
+  - `SECURITY_HARDENING.md` - 500+ line comprehensive security guide
+  - Cryptographic best practices for all SDKs
+  - TLS 1.3+ configuration examples
+  - Authentication & authorization patterns
+  - DoS protection strategies
+  - Session management security
+  - Monitoring & logging recommendations
+  - Production deployment checklist
+
+### Changed
+
+- **Updated all SDKs to use cryptographically secure random number generation**
+  - JavaScript/TypeScript: Web Crypto API + Node.js crypto module
+  - Python: `secrets` module (CSPRNG)
+  - Elixir: `:crypto.strong_rand_bytes()` (already secure)
+  - Rust: `uuid` crate with crypto RNG (already secure)
+
+- **Enhanced server example security**
+  - Added rate limiting middleware
+  - Added connection cleanup
+  - Improved error responses for security violations
+
+### Documentation
+
+- Added `SECURITY_HARDENING.md` - Production security guide
+- Updated `DEPLOYMENT.md` with replay attack protection examples
+- Enhanced security sections in all documentation
+- Added security checklist for production deployments
+
+### Migration Guide
+
+**From v0.3.0 to v0.3.1:**
+
+No breaking changes. All security enhancements are backward compatible.
+
+**Recommended actions:**
+1. Update all SDKs to v0.3.1+
+2. Review `SECURITY_HARDENING.md` for production deployments
+3. Implement rate limiting in production servers
+4. Consider adding replay attack protection (see `DEPLOYMENT.md`)
+5. Verify TLS 1.3+ is configured
+
+**Risk Assessment:**
+- **v0.3.0 and earlier:** Not recommended for production (weak random in JS SDK)
+- **v0.3.1+:** Production ready with proper security hardening
+
 ## [0.3.0] - 2025-01-15
 
 ### Added

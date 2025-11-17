@@ -705,6 +705,106 @@ function validateEnvelope(envelope) {
 }
 ```
 
+### 4. Replay Attack Protection
+
+**Nonce validation with timestamp check:**
+
+```javascript
+// Nonce cache with TTL (use Redis in production)
+const nonceCache = new Map();
+const NONCE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_TIMESTAMP_DRIFT_MS = 60 * 1000; // 1 minute
+
+/**
+ * Validate nonce to prevent replay attacks
+ * Checks:
+ * 1. Nonce has not been seen before
+ * 2. Timestamp is within acceptable drift window
+ * 3. Nonce format is valid
+ */
+function validateNonce(nonce, clientId) {
+  // Parse nonce: format is "clientId-timestamp-randomHex"
+  const parts = nonce.split('-');
+  if (parts.length < 3) {
+    return { valid: false, reason: 'Invalid nonce format' };
+  }
+
+  const [nonceClientId, timestampStr, randomPart] = parts;
+
+  // Verify client ID matches
+  if (nonceClientId !== clientId) {
+    return { valid: false, reason: 'Client ID mismatch in nonce' };
+  }
+
+  // Check timestamp drift
+  const nonceTimestamp = parseInt(timestampStr, 10);
+  const now = Date.now();
+  const drift = Math.abs(now - nonceTimestamp);
+
+  if (drift > MAX_TIMESTAMP_DRIFT_MS) {
+    return { valid: false, reason: 'Nonce timestamp too old or from future' };
+  }
+
+  // Check if nonce already used
+  if (nonceCache.has(nonce)) {
+    return { valid: false, reason: 'Nonce already used (replay attack detected)' };
+  }
+
+  // Store nonce with expiry
+  nonceCache.set(nonce, { timestamp: now, expiresAt: now + NONCE_TTL_MS });
+
+  return { valid: true };
+}
+
+/**
+ * Cleanup expired nonces periodically
+ */
+setInterval(() => {
+  const now = Date.now();
+  for (const [nonce, data] of nonceCache.entries()) {
+    if (data.expiresAt < now) {
+      nonceCache.delete(nonce);
+    }
+  }
+}, 60 * 1000); // Clean up every minute
+
+// Example usage in message handler
+function handleSecureMessage(ws, message) {
+  const clientId = message.meta?.client_id || 'unknown';
+  const nonce = message.nonce;
+
+  if (!nonce) {
+    ws.send(JSON.stringify({
+      type: 'error',
+      payload: { error_code: 'MISSING_NONCE', error_message: 'Nonce required' }
+    }));
+    return;
+  }
+
+  const validation = validateNonce(nonce, clientId);
+  if (!validation.valid) {
+    console.warn(`⚠️  Replay attack detected: ${validation.reason}`);
+    ws.send(JSON.stringify({
+      type: 'error',
+      payload: {
+        error_code: 'INVALID_NONCE',
+        error_message: validation.reason
+      }
+    }));
+    return;
+  }
+
+  // Process message...
+}
+```
+
+**Production considerations:**
+
+- Use Redis with `SETEX` for distributed nonce cache
+- Implement sliding window for timestamp validation
+- Log replay attack attempts for security monitoring
+- Consider using HMAC signatures in v0.4+ for stronger protection
+
 ---
 
 ## Troubleshooting

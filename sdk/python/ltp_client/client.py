@@ -7,6 +7,7 @@ import asyncio
 import json
 import os
 import platform
+import secrets
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -403,7 +404,9 @@ class LtpClient:
         return f"client-{uuid4()}"
 
     def _generate_nonce(self) -> str:
-        return f"{self.client_id}-{int(time.time() * 1000)}-{uuid4().hex[:6]}"
+        """Generate cryptographically secure nonce using secrets module"""
+        random_hex = secrets.token_hex(8)
+        return f"{self.client_id}-{int(time.time() * 1000)}-{random_hex}"
 
     def _detect_platform(self) -> str:
         return f"python-{platform.system().lower()}"

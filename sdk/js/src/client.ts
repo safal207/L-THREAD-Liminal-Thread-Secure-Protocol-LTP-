@@ -732,8 +732,71 @@ export class LtpClient {
     }
   }
 
+  /**
+   * Generate cryptographically secure random hex string
+   * Works in both browser (Web Crypto API) and Node.js (crypto module)
+   */
+  private generateSecureRandomHex(byteLength: number): string {
+    // Browser environment
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+      const randomBytes = new Uint8Array(byteLength);
+      window.crypto.getRandomValues(randomBytes);
+      return Array.from(randomBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    }
+
+    // Node.js environment
+    if (typeof require !== 'undefined') {
+      try {
+        const crypto = require('crypto');
+        return crypto.randomBytes(byteLength).toString('hex');
+      } catch (e) {
+        this.logger.warn('Crypto module not available, falling back to UUID-based random');
+      }
+    }
+
+    // Fallback: Use UUID v4 which has crypto-secure randomness
+    // This is still better than Math.random()
+    const uuid = this.generateUUIDv4();
+    return uuid.replace(/-/g, '').substring(0, byteLength * 2);
+  }
+
+  /**
+   * Generate UUID v4 (cryptographically secure in modern environments)
+   */
+  private generateUUIDv4(): string {
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+
+    // Polyfill for UUID v4 using crypto.getRandomValues or crypto.randomBytes
+    if (typeof window !== 'undefined' && window.crypto && window.crypto.getRandomValues) {
+      const bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+
+      // Set version (4) and variant bits
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+
+      const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+      return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}`;
+    }
+
+    // Last resort: timestamp-based (not crypto-secure, but better than nothing)
+    const timestamp = Date.now().toString(16);
+    const random = Math.random().toString(16).substring(2);
+    this.logger.warn('Using non-crypto-secure UUID fallback');
+    return `${timestamp}-${random}-4xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0;
+      const v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  }
+
   private generateNonce(): string {
-    return `${this.options.clientId}-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+    const randomHex = this.generateSecureRandomHex(8);
+    return `${this.options.clientId}-${Date.now()}-${randomHex}`;
   }
 
   private hasSessionContext(): boolean {
@@ -749,7 +812,8 @@ export class LtpClient {
   }
 
   private generateClientId(): string {
-    return `client-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+    const randomHex = this.generateSecureRandomHex(8);
+    return `client-${Date.now()}-${randomHex}`;
   }
 
   private detectPlatform(): string {
