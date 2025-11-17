@@ -29,7 +29,7 @@ defmodule LTP.MixProject do
 
   defp deps do
     [
-      {:websockex, "~> 0.5"},
+      {:websockex, "~> 0.4"},
       {:jason, "~> 1.4"},
       {:ex_doc, "~> 0.30", only: :dev, runtime: false},
       {:ex_unit_notifier, "~> 1.0", only: :test}

@@ -57,7 +57,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd sdk/elixir
-          mix deps.get --only test
+          mix deps.get
       - name: Compile
         run: |
           cd sdk/elixir
