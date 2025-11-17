@@ -13,11 +13,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-language SDK comparison benchmarks
 - Production-ready TOON codec implementations
 
-## [0.5.0-beta] - 2025-01-17
+## [0.5.0-beta.2] - 2025-01-17
 
-### 🔒 Major Security Enhancements - Addressing Cryptographic Review
+### 🔒 Critical Security - Mandatory Verification & Replay Protection
 
-**WORK IN PROGRESS** - Implementing recommendations from cryptographic security audit
+**Implementing recommendations from cryptographic security audit - Phase 2**
+
+### Added
+
+- **Mandatory Signature Verification** (CRITICAL FIX)
+  - Signature verification now REQUIRED by default when MAC key is present
+  - Invalid signatures are REJECTED (not just logged)
+  - Messages without signatures are REJECTED when verification is required
+  - Configuration error thrown if verification required but no key provided
+  - Location: `sdk/js/src/client.ts:446-578`
+
+- **Nonce Validation for Replay Protection** (CRITICAL FIX)
+  - Comprehensive nonce validation with uniqueness check
+  - Nonce format validation: `clientId-timestamp-randomHex`
+  - Client ID verification in nonce
+  - Timestamp drift detection (rejects old and future nonces)
+  - Entropy validation (minimum 8 hex characters)
+  - Nonce cache with automatic cleanup (TTL-based)
+  - Location: `sdk/js/src/client.ts:957-1046`
+
+- **Timestamp Validation** - Replay protection
+  - Rejects messages older than `maxMessageAge` (default: 60s)
+  - Rejects messages from future (clock skew tolerance: 5s)
+  - Configurable via `maxMessageAge` option
+
+### Changed
+
+- **Signature Generation** - Proper key handling
+  - Uses `sessionMacKey` if present, falls back to `secretKey`
+  - No placeholder when verification is required
+  - Throws error if key missing but verification required
+  - Location: `sdk/js/src/client.ts:1048-1076`
+
+- **Message Handling** - Now fully async
+  - `handleMessage()` → `handleMessageAsync()`
+  - Signature verification is blocking (security critical)
+  - Nonce validation integrated into message flow
+  - Failed verification = message rejected
+
+- **Client Lifecycle** - Nonce cache management
+  - Starts nonce cleanup on connect
+  - Stops cleanup on disconnect
+  - Clears cache on manual disconnect
+  - Periodic cleanup every 60 seconds
+
+### Security Improvements
+
+✅ **Fixed:** Optional signature verification (now MANDATORY)
+✅ **Fixed:** No replay protection (now COMPREHENSIVE)
+✅ **Fixed:** Timestamp validation (age + drift detection)
+✅ **Fixed:** Nonce validation (uniqueness + format + entropy)
+🚧 **In Progress:** ECDH handshake protocol
+🚧 **In Progress:** Remove all placeholder signatures
+
+### Breaking Changes
+
+**None yet** - v0.4 compatibility maintained
+
+However, when a `sessionMacKey` or `secretKey` is provided:
+- Signature verification is NOW REQUIRED by default
+- Messages without valid signatures are REJECTED
+- This is a security improvement, not a breaking change
+
+### Migration Path
+
+```typescript
+// v0.5.0-beta.2 - Automatic security when key is present
+const client = new LtpClient('wss://...', {
+  sessionMacKey: macKey,
+  // requireSignatureVerification defaults to TRUE (automatic)
+  // maxMessageAge defaults to 60000ms (60 seconds)
+});
+
+// To disable verification (NOT RECOMMENDED):
+const insecureClient = new LtpClient('wss://...', {
+  sessionMacKey: macKey,
+  requireSignatureVerification: false, // Explicitly disable
+});
+```
+
+### Roadmap Updates
+
+- [x] Implement mandatory signature verification in client ✅
+- [x] Integrate nonce validation (replay protection) ✅
+- [ ] Add ECDH handshake protocol
+- [ ] Remove placeholder signatures when verification enabled
+- [ ] Update all examples with new key exchange pattern
+- [ ] Security audit documentation
+- [ ] Performance benchmarks
+
+## [0.5.0-beta.1] - 2025-01-17
+
+### 🔒 Major Security Enhancements - Addressing Cryptographic Review (Phase 1)
+
+**Implementing recommendations from cryptographic security audit**
 
 ### Added
 
@@ -85,15 +179,6 @@ const client = new LtpClient('wss://...', {
 });
 ```
 
-### Roadmap to v0.5.0 Final
-
-- [ ] Implement mandatory signature verification in client
-- [ ] Integrate nonce validation (replay protection)
-- [ ] Remove placeholder signatures completely
-- [ ] Add ECDH handshake protocol
-- [ ] Update all examples
-- [ ] Security audit documentation
-- [ ] Performance benchmarks
 
 ## [0.4.0] - 2025-01-17
 
