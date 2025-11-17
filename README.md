@@ -7,6 +7,12 @@
 
 L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the LIMINAL ecosystem. It serves as a "liminal thread" - a protected communication channel between human devices and LIMINAL OS that preserves context, intent, and inner state throughout the interaction.
 
+📖 **Documentation:**
+- [Architecture Overview](./ARCHITECTURE.md) - Ecosystem architecture and SDK comparison
+- [Deployment Guide](./DEPLOYMENT.md) - Production deployment strategies
+- [API Reference](./API.md) - Complete API documentation for all SDKs
+- [Protocol Specifications](./specs/) - Detailed protocol specifications
+
 ### What Makes LTP Different
 
 Unlike traditional HTTPS/WebSocket protocols that treat data as isolated transactions, LTP maintains a continuous **liminal thread session** that:
@@ -467,11 +473,15 @@ See `specs/LTP-message-format.md` section 9 for full details.
 
 ```
 .
-├── README.md
+├── README.md                    # This file
+├── ARCHITECTURE.md              # Ecosystem architecture overview
+├── DEPLOYMENT.md                # Deployment guide
+├── API.md                       # API reference documentation
 ├── specs/
 │   ├── LTP-core.md              # Core protocol architecture
 │   ├── LTP-handshake.md         # Handshake protocol
-│   └── LTP-message-format.md    # Message envelope spec
+│   ├── LTP-message-format.md   # Message envelope spec
+│   └── LTP-toon.md             # TOON encoding specification
 ├── sdk/
 │   ├── js/                      # TypeScript SDK
 │   │   ├── src/
