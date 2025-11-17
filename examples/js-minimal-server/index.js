@@ -170,15 +170,27 @@ function handleMessage(ws, message, sessionData) {
       const threadShort = message.thread_id ? message.thread_id.substring(0, 8) : 'none';
       const sessionShort = message.session_id ? message.session_id.substring(0, 8) : 'none';
       const contextTag = message.meta?.context_tag || 'none';
-      const affectStr = message.meta?.affect
-        ? `valence=${message.meta.affect.valence},arousal=${message.meta.affect.arousal}`
+      const affect = message.meta?.affect;
+      const affectStr = affect
+        ? `valence=${affect.valence},arousal=${affect.arousal}`
         : 'none';
       const intent = message.payload?.data?.intent || 'none';
+      const encoding = message.content_encoding || 'json';
+      const payloadData = message.payload?.data;
+      const payloadPreviewString =
+        typeof payloadData === 'string'
+          ? payloadData
+          : JSON.stringify(payloadData, null, 2);
+      const previewLines = payloadPreviewString.split('\n').slice(0, 3).join('\n');
+      const payloadLength = typeof payloadData === 'string'
+        ? payloadData.length
+        : payloadPreviewString.length;
 
       console.log(`← [LTP] state_update`);
       console.log(`  LTP[${threadShort}/${sessionShort}] ctx=${contextTag} affect={${affectStr}} intent=${intent}`);
+      console.log(`  content_encoding=${encoding} payload_chars=${payloadLength}`);
+      console.log(`  preview:\n${previewLines}`);
 
-      // Detailed payload logging
       console.log('  Kind:', message.payload.kind);
       if (message.payload.kind === 'lri_envelope_v1') {
         console.log('  [LRI] Processing semantic content:');
@@ -191,26 +203,9 @@ function handleMessage(ws, message, sessionData) {
         if (message.payload.data?.resonance_hooks) {
           console.log('    Resonance hooks:', message.payload.data.resonance_hooks.join(', '));
         }
-      } else {
+      } else if (typeof message.payload.data !== 'string') {
         console.log('  Data:', JSON.stringify(message.payload.data, null, 2));
       }
-
-      // Log LRI-enhanced format (LTP + LRI integration)
-      const threadShort = message.thread_id.substring(0, 8);
-      const sessionShort = message.session_id.substring(0, 8);
-      const contextTag = message.meta?.context_tag || 'none';
-      const affect = message.meta?.affect;
-      const intent = message.payload?.data?.intent || 'none';
-
-      let ltpLog = `LTP[${threadShort}.../${sessionShort}...] ctx=${contextTag}`;
-
-      if (affect) {
-        ltpLog += ` affect={${affect.valence},${affect.arousal}}`;
-      }
-
-      ltpLog += ` intent=${intent}`;
-
-      console.log(`  ${ltpLog}`);
 
       // Echo back a server state update (optional)
       const serverStateUpdate = attachSecurity({

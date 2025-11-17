@@ -130,9 +130,7 @@ export interface PongPayload {
  */
 export interface StateUpdatePayload {
   kind: 'minimal' | 'full' | 'delta';
-  data: {
-    [key: string]: unknown;
-  };
+  data: unknown;
 }
 
 /**
@@ -140,9 +138,7 @@ export interface StateUpdatePayload {
  */
 export interface EventPayload {
   event_type: string;
-  data: {
-    [key: string]: unknown;
-  };
+  data: unknown;
 }
 
 /**

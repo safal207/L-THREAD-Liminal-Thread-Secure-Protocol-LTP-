@@ -209,6 +209,26 @@ The `meta` object is optional but recommended for production systems:
 }
 ```
 
+**Example with TOON payload (Client → Server):**
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "session_id": "a8f5f167-d5a1-4c42-9e12-3d8f72e6b5c1",
+  "timestamp": 1731600000,
+  "content_encoding": "toon",
+  "payload": {
+    "kind": "affect_log_v1",
+    "data": "affect_log[3]{t,valence,arousal}:\n  1,0.2,-0.1\n  2,0.3,-0.2\n  3,0.1,0.0\n"
+  },
+  "meta": {
+    "client_id": "client-123",
+    "context_tag": "evening_reflection"
+  }
+}
+```
+
 ### 3.5 event
 
 **Purpose:** Send discrete event notifications (user actions, system events).

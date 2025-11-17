@@ -1,6 +1,6 @@
 """
 LTP (Liminal Thread Protocol) Python Types
-Version 0.1
+Version 0.3
 """
 
 from dataclasses import dataclass, field
@@ -16,7 +16,7 @@ MessageType = Literal[
     "pong",
     "state_update",
     "event",
-    "error"
+    "error",
 ]
 
 StateUpdateKind = Literal["minimal", "full", "delta"]
@@ -56,7 +56,7 @@ class LtpMeta:
 class HandshakeInit:
     """Handshake Init Message (Client → Server)"""
     type: Literal["handshake_init"] = "handshake_init"
-    ltp_version: str = "0.1"
+    ltp_version: str = "0.3"
     client_id: str = ""
     device_fingerprint: Optional[str] = None
     intent: Optional[str] = None
@@ -85,7 +85,7 @@ class HandshakeInit:
 class HandshakeAck:
     """Handshake Acknowledgment Message (Server → Client)"""
     type: Literal["handshake_ack"] = "handshake_ack"
-    ltp_version: str = "0.1"
+    ltp_version: str = "0.3"
     thread_id: str = ""
     session_id: str = ""
     server_capabilities: List[str] = field(default_factory=list)

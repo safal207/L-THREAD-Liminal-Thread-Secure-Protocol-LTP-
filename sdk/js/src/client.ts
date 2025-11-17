@@ -233,7 +233,7 @@ export class LtpClient {
 
     const payload: EventPayload = {
       event_type: eventType,
-      data,
+      data: prepared.encoded,
     };
 
     const metaOverrides: LtpMeta = {
