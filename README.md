@@ -240,28 +240,41 @@ client.sendEvent(
 
 - Node.js 18+ (for JavaScript SDK and examples)
 - Python 3.9+ (for Python SDK)
+- Elixir 1.14+ (for Elixir SDK and server)
+- Rust 1.70+ (for Rust SDK and server)
 
 ### Run Minimal Example
 
-1. **Install dependencies:**
+**Option 1: JavaScript Server + Client**
+
+1. **Start the server:**
    ```bash
    cd examples/js-minimal-server
-   npm install
+   npm install && npm start
    ```
 
-2. **Start the server:**
-   ```bash
-   npm start
-   ```
-
-3. **In another terminal, run the client:**
+2. **In another terminal, run the client:**
    ```bash
    cd examples/js-minimal-client
-   npm install
-   npm start
+   npm install && npm start
    ```
 
-You should see the handshake exchange, ping-pong messages, and state updates flowing through the liminal thread.
+**Option 2: Elixir Server**
+
+```bash
+cd examples/elixir-server
+mix deps.get
+mix run --no-halt
+```
+
+**Option 3: Rust Server**
+
+```bash
+cd examples/rust-server
+cargo run
+```
+
+You should see the handshake exchange, ping-pong messages, and state updates flowing through the liminal thread. All servers are compatible with all clients!
 
 ## SDK Ecosystem
 
@@ -472,8 +485,10 @@ See `specs/LTP-message-format.md` section 9 for full details.
 │           ├── types.py
 │           └── client.py
 └── examples/
-    ├── js-minimal-client/       # Example client
-    └── js-minimal-server/       # Example server
+    ├── js-minimal-client/       # JavaScript client example
+    ├── js-minimal-server/       # JavaScript server example
+    ├── elixir-server/           # Elixir server example
+    └── rust-server/             # Rust server example
 ```
 
 ## Roadmap
