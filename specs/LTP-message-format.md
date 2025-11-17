@@ -1,11 +1,11 @@
-# LTP Message Format Specification v0.2
+# LTP Message Format Specification v0.3
 
 ## 1. Overview
 
 All LTP messages (except handshake) use a unified JSON envelope format. This ensures consistent context propagation, tracing, and extensibility across all message types.
 
 **Design Principles:**
-- Simple JSON structure for v0.2
+- Simple JSON structure for v0.3
 - Every message carries session context (`thread_id`, `session_id`)
 - Extensible `payload` for message-specific data
 - `meta` field for cross-cutting concerns (tracing, liminal metadata, etc.)
@@ -23,6 +23,7 @@ All LTP messages (except handshake) use a unified JSON envelope format. This ens
   "timestamp": 1731600000,
   "payload": {},
   "meta": {},
+  "content_encoding": "json",
   "nonce": "client-uuid-1699824000000-12345",
   "signature": "v0-placeholder"
 }
@@ -38,6 +39,7 @@ All LTP messages (except handshake) use a unified JSON envelope format. This ens
 | `timestamp` | number | Yes | Unix epoch time in seconds (integer) |
 | `payload` | object | No | Message-specific data (structure varies by type) |
 | `meta` | object | No | Metadata for tracing, debugging, liminal context |
+| `content_encoding` | string | No | Declares how `payload.data` is encoded: `json` (default) or `toon` |
 | `nonce` | string | No | Client-provided unique value per message (at least per session) |
 | `signature` | string | No | Placeholder for future integrity/authentication |
 
@@ -82,6 +84,14 @@ The `meta` object is optional but recommended for production systems:
 - `nonce` MUST be unique per message at least within the active `session_id`. SDKs typically concatenate the `client_id`, timestamp, and a random suffix.
 - `signature` is reserved for future MAC/signature schemes. In v0.2 SDKs populate placeholder values so the field is always present when transport policies require it.
 - All LTP traffic SHOULD ride over TLS/WSS (`recommended_env`) until real cryptographic verification ships.
+
+### 2.5 Content Encoding (v0.3)
+
+- `content_encoding` is an optional top-level field describing the encoding for `payload.data`.
+- Supported values:
+  - `json` (default): `payload.data` is a regular JSON object/array.
+  - `toon`: `payload.data` is a TOON string (Token-Oriented Object Notation) negotiated between client/server.
+- LTP itself does not parse TOON; the application/LRI layer is responsible for converting between TOON and native structures.
 
 ## 3. Message Types (v0.2)
 
@@ -205,6 +215,26 @@ The `meta` object is optional but recommended for production systems:
   },
   "meta": {
     "trace_id": "trace-abc-123"
+  }
+}
+```
+
+**Example with TOON payload (Client → Server):**
+
+```json
+{
+  "type": "state_update",
+  "thread_id": "7c9e6679-7425-40de-944b-e07fc1f90ae7",
+  "session_id": "a8f5f167-d5a1-4c42-9e12-3d8f72e6b5c1",
+  "timestamp": 1731600000,
+  "content_encoding": "toon",
+  "payload": {
+    "kind": "affect_log_v1",
+    "data": "affect_log[3]{t,valence,arousal}:\n  1,0.2,-0.1\n  2,0.3,-0.2\n  3,0.1,0.0\n"
+  },
+  "meta": {
+    "client_id": "client-123",
+    "context_tag": "evening_reflection"
   }
 }
 ```

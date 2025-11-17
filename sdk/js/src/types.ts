@@ -52,8 +52,16 @@ export interface LtpEnvelope<T = unknown> {
   timestamp: number;
   payload: T;
   meta?: LtpMeta;
+  content_encoding?: ContentEncoding;
   nonce?: string;
   signature?: string;
+}
+
+export type ContentEncoding = 'json' | 'toon';
+
+export interface LtpCodec {
+  encodeJsonToToon?(value: unknown): string;
+  decodeToonToJson?(toon: string): unknown;
 }
 
 /**
@@ -130,9 +138,7 @@ export interface PongPayload {
  */
 export interface StateUpdatePayload {
   kind: 'minimal' | 'full' | 'delta';
-  data: {
-    [key: string]: unknown;
-  };
+  data: unknown;
 }
 
 /**
@@ -140,9 +146,7 @@ export interface StateUpdatePayload {
  */
 export interface EventPayload {
   event_type: string;
-  data: {
-    [key: string]: unknown;
-  };
+  data: unknown;
 }
 
 /**
@@ -231,6 +235,8 @@ export interface LtpClientOptions {
   storage?: LtpStorage;
   reconnect?: ReconnectStrategy;
   heartbeat?: HeartbeatOptions;
+  codec?: LtpCodec;
+  preferredEncoding?: ContentEncoding;
 }
 
 /**

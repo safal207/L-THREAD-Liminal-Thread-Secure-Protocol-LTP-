@@ -1,6 +1,6 @@
 {
   "name": "@liminal/ltp-client",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "LTP (Liminal Thread Protocol) client SDK for JavaScript/TypeScript",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

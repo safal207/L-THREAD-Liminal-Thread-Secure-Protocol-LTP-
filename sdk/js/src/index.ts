@@ -12,6 +12,8 @@ export type {
   LtpAffect,
   LtpMeta,
   LtpEnvelope,
+  ContentEncoding,
+  LtpCodec,
   HandshakeInitMessage,
   HandshakeAckMessage,
   HandshakeResumeMessage,
