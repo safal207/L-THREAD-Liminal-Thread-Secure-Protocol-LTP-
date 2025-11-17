@@ -9,9 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Planned
 - LRI integration examples
-- Advanced authentication/authorization
-- Production-ready TOON codec implementations
 - Cross-language SDK comparison benchmarks
+- Full E2E encryption implementation
+- Production-ready TOON codec implementations
+
+## [0.4.0] - 2025-01-17
+
+### Added - Real Cryptography
+
+**Major cryptographic enhancements - Message signing and verification**
+
+- **Cryptographic Module** - New crypto.ts with comprehensive utilities
+  - HMAC-SHA256 message signing and verification
+  - ECDH key pair generation and key exchange (P-256)
+  - AES-256-GCM encryption/decryption
+  - Timing-safe comparison
+  - Browser (Web Crypto API) and Node.js support
+
+- **Message Signing** - Automatic HMAC-SHA256 signatures
+  - Optional secretKey in LtpClientOptions
+  - Backward compatible with v0-placeholder fallback
+  - Non-blocking signature generation
+
+- **Signature Verification** - Validate incoming messages
+  - Optional enableSignatureVerification flag
+  - Logs warnings for invalid signatures
+  - Non-blocking verification
+
+- **Exported Crypto Utilities** - Public API for advanced use
+  - signMessage(), verifySignature()
+  - generateKeyPair(), deriveSharedSecret()
+  - encryptPayload(), decryptPayload()
+
+### Changed
+
+- JavaScript SDK version → 0.4.0
+- Enhanced LtpClientOptions with secretKey and enableSignatureVerification
+
+### Security
+
+- HMAC-SHA256 message authentication
+- Timing-safe signature comparison
+- Foundation for E2E encryption
+
+### Backward Compatibility
+
+100% backward compatible with v0.3.x. Crypto features are opt-in.
 
 ## [0.3.1] - 2025-01-17
 

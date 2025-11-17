@@ -257,6 +257,10 @@ export interface LtpClientOptions {
   preferredEncoding?: ContentEncoding;
   /** Optional logger for structured logging (defaults to console if not provided) */
   logger?: LtpLogger;
+  /** Shared secret key for HMAC-SHA256 message signing (v0.4+). If provided, all messages will be signed. */
+  secretKey?: string;
+  /** Enable signature verification for incoming messages (v0.4+). Requires secretKey. */
+  enableSignatureVerification?: boolean;
 }
 
 /**

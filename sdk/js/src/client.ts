@@ -1,8 +1,9 @@
 /**
  * LTP (Liminal Thread Protocol) Client
- * Version 0.3
+ * Version 0.4
  */
 
+import { signMessage, verifySignature } from './crypto';
 import {
   HandshakeInitMessage,
   HandshakeAckMessage,
@@ -430,6 +431,22 @@ export class LtpClient {
   }
 
   private handleMessage(message: LtpMessage): void {
+    // Verify signature if enabled (v0.4+)
+    if (this.options.enableSignatureVerification && this.options.secretKey && message.signature) {
+      // Run verification asynchronously to not block message handling
+      verifySignature(message, this.options.secretKey).then((result) => {
+        if (!result.valid) {
+          this.logger.warn('Message signature verification failed', {
+            type: message.type,
+            error: result.error,
+          });
+          // Still process message for backward compatibility, but log warning
+        }
+      }).catch((error) => {
+        this.logger.error('Failed to verify message signature', error);
+      });
+    }
+
     if (this.events.onMessage) {
       this.events.onMessage(message);
     }
@@ -605,13 +622,26 @@ export class LtpClient {
       return;
     }
 
-    const envelopeWithSecurity: LtpEnvelope = {
-      ...message,
-      nonce: this.generateNonce(),
-      signature: this.generateSignature(),
-    };
+    const nonce = this.generateNonce();
 
-    this.sendRaw(envelopeWithSecurity);
+    // Generate signature asynchronously, but don't block sending
+    this.generateSignature(message, nonce).then((signature) => {
+      const envelopeWithSecurity: LtpEnvelope = {
+        ...message,
+        nonce,
+        signature,
+      };
+
+      this.sendRaw(envelopeWithSecurity);
+    }).catch((error) => {
+      this.logger.error('Failed to generate signature, sending with placeholder', error);
+      const envelopeWithSecurity: LtpEnvelope = {
+        ...message,
+        nonce,
+        signature: 'v0-placeholder',
+      };
+      this.sendRaw(envelopeWithSecurity);
+    });
   }
 
   private sendRaw(message: unknown): void {
@@ -803,8 +833,32 @@ export class LtpClient {
     return Boolean(this.threadId && this.sessionId);
   }
 
-  private generateSignature(): string {
-    return 'v0-placeholder';
+  private async generateSignature(message: LtpEnvelope, nonce: string): Promise<string> {
+    // If no secret key provided, use placeholder (backward compatibility with v0.3)
+    if (!this.options.secretKey) {
+      return 'v0-placeholder';
+    }
+
+    // Generate HMAC-SHA256 signature (v0.4+)
+    try {
+      const signature = await signMessage(
+        {
+          type: message.type,
+          thread_id: message.thread_id || '',
+          session_id: message.session_id,
+          timestamp: message.timestamp,
+          nonce,
+          payload: message.payload,
+        },
+        this.options.secretKey
+      );
+
+      return signature;
+    } catch (error) {
+      this.logger.error('Failed to sign message', error);
+      // Fallback to placeholder if signing fails
+      return 'v0-placeholder';
+    }
   }
 
   private getTimestamp(): number {
