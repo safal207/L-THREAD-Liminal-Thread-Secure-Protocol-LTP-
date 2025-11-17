@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # LTP Server (JavaScript)
+  ltp-server-js:
+    build:
+      context: ./examples/js-minimal-server
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    networks:
+      - ltp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # LTP Server (Elixir)
+  ltp-server-elixir:
+    build:
+      context: ./examples/elixir-server
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8080"
+    environment:
+      - PORT=8080
+    networks:
+      - ltp-network
+    depends_on:
+      - ltp-server-js
+
+  # LTP Server (Rust)
+  ltp-server-rust:
+    build:
+      context: ./examples/rust-server
+      dockerfile: Dockerfile
+    ports:
+      - "8082:8080"
+    environment:
+      - PORT=8080
+    networks:
+      - ltp-network
+    depends_on:
+      - ltp-server-js
+
+networks:
+  ltp-network:
+    driver: bridge
+
+# Usage:
+# docker-compose up -d                    # Start all servers
+# docker-compose up ltp-server-js         # Start only JS server
+# docker-compose logs -f ltp-server-js    # View logs
+# docker-compose down                     # Stop all servers
+
