@@ -22,6 +22,7 @@ import {
   ReconnectStrategy,
   HeartbeatOptions,
   ContentEncoding,
+  LtpLogger,
 } from './types';
 
 const LTP_VERSION = '0.3';
@@ -67,6 +68,45 @@ const DEFAULT_HEARTBEAT: NormalizedHeartbeatOptions = {
 };
 
 /**
+ * Default console-based logger implementation
+ */
+class ConsoleLogger implements LtpLogger {
+  debug(message: string, meta?: Record<string, unknown>): void {
+    if (meta) {
+      console.debug(`[LTP] ${message}`, meta);
+    } else {
+      console.debug(`[LTP] ${message}`);
+    }
+  }
+
+  info(message: string, meta?: Record<string, unknown>): void {
+    if (meta) {
+      console.log(`[LTP] ${message}`, meta);
+    } else {
+      console.log(`[LTP] ${message}`);
+    }
+  }
+
+  warn(message: string, meta?: Record<string, unknown>): void {
+    if (meta) {
+      console.warn(`[LTP] ${message}`, meta);
+    } else {
+      console.warn(`[LTP] ${message}`);
+    }
+  }
+
+  error(message: string, error?: unknown, meta?: Record<string, unknown>): void {
+    if (error || meta) {
+      console.error(`[LTP] ${message}`, error || meta);
+    } else {
+      console.error(`[LTP] ${message}`);
+    }
+  }
+}
+
+const defaultLogger = new ConsoleLogger();
+
+/**
  * LTP Client for establishing and managing liminal thread sessions
  */
 export class LtpClient {
@@ -101,6 +141,7 @@ export class LtpClient {
   private storageKeys: { thread: string; session: string };
   private reconnectConfig: NormalizedReconnectStrategy;
   private heartbeatConfig: NormalizedHeartbeatOptions;
+  private logger: LtpLogger;
 
   /**
    * Create a new LTP client
@@ -127,8 +168,10 @@ export class LtpClient {
       heartbeat: options.heartbeat,
       codec: options.codec,
       preferredEncoding: options.preferredEncoding || 'json',
+      logger: options.logger,
     };
     this.events = events;
+    this.logger = this.options.logger || defaultLogger;
 
     this.storage = this.options.storage || getDefaultStorage();
     this.storageKeys = {
@@ -205,7 +248,7 @@ export class LtpClient {
     options?: { affect?: LtpAffect; contextTag?: string }
   ): void {
     if (!this.hasSessionContext()) {
-      console.error('[LTP] Cannot send state update before handshake completes');
+      this.logger.error('Cannot send state update before handshake completes');
       return;
     }
 
@@ -237,7 +280,7 @@ export class LtpClient {
     options?: { affect?: LtpAffect; contextTag?: string }
   ): void {
     if (!this.hasSessionContext()) {
-      console.error('[LTP] Cannot send event before handshake completes');
+      this.logger.error('Cannot send event before handshake completes');
       return;
     }
 
@@ -261,7 +304,7 @@ export class LtpClient {
    */
   public sendPing(): void {
     if (!this.hasSessionContext()) {
-      console.error('[LTP] Cannot send ping before handshake completes');
+      this.logger.error('Cannot send ping before handshake completes');
       return;
     }
 
@@ -278,7 +321,7 @@ export class LtpClient {
     payload: Record<string, unknown>;
   }): void {
     if (!this.hasSessionContext()) {
-      console.error('[LTP] Cannot send message before handshake completes');
+      this.logger.error('Cannot send message before handshake completes');
       return;
     }
 
@@ -325,7 +368,7 @@ export class LtpClient {
     this.ws = new WebSocket(this.url, SUBPROTOCOL);
 
     this.ws.onopen = () => {
-      console.log('[LTP] WebSocket connected, initiating handshake...');
+      this.logger.info('WebSocket connected, initiating handshake...');
       this.isConnecting = false;
       if (this.threadId) {
         this.isAttemptingResume = true;
@@ -341,16 +384,16 @@ export class LtpClient {
         const message = JSON.parse(event.data) as LtpMessage;
         this.handleMessage(message);
       } catch (error) {
-        console.error('[LTP] Failed to parse message:', error);
+        this.logger.error('Failed to parse message', error);
       }
     };
 
     this.ws.onerror = (error) => {
-      console.error('[LTP] WebSocket error:', error);
+      this.logger.error('WebSocket error', error);
     };
 
     this.ws.onclose = () => {
-      console.log('[LTP] WebSocket closed');
+      this.logger.info('WebSocket closed');
       this.handleDisconnect('closed');
     };
   }
@@ -419,12 +462,16 @@ export class LtpClient {
         this.handleError(message.payload as ErrorPayload);
         break;
       default:
-        console.log('[LTP] Received message:', message.type);
+        this.logger.debug('Received message', { type: message.type });
     }
   }
 
   private handleHandshakeAck(message: HandshakeAckMessage): void {
-    console.log('[LTP] Handshake acknowledged');
+    this.logger.info('Handshake acknowledged', {
+      threadId: message.thread_id,
+      sessionId: message.session_id,
+      resumed: message.resumed,
+    });
 
     this.threadId = message.thread_id;
     this.sessionId = message.session_id;
@@ -452,7 +499,7 @@ export class LtpClient {
   }
 
   private handleHandshakeReject(message: HandshakeRejectMessage): void {
-    console.warn('[LTP] Handshake resume rejected:', message.reason);
+    this.logger.warn('Handshake resume rejected', { reason: message.reason });
 
     if (this.isAttemptingResume) {
       this.isAttemptingResume = false;
@@ -471,7 +518,11 @@ export class LtpClient {
   }
 
   private handleError(payload: ErrorPayload): void {
-    console.error('[LTP] Server error:', payload.error_code, payload.error_message);
+    this.logger.error('Server error', undefined, {
+      errorCode: payload.error_code,
+      errorMessage: payload.error_message,
+      details: payload.details,
+    });
 
     if (this.events.onError) {
       this.events.onError(payload);
@@ -534,7 +585,7 @@ export class LtpClient {
 
     this.clearHeartbeatTimeout();
     this.heartbeatTimeout = setTimeout(() => {
-      console.warn('[LTP] Heartbeat timeout, reconnecting...');
+      this.logger.warn('Heartbeat timeout, reconnecting...');
       this.forceReconnect('heartbeat_timeout');
     }, this.heartbeatConfig.timeoutMs);
   }
@@ -550,7 +601,7 @@ export class LtpClient {
 
   private send(message: LtpEnvelope): void {
     if (!this.isConnected || !this.isHandshakeComplete || !this.ws) {
-      console.error('[LTP] Cannot send message: not connected');
+      this.logger.error('Cannot send message: not connected');
       return;
     }
 
@@ -565,7 +616,7 @@ export class LtpClient {
 
   private sendRaw(message: unknown): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.error('[LTP] Cannot send message: WebSocket not open');
+      this.logger.error('Cannot send message: WebSocket not open');
       return;
     }
 
@@ -650,7 +701,7 @@ export class LtpClient {
     this.lastReconnectDelayMs = delay;
     this.reconnectAttempts += 1;
 
-    console.warn(`[LTP] Scheduling reconnect in ${delay}ms (reason: ${reason})`);
+    this.logger.warn('Scheduling reconnect', { delayMs: delay, reason });
 
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = null;
@@ -667,7 +718,7 @@ export class LtpClient {
 
   private emitPermanentFailure(reason: string): void {
     const error = new Error(reason);
-    console.error('[LTP] Permanent failure:', reason);
+    this.logger.error('Permanent failure', undefined, { reason });
 
     if (this.events.onPermanentFailure) {
       this.events.onPermanentFailure(error);
@@ -746,7 +797,7 @@ export class LtpClient {
             const toonString = this.options.codec.encodeJsonToToon(data);
             return { encoded: toonString, encoding: 'toon' };
           } catch (error) {
-            console.warn('[LTP] TOON encoding failed, falling back to JSON:', error);
+            this.logger.warn('TOON encoding failed, falling back to JSON', { error });
           }
         }
       }

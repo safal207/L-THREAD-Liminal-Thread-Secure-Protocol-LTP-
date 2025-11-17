@@ -255,6 +255,18 @@ export interface LtpClientOptions {
   codec?: LtpCodec;
   /** Preferred content encoding: "json" (default) or "toon" (v0.3+) */
   preferredEncoding?: ContentEncoding;
+  /** Optional logger for structured logging (defaults to console if not provided) */
+  logger?: LtpLogger;
+}
+
+/**
+ * Optional logger interface for structured logging
+ */
+export interface LtpLogger {
+  debug(message: string, meta?: Record<string, unknown>): void;
+  info(message: string, meta?: Record<string, unknown>): void;
+  warn(message: string, meta?: Record<string, unknown>): void;
+  error(message: string, error?: unknown, meta?: Record<string, unknown>): void;
 }
 
 /**

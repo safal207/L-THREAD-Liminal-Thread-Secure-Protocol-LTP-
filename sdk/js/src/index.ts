@@ -1,6 +1,6 @@
 /**
  * LTP (Liminal Thread Protocol) SDK
- * Version 0.1
+ * Version 0.3
  *
  * Entry point for the LTP client library
  */
@@ -34,4 +34,5 @@ export type {
   LtpStorage,
   ReconnectStrategy,
   HeartbeatOptions,
+  LtpLogger,
 } from './types';
