@@ -10,7 +10,6 @@ defmodule LTP.Connection do
   require Logger
 
   @ltp_version "0.3"
-  @subprotocol "ltp.v0.3"
 
   defstruct [
     :url,
@@ -65,7 +64,6 @@ defmodule LTP.Connection do
 
   # WebSockex callbacks
 
-  @impl WebSockex
   def init(state) do
     {:ok, state}
   end
@@ -276,7 +274,7 @@ defmodule LTP.Connection do
     WebSockex.send_frame(self(), {:text, json})
   end
 
-  defp start_heartbeat(state, interval_ms) do
+  defp start_heartbeat(state, _interval_ms) do
     clear_heartbeat_timers(state)
     schedule_heartbeat(state)
     schedule_heartbeat_timeout(state)
