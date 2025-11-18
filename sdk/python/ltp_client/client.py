@@ -28,7 +28,14 @@ from .types import (
     ErrorPayload,
     MessageType,
 )
-from .crypto import sign_message, verify_signature
+from .crypto import (
+    derive_shared_secret,
+    generate_ecdh_key_pair,
+    hash_envelope,
+    hkdf,
+    sign_message,
+    verify_signature,
+)
 
 LTP_VERSION = "0.3"
 SDK_VERSION = "0.3.0"
@@ -145,6 +152,9 @@ class LtpClient:
         )
         self.max_message_age_ms = max_message_age_ms
         self._seen_nonces: Dict[str, int] = {}
+        self._last_sent_hash: Optional[str] = None
+        self._last_received_hash: Optional[str] = None
+        self._handshake_keys: Optional[Tuple[str, str]] = None  # (public, private)
 
         self.on_connected: Optional[Callable[[str, str], None]] = None
         self.on_disconnected: Optional[Callable[[], None]] = None
@@ -172,9 +182,15 @@ class LtpClient:
             self.receiver_task = None
         if self.ws:
             await self.ws.close()
-            self.ws = None
+        self.ws = None
         self.is_connected = False
         self.is_handshake_complete = False
+
+    def _ensure_handshake_keys(self) -> None:
+        """Generate ephemeral ECDH keys for the upcoming handshake if missing."""
+
+        if not self._handshake_keys:
+            self._handshake_keys = generate_ecdh_key_pair()
 
     async def send_state_update(self, payload: Dict[str, Any]) -> None:
         """Send state update payload (expects kind/data keys)."""
@@ -217,6 +233,7 @@ class LtpClient:
         await self._handshake_future
 
     async def _send_handshake(self) -> None:
+        self._ensure_handshake_keys()
         if self.thread_id:
             self.is_attempting_resume = True
             resume_payload = {
@@ -225,6 +242,12 @@ class LtpClient:
                 "client_id": self.client_id,
                 "thread_id": self.thread_id,
                 "resume_reason": "automatic_reconnect",
+                "client_public_key": self._handshake_keys[0] if self._handshake_keys else None,
+                "key_agreement": {
+                    "algorithm": "secp256r1",
+                    "method": "ecdh",
+                    "hkdf": "sha256",
+                },
             }
             await self._send_raw(resume_payload)
         else:
@@ -239,6 +262,12 @@ class LtpClient:
             intent=self.intent,
             capabilities=self.capabilities,
             metadata=self.metadata,
+            client_public_key=self._handshake_keys[0] if self._handshake_keys else None,
+            key_agreement={
+                "algorithm": "secp256r1",
+                "method": "ecdh",
+                "hkdf": "sha256",
+            },
         )
         await self._send_raw(handshake.to_dict())
 
@@ -271,6 +300,9 @@ class LtpClient:
                 return
             if not self._validate_nonce(data):
                 return
+            if not self._validate_prev_hash(data):
+                return
+            self._last_received_hash = hash_envelope(data)
 
         if message_type == "handshake_ack":
             await self._handle_handshake_ack(data)
@@ -295,6 +327,21 @@ class LtpClient:
         self.session_id = ack.session_id
         self.heartbeat_interval_ms = ack.heartbeat_interval_ms
         self.storage.set_ids(self.client_id, ack.thread_id, ack.session_id)
+        self._last_sent_hash = None
+        self._last_received_hash = None
+
+        if ack.server_public_key and self._handshake_keys:
+            try:
+                shared_secret = derive_shared_secret(self._handshake_keys[1], ack.server_public_key)
+                derived_mac = hkdf(shared_secret, ack.session_id, "ltp-mac-key")
+                self._mac_key = derived_mac
+                self.require_signature_verification = True
+            except Exception as error:
+                print(f"[LTP] Failed to derive handshake keys: {error}")
+            finally:
+                self._handshake_keys = None
+        else:
+            self._handshake_keys = None
 
         self.is_connected = True
         self.is_handshake_complete = True
@@ -338,6 +385,9 @@ class LtpClient:
         if self.heartbeat_task:
             self.heartbeat_task.cancel()
             self.heartbeat_task = None
+        self._last_sent_hash = None
+        self._last_received_hash = None
+        self._handshake_keys = None
         if self.on_disconnected:
             self.on_disconnected()
 
@@ -413,12 +463,15 @@ class LtpClient:
             meta=meta,
             content_encoding="json",  # Default to JSON; TOON support will be added in future
             nonce=self._generate_nonce(),
+            prev_message_hash=self._last_sent_hash,
         )
 
         message_dict = envelope.to_dict()
 
         if self._mac_key:
             message_dict["signature"] = sign_message(message_dict, self._mac_key)
+
+        self._last_sent_hash = hash_envelope(message_dict)
 
         return message_dict
 
@@ -506,6 +559,19 @@ class LtpClient:
             return False
 
         self._seen_nonces[nonce] = int(time.time() * 1000)
+        return True
+
+    def _validate_prev_hash(self, message: Dict[str, Any]) -> bool:
+        expected_prev = self._last_received_hash
+        provided_prev = message.get("prev_message_hash")
+
+        if expected_prev is None:
+            return True
+
+        if provided_prev != expected_prev:
+            print("[LTP] Hash chain mismatch; rejecting message")
+            return False
+
         return True
 
     def _generate_client_id(self) -> str:
