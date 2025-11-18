@@ -10,7 +10,8 @@ import {
   deriveSharedSecret,
   deriveSessionKeys,
   hkdf,
-  hashEnvelope
+  hashEnvelope,
+  hmacSha256
 } from './crypto';
 import {
   HandshakeInitMessage,
@@ -928,7 +929,7 @@ export class LtpClient {
       return;
     }
 
-    const nonce = this.generateNonce();
+    const nonce = await this.generateNonce();
 
     const envelopeWithPrev: LtpEnvelope = {
       ...message,
@@ -1156,9 +1157,33 @@ export class LtpClient {
     });
   }
 
-  private generateNonce(): string {
-    const randomHex = this.generateSecureRandomHex(8);
-    return `${this.options.clientId}-${Date.now()}-${randomHex}`;
+  /**
+   * Generate cryptographically secure nonce without leaking client identity
+   * Uses HMAC-based nonce generation (v0.6+) to prevent client ID tracking
+   */
+  private async generateNonce(): Promise<string> {
+    const timestamp = Date.now();
+    const randomHex = this.generateSecureRandomHex(16); // Increased entropy
+
+    // Get MAC key for HMAC-based nonce
+    const macKey = this.options.sessionMacKey || this.options.secretKey;
+
+    if (macKey) {
+      // HMAC-based nonce (v0.6+) - NO client ID leak
+      try {
+        const input = `${timestamp}-${randomHex}`;
+        const hmac = await hmacSha256(input, macKey);
+        // Format: hmac-{first 32 chars of HMAC}-{timestamp}
+        return `hmac-${hmac.substring(0, 32)}-${timestamp}`;
+      } catch (error) {
+        this.logger.error('Failed to generate HMAC nonce, falling back to legacy format', error);
+      }
+    }
+
+    // Legacy format (backward compatibility) - contains client ID
+    // WARNING: This leaks client identity! Use sessionMacKey to enable secure nonces
+    this.logger.warn('Generating legacy nonce with client ID - use sessionMacKey for privacy');
+    return `${this.options.clientId}-${timestamp}-${randomHex}`;
   }
 
   private hasSessionContext(): boolean {
@@ -1166,9 +1191,10 @@ export class LtpClient {
   }
 
   /**
-   * Validate nonce for replay protection (v0.5+)
+   * Validate nonce for replay protection (v0.5+, updated v0.6+)
+   * Supports both HMAC-based nonces (v0.6+) and legacy format
    * @param nonce The nonce to validate
-   * @param clientId Expected client ID (from message meta)
+   * @param clientId Expected client ID (from message meta) - only for legacy format
    * @returns Error message if invalid, null if valid
    */
   private validateNonce(nonce: string | undefined, clientId: string | undefined): string | null {
@@ -1181,25 +1207,53 @@ export class LtpClient {
       return 'Nonce already used (replay attack detected)';
     }
 
-    // Parse nonce format: clientId-timestamp-randomHex
-    const parts = nonce.split('-');
-    if (parts.length !== 3) {
-      return 'Invalid nonce format';
+    let timestamp: number;
+
+    // Check for HMAC-based nonce format (v0.6+): hmac-{32hex}-{timestamp}
+    if (nonce.startsWith('hmac-')) {
+      const parts = nonce.split('-');
+      if (parts.length !== 3) {
+        return 'Invalid HMAC nonce format';
+      }
+
+      const [, hmacPart, timestampPart] = parts;
+
+      // Verify HMAC part has correct length (32 hex chars)
+      if (hmacPart.length !== 32 || !/^[0-9a-f]{32}$/i.test(hmacPart)) {
+        return 'Invalid HMAC nonce format (bad HMAC)';
+      }
+
+      timestamp = parseInt(timestampPart, 10);
+      if (isNaN(timestamp)) {
+        return 'Invalid HMAC nonce timestamp';
+      }
+    } else {
+      // Legacy format: clientId-timestamp-randomHex
+      const parts = nonce.split('-');
+      if (parts.length !== 3) {
+        return 'Invalid nonce format';
+      }
+
+      const [nonceClientId, nonceTimestamp, randomHex] = parts;
+
+      // Verify client ID in nonce matches (if available in meta)
+      if (clientId && nonceClientId !== clientId) {
+        return `Nonce client ID mismatch (expected: ${clientId}, got: ${nonceClientId})`;
+      }
+
+      // Verify timestamp is reasonable
+      timestamp = parseInt(nonceTimestamp, 10);
+      if (isNaN(timestamp)) {
+        return 'Invalid nonce timestamp';
+      }
+
+      // Verify random component has sufficient entropy (at least 8 hex chars)
+      if (randomHex.length < 8) {
+        return 'Insufficient nonce entropy';
+      }
     }
 
-    const [nonceClientId, nonceTimestamp, randomHex] = parts;
-
-    // Verify client ID in nonce matches (if available in meta)
-    if (clientId && nonceClientId !== clientId) {
-      return `Nonce client ID mismatch (expected: ${clientId}, got: ${nonceClientId})`;
-    }
-
-    // Verify timestamp is reasonable (not too old, not in future)
-    const timestamp = parseInt(nonceTimestamp, 10);
-    if (isNaN(timestamp)) {
-      return 'Invalid nonce timestamp';
-    }
-
+    // Common timestamp validation for both formats
     const now = Date.now();
     const nonceAge = now - timestamp;
 
@@ -1211,11 +1265,6 @@ export class LtpClient {
     // Reject if nonce is from the future (with 5s clock skew tolerance)
     if (nonceAge < -5000) {
       return 'Nonce timestamp in future';
-    }
-
-    // Verify random component has sufficient entropy (at least 8 hex chars)
-    if (randomHex.length < 8) {
-      return 'Insufficient nonce entropy';
     }
 
     // Add to seen nonces cache

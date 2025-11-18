@@ -16,6 +16,51 @@ function getErrorMessage(error: unknown): string {
 }
 
 /**
+ * Compute HMAC-SHA256 for any string input
+ * Used for secure nonce generation and other HMAC operations
+ */
+export async function hmacSha256(input: string, key: string): Promise<string> {
+  // Browser environment - Web Crypto API
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    try {
+      const encoder = new TextEncoder();
+      const keyData = encoder.encode(key);
+      const inputData = encoder.encode(input);
+
+      const cryptoKey = await window.crypto.subtle.importKey(
+        'raw',
+        keyData,
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      );
+
+      const signature = await window.crypto.subtle.sign('HMAC', cryptoKey, inputData);
+
+      return Array.from(new Uint8Array(signature))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    } catch (error) {
+      throw new Error(`Failed to compute HMAC (Web Crypto): ${getErrorMessage(error)}`);
+    }
+  }
+
+  // Node.js environment - crypto module
+  if (typeof require !== 'undefined') {
+    try {
+      const crypto = require('crypto');
+      const hmac = crypto.createHmac('sha256', key);
+      hmac.update(input);
+      return hmac.digest('hex');
+    } catch (error) {
+      throw new Error(`Failed to compute HMAC (Node.js crypto): ${getErrorMessage(error)}`);
+    }
+  }
+
+  throw new Error('No cryptographic implementation available for HMAC');
+}
+
+/**
  * Deterministically serialize objects by sorting keys recursively.
  */
 function canonicalize(value: any): any {

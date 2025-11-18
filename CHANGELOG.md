@@ -8,10 +8,148 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned
-- Complete v0.5.0 implementation (see below)
+- Complete v0.6.0 production security (see roadmap below)
 - LRI integration examples
 - Cross-language SDK comparison benchmarks
 - Production-ready TOON codec implementations
+
+## [0.6.0-alpha.1] - 2025-01-18
+
+### 🔒 CRITICAL PRIVACY FIX - HMAC-based Nonces (No Client ID Leak)
+
+**Addressing HIGH priority issue from Snowden/Assange security audit**
+
+### Fixed
+
+- **Client Identity Leak in Nonces** (HIGH PRIORITY FIX ❌→✅)
+  - Nonces now use HMAC-based format: `hmac-{32hex}-{timestamp}`
+  - **NO client_id exposed** - prevents user tracking across sessions
+  - Uses session MAC key to generate unpredictable nonce values
+  - Attackers can no longer correlate messages to specific users
+  - Location: `sdk/js/src/client.ts:1160-1187`
+
+- **Dual-Format Nonce Validation** (Backward Compatibility)
+  - Validates both HMAC-based nonces (v0.6+) and legacy format (v0.5)
+  - Legacy format: `{clientId}-{timestamp}-{random}` still supported
+  - Warnings logged when using legacy format
+  - Location: `sdk/js/src/client.ts:1193-1274`
+
+### Added
+
+- **HMAC-SHA256 Utility Function** - Cross-platform HMAC computation
+  - `hmacSha256(input, key)` - Works in browser (Web Crypto API) and Node.js
+  - Used for secure nonce generation and other HMAC operations
+  - Location: `sdk/js/src/crypto.ts:18-61`
+
+### Changed
+
+- **`generateNonce()` - Now Async**
+  - Changed from synchronous to async function
+  - Computes HMAC over `{timestamp}-{random}` using session MAC key
+  - Falls back to legacy format if MAC key not available (logs warning)
+  - Location: `sdk/js/src/client.ts:1160-1187`
+
+- **`send()` Method** - Awaits nonce generation
+  - Updated to `await this.generateNonce()`
+  - Location: `sdk/js/src/client.ts:932`
+
+### Security Impact
+
+**Before v0.6.0-alpha.1:** ❌ IDENTITY LEAK
+```typescript
+// Nonce format exposed client_id:
+{
+  "nonce": "user-device-123-1705598400000-a1b2c3d4",
+           // ^^^^^^^^^^^^^^^^ - Client identity leaked!
+  // Attacker can:
+  // - Track user across sessions
+  // - Correlate messages to specific users
+  // - Build user activity profiles
+}
+```
+
+**After v0.6.0-alpha.1:** ✅ PRIVACY PROTECTED
+```typescript
+// Nonce format is HMAC-based (no client_id):
+{
+  "nonce": "hmac-f3a8b9c2d1e4567890abcdef12345678-1705598400000",
+           // ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ - Unpredictable HMAC
+  // Attacker cannot:
+  // - Identify which user sent the message
+  // - Correlate messages across sessions
+  // - Build user profiles from nonces
+}
+```
+
+**Privacy Protection Mechanism:**
+```typescript
+// HMAC computation prevents identity inference:
+const input = `${timestamp}-${randomHex}`;
+const hmac = await hmacSha256(input, sessionMacKey);
+const nonce = `hmac-${hmac.substring(0, 32)}-${timestamp}`;
+
+// Even with identical timestamp, different random value = different HMAC
+// Without MAC key, attacker cannot predict or verify nonce values
+```
+
+### Compatibility
+
+- ✅ **Backward compatible** - Legacy nonce format still validated
+- ✅ **Graceful migration** - Clients can mix HMAC and legacy nonces
+- ⚠️ **Warning logged** - When using legacy format (prompts upgrade)
+- 🔄 **Transition period** - Both formats supported until v0.7.0
+
+### Testing
+
+```bash
+npm test  # All tests passing ✅
+```
+
+### Migration
+
+**Recommended (HMAC-based nonces):**
+```typescript
+import { LtpClient } from '@liminal/ltp-client';
+
+// Provide sessionMacKey to enable HMAC-based nonces
+const client = new LtpClient('wss://api.example.com', {
+  clientId: 'user-device-123',
+  sessionMacKey: macKey, // ← Enables HMAC nonces (no ID leak)
+  enableEcdhKeyExchange: true,
+});
+
+// Nonces now: hmac-{32hex}-{timestamp}
+await client.send('state_update', { data: 'example' });
+```
+
+**Legacy (still works, but logs warning):**
+```typescript
+// Without sessionMacKey, falls back to legacy format
+const client = new LtpClient('wss://api.example.com', {
+  clientId: 'user-device-123',
+  // No sessionMacKey provided
+});
+
+// WARNING: Nonces use legacy format with client ID
+// Format: user-device-123-{timestamp}-{random}
+```
+
+### Roadmap to v0.6.0-stable
+
+- [x] **HIGH**: Remove client ID from nonce (HMAC-based nonce) ✅
+- [ ] **CRITICAL**: Authenticate ECDH public keys (sign with long-term keys)
+- [ ] **HIGH**: Encrypt metadata fields (thread_id, timestamps)
+- [ ] **MEDIUM**: Migrate to X25519 curve
+- [ ] **MEDIUM**: Implement message padding
+- [ ] Remove v0.3 placeholder signatures entirely
+- [ ] Add key rotation mechanism
+
+### Related
+
+- Addresses HIGH priority issue from security audit (PR #13)
+- Part of v0.6.0 production security roadmap
+- Complements metadata signing (v0.5.0-beta.4)
+- Requires session MAC key (derived via ECDH + HKDF)
 
 ## [0.5.0-beta.4] - 2025-01-18
 
