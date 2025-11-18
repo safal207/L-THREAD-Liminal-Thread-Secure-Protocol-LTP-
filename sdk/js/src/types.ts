@@ -79,6 +79,18 @@ export interface LtpEnvelope<T = unknown> {
   nonce?: string;
   signature?: string;
   prev_message_hash?: string;
+  /**
+   * Encrypted metadata (v0.6+) - prevents tracking
+   * Format: ciphertext:iv:tag
+   * Contains encrypted: { thread_id, session_id, timestamp }
+   */
+  encrypted_metadata?: string;
+  /**
+   * Routing tag (v0.6+) - for server-side routing
+   * HMAC-based tag that doesn't reveal thread_id or session_id
+   * Format: HMAC(macKey, threadId:sessionId).substring(0, 32)
+   */
+  routing_tag?: string;
 }
 
 /**
@@ -347,6 +359,21 @@ export interface LtpClientOptions {
    * @default 60000 (60 seconds)
    */
   maxMessageAge?: number;
+  /**
+   * Enable metadata encryption for privacy protection (v0.6+)
+   * When enabled, thread_id, session_id, and timestamp are encrypted
+   * Server uses routing_tag for message routing without seeing metadata
+   * Requires encryption key from ECDH key derivation
+   * @default false (opt-in for now)
+   */
+  enableMetadataEncryption?: boolean;
+  /**
+   * Encryption key for metadata encryption (v0.6+)
+   * Should be derived from ECDH key exchange using deriveSessionKeys()
+   * When provided and enableMetadataEncryption is true, metadata will be encrypted
+   * Note: If enableEcdhKeyExchange is true, this will be set automatically
+   */
+  sessionEncryptionKey?: string;
   /**
    * @deprecated Use sessionMacKey instead (v0.5+)
    * Legacy shared secret key for backward compatibility with v0.4

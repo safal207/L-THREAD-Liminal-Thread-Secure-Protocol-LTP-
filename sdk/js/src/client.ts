@@ -13,7 +13,10 @@ import {
   hashEnvelope,
   hmacSha256,
   signEcdhPublicKey,
-  verifyEcdhPublicKey
+  verifyEcdhPublicKey,
+  encryptMetadata,
+  decryptMetadata,
+  generateRoutingTag,
 } from './crypto';
 import {
   HandshakeInitMessage,
@@ -552,6 +555,27 @@ export class LtpClient {
   }
 
   private async handleMessageAsync(message: LtpMessage): Promise<void> {
+    // Decrypt metadata if present (v0.6+)
+    const envelopeMsg = message as LtpEnvelope;
+    if (envelopeMsg.encrypted_metadata && this.options.sessionEncryptionKey) {
+      try {
+        const decryptedMetadata = await decryptMetadata(
+          envelopeMsg.encrypted_metadata,
+          this.options.sessionEncryptionKey
+        );
+
+        // Restore decrypted metadata to envelope
+        envelopeMsg.thread_id = decryptedMetadata.thread_id;
+        envelopeMsg.session_id = decryptedMetadata.session_id;
+        envelopeMsg.timestamp = decryptedMetadata.timestamp;
+
+        this.logger.debug('Metadata decrypted successfully');
+      } catch (error) {
+        this.logger.error('Failed to decrypt metadata - using plaintext fallback', error);
+        // Continue with plaintext metadata (backward compatibility)
+      }
+    }
+
     // Get the MAC key (sessionMacKey takes precedence over deprecated secretKey)
     const macKey = this.options.sessionMacKey || this.options.secretKey;
 
@@ -817,6 +841,9 @@ export class LtpClient {
         this.options.sessionMacKey = macKey;
         this.options.requireSignatureVerification = true;
 
+        // Set encryption key for metadata encryption (v0.6+)
+        this.options.sessionEncryptionKey = encryptionKey;
+
         this.logger.info('Session keys derived successfully - signatures now required');
 
         // Clear ephemeral private key for forward secrecy
@@ -975,17 +1002,59 @@ export class LtpClient {
 
     try {
       const signature = await this.generateSignature(envelopeWithPrev, nonce);
-      const envelopeWithSecurity: LtpEnvelope = {
+      let envelopeWithSecurity: LtpEnvelope = {
         ...envelopeWithPrev,
         nonce,
         signature,
       };
 
+      // Encrypt metadata for privacy (v0.6+)
+      if (
+        this.options.enableMetadataEncryption &&
+        this.options.sessionEncryptionKey &&
+        this.options.sessionMacKey
+      ) {
+        try {
+          // Encrypt thread_id, session_id, timestamp
+          const encryptedMetadata = await encryptMetadata(
+            {
+              thread_id: envelopeWithSecurity.thread_id,
+              session_id: envelopeWithSecurity.session_id || '',
+              timestamp: envelopeWithSecurity.timestamp,
+            },
+            this.options.sessionEncryptionKey
+          );
+
+          // Generate routing tag for server-side routing
+          const routingTag = await generateRoutingTag(
+            envelopeWithSecurity.thread_id,
+            envelopeWithSecurity.session_id || '',
+            this.options.sessionMacKey
+          );
+
+          // Replace plaintext metadata with encrypted version
+          envelopeWithSecurity = {
+            ...envelopeWithSecurity,
+            encrypted_metadata: encryptedMetadata,
+            routing_tag: routingTag,
+            // Remove plaintext metadata (server uses routing_tag)
+            thread_id: '', // Empty - server uses routing_tag
+            session_id: '', // Empty - server uses routing_tag
+            timestamp: 0, // Zero - server uses routing_tag
+          };
+
+          this.logger.debug('Metadata encrypted for privacy protection');
+        } catch (error) {
+          this.logger.error('Failed to encrypt metadata - using plaintext fallback', error);
+          // Continue with plaintext metadata (backward compatibility)
+        }
+      }
+
       this.lastSentHash = await hashEnvelope({
         type: envelopeWithSecurity.type,
-        thread_id: envelopeWithSecurity.thread_id,
-        session_id: envelopeWithSecurity.session_id,
-        timestamp: envelopeWithSecurity.timestamp,
+        thread_id: envelopeWithSecurity.thread_id || envelopeWithPrev.thread_id,
+        session_id: envelopeWithSecurity.session_id || envelopeWithPrev.session_id,
+        timestamp: envelopeWithSecurity.timestamp || envelopeWithPrev.timestamp,
         nonce: envelopeWithSecurity.nonce!,
         payload: envelopeWithSecurity.payload,
         prev_message_hash: envelopeWithSecurity.prev_message_hash,

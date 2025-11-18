@@ -13,6 +13,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-language SDK comparison benchmarks
 - Production-ready TOON codec implementations
 
+## [0.6.0-alpha.3] - 2025-01-18
+
+### 🔒 HIGH PRIORITY SECURITY FIX - Metadata Encryption (Privacy Protection)
+
+**Addressing HIGH priority issue from Snowden/Assange security audit**
+
+### Fixed
+
+- **Metadata Tracking Vulnerability** (HIGH PRIORITY FIX ❌→✅)
+  - `thread_id`, `session_id`, and `timestamp` now encrypted using AES-256-GCM
+  - Prevents adversaries from tracking users across sessions
+  - Server uses `routing_tag` (HMAC-based) for message routing without seeing plaintext metadata
+  - Location: `sdk/js/src/client.ts:1011-1051, 557-577`
+
+### Added
+
+- **Metadata Encryption Functions** - Encrypt sensitive metadata fields
+  - `encryptMetadata(metadata, encryptionKey)` - Encrypts thread_id, session_id, timestamp
+  - `decryptMetadata(encryptedMetadata, encryptionKey)` - Decrypts metadata blob
+  - `generateRoutingTag(threadId, sessionId, macKey)` - Creates HMAC-based routing tag
+  - Format: `ciphertext:iv:tag` (colon-separated for easy parsing)
+  - Location: `sdk/js/src/crypto.ts:756-838`
+
+- **New Envelope Fields** - Support encrypted metadata
+  - `LtpEnvelope.encrypted_metadata` - Encrypted metadata blob (AES-256-GCM)
+  - `LtpEnvelope.routing_tag` - HMAC-based tag for server routing
+  - Location: `sdk/js/src/types.ts:245-260`
+
+- **Client Options** - Enable metadata encryption
+  - `enableMetadataEncryption` - Opt-in flag for metadata encryption (default: false)
+  - `sessionEncryptionKey` - Encryption key from ECDH key derivation
+  - Automatically set when `enableEcdhKeyExchange` is true
+  - Location: `sdk/js/src/types.ts:295-310`
+
+### Changed
+
+- **Message Sending** - Encrypts metadata when enabled
+  - `send()` method now encrypts metadata if `enableMetadataEncryption` is true
+  - Plaintext metadata fields cleared (set to empty/zero) when encrypted
+  - Server uses `routing_tag` for message routing
+  - Location: `sdk/js/src/client.ts:1011-1051`
+
+- **Message Receiving** - Decrypts metadata automatically
+  - `handleMessageAsync()` decrypts `encrypted_metadata` if present
+  - Restores plaintext metadata to envelope for backward compatibility
+  - Falls back to plaintext if decryption fails
+  - Location: `sdk/js/src/client.ts:557-577`
+
+### Security Impact
+
+**Before v0.6.0-alpha.3:** ❌ Metadata EXPOSED
+```typescript
+// All metadata in cleartext:
+{
+  thread_id: "thread-abc123",      // ← Tracking identifier
+  session_id: "session-xyz789",    // ← Session identifier
+  timestamp: 1705598400000,        // ← Behavioral profiling
+  // Adversary can:
+  // - Track user across sessions (thread_id)
+  // - Correlate messages (session_id)
+  // - Profile activity patterns (timestamp)
+}
+```
+
+**After v0.6.0-alpha.3:** ✅ Metadata PROTECTED
+```typescript
+// Metadata encrypted:
+{
+  encrypted_metadata: "ciphertext:iv:tag",  // ← Encrypted blob
+  routing_tag: "a1b2c3d4e5f6...",          // ← HMAC tag (no plaintext)
+  thread_id: "",                            // ← Cleared (server uses routing_tag)
+  session_id: "",                           // ← Cleared
+  timestamp: 0,                             // ← Zeroed
+  // Adversary cannot:
+  // - See thread_id or session_id
+  // - Track user across sessions
+  // - Profile activity patterns
+  // Server uses routing_tag for routing (HMAC-based, no plaintext)
+}
+```
+
+**Protection Mechanism:**
+```typescript
+// Encryption process:
+const metadata = { thread_id, session_id, timestamp };
+const encrypted = await encryptMetadata(metadata, encryptionKey);
+// Format: ciphertext:iv:tag
+
+// Routing tag generation:
+const routingTag = await generateRoutingTag(threadId, sessionId, macKey);
+// Server uses routing_tag for routing without decrypting
+
+// Decryption (client-side only):
+const decrypted = await decryptMetadata(encrypted, encryptionKey);
+// Restores plaintext metadata for application use
+```
+
+### Migration Guide
+
+**Enable metadata encryption:**
+```typescript
+const client = new LtpClient('wss://api.example.com', {
+  enableEcdhKeyExchange: true,        // Required for encryption key
+  enableMetadataEncryption: true,      // Enable metadata encryption
+  // sessionEncryptionKey set automatically from ECDH
+});
+```
+
+**Backward Compatibility:**
+- Metadata encryption is opt-in (default: false)
+- Servers can handle both encrypted and plaintext metadata
+- Clients decrypt automatically if `encrypted_metadata` present
+- Falls back to plaintext if decryption fails
+
+### Related
+
+- Part of v0.6.0 production security roadmap
+- Addresses HIGH priority from Snowden/Assange audit
+- Complements HMAC-based nonces (v0.6.0-alpha.1)
+- Complements authenticated ECDH (v0.6.0-alpha.2)
+
+---
+
 ## [0.6.0-alpha.2] - 2025-01-18
 
 ### 🔒 CRITICAL SECURITY FIX - Authenticated ECDH (MitM Protection)

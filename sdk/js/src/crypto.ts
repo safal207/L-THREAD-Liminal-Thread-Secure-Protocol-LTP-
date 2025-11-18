@@ -742,3 +742,97 @@ function bufferToHex(buffer: ArrayBuffer | Uint8Array): string {
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
 }
+
+/**
+ * Encrypt sensitive metadata fields to prevent tracking (v0.6+)
+ *
+ * Encrypts thread_id, session_id, and timestamp using AES-256-GCM
+ * This prevents adversaries from tracking users across sessions
+ *
+ * @param metadata - Metadata object containing thread_id, session_id, timestamp
+ * @param encryptionKey - Hex-encoded 256-bit encryption key (from HKDF)
+ * @returns Encrypted metadata blob (ciphertext:iv:tag format)
+ */
+export async function encryptMetadata(
+  metadata: {
+    thread_id: string;
+    session_id: string;
+    timestamp: number;
+  },
+  encryptionKey: string
+): Promise<string> {
+  // Serialize metadata to JSON
+  const metadataJson = JSON.stringify({
+    thread_id: metadata.thread_id,
+    session_id: metadata.session_id,
+    timestamp: metadata.timestamp,
+  });
+
+  // Encrypt using AES-256-GCM
+  const encrypted = await encryptPayload(metadataJson, encryptionKey);
+
+  // Format: ciphertext:iv:tag (colon-separated for easy parsing)
+  return `${encrypted.ciphertext}:${encrypted.iv}:${encrypted.tag}`;
+}
+
+/**
+ * Decrypt metadata fields (v0.6+)
+ *
+ * @param encryptedMetadata - Encrypted metadata blob (ciphertext:iv:tag format)
+ * @param encryptionKey - Hex-encoded 256-bit encryption key
+ * @returns Decrypted metadata object
+ */
+export async function decryptMetadata(
+  encryptedMetadata: string,
+  encryptionKey: string
+): Promise<{
+  thread_id: string;
+  session_id: string;
+  timestamp: number;
+}> {
+  // Parse format: ciphertext:iv:tag
+  const parts = encryptedMetadata.split(':');
+  if (parts.length !== 3) {
+    throw new Error('Invalid encrypted metadata format - expected ciphertext:iv:tag');
+  }
+
+  const [ciphertext, iv, tag] = parts;
+
+  // Decrypt using AES-256-GCM
+  const decryptedJson = await decryptPayload({ ciphertext, iv, tag }, encryptionKey);
+
+  // Parse JSON back to metadata object
+  const metadata = JSON.parse(decryptedJson);
+
+  if (!metadata.thread_id || !metadata.session_id || typeof metadata.timestamp !== 'number') {
+    throw new Error('Invalid decrypted metadata structure');
+  }
+
+  return {
+    thread_id: metadata.thread_id,
+    session_id: metadata.session_id,
+    timestamp: metadata.timestamp,
+  };
+}
+
+/**
+ * Generate routing tag for server-side message routing (v0.6+)
+ *
+ * Creates HMAC-based tag that doesn't reveal thread_id or session_id
+ * Server can use this for routing without seeing plaintext metadata
+ *
+ * @param threadId - Thread identifier
+ * @param sessionId - Session identifier
+ * @param macKey - Hex-encoded MAC key (from HKDF)
+ * @returns Routing tag (first 32 hex characters of HMAC)
+ */
+export async function generateRoutingTag(
+  threadId: string,
+  sessionId: string,
+  macKey: string
+): Promise<string> {
+  const input = `${threadId}:${sessionId}`;
+  const hmac = await hmacSha256(input, macKey);
+  // Return first 32 hex characters (16 bytes) for routing tag
+  return hmac.substring(0, 32);
+}

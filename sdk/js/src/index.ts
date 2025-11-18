@@ -47,4 +47,7 @@ export {
   deriveSessionKeys,
   encryptPayload,
   decryptPayload,
+  encryptMetadata,
+  decryptMetadata,
+  generateRoutingTag,
 } from './crypto';
