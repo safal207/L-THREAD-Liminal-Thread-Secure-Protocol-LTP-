@@ -62,6 +62,8 @@ class HandshakeInit:
     intent: Optional[str] = None
     capabilities: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
+    client_public_key: Optional[str] = None
+    key_agreement: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -78,6 +80,10 @@ class HandshakeInit:
             result['capabilities'] = self.capabilities
         if self.metadata:
             result['metadata'] = self.metadata
+        if self.client_public_key:
+            result['client_public_key'] = self.client_public_key
+        if self.key_agreement:
+            result['key_agreement'] = self.key_agreement
         return result
 
 
@@ -91,6 +97,8 @@ class HandshakeAck:
     server_capabilities: List[str] = field(default_factory=list)
     heartbeat_interval_ms: int = 15000
     metadata: Dict[str, Any] = field(default_factory=dict)
+    server_public_key: Optional[str] = None
+    key_agreement: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'HandshakeAck':
@@ -102,7 +110,9 @@ class HandshakeAck:
             session_id=data.get('session_id', ''),
             server_capabilities=data.get('server_capabilities', []),
             heartbeat_interval_ms=data.get('heartbeat_interval_ms', 15000),
-            metadata=data.get('metadata', {})
+            metadata=data.get('metadata', {}),
+            server_public_key=data.get('server_public_key'),
+            key_agreement=data.get('key_agreement', {}),
         )
 
 
@@ -118,6 +128,7 @@ class LtpEnvelope:
     content_encoding: Optional[str] = None  # "json" (default) or "toon" (v0.3+)
     nonce: Optional[str] = None
     signature: Optional[str] = None
+    prev_message_hash: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -135,6 +146,8 @@ class LtpEnvelope:
             result['nonce'] = self.nonce
         if self.signature:
             result['signature'] = self.signature
+        if self.prev_message_hash:
+            result['prev_message_hash'] = self.prev_message_hash
         return result
 
     @classmethod

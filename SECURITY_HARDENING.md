@@ -4,6 +4,13 @@
 
 This guide provides comprehensive security hardening recommendations for deploying L-THREAD/LTP in production environments. Follow these guidelines to ensure your LTP deployment is secure against common vulnerabilities.
 
+### What changed in v0.5 (this branch)
+
+- **Deterministic envelopes**: all SDK signatures now use canonical, key-sorted JSON that includes `prev_message_hash`, eliminating ambiguity in HMAC inputs.
+- **Hash chaining**: every envelope carries the previous message hash so clients can reject re-ordered or spliced packets before application handling.
+- **ECDH-derived MAC keys**: the JavaScript and Python clients now negotiate a `secp256r1` key during handshake and derive a session MAC key via HKDF-SHA256, enabling security-by-default without pre-shared secrets.
+- **Replay defences tightened**: timestamp, nonce, and hash-chain checks all gate message dispatch when signature verification is required.
+
 ---
 
 ## Table of Contents

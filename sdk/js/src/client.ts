@@ -3,7 +3,15 @@
  * Version 0.4
  */
 
-import { signMessage, verifySignature } from './crypto';
+import {
+  signMessage,
+  verifySignature,
+  generateKeyPair,
+  deriveSharedSecret,
+  deriveSessionKeys,
+  hkdf,
+  hashEnvelope
+} from './crypto';
 import {
   HandshakeInitMessage,
   HandshakeAckMessage,
@@ -147,6 +155,22 @@ export class LtpClient {
   // Nonce cache for replay protection (v0.5+)
   private seenNonces: Map<string, number> = new Map(); // Map<nonce, timestamp>
   private nonceCacheCleanupTimer: NodeJS.Timeout | null = null;
+
+  // ECDH key exchange (v0.5+)
+  private ecdhPrivateKey: string | null = null;
+  private ecdhPublicKey: string | null = null;
+
+  // Hash chaining for message integrity (v0.5+)
+  private lastSentHash: string | null = null;
+  private lastReceivedHash: string | null = null;
+
+  // Compatibility alias for handshakeKeys
+  private get handshakeKeys() {
+    if (this.ecdhPrivateKey && this.ecdhPublicKey) {
+      return { privateKey: this.ecdhPrivateKey, publicKey: this.ecdhPublicKey };
+    }
+    return null;
+  }
 
   /**
    * Create a new LTP client
@@ -392,10 +416,10 @@ export class LtpClient {
       this.isConnecting = false;
       if (this.threadId) {
         this.isAttemptingResume = true;
-        this.sendHandshakeResume();
+        void this.sendHandshakeResume();
       } else {
         this.isAttemptingResume = false;
-        this.sendHandshakeInit();
+        void this.sendHandshakeInit();
       }
     };
 
@@ -421,7 +445,10 @@ export class LtpClient {
     };
   }
 
-  private sendHandshakeInit(): void {
+  private async sendHandshakeInit(): Promise<void> {
+    // Ensure we have ECDH keys for handshake
+    await this.ensureHandshakeKeys();
+
     const handshake: HandshakeInitMessage = {
       type: 'handshake_init',
       ltp_version: LTP_VERSION,
@@ -430,16 +457,24 @@ export class LtpClient {
       intent: this.options.intent,
       capabilities: this.options.capabilities,
       metadata: this.options.metadata,
+      client_ecdh_public_key: this.ecdhPublicKey || undefined,
+      key_agreement: this.ecdhPublicKey ? {
+        algorithm: 'secp256r1',
+        method: 'ecdh',
+        hkdf: 'sha256',
+      } : undefined,
     };
 
     this.sendRaw(handshake);
   }
 
-  private sendHandshakeResume(): void {
+  private async sendHandshakeResume(): Promise<void> {
     if (!this.threadId) {
-      this.sendHandshakeInit();
+      await this.sendHandshakeInit();
       return;
     }
+
+    await this.ensureHandshakeKeys();
 
     const resume: HandshakeResumeMessage = {
       type: 'handshake_resume',
@@ -447,9 +482,30 @@ export class LtpClient {
       client_id: this.options.clientId!,
       thread_id: this.threadId,
       resume_reason: 'automatic_reconnect',
+      client_public_key: this.ecdhPublicKey || undefined,
+      key_agreement: this.ecdhPublicKey ? {
+        algorithm: 'secp256r1',
+        method: 'ecdh',
+        hkdf: 'sha256',
+      } : undefined,
     };
 
     this.sendRaw(resume);
+  }
+
+  private async ensureHandshakeKeys(): Promise<void> {
+    // Generate keys only if enableEcdhKeyExchange is true and keys don't exist
+    if (this.options.enableEcdhKeyExchange && !this.ecdhPrivateKey) {
+      try {
+        this.logger.info('Generating ECDH key pair for key exchange...');
+        const keyPair = await generateKeyPair();
+        this.ecdhPrivateKey = keyPair.privateKey;
+        this.ecdhPublicKey = keyPair.publicKey;
+        this.logger.info('ECDH public key generated');
+      } catch (error) {
+        this.logger.error('Failed to generate ECDH key pair', error);
+      }
+    }
   }
 
   private async handleMessageAsync(message: LtpMessage): Promise<void> {
@@ -457,13 +513,21 @@ export class LtpClient {
     const macKey = this.options.sessionMacKey || this.options.secretKey;
 
     // Mandatory signature verification (v0.5+)
-    if (this.options.requireSignatureVerification && macKey) {
+    const shouldVerify =
+      this.options.requireSignatureVerification &&
+      macKey &&
+      message.type !== 'handshake_ack' &&
+      message.type !== 'handshake_reject';
+
+    if (shouldVerify) {
+      const envelopeMessage = message as LtpEnvelope;
+
       // Check if message has all required fields for verification
       const hasRequiredFields =
-        'thread_id' in message &&
-        'timestamp' in message &&
-        'nonce' in message &&
-        'payload' in message;
+        'thread_id' in envelopeMessage &&
+        'timestamp' in envelopeMessage &&
+        'nonce' in envelopeMessage &&
+        'payload' in envelopeMessage;
 
       if (!hasRequiredFields) {
         this.logger.error('Message missing required fields for signature verification', {
@@ -480,7 +544,7 @@ export class LtpClient {
         return; // Reject message
       }
 
-      if (!message.signature) {
+      if (!envelopeMessage.signature) {
         this.logger.error('Message missing required signature', {
           type: message.type,
         });
@@ -493,7 +557,7 @@ export class LtpClient {
 
       // Verify signature (blocking - security critical)
       try {
-        const verifiableMessage = message as any; // Type assertion for verification
+        const verifiableMessage = envelopeMessage as any; // Type assertion for verification
         const result = await verifySignature(verifiableMessage, macKey);
 
         if (!result.valid) {
@@ -551,20 +615,18 @@ export class LtpClient {
       this.logger.debug('Message signature verified successfully', {
         type: message.type,
       });
-    }
 
-    // Nonce validation for replay protection (v0.5+)
-    if (this.options.requireSignatureVerification && macKey) {
-      const clientId = 'meta' in message && message.meta?.client_id
-        ? message.meta.client_id
+      // Nonce validation for replay protection (v0.5+)
+      const clientId = 'meta' in envelopeMessage && envelopeMessage.meta?.client_id
+        ? envelopeMessage.meta.client_id
         : undefined;
 
-      const nonceError = this.validateNonce(message.nonce, clientId);
+      const nonceError = this.validateNonce(envelopeMessage.nonce, clientId);
       if (nonceError) {
         this.logger.error('Nonce validation failed - REJECTING', {
           type: message.type,
           error: nonceError,
-          nonce: message.nonce,
+          nonce: envelopeMessage.nonce,
         });
         this.handleError({
           error_code: 'INVALID_NONCE',
@@ -575,8 +637,41 @@ export class LtpClient {
 
       this.logger.debug('Nonce validated successfully', {
         type: message.type,
-        nonce: message.nonce,
+        nonce: envelopeMessage.nonce,
       });
+
+      if (this.lastReceivedHash && envelopeMessage.prev_message_hash !== this.lastReceivedHash) {
+        this.logger.error('Hash chain mismatch - REJECTING', {
+          type: message.type,
+          expectedPrev: this.lastReceivedHash,
+          providedPrev: envelopeMessage.prev_message_hash,
+        });
+        this.handleError({
+          error_code: 'HASH_CHAIN_MISMATCH',
+          error_message: 'prev_message_hash does not match last commitment',
+        });
+        return;
+      }
+
+      // Advance hash chain after validation
+      try {
+        this.lastReceivedHash = await hashEnvelope({
+          type: message.type,
+          thread_id: envelopeMessage.thread_id,
+          session_id: envelopeMessage.session_id,
+          timestamp: envelopeMessage.timestamp,
+          nonce: envelopeMessage.nonce!,
+          payload: envelopeMessage.payload,
+          prev_message_hash: envelopeMessage.prev_message_hash,
+        });
+      } catch (error) {
+        this.logger.error('Failed to hash envelope - REJECTING', error);
+        this.handleError({
+          error_code: 'HASH_FAILURE',
+          error_message: 'Unable to hash envelope for chain integrity',
+        });
+        return;
+      }
     }
 
     if (this.events.onMessage) {
@@ -585,7 +680,9 @@ export class LtpClient {
 
     switch (message.type) {
       case 'handshake_ack':
-        this.handleHandshakeAck(message as HandshakeAckMessage);
+        this.handleHandshakeAck(message as HandshakeAckMessage).catch((error) => {
+          this.logger.error('Failed to handle handshake acknowledgment', error);
+        });
         break;
       case 'handshake_reject':
         this.handleHandshakeReject(message as HandshakeRejectMessage);
@@ -615,7 +712,7 @@ export class LtpClient {
     }
   }
 
-  private handleHandshakeAck(message: HandshakeAckMessage): void {
+  private async handleHandshakeAck(message: HandshakeAckMessage): Promise<void> {
     this.logger.info('Handshake acknowledged', {
       threadId: message.thread_id,
       sessionId: message.session_id,
@@ -627,6 +724,41 @@ export class LtpClient {
     this.negotiatedHeartbeatMs = message.heartbeat_interval_ms;
     this.persistIds();
 
+    // ECDH key exchange - derive session keys (v0.5+)
+    if (this.options.enableEcdhKeyExchange &&
+        this.ecdhPrivateKey &&
+        message.server_ecdh_public_key) {
+      try {
+        this.logger.info('Deriving session keys from ECDH shared secret...');
+
+        // Derive shared secret
+        const sharedSecret = await deriveSharedSecret(
+          this.ecdhPrivateKey,
+          message.server_ecdh_public_key
+        );
+
+        // Derive session keys
+        const { macKey, encryptionKey, ivKey } = await deriveSessionKeys(
+          sharedSecret,
+          this.sessionId
+        );
+
+        // Set MAC key for signature verification
+        this.options.sessionMacKey = macKey;
+        this.options.requireSignatureVerification = true;
+
+        this.logger.info('Session keys derived successfully - signatures now required');
+
+        // Clear ephemeral private key for forward secrecy
+        this.ecdhPrivateKey = null;
+      } catch (error) {
+        this.logger.error('Failed to derive session keys from ECDH', error);
+        // Continue without automatic key derivation
+      }
+    } else if (this.options.enableEcdhKeyExchange && !message.server_ecdh_public_key) {
+      this.logger.warn('ECDH key exchange enabled but server did not provide public key');
+    }
+
     this.isConnected = true;
     this.isHandshakeComplete = true;
     this.isAttemptingResume = false;
@@ -635,6 +767,42 @@ export class LtpClient {
     this.clearReconnectTimer();
     this.startHeartbeat();
     this.startNonceCleanup(); // Start replay protection cleanup
+
+    // Reset hash chain at the start of each session
+    this.lastSentHash = null;
+    this.lastReceivedHash = null;
+
+    // ECDH key exchange - derive session keys (v0.5+)
+    if (message.server_ecdh_public_key && this.ecdhPrivateKey) {
+      try {
+        this.logger.info('Deriving session keys from ECDH shared secret...');
+
+        // Derive shared secret
+        const sharedSecret = await deriveSharedSecret(
+          this.ecdhPrivateKey,
+          message.server_ecdh_public_key
+        );
+
+        // Derive session keys using HKDF
+        const { macKey, encryptionKey, ivKey } = await deriveSessionKeys(
+          sharedSecret,
+          this.sessionId
+        );
+
+        // Set MAC key for signature verification
+        this.options.sessionMacKey = macKey;
+        this.options.requireSignatureVerification = true;
+
+        this.logger.info('Session keys derived successfully - signatures now required');
+      } catch (error) {
+        this.logger.error('Failed to derive session keys from ECDH', error);
+      } finally {
+        // Clear ephemeral private key for forward secrecy
+        this.ecdhPrivateKey = null;
+      }
+    } else if (this.options.enableEcdhKeyExchange && !message.server_ecdh_public_key) {
+      this.logger.warn('ECDH key exchange enabled but server did not provide public key');
+    }
 
     if (this.events.onConnected) {
       this.events.onConnected(this.threadId, this.sessionId);
@@ -657,7 +825,7 @@ export class LtpClient {
       this.sessionId = null;
       this.storage.removeItem(this.storageKeys.thread);
       this.storage.removeItem(this.storageKeys.session);
-      this.sendHandshakeInit();
+      void this.sendHandshakeInit();
       return;
     }
 
@@ -684,6 +852,10 @@ export class LtpClient {
     this.isHandshakeComplete = false;
     this.clearHeartbeatTimers();
     this.stopNonceCleanup(); // Stop replay protection cleanup
+    this.lastSentHash = null;
+    this.lastReceivedHash = null;
+    this.ecdhPrivateKey = null;
+    this.ecdhPublicKey = null;
 
     if (this.events.onDisconnected) {
       this.events.onDisconnected();
@@ -750,7 +922,7 @@ export class LtpClient {
     this.handleDisconnect(reason);
   }
 
-  private send(message: LtpEnvelope): void {
+  private async send(message: LtpEnvelope): Promise<void> {
     if (!this.isConnected || !this.isHandshakeComplete || !this.ws) {
       this.logger.error('Cannot send message: not connected');
       return;
@@ -758,16 +930,31 @@ export class LtpClient {
 
     const nonce = this.generateNonce();
 
-    // Generate signature asynchronously
-    this.generateSignature(message, nonce).then((signature) => {
+    const envelopeWithPrev: LtpEnvelope = {
+      ...message,
+      prev_message_hash: this.lastSentHash || undefined,
+    };
+
+    try {
+      const signature = await this.generateSignature(envelopeWithPrev, nonce);
       const envelopeWithSecurity: LtpEnvelope = {
-        ...message,
+        ...envelopeWithPrev,
         nonce,
         signature,
       };
 
+      this.lastSentHash = await hashEnvelope({
+        type: envelopeWithSecurity.type,
+        thread_id: envelopeWithSecurity.thread_id,
+        session_id: envelopeWithSecurity.session_id,
+        timestamp: envelopeWithSecurity.timestamp,
+        nonce: envelopeWithSecurity.nonce!,
+        payload: envelopeWithSecurity.payload,
+        prev_message_hash: envelopeWithSecurity.prev_message_hash,
+      });
+
       this.sendRaw(envelopeWithSecurity);
-    }).catch((error) => {
+    } catch (error) {
       // If signatures are required, don't send unsigned message
       if (this.options.requireSignatureVerification) {
         this.logger.error('Failed to generate required signature - message not sent', error);
@@ -781,12 +968,12 @@ export class LtpClient {
       // Backward compatibility: fallback to placeholder
       this.logger.error('Failed to generate signature, sending with placeholder', error);
       const envelopeWithSecurity: LtpEnvelope = {
-        ...message,
+        ...envelopeWithPrev,
         nonce,
         signature: 'v0-placeholder',
       };
       this.sendRaw(envelopeWithSecurity);
-    });
+    }
   }
 
   private sendRaw(message: unknown): void {
@@ -1080,7 +1267,11 @@ export class LtpClient {
     const macKey = this.options.sessionMacKey || this.options.secretKey;
 
     // If no MAC key and signatures not required, use placeholder (backward compatibility)
+    // WARNING: This is INSECURE and only for v0.3 compatibility
+    // Will be removed in v0.6.0
     if (!macKey && !this.options.requireSignatureVerification) {
+      this.logger.warn('Using insecure placeholder signature - v0.3 compatibility mode. ' +
+        'This will be removed in v0.6.0. Please use sessionMacKey.');
       return 'v0-placeholder';
     }
 
@@ -1099,6 +1290,7 @@ export class LtpClient {
           timestamp: message.timestamp,
           nonce,
           payload: message.payload,
+          prev_message_hash: message.prev_message_hash,
         },
         macKey!
       );
@@ -1118,7 +1310,7 @@ export class LtpClient {
   }
 
   private getTimestamp(): number {
-    return Math.floor(Date.now() / 1000);
+    return Date.now();
   }
 
   private generateClientId(): string {

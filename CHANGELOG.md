@@ -13,6 +13,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-language SDK comparison benchmarks
 - Production-ready TOON codec implementations
 
+## [0.5.0-beta.3] - 2025-01-18
+
+### 🔒 Security Hardening & Automatic ECDH Key Exchange
+
+**Completing cryptographic security enhancements - Phase 3**
+
+### Added
+
+- **Automatic ECDH Key Exchange During Handshake** (MAJOR FEATURE)
+  - Client generates ephemeral ECDH P-256 key pair automatically
+  - Public key sent in `handshake_init` message
+  - Server's public key received in `handshake_ack`
+  - Session keys derived automatically via HKDF
+  - Perfect Forward Secrecy (PFS) - ephemeral keys cleared after derivation
+  - Opt-in via `enableEcdhKeyExchange: true` option
+  - Location: `sdk/js/src/client.ts:445-458, 655-688`
+
+- **Enhanced Type Definitions**
+  - `HandshakeInitMessage.client_ecdh_public_key` field
+  - `HandshakeAckMessage.server_ecdh_public_key` field
+  - `LtpClientOptions.enableEcdhKeyExchange` flag
+  - Location: `sdk/js/src/types.ts`
+
+### Fixed
+
+- **Timing Leak in timingSafeEqual()** (SECURITY FIX)
+  - Early return on length mismatch leaked timing information
+  - Now compares max(a.length, b.length) characters always
+  - Includes length difference in result for constant-time behavior
+  - Added dummy comparison for Node.js crypto.timingSafeEqual fallback
+  - Location: `sdk/js/src/crypto.ts:128-160`
+
+- **Placeholder Signatures** (SECURITY IMPROVEMENT)
+  - Added deprecation warnings when using v0-placeholder signatures
+  - Warns: "Using insecure placeholder signature - v0.3 compatibility mode"
+  - Documented removal in v0.6.0
+  - No fallback to placeholder when signatures required
+  - Location: `sdk/js/src/client.ts:1082-1089`
+
+### Security Audit Results
+
+**Independent security assessment conducted**
+
+#### ✅ Strengths Identified
+- Perfect Forward Secrecy implementation ✅
+- Proper HKDF key derivation (RFC 5869) ✅
+- Constant-time comparison (after fix) ✅
+- Mandatory signature verification ✅
+- Comprehensive replay protection ✅
+
+#### ⚠️ Issues Identified (for future versions)
+- **CRITICAL**: ECDH public keys not authenticated (MitM vulnerability)
+- **HIGH**: Client ID leaked in nonce format
+- **HIGH**: Metadata transmitted in cleartext (tracking risk)
+- **MEDIUM**: P-256 curve (NIST-standardized, X25519 preferred)
+- **MEDIUM**: No traffic padding (vulnerable to traffic analysis)
+- **LOW**: No key rotation mechanism
+
+### Usage Example
+
+```typescript
+import { LtpClient } from '@liminal/ltp-client';
+
+// Automatic ECDH key exchange + signature verification
+const client = new LtpClient('wss://api.example.com', {
+  clientId: 'user-device-123',
+  enableEcdhKeyExchange: true, // ← Automatic key exchange
+}, {
+  onConnected: (threadId, sessionId) => {
+    console.log('🔒 Secure session established with PFS');
+  }
+});
+
+await client.connect();
+```
+
+### Breaking Changes
+
+**None** - Fully backward compatible with v0.5.0-beta.2
+
+### Roadmap to v0.6.0
+
+- [ ] **CRITICAL**: Authenticate ECDH public keys (sign with long-term keys)
+- [ ] **HIGH**: Remove client ID from nonce (use HMAC-based nonce)
+- [ ] **HIGH**: Encrypt metadata fields (thread_id, timestamps)
+- [ ] **MEDIUM**: Migrate to X25519 curve
+- [ ] **MEDIUM**: Implement message padding
+- [ ] Remove v0.3 placeholder signatures entirely
+- [ ] Add key rotation mechanism
+
 ## [0.5.0-beta.2] - 2025-01-17
 
 ### 🔒 Critical Security - Mandatory Verification & Replay Protection

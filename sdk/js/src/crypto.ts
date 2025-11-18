@@ -16,6 +16,48 @@ function getErrorMessage(error: unknown): string {
 }
 
 /**
+ * Deterministically serialize objects by sorting keys recursively.
+ */
+function canonicalize(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce<Record<string, any>>((acc, key) => {
+        acc[key] = canonicalize((value as Record<string, any>)[key]);
+        return acc;
+      }, {});
+  }
+
+  return value;
+}
+
+function serializeCanonical(message: {
+  type: string;
+  thread_id: string;
+  session_id?: string;
+  timestamp: number;
+  nonce: string;
+  payload: any;
+  prev_message_hash?: string;
+}): string {
+  const canonical = canonicalize({
+    type: message.type,
+    thread_id: message.thread_id,
+    session_id: message.session_id || '',
+    timestamp: message.timestamp,
+    nonce: message.nonce,
+    payload: message.payload,
+    prev_message_hash: message.prev_message_hash || '',
+  });
+
+  return JSON.stringify(canonical);
+}
+
+/**
  * Generate HMAC-SHA256 signature for LTP message
  * Works in both browser (Web Crypto API) and Node.js (crypto module)
  */
@@ -27,18 +69,12 @@ export async function signMessage(
     timestamp: number;
     nonce: string;
     payload: any;
+    prev_message_hash?: string;
   },
   secretKey: string
 ): Promise<string> {
   // Create canonical message representation
-  const canonical = JSON.stringify({
-    type: message.type,
-    thread_id: message.thread_id,
-    session_id: message.session_id || '',
-    timestamp: message.timestamp,
-    nonce: message.nonce,
-    payload: message.payload,
-  });
+  const canonical = serializeCanonical(message);
 
   // Browser environment - Web Crypto API
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
@@ -94,6 +130,7 @@ export async function verifySignature(
     nonce: string;
     payload: any;
     signature: string;
+    prev_message_hash?: string;
   },
   secretKey: string
 ): Promise<{ valid: boolean; error?: string }> {
@@ -123,16 +160,22 @@ export async function verifySignature(
 /**
  * Timing-safe string comparison to prevent timing attacks
  * Ensures comparison takes constant time regardless of where strings differ
+ * or if lengths are different
  */
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-
   // Node.js environment - use native crypto.timingSafeEqual
   if (typeof require !== 'undefined') {
     try {
       const crypto = require('crypto');
+      // Native implementation handles length mismatch safely
+      if (a.length !== b.length) {
+        // Still do constant-time comparison of same-length dummy values
+        // to prevent timing leak from early return
+        const dummyA = Buffer.alloc(32);
+        const dummyB = Buffer.alloc(32);
+        crypto.timingSafeEqual(dummyA, dummyB);
+        return false;
+      }
       return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
     } catch (error) {
       // Fall through to manual implementation
@@ -140,12 +183,49 @@ function timingSafeEqual(a: string, b: string): boolean {
   }
 
   // Browser environment or fallback - constant-time comparison
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  // Always compare max(a.length, b.length) characters to prevent timing leak
+  const maxLen = Math.max(a.length, b.length);
+  let result = a.length ^ b.length; // Include length difference in result
+
+  for (let i = 0; i < maxLen; i++) {
+    const aChar = i < a.length ? a.charCodeAt(i) : 0;
+    const bChar = i < b.length ? b.charCodeAt(i) : 0;
+    result |= aChar ^ bChar;
   }
 
   return result === 0;
+}
+
+/**
+ * Generate a deterministic SHA-256 hash commitment for a canonical envelope.
+ */
+export async function hashEnvelope(message: {
+  type: string;
+  thread_id: string;
+  session_id?: string;
+  timestamp: number;
+  nonce: string;
+  payload: any;
+  prev_message_hash?: string;
+}): Promise<string> {
+  const canonical = serializeCanonical(message);
+
+  // Browser environment - Web Crypto API
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
+    const encoder = new TextEncoder();
+    const digest = await window.crypto.subtle.digest('SHA-256', encoder.encode(canonical));
+    return bufferToHex(new Uint8Array(digest));
+  }
+
+  // Node.js environment
+  if (typeof require !== 'undefined') {
+    const crypto = require('crypto');
+    const hash = crypto.createHash('sha256');
+    hash.update(canonical);
+    return hash.digest('hex');
+  }
+
+  throw new Error('No cryptographic implementation available for hashing');
 }
 
 /**
