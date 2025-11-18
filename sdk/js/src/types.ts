@@ -96,8 +96,20 @@ export interface HandshakeInitMessage {
     platform?: string;
     [key: string]: unknown;
   };
-  client_public_key?: string;
-  key_agreement?: Record<string, unknown>;
+  /**
+   * ECDH P-256 public key for key exchange (v0.5+)
+   * Hex-encoded public key for deriving shared secret
+   */
+  client_ecdh_public_key?: string;
+  /**
+   * Key agreement parameters (v0.5+)
+   */
+  key_agreement?: {
+    algorithm?: string;
+    method?: string;
+    hkdf?: string;
+    [key: string]: unknown;
+  };
   nonce?: string;
   signature?: string;
 }
@@ -118,8 +130,11 @@ export interface HandshakeAckMessage {
     region?: string;
     [key: string]: unknown;
   };
-  server_public_key?: string;
-  key_agreement?: Record<string, unknown>;
+  /**
+   * ECDH P-256 public key for key exchange (v0.5+)
+   * Server's hex-encoded public key for deriving shared secret
+   */
+  server_ecdh_public_key?: string;
   nonce?: string;
   signature?: string;
   timestamp?: number;
@@ -275,9 +290,17 @@ export interface LtpClientOptions {
   /** Optional logger for structured logging (defaults to console if not provided) */
   logger?: LtpLogger;
   /**
+   * Enable automatic ECDH key exchange during handshake (v0.5+)
+   * When enabled, client generates ephemeral ECDH key pair and exchanges
+   * public keys with server during handshake. Session keys are derived automatically.
+   * @default false (opt-in for now, will be default in v0.6+)
+   */
+  enableEcdhKeyExchange?: boolean;
+  /**
    * Session MAC key for HMAC-SHA256 message signing (v0.5+)
    * Should be derived from ECDH key exchange using deriveSessionKeys()
    * When provided, signatures are REQUIRED (not optional)
+   * Note: If enableEcdhKeyExchange is true, this will be set automatically
    */
   sessionMacKey?: string;
   /**

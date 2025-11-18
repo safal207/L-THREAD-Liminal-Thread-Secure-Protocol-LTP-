@@ -1,7 +1,7 @@
 {
   "name": "@liminal/ltp-client",
-  "version": "0.5.0-beta.2",
-  "description": "LTP (Liminal Thread Protocol) client SDK with mandatory signature verification and replay protection",
+  "version": "0.5.0-beta.3",
+  "description": "LTP (Liminal Thread Protocol) client SDK with automatic ECDH key exchange and security hardening",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
