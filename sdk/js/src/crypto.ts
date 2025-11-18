@@ -799,7 +799,7 @@ export async function decryptMetadata(
   const [ciphertext, iv, tag] = parts;
 
   // Decrypt using AES-256-GCM
-  const decryptedJson = await decryptPayload({ ciphertext, iv, tag }, encryptionKey);
+  const decryptedJson = await decryptPayload(ciphertext, encryptionKey, iv, tag);
 
   // Parse JSON back to metadata object
   const metadata = JSON.parse(decryptedJson);
