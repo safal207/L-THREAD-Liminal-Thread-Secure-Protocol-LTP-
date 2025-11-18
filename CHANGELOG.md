@@ -13,6 +13,105 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-language SDK comparison benchmarks
 - Production-ready TOON codec implementations
 
+## [0.5.0-beta.4] - 2025-01-18
+
+### 🔒 CRITICAL SECURITY FIX - Metadata Signing & Tamper Protection
+
+**Ported from PR #11 - Closes metadata tampering vulnerability**
+
+### Fixed
+
+- **Metadata Tampering Vulnerability** (CRITICAL FIX ❌→✅)
+  - HMAC signatures now include `meta` field
+  - HMAC signatures now include `content_encoding` field
+  - Attackers can no longer modify metadata without breaking signature
+  - Prevents client_id spoofing, platform manipulation, etc.
+  - Location: `sdk/js/src/crypto.ts`
+
+### Changed
+
+- **`signMessage()` signature** - Now accepts `meta` and `content_encoding`
+  ```typescript
+  await signMessage({
+    // ... existing fields
+    meta: message.meta,              // ✅ NEW - now signed
+    content_encoding: message.content_encoding  // ✅ NEW - now signed
+  }, secretKey);
+  ```
+
+- **`verifySignature()` signature** - Now verifies `meta` and `content_encoding`
+  - Validation includes all envelope metadata
+  - Any modification to metadata breaks signature
+
+- **Canonical serialization** - Updated to include new fields
+  - `meta` field included in canonical representation
+  - `content_encoding` field included in canonical representation
+  - Sorted-key JSON serialization maintained
+
+### Security Impact
+
+**Before v0.5.0-beta.4:** ❌ VULNERABLE
+```typescript
+// Attacker could modify metadata without detection:
+{
+  "type": "state_update",
+  "payload": {...},
+  "signature": "valid_hmac", // ✅ Still valid!
+  "meta": {
+    "client_id": "attacker"  // ❌ Modified but signature valid
+  }
+}
+```
+
+**After v0.5.0-beta.4:** ✅ PROTECTED
+```typescript
+// Any metadata modification breaks signature:
+{
+  "type": "state_update",
+  "payload": {...},
+  "signature": "invalid_hmac", // ❌ Signature now invalid
+  "meta": {
+    "client_id": "attacker"  // Modification detected!
+  }
+}
+```
+
+### Compatibility
+
+- ✅ **Backward compatible** - `meta` and `content_encoding` are optional
+- ✅ **Graceful degradation** - Missing fields treated as empty objects/strings
+- ⚠️ **Signature mismatch** - Old signatures won't verify if metadata present
+
+### Testing
+
+```bash
+npm test  # All tests passing ✅
+```
+
+### Migration
+
+No code changes required for existing clients. Signatures will automatically include metadata when present:
+
+```typescript
+// Before (still works):
+const signature = await signMessage({
+  type, thread_id, session_id, timestamp, nonce, payload
+}, key);
+
+// After (recommended):
+const signature = await signMessage({
+  type, thread_id, session_id, timestamp, nonce, payload,
+  meta: { client_id, platform },        // ✅ Now protected
+  content_encoding: 'json'              // ✅ Now protected
+}, key);
+```
+
+### Related
+
+- Ported from Python SDK (PR #11)
+- Complements hash chaining (already in main)
+- Part of v0.5.0 security hardening roadmap
+
 ## [0.5.0-beta.3] - 2025-01-18
 
 ### 🔒 Security Hardening & Automatic ECDH Key Exchange
