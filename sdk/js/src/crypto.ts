@@ -123,16 +123,22 @@ export async function verifySignature(
 /**
  * Timing-safe string comparison to prevent timing attacks
  * Ensures comparison takes constant time regardless of where strings differ
+ * or if lengths are different
  */
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) {
-    return false;
-  }
-
   // Node.js environment - use native crypto.timingSafeEqual
   if (typeof require !== 'undefined') {
     try {
       const crypto = require('crypto');
+      // Native implementation handles length mismatch safely
+      if (a.length !== b.length) {
+        // Still do constant-time comparison of same-length dummy values
+        // to prevent timing leak from early return
+        const dummyA = Buffer.alloc(32);
+        const dummyB = Buffer.alloc(32);
+        crypto.timingSafeEqual(dummyA, dummyB);
+        return false;
+      }
       return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
     } catch (error) {
       // Fall through to manual implementation
@@ -140,9 +146,14 @@ function timingSafeEqual(a: string, b: string): boolean {
   }
 
   // Browser environment or fallback - constant-time comparison
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  // Always compare max(a.length, b.length) characters to prevent timing leak
+  const maxLen = Math.max(a.length, b.length);
+  let result = a.length ^ b.length; // Include length difference in result
+
+  for (let i = 0; i < maxLen; i++) {
+    const aChar = i < a.length ? a.charCodeAt(i) : 0;
+    const bChar = i < b.length ? b.charCodeAt(i) : 0;
+    result |= aChar ^ bChar;
   }
 
   return result === 0;

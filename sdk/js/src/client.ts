@@ -3,7 +3,13 @@
  * Version 0.4
  */
 
-import { signMessage, verifySignature } from './crypto';
+import {
+  signMessage,
+  verifySignature,
+  generateKeyPair,
+  deriveSharedSecret,
+  deriveSessionKeys
+} from './crypto';
 import {
   HandshakeInitMessage,
   HandshakeAckMessage,
@@ -147,6 +153,10 @@ export class LtpClient {
   // Nonce cache for replay protection (v0.5+)
   private seenNonces: Map<string, number> = new Map(); // Map<nonce, timestamp>
   private nonceCacheCleanupTimer: NodeJS.Timeout | null = null;
+
+  // ECDH key exchange (v0.5+)
+  private ecdhPrivateKey: string | null = null;
+  private ecdhPublicKey: string | null = null;
 
   /**
    * Create a new LTP client
@@ -421,7 +431,7 @@ export class LtpClient {
     };
   }
 
-  private sendHandshakeInit(): void {
+  private async sendHandshakeInit(): Promise<void> {
     const handshake: HandshakeInitMessage = {
       type: 'handshake_init',
       ltp_version: LTP_VERSION,
@@ -431,6 +441,21 @@ export class LtpClient {
       capabilities: this.options.capabilities,
       metadata: this.options.metadata,
     };
+
+    // Generate ECDH key pair if key exchange is enabled (v0.5+)
+    if (this.options.enableEcdhKeyExchange) {
+      try {
+        this.logger.info('Generating ECDH key pair for key exchange...');
+        const keyPair = await generateKeyPair();
+        this.ecdhPrivateKey = keyPair.privateKey;
+        this.ecdhPublicKey = keyPair.publicKey;
+        handshake.client_ecdh_public_key = this.ecdhPublicKey;
+        this.logger.info('ECDH public key generated and added to handshake');
+      } catch (error) {
+        this.logger.error('Failed to generate ECDH key pair', error);
+        // Continue without key exchange
+      }
+    }
 
     this.sendRaw(handshake);
   }
@@ -585,7 +610,9 @@ export class LtpClient {
 
     switch (message.type) {
       case 'handshake_ack':
-        this.handleHandshakeAck(message as HandshakeAckMessage);
+        this.handleHandshakeAck(message as HandshakeAckMessage).catch((error) => {
+          this.logger.error('Failed to handle handshake acknowledgment', error);
+        });
         break;
       case 'handshake_reject':
         this.handleHandshakeReject(message as HandshakeRejectMessage);
@@ -615,7 +642,7 @@ export class LtpClient {
     }
   }
 
-  private handleHandshakeAck(message: HandshakeAckMessage): void {
+  private async handleHandshakeAck(message: HandshakeAckMessage): Promise<void> {
     this.logger.info('Handshake acknowledged', {
       threadId: message.thread_id,
       sessionId: message.session_id,
@@ -626,6 +653,41 @@ export class LtpClient {
     this.sessionId = message.session_id;
     this.negotiatedHeartbeatMs = message.heartbeat_interval_ms;
     this.persistIds();
+
+    // ECDH key exchange - derive session keys (v0.5+)
+    if (this.options.enableEcdhKeyExchange &&
+        this.ecdhPrivateKey &&
+        message.server_ecdh_public_key) {
+      try {
+        this.logger.info('Deriving session keys from ECDH shared secret...');
+
+        // Derive shared secret
+        const sharedSecret = await deriveSharedSecret(
+          this.ecdhPrivateKey,
+          message.server_ecdh_public_key
+        );
+
+        // Derive session keys
+        const { macKey, encryptionKey, ivKey } = await deriveSessionKeys(
+          sharedSecret,
+          this.sessionId
+        );
+
+        // Set MAC key for signature verification
+        this.options.sessionMacKey = macKey;
+        this.options.requireSignatureVerification = true;
+
+        this.logger.info('Session keys derived successfully - signatures now required');
+
+        // Clear ephemeral private key for forward secrecy
+        this.ecdhPrivateKey = null;
+      } catch (error) {
+        this.logger.error('Failed to derive session keys from ECDH', error);
+        // Continue without automatic key derivation
+      }
+    } else if (this.options.enableEcdhKeyExchange && !message.server_ecdh_public_key) {
+      this.logger.warn('ECDH key exchange enabled but server did not provide public key');
+    }
 
     this.isConnected = true;
     this.isHandshakeComplete = true;
@@ -1080,7 +1142,11 @@ export class LtpClient {
     const macKey = this.options.sessionMacKey || this.options.secretKey;
 
     // If no MAC key and signatures not required, use placeholder (backward compatibility)
+    // WARNING: This is INSECURE and only for v0.3 compatibility
+    // Will be removed in v0.6.0
     if (!macKey && !this.options.requireSignatureVerification) {
+      this.logger.warn('Using insecure placeholder signature - v0.3 compatibility mode. ' +
+        'This will be removed in v0.6.0. Please use sessionMacKey.');
       return 'v0-placeholder';
     }
 
