@@ -8,6 +8,7 @@ setup(
     packages=find_packages(),
     install_requires=[
         "websockets>=11.0",
+        "cryptography>=41.0",
     ],
     extras_require={
         "dev": [

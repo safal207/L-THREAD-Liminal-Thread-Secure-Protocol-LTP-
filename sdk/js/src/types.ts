@@ -78,6 +78,7 @@ export interface LtpEnvelope<T = unknown> {
   meta?: LtpMeta;
   nonce?: string;
   signature?: string;
+  prev_message_hash?: string;
 }
 
 /**
@@ -95,6 +96,8 @@ export interface HandshakeInitMessage {
     platform?: string;
     [key: string]: unknown;
   };
+  client_public_key?: string;
+  key_agreement?: Record<string, unknown>;
   nonce?: string;
   signature?: string;
 }
@@ -115,6 +118,8 @@ export interface HandshakeAckMessage {
     region?: string;
     [key: string]: unknown;
   };
+  server_public_key?: string;
+  key_agreement?: Record<string, unknown>;
   nonce?: string;
   signature?: string;
   timestamp?: number;
@@ -127,6 +132,8 @@ export interface HandshakeResumeMessage {
   client_id: string;
   thread_id: string;
   resume_reason?: string;
+  client_public_key?: string;
+  key_agreement?: Record<string, unknown>;
   nonce?: string;
   signature?: string;
 }

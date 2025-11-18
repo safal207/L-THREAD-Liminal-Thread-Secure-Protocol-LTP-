@@ -3,7 +3,14 @@
  * Version 0.4
  */
 
-import { signMessage, verifySignature } from './crypto';
+import {
+  deriveSharedSecret,
+  generateKeyPair,
+  hashEnvelope,
+  hkdf,
+  signMessage,
+  verifySignature,
+} from './crypto';
 import {
   HandshakeInitMessage,
   HandshakeAckMessage,
@@ -147,6 +154,13 @@ export class LtpClient {
   // Nonce cache for replay protection (v0.5+)
   private seenNonces: Map<string, number> = new Map(); // Map<nonce, timestamp>
   private nonceCacheCleanupTimer: NodeJS.Timeout | null = null;
+
+  // Hash chaining (v0.5+)
+  private lastSentHash: string | null = null;
+  private lastReceivedHash: string | null = null;
+
+  // Ephemeral handshake keys
+  private handshakeKeys: { publicKey: string; privateKey: string } | null = null;
 
   /**
    * Create a new LTP client
@@ -392,10 +406,10 @@ export class LtpClient {
       this.isConnecting = false;
       if (this.threadId) {
         this.isAttemptingResume = true;
-        this.sendHandshakeResume();
+        void this.sendHandshakeResume();
       } else {
         this.isAttemptingResume = false;
-        this.sendHandshakeInit();
+        void this.sendHandshakeInit();
       }
     };
 
@@ -421,7 +435,9 @@ export class LtpClient {
     };
   }
 
-  private sendHandshakeInit(): void {
+  private async sendHandshakeInit(): Promise<void> {
+    await this.ensureHandshakeKeys();
+
     const handshake: HandshakeInitMessage = {
       type: 'handshake_init',
       ltp_version: LTP_VERSION,
@@ -430,16 +446,24 @@ export class LtpClient {
       intent: this.options.intent,
       capabilities: this.options.capabilities,
       metadata: this.options.metadata,
+      client_public_key: this.handshakeKeys?.publicKey,
+      key_agreement: {
+        algorithm: 'secp256r1',
+        method: 'ecdh',
+        hkdf: 'sha256',
+      },
     };
 
     this.sendRaw(handshake);
   }
 
-  private sendHandshakeResume(): void {
+  private async sendHandshakeResume(): Promise<void> {
     if (!this.threadId) {
-      this.sendHandshakeInit();
+      await this.sendHandshakeInit();
       return;
     }
+
+    await this.ensureHandshakeKeys();
 
     const resume: HandshakeResumeMessage = {
       type: 'handshake_resume',
@@ -447,9 +471,21 @@ export class LtpClient {
       client_id: this.options.clientId!,
       thread_id: this.threadId,
       resume_reason: 'automatic_reconnect',
+      client_public_key: this.handshakeKeys?.publicKey,
+      key_agreement: {
+        algorithm: 'secp256r1',
+        method: 'ecdh',
+        hkdf: 'sha256',
+      },
     };
 
     this.sendRaw(resume);
+  }
+
+  private async ensureHandshakeKeys(): Promise<void> {
+    if (!this.handshakeKeys) {
+      this.handshakeKeys = await generateKeyPair();
+    }
   }
 
   private async handleMessageAsync(message: LtpMessage): Promise<void> {
@@ -457,7 +493,13 @@ export class LtpClient {
     const macKey = this.options.sessionMacKey || this.options.secretKey;
 
     // Mandatory signature verification (v0.5+)
-    if (this.options.requireSignatureVerification && macKey) {
+    const shouldVerify =
+      this.options.requireSignatureVerification &&
+      macKey &&
+      message.type !== 'handshake_ack' &&
+      message.type !== 'handshake_reject';
+
+    if (shouldVerify) {
       // Check if message has all required fields for verification
       const hasRequiredFields =
         'thread_id' in message &&
@@ -554,7 +596,7 @@ export class LtpClient {
     }
 
     // Nonce validation for replay protection (v0.5+)
-    if (this.options.requireSignatureVerification && macKey) {
+    if (shouldVerify) {
       const clientId = 'meta' in message && message.meta?.client_id
         ? message.meta.client_id
         : undefined;
@@ -577,6 +619,39 @@ export class LtpClient {
         type: message.type,
         nonce: message.nonce,
       });
+
+      if (this.lastReceivedHash && message.prev_message_hash !== this.lastReceivedHash) {
+        this.logger.error('Hash chain mismatch - REJECTING', {
+          type: message.type,
+          expectedPrev: this.lastReceivedHash,
+          providedPrev: message.prev_message_hash,
+        });
+        this.handleError({
+          error_code: 'HASH_CHAIN_MISMATCH',
+          error_message: 'prev_message_hash does not match last commitment',
+        });
+        return;
+      }
+
+      // Advance hash chain after validation
+      try {
+        this.lastReceivedHash = await hashEnvelope({
+          type: message.type,
+          thread_id: (message as any).thread_id,
+          session_id: (message as any).session_id,
+          timestamp: (message as any).timestamp,
+          nonce: message.nonce!,
+          payload: (message as any).payload,
+          prev_message_hash: message.prev_message_hash,
+        });
+      } catch (error) {
+        this.logger.error('Failed to hash envelope - REJECTING', error);
+        this.handleError({
+          error_code: 'HASH_FAILURE',
+          error_message: 'Unable to hash envelope for chain integrity',
+        });
+        return;
+      }
     }
 
     if (this.events.onMessage) {
@@ -585,7 +660,7 @@ export class LtpClient {
 
     switch (message.type) {
       case 'handshake_ack':
-        this.handleHandshakeAck(message as HandshakeAckMessage);
+        await this.handleHandshakeAck(message as HandshakeAckMessage);
         break;
       case 'handshake_reject':
         this.handleHandshakeReject(message as HandshakeRejectMessage);
@@ -615,7 +690,7 @@ export class LtpClient {
     }
   }
 
-  private handleHandshakeAck(message: HandshakeAckMessage): void {
+  private async handleHandshakeAck(message: HandshakeAckMessage): Promise<void> {
     this.logger.info('Handshake acknowledged', {
       threadId: message.thread_id,
       sessionId: message.session_id,
@@ -635,6 +710,24 @@ export class LtpClient {
     this.clearReconnectTimer();
     this.startHeartbeat();
     this.startNonceCleanup(); // Start replay protection cleanup
+
+    // Reset hash chain at the start of each session
+    this.lastSentHash = null;
+    this.lastReceivedHash = null;
+
+    if (message.server_public_key && this.handshakeKeys) {
+      try {
+        const sharedSecret = await deriveSharedSecret(this.handshakeKeys.privateKey, message.server_public_key);
+        const derivedMac = await hkdf(sharedSecret, message.session_id, 'ltp-mac-key', 32);
+        this.options.sessionMacKey = derivedMac;
+        this.options.requireSignatureVerification = true;
+        this.logger.info('Derived session MAC key via ECDH handshake');
+      } catch (error) {
+        this.logger.error('Failed to derive session keys from handshake', error);
+      } finally {
+        this.handshakeKeys = null;
+      }
+    }
 
     if (this.events.onConnected) {
       this.events.onConnected(this.threadId, this.sessionId);
@@ -657,7 +750,7 @@ export class LtpClient {
       this.sessionId = null;
       this.storage.removeItem(this.storageKeys.thread);
       this.storage.removeItem(this.storageKeys.session);
-      this.sendHandshakeInit();
+      void this.sendHandshakeInit();
       return;
     }
 
@@ -684,6 +777,9 @@ export class LtpClient {
     this.isHandshakeComplete = false;
     this.clearHeartbeatTimers();
     this.stopNonceCleanup(); // Stop replay protection cleanup
+    this.lastSentHash = null;
+    this.lastReceivedHash = null;
+    this.handshakeKeys = null;
 
     if (this.events.onDisconnected) {
       this.events.onDisconnected();
@@ -750,7 +846,7 @@ export class LtpClient {
     this.handleDisconnect(reason);
   }
 
-  private send(message: LtpEnvelope): void {
+  private async send(message: LtpEnvelope): Promise<void> {
     if (!this.isConnected || !this.isHandshakeComplete || !this.ws) {
       this.logger.error('Cannot send message: not connected');
       return;
@@ -758,16 +854,31 @@ export class LtpClient {
 
     const nonce = this.generateNonce();
 
-    // Generate signature asynchronously
-    this.generateSignature(message, nonce).then((signature) => {
+    const envelopeWithPrev: LtpEnvelope = {
+      ...message,
+      prev_message_hash: this.lastSentHash || undefined,
+    };
+
+    try {
+      const signature = await this.generateSignature(envelopeWithPrev, nonce);
       const envelopeWithSecurity: LtpEnvelope = {
-        ...message,
+        ...envelopeWithPrev,
         nonce,
         signature,
       };
 
+      this.lastSentHash = await hashEnvelope({
+        type: envelopeWithSecurity.type,
+        thread_id: envelopeWithSecurity.thread_id,
+        session_id: envelopeWithSecurity.session_id,
+        timestamp: envelopeWithSecurity.timestamp,
+        nonce: envelopeWithSecurity.nonce!,
+        payload: envelopeWithSecurity.payload,
+        prev_message_hash: envelopeWithSecurity.prev_message_hash,
+      });
+
       this.sendRaw(envelopeWithSecurity);
-    }).catch((error) => {
+    } catch (error) {
       // If signatures are required, don't send unsigned message
       if (this.options.requireSignatureVerification) {
         this.logger.error('Failed to generate required signature - message not sent', error);
@@ -781,12 +892,12 @@ export class LtpClient {
       // Backward compatibility: fallback to placeholder
       this.logger.error('Failed to generate signature, sending with placeholder', error);
       const envelopeWithSecurity: LtpEnvelope = {
-        ...message,
+        ...envelopeWithPrev,
         nonce,
         signature: 'v0-placeholder',
       };
       this.sendRaw(envelopeWithSecurity);
-    });
+    }
   }
 
   private sendRaw(message: unknown): void {
@@ -1099,6 +1210,7 @@ export class LtpClient {
           timestamp: message.timestamp,
           nonce,
           payload: message.payload,
+          prev_message_hash: message.prev_message_hash,
         },
         macKey!
       );
@@ -1118,7 +1230,7 @@ export class LtpClient {
   }
 
   private getTimestamp(): number {
-    return Math.floor(Date.now() / 1000);
+    return Date.now();
   }
 
   private generateClientId(): string {
