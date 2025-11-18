@@ -500,12 +500,14 @@ export class LtpClient {
       message.type !== 'handshake_reject';
 
     if (shouldVerify) {
+      const envelopeMessage = message as LtpEnvelope;
+
       // Check if message has all required fields for verification
       const hasRequiredFields =
-        'thread_id' in message &&
-        'timestamp' in message &&
-        'nonce' in message &&
-        'payload' in message;
+        'thread_id' in envelopeMessage &&
+        'timestamp' in envelopeMessage &&
+        'nonce' in envelopeMessage &&
+        'payload' in envelopeMessage;
 
       if (!hasRequiredFields) {
         this.logger.error('Message missing required fields for signature verification', {
@@ -522,7 +524,7 @@ export class LtpClient {
         return; // Reject message
       }
 
-      if (!message.signature) {
+      if (!envelopeMessage.signature) {
         this.logger.error('Message missing required signature', {
           type: message.type,
         });
@@ -535,7 +537,7 @@ export class LtpClient {
 
       // Verify signature (blocking - security critical)
       try {
-        const verifiableMessage = message as any; // Type assertion for verification
+        const verifiableMessage = envelopeMessage as any; // Type assertion for verification
         const result = await verifySignature(verifiableMessage, macKey);
 
         if (!result.valid) {
@@ -593,20 +595,18 @@ export class LtpClient {
       this.logger.debug('Message signature verified successfully', {
         type: message.type,
       });
-    }
 
-    // Nonce validation for replay protection (v0.5+)
-    if (shouldVerify) {
-      const clientId = 'meta' in message && message.meta?.client_id
-        ? message.meta.client_id
+      // Nonce validation for replay protection (v0.5+)
+      const clientId = 'meta' in envelopeMessage && envelopeMessage.meta?.client_id
+        ? envelopeMessage.meta.client_id
         : undefined;
 
-      const nonceError = this.validateNonce(message.nonce, clientId);
+      const nonceError = this.validateNonce(envelopeMessage.nonce, clientId);
       if (nonceError) {
         this.logger.error('Nonce validation failed - REJECTING', {
           type: message.type,
           error: nonceError,
-          nonce: message.nonce,
+          nonce: envelopeMessage.nonce,
         });
         this.handleError({
           error_code: 'INVALID_NONCE',
@@ -617,14 +617,14 @@ export class LtpClient {
 
       this.logger.debug('Nonce validated successfully', {
         type: message.type,
-        nonce: message.nonce,
+        nonce: envelopeMessage.nonce,
       });
 
-      if (this.lastReceivedHash && message.prev_message_hash !== this.lastReceivedHash) {
+      if (this.lastReceivedHash && envelopeMessage.prev_message_hash !== this.lastReceivedHash) {
         this.logger.error('Hash chain mismatch - REJECTING', {
           type: message.type,
           expectedPrev: this.lastReceivedHash,
-          providedPrev: message.prev_message_hash,
+          providedPrev: envelopeMessage.prev_message_hash,
         });
         this.handleError({
           error_code: 'HASH_CHAIN_MISMATCH',
@@ -637,12 +637,12 @@ export class LtpClient {
       try {
         this.lastReceivedHash = await hashEnvelope({
           type: message.type,
-          thread_id: (message as any).thread_id,
-          session_id: (message as any).session_id,
-          timestamp: (message as any).timestamp,
-          nonce: message.nonce!,
-          payload: (message as any).payload,
-          prev_message_hash: message.prev_message_hash,
+          thread_id: envelopeMessage.thread_id,
+          session_id: envelopeMessage.session_id,
+          timestamp: envelopeMessage.timestamp,
+          nonce: envelopeMessage.nonce!,
+          payload: envelopeMessage.payload,
+          prev_message_hash: envelopeMessage.prev_message_hash,
         });
       } catch (error) {
         this.logger.error('Failed to hash envelope - REJECTING', error);
