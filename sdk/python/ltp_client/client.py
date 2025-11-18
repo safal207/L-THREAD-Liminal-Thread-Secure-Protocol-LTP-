@@ -28,14 +28,7 @@ from .types import (
     ErrorPayload,
     MessageType,
 )
-from .crypto import (
-    derive_shared_secret,
-    generate_ecdh_key_pair,
-    hash_envelope,
-    hkdf,
-    sign_message,
-    verify_signature,
-)
+from .crypto import sign_message, verify_signature
 
 LTP_VERSION = "0.3"
 SDK_VERSION = "0.3.0"
@@ -152,9 +145,6 @@ class LtpClient:
         )
         self.max_message_age_ms = max_message_age_ms
         self._seen_nonces: Dict[str, int] = {}
-        self._last_sent_hash: Optional[str] = None
-        self._last_received_hash: Optional[str] = None
-        self._handshake_keys: Optional[Tuple[str, str]] = None  # (public, private)
 
         self.on_connected: Optional[Callable[[str, str], None]] = None
         self.on_disconnected: Optional[Callable[[], None]] = None
@@ -300,9 +290,6 @@ class LtpClient:
                 return
             if not self._validate_nonce(data):
                 return
-            if not self._validate_prev_hash(data):
-                return
-            self._last_received_hash = hash_envelope(data)
 
         if message_type == "handshake_ack":
             await self._handle_handshake_ack(data)
@@ -463,15 +450,12 @@ class LtpClient:
             meta=meta,
             content_encoding="json",  # Default to JSON; TOON support will be added in future
             nonce=self._generate_nonce(),
-            prev_message_hash=self._last_sent_hash,
         )
 
         message_dict = envelope.to_dict()
 
         if self._mac_key:
             message_dict["signature"] = sign_message(message_dict, self._mac_key)
-
-        self._last_sent_hash = hash_envelope(message_dict)
 
         return message_dict
 
@@ -490,7 +474,17 @@ class LtpClient:
         return int(time.time() * 1000)
 
     def _validate_signature(self, message: Dict[str, Any]) -> bool:
-        required_fields = ["type", "thread_id", "session_id", "timestamp", "nonce", "payload", "signature"]
+        required_fields = [
+            "type",
+            "thread_id",
+            "session_id",
+            "timestamp",
+            "nonce",
+            "payload",
+            "meta",
+            "content_encoding",
+            "signature",
+        ]
         missing = [field for field in required_fields if field not in message]
 
         if missing:
@@ -559,19 +553,6 @@ class LtpClient:
             return False
 
         self._seen_nonces[nonce] = int(time.time() * 1000)
-        return True
-
-    def _validate_prev_hash(self, message: Dict[str, Any]) -> bool:
-        expected_prev = self._last_received_hash
-        provided_prev = message.get("prev_message_hash")
-
-        if expected_prev is None:
-            return True
-
-        if provided_prev != expected_prev:
-            print("[LTP] Hash chain mismatch; rejecting message")
-            return False
-
         return True
 
     def _generate_client_id(self) -> str:

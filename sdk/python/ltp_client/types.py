@@ -141,8 +141,7 @@ class LtpEnvelope:
         }
         if self.meta:
             result['meta'] = self.meta.to_dict()
-        if self.content_encoding and self.content_encoding != 'json':
-            result['content_encoding'] = self.content_encoding
+        result['content_encoding'] = self.content_encoding or 'json'
         if self.nonce:
             result['nonce'] = self.nonce
         if self.signature:

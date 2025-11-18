@@ -167,3 +167,29 @@ class TestLtpClient:
 
         asyncio.run(run_test())
 
+    def test_signature_verification_blocks_meta_tampering(self):
+        client = LtpClient(
+            url="ws://localhost:8080",
+            client_id="test-client",
+            session_mac_key="super-secret",
+            require_signature_verification=True,
+        )
+        client.thread_id = "thread-123"
+        client.session_id = "session-456"
+        client.on_state_update = MagicMock()
+
+        message = client._build_envelope(
+            msg_type="state_update",
+            payload={"kind": "test", "data": {"value": 1}},
+        )
+
+        # Tamper with the meta field to invalidate the signature
+        message["meta"]["context_tag"] = "tampered-context"
+
+        async def run_test():
+            await client._handle_message(message)
+
+            client.on_state_update.assert_not_called()
+
+        asyncio.run(run_test())
+
