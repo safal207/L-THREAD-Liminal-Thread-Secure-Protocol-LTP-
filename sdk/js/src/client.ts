@@ -8,7 +8,9 @@ import {
   verifySignature,
   generateKeyPair,
   deriveSharedSecret,
-  deriveSessionKeys
+  deriveSessionKeys,
+  hkdf,
+  hashEnvelope
 } from './crypto';
 import {
   HandshakeInitMessage,
@@ -157,6 +159,18 @@ export class LtpClient {
   // ECDH key exchange (v0.5+)
   private ecdhPrivateKey: string | null = null;
   private ecdhPublicKey: string | null = null;
+
+  // Hash chaining for message integrity (v0.5+)
+  private lastSentHash: string | null = null;
+  private lastReceivedHash: string | null = null;
+
+  // Compatibility alias for handshakeKeys
+  private get handshakeKeys() {
+    if (this.ecdhPrivateKey && this.ecdhPublicKey) {
+      return { privateKey: this.ecdhPrivateKey, publicKey: this.ecdhPublicKey };
+    }
+    return null;
+  }
 
   /**
    * Create a new LTP client
@@ -432,6 +446,9 @@ export class LtpClient {
   }
 
   private async sendHandshakeInit(): Promise<void> {
+    // Ensure we have ECDH keys for handshake
+    await this.ensureHandshakeKeys();
+
     const handshake: HandshakeInitMessage = {
       type: 'handshake_init',
       ltp_version: LTP_VERSION,
@@ -440,28 +457,13 @@ export class LtpClient {
       intent: this.options.intent,
       capabilities: this.options.capabilities,
       metadata: this.options.metadata,
-      client_public_key: this.handshakeKeys?.publicKey,
-      key_agreement: {
+      client_ecdh_public_key: this.ecdhPublicKey || undefined,
+      key_agreement: this.ecdhPublicKey ? {
         algorithm: 'secp256r1',
         method: 'ecdh',
         hkdf: 'sha256',
-      },
+      } : undefined,
     };
-
-    // Generate ECDH key pair if key exchange is enabled (v0.5+)
-    if (this.options.enableEcdhKeyExchange) {
-      try {
-        this.logger.info('Generating ECDH key pair for key exchange...');
-        const keyPair = await generateKeyPair();
-        this.ecdhPrivateKey = keyPair.privateKey;
-        this.ecdhPublicKey = keyPair.publicKey;
-        handshake.client_ecdh_public_key = this.ecdhPublicKey;
-        this.logger.info('ECDH public key generated and added to handshake');
-      } catch (error) {
-        this.logger.error('Failed to generate ECDH key pair', error);
-        // Continue without key exchange
-      }
-    }
 
     this.sendRaw(handshake);
   }
@@ -480,20 +482,29 @@ export class LtpClient {
       client_id: this.options.clientId!,
       thread_id: this.threadId,
       resume_reason: 'automatic_reconnect',
-      client_public_key: this.handshakeKeys?.publicKey,
-      key_agreement: {
+      client_public_key: this.ecdhPublicKey || undefined,
+      key_agreement: this.ecdhPublicKey ? {
         algorithm: 'secp256r1',
         method: 'ecdh',
         hkdf: 'sha256',
-      },
+      } : undefined,
     };
 
     this.sendRaw(resume);
   }
 
   private async ensureHandshakeKeys(): Promise<void> {
-    if (!this.handshakeKeys) {
-      this.handshakeKeys = await generateKeyPair();
+    // Generate keys only if enableEcdhKeyExchange is true and keys don't exist
+    if (this.options.enableEcdhKeyExchange && !this.ecdhPrivateKey) {
+      try {
+        this.logger.info('Generating ECDH key pair for key exchange...');
+        const keyPair = await generateKeyPair();
+        this.ecdhPrivateKey = keyPair.privateKey;
+        this.ecdhPublicKey = keyPair.publicKey;
+        this.logger.info('ECDH public key generated');
+      } catch (error) {
+        this.logger.error('Failed to generate ECDH key pair', error);
+      }
     }
   }
 
@@ -761,18 +772,36 @@ export class LtpClient {
     this.lastSentHash = null;
     this.lastReceivedHash = null;
 
-    if (message.server_public_key && this.handshakeKeys) {
+    // ECDH key exchange - derive session keys (v0.5+)
+    if (message.server_ecdh_public_key && this.ecdhPrivateKey) {
       try {
-        const sharedSecret = await deriveSharedSecret(this.handshakeKeys.privateKey, message.server_public_key);
-        const derivedMac = await hkdf(sharedSecret, message.session_id, 'ltp-mac-key', 32);
-        this.options.sessionMacKey = derivedMac;
+        this.logger.info('Deriving session keys from ECDH shared secret...');
+
+        // Derive shared secret
+        const sharedSecret = await deriveSharedSecret(
+          this.ecdhPrivateKey,
+          message.server_ecdh_public_key
+        );
+
+        // Derive session keys using HKDF
+        const { macKey, encryptionKey, ivKey } = await deriveSessionKeys(
+          sharedSecret,
+          this.sessionId
+        );
+
+        // Set MAC key for signature verification
+        this.options.sessionMacKey = macKey;
         this.options.requireSignatureVerification = true;
-        this.logger.info('Derived session MAC key via ECDH handshake');
+
+        this.logger.info('Session keys derived successfully - signatures now required');
       } catch (error) {
-        this.logger.error('Failed to derive session keys from handshake', error);
+        this.logger.error('Failed to derive session keys from ECDH', error);
       } finally {
-        this.handshakeKeys = null;
+        // Clear ephemeral private key for forward secrecy
+        this.ecdhPrivateKey = null;
       }
+    } else if (this.options.enableEcdhKeyExchange && !message.server_ecdh_public_key) {
+      this.logger.warn('ECDH key exchange enabled but server did not provide public key');
     }
 
     if (this.events.onConnected) {
@@ -825,7 +854,8 @@ export class LtpClient {
     this.stopNonceCleanup(); // Stop replay protection cleanup
     this.lastSentHash = null;
     this.lastReceivedHash = null;
-    this.handshakeKeys = null;
+    this.ecdhPrivateKey = null;
+    this.ecdhPublicKey = null;
 
     if (this.events.onDisconnected) {
       this.events.onDisconnected();

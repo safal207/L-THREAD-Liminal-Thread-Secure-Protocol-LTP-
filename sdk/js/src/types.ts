@@ -101,6 +101,15 @@ export interface HandshakeInitMessage {
    * Hex-encoded public key for deriving shared secret
    */
   client_ecdh_public_key?: string;
+  /**
+   * Key agreement parameters (v0.5+)
+   */
+  key_agreement?: {
+    algorithm?: string;
+    method?: string;
+    hkdf?: string;
+    [key: string]: unknown;
+  };
   nonce?: string;
   signature?: string;
 }
