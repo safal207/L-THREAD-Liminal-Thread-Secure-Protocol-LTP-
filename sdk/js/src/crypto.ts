@@ -43,6 +43,8 @@ function serializeCanonical(message: {
   nonce: string;
   payload: any;
   prev_message_hash?: string;
+  meta?: any;
+  content_encoding?: string;
 }): string {
   const canonical = canonicalize({
     type: message.type,
@@ -52,6 +54,8 @@ function serializeCanonical(message: {
     nonce: message.nonce,
     payload: message.payload,
     prev_message_hash: message.prev_message_hash || '',
+    meta: message.meta || {},
+    content_encoding: message.content_encoding || '',
   });
 
   return JSON.stringify(canonical);
@@ -70,6 +74,8 @@ export async function signMessage(
     nonce: string;
     payload: any;
     prev_message_hash?: string;
+    meta?: any;
+    content_encoding?: string;
   },
   secretKey: string
 ): Promise<string> {
@@ -131,6 +137,8 @@ export async function verifySignature(
     payload: any;
     signature: string;
     prev_message_hash?: string;
+    meta?: any;
+    content_encoding?: string;
   },
   secretKey: string
 ): Promise<{ valid: boolean; error?: string }> {
@@ -144,6 +152,9 @@ export async function verifySignature(
         timestamp: message.timestamp,
         nonce: message.nonce,
         payload: message.payload,
+        prev_message_hash: message.prev_message_hash,
+        meta: message.meta,
+        content_encoding: message.content_encoding,
       },
       secretKey
     );

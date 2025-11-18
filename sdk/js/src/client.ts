@@ -1291,6 +1291,8 @@ export class LtpClient {
           nonce,
           payload: message.payload,
           prev_message_hash: message.prev_message_hash,
+          meta: message.meta,
+          content_encoding: message.content_encoding,
         },
         macKey!
       );
