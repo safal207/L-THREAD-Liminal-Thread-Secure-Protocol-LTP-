@@ -28,6 +28,14 @@ from .types import (
     ErrorPayload,
     MessageType,
 )
+from .crypto import (
+    derive_shared_secret,
+    generate_ecdh_key_pair,
+    hash_envelope,
+    hkdf,
+    sign_message,
+    verify_signature,
+)
 
 LTP_VERSION = "0.3"
 SDK_VERSION = "0.3.0"
@@ -87,12 +95,11 @@ class LtpClient:
         storage_path: Optional[str] = None,
         reconnect_strategy: Optional[Dict[str, int]] = None,
         heartbeat_options: Optional[Dict[str, Any]] = None,
+        session_mac_key: Optional[str] = None,
+        secret_key: Optional[str] = None,
+        require_signature_verification: Optional[bool] = None,
+        max_message_age_ms: int = 60000,
     ) -> None:
-        if websockets is None:
-            raise ImportError(
-                "websockets library is required. Install with: pip install websockets"
-            )
-
         self.url = url
         self.client_id = client_id or self._generate_client_id()
         self.device_fingerprint = device_fingerprint
@@ -136,6 +143,19 @@ class LtpClient:
             "timeout_ms": (heartbeat_options or {}).get("timeout_ms", 45000),
         }
 
+        # Security configuration
+        self._mac_key = session_mac_key or secret_key
+        self.require_signature_verification = (
+            require_signature_verification
+            if require_signature_verification is not None
+            else bool(self._mac_key)
+        )
+        self.max_message_age_ms = max_message_age_ms
+        self._seen_nonces: Dict[str, int] = {}
+        self._last_sent_hash: Optional[str] = None
+        self._last_received_hash: Optional[str] = None
+        self._handshake_keys: Optional[Tuple[str, str]] = None  # (public, private)
+
         self.on_connected: Optional[Callable[[str, str], None]] = None
         self.on_disconnected: Optional[Callable[[], None]] = None
         self.on_error: Optional[Callable[[ErrorPayload], None]] = None
@@ -162,9 +182,15 @@ class LtpClient:
             self.receiver_task = None
         if self.ws:
             await self.ws.close()
-            self.ws = None
+        self.ws = None
         self.is_connected = False
         self.is_handshake_complete = False
+
+    def _ensure_handshake_keys(self) -> None:
+        """Generate ephemeral ECDH keys for the upcoming handshake if missing."""
+
+        if not self._handshake_keys:
+            self._handshake_keys = generate_ecdh_key_pair()
 
     async def send_state_update(self, payload: Dict[str, Any]) -> None:
         """Send state update payload (expects kind/data keys)."""
@@ -195,6 +221,11 @@ class LtpClient:
     # Internal helpers
 
     async def _connect_once(self) -> None:
+        if websockets is None:
+            raise ImportError(
+                "websockets library is required. Install with: pip install websockets"
+            )
+
         self.ws = await websockets.connect(self.url, subprotocols=[SUBPROTOCOL])
         self._handshake_future = asyncio.get_running_loop().create_future()
         self.receiver_task = asyncio.create_task(self._message_loop(self.ws))
@@ -202,6 +233,7 @@ class LtpClient:
         await self._handshake_future
 
     async def _send_handshake(self) -> None:
+        self._ensure_handshake_keys()
         if self.thread_id:
             self.is_attempting_resume = True
             resume_payload = {
@@ -210,6 +242,12 @@ class LtpClient:
                 "client_id": self.client_id,
                 "thread_id": self.thread_id,
                 "resume_reason": "automatic_reconnect",
+                "client_public_key": self._handshake_keys[0] if self._handshake_keys else None,
+                "key_agreement": {
+                    "algorithm": "secp256r1",
+                    "method": "ecdh",
+                    "hkdf": "sha256",
+                },
             }
             await self._send_raw(resume_payload)
         else:
@@ -224,6 +262,12 @@ class LtpClient:
             intent=self.intent,
             capabilities=self.capabilities,
             metadata=self.metadata,
+            client_public_key=self._handshake_keys[0] if self._handshake_keys else None,
+            key_agreement={
+                "algorithm": "secp256r1",
+                "method": "ecdh",
+                "hkdf": "sha256",
+            },
         )
         await self._send_raw(handshake.to_dict())
 
@@ -245,6 +289,21 @@ class LtpClient:
             self.on_message(data)
 
         message_type = data.get("type")
+
+        if self.require_signature_verification and self._mac_key and message_type not in {
+            "handshake_ack",
+            "handshake_reject",
+        }:
+            if not self._validate_signature(data):
+                return
+            if not self._validate_timestamp(data):
+                return
+            if not self._validate_nonce(data):
+                return
+            if not self._validate_prev_hash(data):
+                return
+            self._last_received_hash = hash_envelope(data)
+
         if message_type == "handshake_ack":
             await self._handle_handshake_ack(data)
         elif message_type == "handshake_reject":
@@ -268,6 +327,21 @@ class LtpClient:
         self.session_id = ack.session_id
         self.heartbeat_interval_ms = ack.heartbeat_interval_ms
         self.storage.set_ids(self.client_id, ack.thread_id, ack.session_id)
+        self._last_sent_hash = None
+        self._last_received_hash = None
+
+        if ack.server_public_key and self._handshake_keys:
+            try:
+                shared_secret = derive_shared_secret(self._handshake_keys[1], ack.server_public_key)
+                derived_mac = hkdf(shared_secret, ack.session_id, "ltp-mac-key")
+                self._mac_key = derived_mac
+                self.require_signature_verification = True
+            except Exception as error:
+                print(f"[LTP] Failed to derive handshake keys: {error}")
+            finally:
+                self._handshake_keys = None
+        else:
+            self._handshake_keys = None
 
         self.is_connected = True
         self.is_handshake_complete = True
@@ -311,6 +385,9 @@ class LtpClient:
         if self.heartbeat_task:
             self.heartbeat_task.cancel()
             self.heartbeat_task = None
+        self._last_sent_hash = None
+        self._last_received_hash = None
+        self._handshake_keys = None
         if self.on_disconnected:
             self.on_disconnected()
 
@@ -367,6 +444,10 @@ class LtpClient:
             print("[LTP] Cannot send message: not connected")
             return
 
+        envelope = self._build_envelope(message_type, payload)
+        await self._send(envelope)
+
+    def _build_envelope(self, msg_type: MessageType, payload: Dict[str, Any]) -> Dict[str, Any]:
         meta = LtpMeta(
             client_id=self.client_id,
             context_tag=self.default_context_tag,
@@ -374,23 +455,31 @@ class LtpClient:
         )
 
         envelope = LtpEnvelope(
-            type=message_type,
-            thread_id=self.thread_id,
-            session_id=self.session_id,
+            type=msg_type,
+            thread_id=self.thread_id or "",
+            session_id=self.session_id or "",
             timestamp=self._get_timestamp(),
             payload=payload,
             meta=meta,
             content_encoding="json",  # Default to JSON; TOON support will be added in future
             nonce=self._generate_nonce(),
-            signature="v0-placeholder",
+            prev_message_hash=self._last_sent_hash,
         )
-        await self._send(envelope)
 
-    async def _send(self, envelope: LtpEnvelope) -> None:
+        message_dict = envelope.to_dict()
+
+        if self._mac_key:
+            message_dict["signature"] = sign_message(message_dict, self._mac_key)
+
+        self._last_sent_hash = hash_envelope(message_dict)
+
+        return message_dict
+
+    async def _send(self, envelope: Dict[str, Any]) -> None:
         if not self.ws:
             print("[LTP] Cannot send message: WebSocket not initialized")
             return
-        await self._send_raw(envelope.to_dict())
+        await self._send_raw(envelope)
 
     async def _send_raw(self, message: Dict[str, Any]) -> None:
         if not self.ws:
@@ -398,7 +487,92 @@ class LtpClient:
         await self.ws.send(json.dumps(message))
 
     def _get_timestamp(self) -> int:
-        return int(time.time())
+        return int(time.time() * 1000)
+
+    def _validate_signature(self, message: Dict[str, Any]) -> bool:
+        required_fields = ["type", "thread_id", "session_id", "timestamp", "nonce", "payload", "signature"]
+        missing = [field for field in required_fields if field not in message]
+
+        if missing:
+            print(f"[LTP] Message missing fields for signature verification: {missing}")
+            return False
+
+        signature = message.get("signature")
+        if not isinstance(signature, str) or not signature:
+            print("[LTP] Invalid or missing signature; rejecting message")
+            return False
+
+        if not self._mac_key:
+            return False
+
+        if not verify_signature(message, self._mac_key):
+            print("[LTP] Signature verification failed; rejecting message")
+            return False
+
+        return True
+
+    def _normalize_timestamp_ms(self, raw_timestamp: Any) -> Optional[int]:
+        if not isinstance(raw_timestamp, (int, float)):
+            return None
+
+        # Support both seconds and milliseconds inputs
+        if raw_timestamp > 1_000_000_000_000:
+            return int(raw_timestamp)
+        return int(raw_timestamp * 1000)
+
+    def _validate_timestamp(self, message: Dict[str, Any]) -> bool:
+        ts_ms = self._normalize_timestamp_ms(message.get("timestamp"))
+        if ts_ms is None:
+            print("[LTP] Missing or invalid timestamp; rejecting message")
+            return False
+
+        now_ms = int(time.time() * 1000)
+        age_ms = now_ms - ts_ms
+
+        if age_ms > self.max_message_age_ms:
+            print(f"[LTP] Message too old ({age_ms}ms); rejecting to prevent replay")
+            return False
+
+        if age_ms < -5000:
+            print(f"[LTP] Message from the future ({age_ms}ms); rejecting")
+            return False
+
+        return True
+
+    def _cleanup_nonces(self) -> None:
+        cutoff = int(time.time() * 1000) - (self.max_message_age_ms * 2)
+        stale_nonces = [nonce for nonce, ts in self._seen_nonces.items() if ts < cutoff]
+        for nonce in stale_nonces:
+            del self._seen_nonces[nonce]
+
+    def _validate_nonce(self, message: Dict[str, Any]) -> bool:
+        nonce = message.get("nonce")
+
+        if not isinstance(nonce, str) or not nonce:
+            print("[LTP] Missing nonce; rejecting message")
+            return False
+
+        self._cleanup_nonces()
+
+        if nonce in self._seen_nonces:
+            print("[LTP] Replay detected via nonce; rejecting message")
+            return False
+
+        self._seen_nonces[nonce] = int(time.time() * 1000)
+        return True
+
+    def _validate_prev_hash(self, message: Dict[str, Any]) -> bool:
+        expected_prev = self._last_received_hash
+        provided_prev = message.get("prev_message_hash")
+
+        if expected_prev is None:
+            return True
+
+        if provided_prev != expected_prev:
+            print("[LTP] Hash chain mismatch; rejecting message")
+            return False
+
+        return True
 
     def _generate_client_id(self) -> str:
         return f"client-{uuid4()}"
