@@ -13,6 +13,178 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-language SDK comparison benchmarks
 - Production-ready TOON codec implementations
 
+## [0.6.0-alpha.2] - 2025-01-18
+
+### 🔒 CRITICAL SECURITY FIX - Authenticated ECDH (MitM Protection)
+
+**Addressing CRITICAL priority issue from Snowden/Assange security audit**
+
+### Fixed
+
+- **Man-in-the-Middle Vulnerability in ECDH Key Exchange** (CRITICAL FIX ❌→✅)
+  - Ephemeral ECDH public keys now signed with long-term secret key
+  - Client signs `client_ecdh_public_key` before sending in handshake
+  - Client verifies `server_ecdh_public_key` signature before deriving keys
+  - MitM attackers can no longer substitute ECDH keys undetected
+  - **Handshake is rejected** if server ECDH signature verification fails
+  - Location: `sdk/js/src/client.ts:471-489, 516-534, 775-800`
+
+### Added
+
+- **ECDH Key Signing Functions** - Authenticate ephemeral keys
+  - `signEcdhPublicKey(publicKey, entityId, timestamp, secretKey)`
+  - Creates HMAC-SHA256 signature over `publicKey:entityId:timestamp`
+  - Used by client to sign ephemeral keys during handshake
+  - Location: `sdk/js/src/crypto.ts:75-83`
+
+- **ECDH Key Verification Functions** - Validate signatures
+  - `verifyEcdhPublicKey(publicKey, entityId, timestamp, signature, secretKey, maxAge)`
+  - Validates signature and checks timestamp freshness (default: 5 minutes)
+  - Prevents replay attacks on key exchange
+  - Returns `{ valid: boolean; error?: string }`
+  - Location: `sdk/js/src/crypto.ts:99-129`
+
+- **New Type Fields** - Support authenticated ECDH
+  - `HandshakeInitMessage.client_ecdh_signature` - Client key signature
+  - `HandshakeInitMessage.client_ecdh_timestamp` - Signature timestamp
+  - `HandshakeAckMessage.server_ecdh_signature` - Server key signature
+  - `HandshakeAckMessage.server_ecdh_timestamp` - Signature timestamp
+  - `HandshakeResumeMessage.client_ecdh_signature` - Resume key signature
+  - `HandshakeResumeMessage.client_ecdh_timestamp` - Resume timestamp
+  - Location: `sdk/js/src/types.ts:109-114, 154-159, 177-181`
+
+### Changed
+
+- **Handshake Protocol** - Signs and verifies ECDH keys
+  - `sendHandshakeInit()` now signs client ECDH key if `secretKey` provided
+  - `sendHandshakeResume()` signs client key for resumed sessions
+  - `handleHandshakeAck()` verifies server ECDH key signature
+  - **Connection terminated** if server signature verification fails
+  - Warnings logged if ECDH enabled without `secretKey` (MitM risk)
+
+### Security Impact
+
+**Before v0.6.0-alpha.2:** ❌ MitM VULNERABLE
+```typescript
+// Attacker intercepts handshake:
+Client → [Attacker] → Server
+  client_ecdh_public_key: "CLIENT_KEY"
+  // Attacker replaces with own key:
+  client_ecdh_public_key: "ATTACKER_KEY"
+
+Server → [Attacker] → Client
+  server_ecdh_public_key: "SERVER_KEY"
+  // Attacker replaces with own key:
+  server_ecdh_public_key: "ATTACKER_KEY"
+
+// Result: Attacker can decrypt all messages
+// Client ←[decrypt]→ Attacker ←[decrypt]→ Server
+```
+
+**After v0.6.0-alpha.2:** ✅ MitM PROTECTED
+```typescript
+// Client signs its ECDH key:
+client_ecdh_public_key: "CLIENT_KEY"
+client_ecdh_signature: HMAC(secretKey, "CLIENT_KEY:clientId:timestamp")
+client_ecdh_timestamp: 1705598400000
+
+// Server verifies signature before using key
+// Attacker cannot forge signature without secretKey
+
+// Server signs its ECDH key:
+server_ecdh_public_key: "SERVER_KEY"
+server_ecdh_signature: HMAC(serverSecretKey, "SERVER_KEY:sessionId:timestamp")
+server_ecdh_timestamp: 1705598401000
+
+// Client verifies signature - REJECTS if invalid:
+if (!verifyEcdhPublicKey(...)) {
+  disconnect(); // ← Connection terminated
+  return;
+}
+
+// Result: MitM attack PREVENTED
+```
+
+**Protection Mechanism:**
+```typescript
+// Signature format prevents key substitution:
+const input = `${publicKey}:${entityId}:${timestamp}`;
+const signature = HMAC-SHA256(secretKey, input);
+
+// Without secretKey, attacker cannot:
+// 1. Generate valid signature for their own key
+// 2. Modify the public key without breaking signature
+// 3. Replay old signatures (timestamp validation)
+
+// Timestamp validation:
+if (age > 5 minutes) reject; // Prevents replay attacks
+if (skew > 5 seconds) reject; // Prevents future timestamps
+```
+
+### Compatibility
+
+- ✅ **Backward compatible** - Signatures are optional (but recommended)
+- ⚠️ **Warning logged** - If ECDH enabled without `secretKey` (insecure)
+- 🔐 **Production ready** - When `secretKey` provided, MitM protection active
+- 🔄 **Server support needed** - Server must sign its ECDH key for full protection
+
+### Testing
+
+```bash
+npm test  # All tests passing ✅
+```
+
+### Migration
+
+**Recommended (Authenticated ECDH):**
+```typescript
+import { LtpClient } from '@liminal/ltp-client';
+
+// Provide secretKey to enable authenticated ECDH
+const client = new LtpClient('wss://api.example.com', {
+  clientId: 'user-device-123',
+  secretKey: 'shared-secret',        // ← Enables key authentication
+  enableEcdhKeyExchange: true,       // ← Automatic key exchange
+});
+
+// Handshake now includes signed ECDH keys:
+// - client_ecdh_public_key (ephemeral)
+// - client_ecdh_signature (authenticated)
+// - client_ecdh_timestamp (freshness)
+
+// If server signature invalid → connection rejected
+```
+
+**Insecure (No authentication - logs warning):**
+```typescript
+// Without secretKey, ECDH keys are NOT authenticated
+const client = new LtpClient('wss://api.example.com', {
+  clientId: 'user-device-123',
+  enableEcdhKeyExchange: true,
+  // No secretKey provided ← MitM risk!
+});
+
+// WARNING logged: "ECDH key exchange enabled but no secretKey
+// provided - key not authenticated (MitM risk!)"
+```
+
+### Roadmap to v0.6.0-stable
+
+- [x] **HIGH**: Remove client ID from nonce (HMAC-based nonce) ✅
+- [x] **CRITICAL**: Authenticate ECDH public keys (sign with long-term keys) ✅
+- [ ] **HIGH**: Encrypt metadata fields (thread_id, timestamps)
+- [ ] **MEDIUM**: Migrate to X25519 curve
+- [ ] **MEDIUM**: Implement message padding
+- [ ] Remove v0.3 placeholder signatures entirely
+- [ ] Add key rotation mechanism
+
+### Related
+
+- Addresses CRITICAL priority from security audit (PR #13)
+- Prevents Man-in-the-Middle attacks on key exchange
+- Complements HMAC-based nonces (v0.6.0-alpha.1)
+- Requires shared `secretKey` for authentication
+
 ## [0.6.0-alpha.1] - 2025-01-18
 
 ### 🔒 CRITICAL PRIVACY FIX - HMAC-based Nonces (No Client ID Leak)

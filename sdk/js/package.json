@@ -1,7 +1,7 @@
 {
   "name": "@liminal/ltp-client",
-  "version": "0.6.0-alpha.1",
-  "description": "LTP (Liminal Thread Protocol) client SDK with HMAC-based nonces and privacy protection",
+  "version": "0.6.0-alpha.2",
+  "description": "LTP (Liminal Thread Protocol) client SDK with authenticated ECDH and privacy protection",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {

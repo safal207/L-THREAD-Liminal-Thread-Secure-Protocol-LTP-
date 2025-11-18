@@ -11,7 +11,9 @@ import {
   deriveSessionKeys,
   hkdf,
   hashEnvelope,
-  hmacSha256
+  hmacSha256,
+  signEcdhPublicKey,
+  verifyEcdhPublicKey
 } from './crypto';
 import {
   HandshakeInitMessage,
@@ -466,6 +468,26 @@ export class LtpClient {
       } : undefined,
     };
 
+    // Sign ECDH public key to prevent MitM attacks (v0.6+)
+    if (this.ecdhPublicKey && this.options.secretKey) {
+      try {
+        const timestamp = Date.now();
+        handshake.client_ecdh_signature = await signEcdhPublicKey(
+          this.ecdhPublicKey,
+          this.options.clientId!,
+          timestamp,
+          this.options.secretKey
+        );
+        handshake.client_ecdh_timestamp = timestamp;
+        this.logger.info('Client ECDH key signed for authenticated handshake');
+      } catch (error) {
+        this.logger.warn(`Failed to sign ECDH public key: ${error}`);
+        // Continue without signature - server may reject or allow unauthenticated
+      }
+    } else if (this.ecdhPublicKey && !this.options.secretKey) {
+      this.logger.warn('ECDH key exchange enabled but no secretKey provided - key not authenticated (MitM risk!)');
+    }
+
     this.sendRaw(handshake);
   }
 
@@ -490,6 +512,26 @@ export class LtpClient {
         hkdf: 'sha256',
       } : undefined,
     };
+
+    // Sign ECDH public key to prevent MitM attacks (v0.6+)
+    if (this.ecdhPublicKey && this.options.secretKey) {
+      try {
+        const timestamp = Date.now();
+        resume.client_ecdh_signature = await signEcdhPublicKey(
+          this.ecdhPublicKey,
+          this.options.clientId!,
+          timestamp,
+          this.options.secretKey
+        );
+        resume.client_ecdh_timestamp = timestamp;
+        this.logger.info('Client ECDH key signed for authenticated resume');
+      } catch (error) {
+        this.logger.warn(`Failed to sign ECDH public key for resume: ${error}`);
+        // Continue without signature - server may reject or allow unauthenticated
+      }
+    } else if (this.ecdhPublicKey && !this.options.secretKey) {
+      this.logger.warn('ECDH key exchange enabled but no secretKey provided - key not authenticated (MitM risk!)');
+    }
 
     this.sendRaw(resume);
   }
@@ -730,6 +772,33 @@ export class LtpClient {
         this.ecdhPrivateKey &&
         message.server_ecdh_public_key) {
       try {
+        // Verify server ECDH key signature (v0.6+) - CRITICAL for MitM protection
+        if (message.server_ecdh_signature && message.server_ecdh_timestamp && this.options.secretKey) {
+          this.logger.info('Verifying server ECDH key signature...');
+
+          const verifyResult = await verifyEcdhPublicKey(
+            message.server_ecdh_public_key,
+            this.sessionId,
+            message.server_ecdh_timestamp,
+            message.server_ecdh_signature,
+            this.options.secretKey
+          );
+
+          if (!verifyResult.valid) {
+            this.logger.error('Server ECDH key signature verification FAILED', verifyResult.error);
+            this.handleError({
+              error_code: 'ECDH_AUTH_FAILED',
+              error_message: `Server ECDH key authentication failed: ${verifyResult.error}`,
+            });
+            this.disconnect();
+            return;
+          }
+
+          this.logger.info('✓ Server ECDH key authenticated - MitM protection active');
+        } else if (this.options.secretKey) {
+          this.logger.warn('⚠ Server ECDH key NOT authenticated - MitM attack possible!');
+        }
+
         this.logger.info('Deriving session keys from ECDH shared secret...');
 
         // Derive shared secret
@@ -772,38 +841,6 @@ export class LtpClient {
     // Reset hash chain at the start of each session
     this.lastSentHash = null;
     this.lastReceivedHash = null;
-
-    // ECDH key exchange - derive session keys (v0.5+)
-    if (message.server_ecdh_public_key && this.ecdhPrivateKey) {
-      try {
-        this.logger.info('Deriving session keys from ECDH shared secret...');
-
-        // Derive shared secret
-        const sharedSecret = await deriveSharedSecret(
-          this.ecdhPrivateKey,
-          message.server_ecdh_public_key
-        );
-
-        // Derive session keys using HKDF
-        const { macKey, encryptionKey, ivKey } = await deriveSessionKeys(
-          sharedSecret,
-          this.sessionId
-        );
-
-        // Set MAC key for signature verification
-        this.options.sessionMacKey = macKey;
-        this.options.requireSignatureVerification = true;
-
-        this.logger.info('Session keys derived successfully - signatures now required');
-      } catch (error) {
-        this.logger.error('Failed to derive session keys from ECDH', error);
-      } finally {
-        // Clear ephemeral private key for forward secrecy
-        this.ecdhPrivateKey = null;
-      }
-    } else if (this.options.enableEcdhKeyExchange && !message.server_ecdh_public_key) {
-      this.logger.warn('ECDH key exchange enabled but server did not provide public key');
-    }
 
     if (this.events.onConnected) {
       this.events.onConnected(this.threadId, this.sessionId);

@@ -61,6 +61,74 @@ export async function hmacSha256(input: string, key: string): Promise<string> {
 }
 
 /**
+ * Sign an ECDH public key to prevent MitM attacks (v0.6+)
+ *
+ * Creates HMAC signature over: publicKey + entityId + timestamp
+ * This authenticates the ephemeral ECDH key exchange
+ *
+ * @param publicKey - Hex-encoded ECDH public key
+ * @param entityId - client_id (for client) or session_id (for server)
+ * @param timestamp - Unix timestamp in milliseconds
+ * @param secretKey - Long-term secret key for signing
+ * @returns Hex-encoded HMAC-SHA256 signature
+ */
+export async function signEcdhPublicKey(
+  publicKey: string,
+  entityId: string,
+  timestamp: number,
+  secretKey: string
+): Promise<string> {
+  const input = `${publicKey}:${entityId}:${timestamp}`;
+  return await hmacSha256(input, secretKey);
+}
+
+/**
+ * Verify ECDH public key signature (v0.6+)
+ *
+ * Validates that the ephemeral ECDH public key was signed by the expected party
+ * Prevents MitM attacks on key exchange
+ *
+ * @param publicKey - Hex-encoded ECDH public key
+ * @param entityId - client_id (for client) or session_id (for server)
+ * @param timestamp - Unix timestamp in milliseconds
+ * @param signature - Hex-encoded HMAC-SHA256 signature to verify
+ * @param secretKey - Long-term secret key for verification
+ * @param maxAge - Maximum age of signature in milliseconds (default: 300000 = 5 minutes)
+ * @returns true if signature is valid, false otherwise
+ */
+export async function verifyEcdhPublicKey(
+  publicKey: string,
+  entityId: string,
+  timestamp: number,
+  signature: string,
+  secretKey: string,
+  maxAge: number = 300000
+): Promise<{ valid: boolean; error?: string }> {
+  // Check timestamp freshness
+  const now = Date.now();
+  const age = now - timestamp;
+
+  if (age > maxAge) {
+    return { valid: false, error: `ECDH key signature expired (age: ${age}ms, max: ${maxAge}ms)` };
+  }
+
+  if (age < -5000) {
+    return { valid: false, error: `ECDH key signature from future (skew: ${-age}ms)` };
+  }
+
+  // Compute expected signature
+  const input = `${publicKey}:${entityId}:${timestamp}`;
+  const expectedSignature = await hmacSha256(input, secretKey);
+
+  // Constant-time comparison
+  if (!timingSafeEqual(signature, expectedSignature)) {
+    return { valid: false, error: 'ECDH key signature mismatch' };
+  }
+
+  return { valid: true };
+}
+
+/**
  * Deterministically serialize objects by sorting keys recursively.
  */
 function canonicalize(value: any): any {
