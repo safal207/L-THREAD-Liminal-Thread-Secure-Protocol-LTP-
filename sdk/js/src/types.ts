@@ -102,6 +102,17 @@ export interface HandshakeInitMessage {
    */
   client_ecdh_public_key?: string;
   /**
+   * HMAC signature of client_ecdh_public_key (v0.6+)
+   * Authenticates the ephemeral key to prevent MitM attacks
+   * Format: HMAC-SHA256(secretKey, publicKey:clientId:timestamp)
+   */
+  client_ecdh_signature?: string;
+  /**
+   * Timestamp for ECDH signature (v0.6+)
+   * Used to prevent replay attacks on key exchange
+   */
+  client_ecdh_timestamp?: number;
+  /**
    * Key agreement parameters (v0.5+)
    */
   key_agreement?: {
@@ -135,6 +146,17 @@ export interface HandshakeAckMessage {
    * Server's hex-encoded public key for deriving shared secret
    */
   server_ecdh_public_key?: string;
+  /**
+   * HMAC signature of server_ecdh_public_key (v0.6+)
+   * Authenticates the server's ephemeral key to prevent MitM attacks
+   * Format: HMAC-SHA256(serverSecretKey, publicKey:sessionId:timestamp)
+   */
+  server_ecdh_signature?: string;
+  /**
+   * Timestamp for ECDH signature (v0.6+)
+   * Used to prevent replay attacks on key exchange
+   */
+  server_ecdh_timestamp?: number;
   nonce?: string;
   signature?: string;
   timestamp?: number;
@@ -148,6 +170,15 @@ export interface HandshakeResumeMessage {
   thread_id: string;
   resume_reason?: string;
   client_public_key?: string;
+  /**
+   * HMAC signature of client_public_key (v0.6+)
+   * Authenticates the ephemeral key to prevent MitM attacks
+   */
+  client_ecdh_signature?: string;
+  /**
+   * Timestamp for ECDH signature (v0.6+)
+   */
+  client_ecdh_timestamp?: number;
   key_agreement?: Record<string, unknown>;
   nonce?: string;
   signature?: string;
