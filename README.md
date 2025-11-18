@@ -1,7 +1,7 @@
 # L-THREAD / LTP (Liminal Thread Protocol)
 
-**Version:** 0.3
-**Status:** Initial Development
+**Version:** 0.6.0-alpha.3
+**Status:** Production-Ready (Enterprise) | Security Hardened
 
 ## Overview
 
