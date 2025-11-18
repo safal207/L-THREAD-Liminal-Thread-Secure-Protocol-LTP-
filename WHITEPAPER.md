@@ -292,16 +292,19 @@ LTP provides **protocol-compatible** SDKs:
 
 ### 7.1 Current Implementation (v0.3)
 
-- **Transport:** Requires TLS/WSS in production
-- **Nonce:** Cryptographically secure random generation
-- **Signature:** Placeholder (real crypto in v0.4+)
+- **Transport:** TLS/WSS required in production
+- **Integrity:** Deterministic HMAC on every outgoing envelope with enforced verification on receipt
+- **Replay Defense:** Timestamp + nonce validation blocks stale or duplicated messages prior to payload processing
+- **Signature Policy:** When a MAC key is negotiated, signatures are mandatory—missing or invalid signatures are rejected
+- **Envelope Validation:** Strict rejection path for malformed or tampered packets before they can affect session state
 
-### 7.2 Future Enhancements (v0.4+)
+### 7.2 Near-Term Security Roadmap
 
-- **Cryptographic Signatures:** Message integrity verification
-- **Encryption:** End-to-end encryption support
-- **Authentication:** Token-based authentication
-- **Authorization:** Role-based access control
+- **ECDH Handshake:** Ephemeral Diffie-Hellman for forward-secret session keys
+- **Canonical Encoding:** Canonical JSON/TOON to make signatures byte-for-byte deterministic across platforms
+- **Hash Chaining:** `prev_message_hash` fields to strengthen auditability and tamper evidence
+- **Post-Quantum Options:** PQ-safe key exchange and signatures (e.g., Kyber/ML-DSA) alongside classical suites
+- **Security Whitepaper:** Dedicated cryptography overview covering threat model, primitives, and verification guidance
 
 ---
 
