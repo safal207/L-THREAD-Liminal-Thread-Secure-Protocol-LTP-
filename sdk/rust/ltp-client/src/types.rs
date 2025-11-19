@@ -30,6 +30,12 @@ pub struct LtpEnvelope<T = serde_json::Value> {
     pub nonce: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub signature: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub prev_message_hash: Option<String>,  // v0.5+ hash chaining
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub encrypted_metadata: Option<String>,  // v0.6+ metadata encryption
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub routing_tag: Option<String>,  // v0.6+ routing tag for encrypted metadata
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -52,6 +58,16 @@ pub struct HandshakeInit {
     pub capabilities: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_public_key: Option<String>,  // Legacy field name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_ecdh_public_key: Option<String>,  // v0.6+ explicit name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_ecdh_signature: Option<String>,  // v0.6+ authenticated ECDH
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_ecdh_timestamp: Option<i64>,  // v0.6+ authenticated ECDH
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_agreement: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -78,6 +94,16 @@ pub struct HandshakeAck {
     pub heartbeat_interval_ms: u64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_public_key: Option<String>,  // Legacy field name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_ecdh_public_key: Option<String>,  // v0.6+ explicit name
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_ecdh_signature: Option<String>,  // v0.6+ authenticated ECDH
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub server_ecdh_timestamp: Option<i64>,  // v0.6+ authenticated ECDH
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_agreement: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

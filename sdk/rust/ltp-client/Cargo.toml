@@ -1,6 +1,6 @@
 [package]
 name = "ltp-client"
-version = "0.1.0"
+version = "0.6.0-alpha.3"
 edition = "2021"
 authors = ["LIMINAL Team"]
 description = "LTP (Liminal Thread Protocol) client SDK for Rust"
@@ -16,6 +16,14 @@ thiserror = "1.0"
 uuid = { version = "1.6", features = ["v4", "serde"] }
 futures-util = "0.3"
 url = "2.5"
+# v0.6.0 Security features
+p256 = "0.13"  # ECDH (secp256r1)
+hkdf = "0.12"  # HKDF key derivation
+aes-gcm = "0.10"  # AES-256-GCM encryption
+sha2 = "0.10"  # SHA-256 hashing
+hmac = "0.12"  # HMAC-SHA256
+hex = "0.4"  # Hex encoding/decoding
+rand = "0.8"  # Random number generation
 
 [dev-dependencies]
 tokio-test = "0.4"

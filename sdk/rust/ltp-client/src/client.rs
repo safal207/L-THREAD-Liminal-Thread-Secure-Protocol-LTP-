@@ -1,3 +1,4 @@
+use crate::crypto;
 use crate::error::{LtpError, Result};
 use crate::types::*;
 use futures_util::{SinkExt, StreamExt};
@@ -22,6 +23,17 @@ pub struct LtpClient {
     is_connected: bool,
     last_pong_time: Option<Instant>,
     write: Option<futures_util::stream::SplitSink<WsStream, Message>>,
+    // v0.6.0 Security features
+    enable_ecdh_key_exchange: bool,
+    enable_metadata_encryption: bool,
+    secret_key: Option<String>,
+    session_mac_key: Option<String>,
+    ecdh_private_key: Option<String>,
+    ecdh_public_key: Option<String>,
+    session_encryption_key: Option<String>,
+    last_sent_hash: Option<String>,
+    last_received_hash: Option<String>,
+    seen_nonces: std::collections::HashSet<String>,
 }
 
 impl LtpClient {
@@ -46,7 +58,42 @@ impl LtpClient {
             is_connected: false,
             last_pong_time: None,
             write: None,
+            // v0.6.0 Security features initialization
+            enable_ecdh_key_exchange: false,
+            enable_metadata_encryption: false,
+            secret_key: None,
+            session_mac_key: None,
+            ecdh_private_key: None,
+            ecdh_public_key: None,
+            session_encryption_key: None,
+            last_sent_hash: None,
+            last_received_hash: None,
+            seen_nonces: std::collections::HashSet::new(),
         }
+    }
+
+    /// Enable ECDH key exchange (v0.6+)
+    pub fn with_ecdh_key_exchange(mut self, enable: bool) -> Self {
+        self.enable_ecdh_key_exchange = enable;
+        self
+    }
+
+    /// Enable metadata encryption (v0.6+)
+    pub fn with_metadata_encryption(mut self, enable: bool) -> Self {
+        self.enable_metadata_encryption = enable;
+        self
+    }
+
+    /// Set secret key for authenticated ECDH and signing (v0.6+)
+    pub fn with_secret_key(mut self, secret_key: impl Into<String>) -> Self {
+        self.secret_key = Some(secret_key.into());
+        self
+    }
+
+    /// Set session MAC key (v0.6+)
+    pub fn with_session_mac_key(mut self, mac_key: impl Into<String>) -> Self {
+        self.session_mac_key = Some(mac_key.into());
+        self
     }
 
     /// Set device fingerprint
@@ -105,6 +152,11 @@ impl LtpClient {
         // Update heartbeat interval if provided by server
         if ack.heartbeat_interval_ms > 0 {
             self.heartbeat_interval_ms = ack.heartbeat_interval_ms;
+        }
+
+        // Handle ECDH key exchange (v0.6+)
+        if self.enable_ecdh_key_exchange {
+            self.handle_ecdh_key_exchange(&ack)?;
         }
 
         // Start message handling loop (simplified - in production would be more robust)
@@ -167,15 +219,59 @@ impl LtpClient {
     // Private helpers
 
     async fn send_handshake_init(&mut self) -> Result<()> {
-        let init = HandshakeInit {
+        // Generate ECDH key pair if enabled
+        let (ecdh_public_key, ecdh_private_key) = if self.enable_ecdh_key_exchange {
+            let (pub_key, priv_key) = crypto::generate_ecdh_key_pair();
+            self.ecdh_public_key = Some(pub_key.clone());
+            self.ecdh_private_key = Some(priv_key.clone());
+            (Some(pub_key), Some(priv_key))
+        } else {
+            (None, None)
+        };
+
+        let mut init = HandshakeInit {
             r#type: "handshake_init".to_string(),
-            ltp_version: "0.3".to_string(),
+            ltp_version: "0.6".to_string(),
             client_id: self.client_id.clone(),
             device_fingerprint: self.device_fingerprint.clone(),
             intent: self.intent.clone(),
             capabilities: self.capabilities.clone(),
             metadata: self.metadata.clone(),
+            client_public_key: None,
+            client_ecdh_public_key: None,
+            client_ecdh_signature: None,
+            client_ecdh_timestamp: None,
+            key_agreement: None,
         };
+
+        // Add ECDH public key if available
+        if let Some(ref pub_key) = ecdh_public_key {
+            init.client_ecdh_public_key = Some(pub_key.clone());
+            init.client_public_key = Some(pub_key.clone()); // Legacy field
+            init.key_agreement = Some(serde_json::json!({
+                "algorithm": "secp256r1",
+                "method": "ecdh",
+                "hkdf": "sha256"
+            }));
+
+            // Sign ECDH public key if secret_key is available (v0.6+ authenticated ECDH)
+            if let Some(ref secret_key) = self.secret_key {
+                let timestamp = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as i64;
+                
+                let signature = crypto::sign_ecdh_public_key(
+                    pub_key,
+                    &self.client_id,
+                    timestamp,
+                    secret_key,
+                );
+                
+                init.client_ecdh_signature = Some(signature);
+                init.client_ecdh_timestamp = Some(timestamp);
+            }
+        }
 
         let json = serde_json::to_string(&init)?;
         self.send_text(json).await
@@ -184,7 +280,7 @@ impl LtpClient {
     async fn send_handshake_resume(&mut self) -> Result<()> {
         let resume = HandshakeResume {
             r#type: "handshake_resume".to_string(),
-            ltp_version: "0.3".to_string(),
+            ltp_version: "0.6".to_string(),
             client_id: self.client_id.clone(),
             thread_id: self.thread_id.clone().unwrap(),
             resume_reason: "automatic_reconnect".to_string(),
@@ -217,6 +313,60 @@ impl LtpClient {
                 }
             }
         }
+    }
+
+    /// Handle ECDH key exchange and derive session keys (v0.6+)
+    fn handle_ecdh_key_exchange(&mut self, ack: &HandshakeAck) -> Result<()> {
+        // Get server's ECDH public key
+        let server_ecdh_public_key = ack
+            .server_ecdh_public_key
+            .as_ref()
+            .or_else(|| ack.server_public_key.as_ref())
+            .ok_or_else(|| LtpError::InvalidState("Server did not provide ECDH public key".to_string()))?;
+
+        // Verify server's ECDH public key signature if available (v0.6+ authenticated ECDH)
+        if let (Some(ref signature), Some(timestamp)) = (
+            ack.server_ecdh_signature.as_ref(),
+            ack.server_ecdh_timestamp,
+        ) {
+            if let Some(ref secret_key) = self.secret_key {
+                // For server verification, we'd need server_id - simplified for now
+                // In production, this should verify against server's known identity
+                crypto::verify_ecdh_public_key(
+                    server_ecdh_public_key,
+                    "server", // TODO: Use actual server_id from ack
+                    timestamp,
+                    signature,
+                    secret_key,
+                    300_000, // 5 minutes max age
+                )
+                .map_err(|e| LtpError::InvalidState(format!("ECDH signature verification failed: {}", e)))?;
+            }
+        }
+
+        // Derive shared secret
+        let private_key = self
+            .ecdh_private_key
+            .as_ref()
+            .ok_or_else(|| LtpError::InvalidState("Client ECDH private key not found".to_string()))?;
+
+        let shared_secret = crypto::derive_shared_secret(private_key, server_ecdh_public_key)
+            .map_err(|e| LtpError::InvalidState(format!("Failed to derive shared secret: {}", e)))?;
+
+        // Derive session keys using HKDF
+        let session_id = self
+            .session_id
+            .as_ref()
+            .ok_or_else(|| LtpError::InvalidState("Session ID not available".to_string()))?;
+
+        let (encryption_key, mac_key, _iv_key) = crypto::derive_session_keys(&shared_secret, session_id)
+            .map_err(|e| LtpError::InvalidState(format!("Failed to derive session keys: {}", e)))?;
+
+        // Store session keys
+        self.session_encryption_key = Some(encryption_key);
+        self.session_mac_key = Some(mac_key);
+
+        Ok(())
     }
 
     async fn send_text(&mut self, text: String) -> Result<()> {

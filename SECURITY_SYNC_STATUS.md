@@ -210,37 +210,51 @@
 
 ---
 
-### Phase 3: Rust SDK (Priority: MEDIUM)
-**Estimated Time:** 3-4 days
+### Phase 3: Rust SDK (Priority: MEDIUM) ✅ **IN PROGRESS**
+**Status:** Basic ECDH integration complete, crypto functions ready
 
-1. **Implement ECDH Key Exchange**
-   - [ ] Use `p256` or `secp256r1` crate
-   - [ ] Add key pair generation
-   - [ ] Add shared secret derivation
-   - [ ] Add HKDF implementation (`hkdf` crate)
+1. **Implement ECDH Key Exchange** ✅
+   - [x] Use `p256` crate
+   - [x] Add key pair generation (`generate_ecdh_key_pair`)
+   - [x] Add shared secret derivation (`derive_shared_secret`)
+   - [x] Add HKDF implementation (`hkdf`, `derive_session_keys`)
 
-2. **Implement Authenticated ECDH**
-   - [ ] Add ECDH key signing functions
-   - [ ] Add verification functions
+2. **Implement Authenticated ECDH** ✅
+   - [x] Add ECDH key signing functions (`sign_ecdh_public_key`)
+   - [x] Add verification functions (`verify_ecdh_public_key`)
 
-3. **Implement HMAC-based Nonces**
-   - [ ] Update nonce generation
-   - [ ] Add nonce validation
+3. **Implement HMAC-based Nonces** ⏳
+   - [ ] Update nonce generation (crypto functions ready)
+   - [ ] Add nonce validation (crypto functions ready)
+   - [ ] Integrate into client message building
 
-4. **Implement Metadata Encryption**
-   - [ ] Use `aes-gcm` crate
-   - [ ] Add encryption/decryption functions
+4. **Implement Metadata Encryption** ⏳
+   - [x] Use `aes-gcm` crate
+   - [x] Add encryption/decryption functions (`encrypt_metadata`, `decrypt_metadata`)
+   - [ ] Integrate into client message building
 
-5. **Implement Hash Chaining**
-   - [ ] Add envelope hashing (`sha2` crate)
+5. **Implement Hash Chaining** ⏳
+   - [x] Add envelope hashing (`hash_envelope`)
    - [ ] Add chain verification
+   - [ ] Integrate into client message building
 
-**Dependencies:**
-- `p256` or `secp256r1` (ECDH)
-- `hkdf` (key derivation)
-- `aes-gcm` (encryption)
-- `sha2` (hashing)
-- `hmac` (HMAC)
+**Dependencies:** ✅ All added
+- `p256` (ECDH) ✅
+- `hkdf` (key derivation) ✅
+- `aes-gcm` (encryption) ✅
+- `sha2` (hashing) ✅
+- `hmac` (HMAC) ✅
+- `hex` (hex encoding) ✅
+- `rand` (random generation) ✅
+
+**Integration Status:**
+- ✅ Crypto module created (`src/crypto.rs`)
+- ✅ Types updated for v0.6.0 fields
+- ✅ Basic ECDH integration in `send_handshake_init`
+- ✅ ECDH key derivation in `handle_ecdh_key_exchange`
+- ⏳ Pending: HMAC nonces integration
+- ⏳ Pending: Metadata encryption integration
+- ⏳ Pending: Hash chaining integration
 
 ---
 
