@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ltp-client",
-    version="0.3.0",
+    version="0.6.0-alpha.3",
     description="LTP (Liminal Thread Protocol) client SDK for Python",
     author="LIMINAL Team",
     packages=find_packages(),

@@ -1,6 +1,6 @@
 """
 LTP (Liminal Thread Protocol) Python Types
-Version 0.3
+Version 0.6
 """
 
 from dataclasses import dataclass, field
@@ -56,13 +56,16 @@ class LtpMeta:
 class HandshakeInit:
     """Handshake Init Message (Client → Server)"""
     type: Literal["handshake_init"] = "handshake_init"
-    ltp_version: str = "0.3"
+    ltp_version: str = "0.6"
     client_id: str = ""
     device_fingerprint: Optional[str] = None
     intent: Optional[str] = None
     capabilities: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    client_public_key: Optional[str] = None
+    client_public_key: Optional[str] = None  # Legacy field name
+    client_ecdh_public_key: Optional[str] = None  # v0.6+ explicit name
+    client_ecdh_signature: Optional[str] = None  # v0.6+ authenticated ECDH
+    client_ecdh_timestamp: Optional[int] = None  # v0.6+ authenticated ECDH
     key_agreement: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
@@ -80,10 +83,19 @@ class HandshakeInit:
             result['capabilities'] = self.capabilities
         if self.metadata:
             result['metadata'] = self.metadata
-        if self.client_public_key:
-            result['client_public_key'] = self.client_public_key
+        # Use client_ecdh_public_key if available, fallback to client_public_key for backward compatibility
+        ecdh_key = self.client_ecdh_public_key or self.client_public_key
+        if ecdh_key:
+            result['client_ecdh_public_key'] = ecdh_key
+            # Also include legacy field for backward compatibility
+            if self.client_public_key:
+                result['client_public_key'] = self.client_public_key
         if self.key_agreement:
             result['key_agreement'] = self.key_agreement
+        if self.client_ecdh_signature:
+            result['client_ecdh_signature'] = self.client_ecdh_signature
+        if self.client_ecdh_timestamp:
+            result['client_ecdh_timestamp'] = self.client_ecdh_timestamp
         return result
 
 
@@ -91,18 +103,24 @@ class HandshakeInit:
 class HandshakeAck:
     """Handshake Acknowledgment Message (Server → Client)"""
     type: Literal["handshake_ack"] = "handshake_ack"
-    ltp_version: str = "0.3"
+    ltp_version: str = "0.6"
     thread_id: str = ""
     session_id: str = ""
     server_capabilities: List[str] = field(default_factory=list)
     heartbeat_interval_ms: int = 15000
     metadata: Dict[str, Any] = field(default_factory=dict)
-    server_public_key: Optional[str] = None
+    server_public_key: Optional[str] = None  # Legacy field name
+    server_ecdh_public_key: Optional[str] = None  # v0.6+ explicit name
+    server_ecdh_signature: Optional[str] = None  # v0.6+ authenticated ECDH
+    server_ecdh_timestamp: Optional[int] = None  # v0.6+ authenticated ECDH
     key_agreement: Dict[str, Any] = field(default_factory=dict)
+    resumed: bool = False  # v0.2+ resume support
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'HandshakeAck':
         """Create from dictionary"""
+        # Use server_ecdh_public_key if available, fallback to server_public_key
+        server_key = data.get('server_ecdh_public_key') or data.get('server_public_key')
         return cls(
             type=data.get('type', 'handshake_ack'),
             ltp_version=data.get('ltp_version', '0.1'),
@@ -112,7 +130,11 @@ class HandshakeAck:
             heartbeat_interval_ms=data.get('heartbeat_interval_ms', 15000),
             metadata=data.get('metadata', {}),
             server_public_key=data.get('server_public_key'),
+            server_ecdh_public_key=server_key,
+            server_ecdh_signature=data.get('server_ecdh_signature'),
+            server_ecdh_timestamp=data.get('server_ecdh_timestamp'),
             key_agreement=data.get('key_agreement', {}),
+            resumed=data.get('resumed', False),
         )
 
 
@@ -128,7 +150,9 @@ class LtpEnvelope:
     content_encoding: Optional[str] = None  # "json" (default) or "toon" (v0.3+)
     nonce: Optional[str] = None
     signature: Optional[str] = None
-    prev_message_hash: Optional[str] = None
+    prev_message_hash: Optional[str] = None  # v0.5+ hash chaining
+    encrypted_metadata: Optional[str] = None  # v0.6+ metadata encryption
+    routing_tag: Optional[str] = None  # v0.6+ routing tag for encrypted metadata
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary"""
@@ -148,6 +172,10 @@ class LtpEnvelope:
             result['signature'] = self.signature
         if self.prev_message_hash:
             result['prev_message_hash'] = self.prev_message_hash
+        if self.encrypted_metadata:
+            result['encrypted_metadata'] = self.encrypted_metadata
+        if self.routing_tag:
+            result['routing_tag'] = self.routing_tag
         return result
 
     @classmethod
@@ -158,14 +186,17 @@ class LtpEnvelope:
 
         return cls(
             type=data['type'],
-            thread_id=data['thread_id'],
-            session_id=data['session_id'],
-            timestamp=data['timestamp'],
+            thread_id=data.get('thread_id', ''),
+            session_id=data.get('session_id', ''),
+            timestamp=data.get('timestamp', 0),
             payload=data.get('payload', {}),
             meta=meta,
             content_encoding=data.get('content_encoding'),  # v0.3+: TOON support
             nonce=data.get('nonce'),
-            signature=data.get('signature')
+            signature=data.get('signature'),
+            prev_message_hash=data.get('prev_message_hash'),  # v0.5+ hash chaining
+            encrypted_metadata=data.get('encrypted_metadata'),  # v0.6+ metadata encryption
+            routing_tag=data.get('routing_tag'),  # v0.6+ routing tag
         )
 
 

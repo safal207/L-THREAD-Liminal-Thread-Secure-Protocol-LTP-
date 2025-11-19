@@ -28,11 +28,24 @@ from .types import (
     ErrorPayload,
     MessageType,
 )
-from .crypto import sign_message, verify_signature
+from .crypto import (
+    sign_message,
+    verify_signature,
+    generate_ecdh_key_pair,
+    derive_shared_secret,
+    derive_session_keys,
+    sign_ecdh_public_key,
+    verify_ecdh_public_key,
+    hash_envelope,
+    hmac_sha256,
+    encrypt_metadata,
+    decrypt_metadata,
+    generate_routing_tag,
+)
 
-LTP_VERSION = "0.3"
-SDK_VERSION = "0.3.0"
-SUBPROTOCOL = "ltp.v0.3"
+LTP_VERSION = "0.6"
+SDK_VERSION = "0.6.0-alpha.3"
+SUBPROTOCOL = "ltp.v0.6"
 
 
 class ThreadStorage:
@@ -92,6 +105,8 @@ class LtpClient:
         secret_key: Optional[str] = None,
         require_signature_verification: Optional[bool] = None,
         max_message_age_ms: int = 60000,
+        enable_ecdh_key_exchange: bool = False,
+        enable_metadata_encryption: bool = False,
     ) -> None:
         self.url = url
         self.client_id = client_id or self._generate_client_id()
@@ -138,6 +153,7 @@ class LtpClient:
 
         # Security configuration
         self._mac_key = session_mac_key or secret_key
+        self.secret_key = secret_key
         self.require_signature_verification = (
             require_signature_verification
             if require_signature_verification is not None
@@ -145,6 +161,15 @@ class LtpClient:
         )
         self.max_message_age_ms = max_message_age_ms
         self._seen_nonces: Dict[str, int] = {}
+        
+        # v0.6.0 Security features
+        self.enable_ecdh_key_exchange = enable_ecdh_key_exchange
+        self.enable_metadata_encryption = enable_metadata_encryption
+        self._ecdh_private_key: Optional[str] = None
+        self._ecdh_public_key: Optional[str] = None
+        self._session_encryption_key: Optional[str] = None
+        self._last_sent_hash: Optional[str] = None
+        self._last_received_hash: Optional[str] = None
 
         self.on_connected: Optional[Callable[[str, str], None]] = None
         self.on_disconnected: Optional[Callable[[], None]] = None
@@ -179,7 +204,18 @@ class LtpClient:
     def _ensure_handshake_keys(self) -> None:
         """Generate ephemeral ECDH keys for the upcoming handshake if missing."""
 
-        if not self._handshake_keys:
+        if self.enable_ecdh_key_exchange and not self._ecdh_private_key:
+            try:
+                public_key, private_key = generate_ecdh_key_pair()
+                self._ecdh_public_key = public_key
+                self._ecdh_private_key = private_key
+                # Keep backward compatibility with _handshake_keys
+                self._handshake_keys = (public_key, private_key)
+            except Exception as e:
+                # Log error but continue without ECDH
+                print(f"Warning: Failed to generate ECDH key pair: {e}")
+        elif not self._handshake_keys:
+            # Legacy: generate keys even if ECDH not enabled (for backward compatibility)
             self._handshake_keys = generate_ecdh_key_pair()
 
     async def send_state_update(self, payload: Dict[str, Any]) -> None:
@@ -245,6 +281,9 @@ class LtpClient:
             await self._send_handshake_init()
 
     async def _send_handshake_init(self) -> None:
+        self._ensure_handshake_keys()
+        ecdh_public_key = self._ecdh_public_key or (self._handshake_keys[0] if self._handshake_keys else None)
+        
         handshake = HandshakeInit(
             ltp_version=LTP_VERSION,
             client_id=self.client_id,
@@ -252,13 +291,31 @@ class LtpClient:
             intent=self.intent,
             capabilities=self.capabilities,
             metadata=self.metadata,
-            client_public_key=self._handshake_keys[0] if self._handshake_keys else None,
+            client_public_key=ecdh_public_key,  # Legacy field
+            client_ecdh_public_key=ecdh_public_key if self.enable_ecdh_key_exchange else None,
             key_agreement={
                 "algorithm": "secp256r1",
                 "method": "ecdh",
                 "hkdf": "sha256",
-            },
+            } if ecdh_public_key else {},
         )
+        
+        # Sign ECDH public key to prevent MitM attacks (v0.6+)
+        if self.enable_ecdh_key_exchange and ecdh_public_key and self.secret_key:
+            try:
+                timestamp = int(time.time() * 1000)
+                handshake.client_ecdh_signature = sign_ecdh_public_key(
+                    ecdh_public_key,
+                    self.client_id,
+                    timestamp,
+                    self.secret_key
+                )
+                handshake.client_ecdh_timestamp = timestamp
+            except Exception as e:
+                print(f"Warning: Failed to sign ECDH public key: {e}")
+        elif self.enable_ecdh_key_exchange and ecdh_public_key and not self.secret_key:
+            print("Warning: ECDH key exchange enabled but no secretKey provided - key not authenticated (MitM risk!)")
+        
         await self._send_raw(handshake.to_dict())
 
     async def _message_loop(self, ws: WebSocketClientProtocol) -> None:
@@ -279,6 +336,38 @@ class LtpClient:
             self.on_message(data)
 
         message_type = data.get("type")
+
+        # Decrypt metadata if encrypted (v0.6+)
+        if data.get("encrypted_metadata") and self._session_encryption_key:
+            try:
+                decrypted_metadata = decrypt_metadata(
+                    data["encrypted_metadata"],
+                    self._session_encryption_key
+                )
+                # Restore plaintext metadata fields
+                data["thread_id"] = decrypted_metadata.get("thread_id", "")
+                data["session_id"] = decrypted_metadata.get("session_id", "")
+                data["timestamp"] = decrypted_metadata.get("timestamp", 0)
+            except Exception as e:
+                print(f"[LTP] Failed to decrypt metadata: {e}")
+                return  # Reject message if decryption fails
+
+        # Verify hash chain (v0.5+) - detect tampering
+        if data.get("prev_message_hash"):
+            if self._last_received_hash:
+                if data["prev_message_hash"] != self._last_received_hash:
+                    print("[LTP] Hash chain mismatch - message tampering detected!")
+                    return  # Reject tampered message
+            else:
+                # First message in chain - accept
+                pass
+        
+        # Update last received hash for next message
+        if message_type not in {"handshake_ack", "handshake_reject"}:
+            try:
+                self._last_received_hash = hash_envelope(data)
+            except Exception as e:
+                print(f"[LTP] Warning: Failed to compute received message hash: {e}")
 
         if self.require_signature_verification and self._mac_key and message_type not in {
             "handshake_ack",
@@ -317,10 +406,61 @@ class LtpClient:
         self._last_sent_hash = None
         self._last_received_hash = None
 
-        if ack.server_public_key and self._handshake_keys:
+        # ECDH key exchange - derive session keys (v0.5+)
+        server_ecdh_key = ack.server_ecdh_public_key or ack.server_public_key
+        if self.enable_ecdh_key_exchange and self._ecdh_private_key and server_ecdh_key:
+            try:
+                # Verify server ECDH key signature (v0.6+) - CRITICAL for MitM protection
+                if ack.server_ecdh_signature and ack.server_ecdh_timestamp and self.secret_key:
+                    verify_result, error_msg = verify_ecdh_public_key(
+                        server_ecdh_key,
+                        self.session_id,
+                        ack.server_ecdh_timestamp,
+                        ack.server_ecdh_signature,
+                        self.secret_key
+                    )
+                    
+                    if not verify_result:
+                        print(f"[LTP] Server ECDH key signature verification FAILED: {error_msg}")
+                        await self._handle_error({
+                            "error_code": "ECDH_AUTH_FAILED",
+                            "error_message": f"Server ECDH key authentication failed: {error_msg}",
+                        })
+                        await self.disconnect()
+                        return
+                    print("[LTP] ✓ Server ECDH key authenticated - MitM protection active")
+                elif self.secret_key:
+                    print("[LTP] ⚠ Server ECDH key NOT authenticated - MitM attack possible!")
+                
+                # Derive shared secret
+                shared_secret = derive_shared_secret(self._ecdh_private_key, server_ecdh_key)
+                
+                # Derive session keys
+                encryption_key, mac_key, _ = derive_session_keys(shared_secret, self.session_id)
+                
+                # Set MAC key for signature verification
+                self._mac_key = mac_key
+                self.require_signature_verification = True
+                
+                # Set encryption key for metadata encryption (v0.6+)
+                self._session_encryption_key = encryption_key
+                
+                print("[LTP] Session keys derived successfully - signatures now required")
+                
+                # Clear ephemeral private key for forward secrecy
+                self._ecdh_private_key = None
+            except Exception as error:
+                print(f"[LTP] Failed to derive session keys from ECDH: {error}")
+                # Continue without automatic key derivation
+        elif self.enable_ecdh_key_exchange and not server_ecdh_key:
+            print("[LTP] Warning: ECDH key exchange enabled but server did not provide public key")
+        
+        # Legacy: backward compatibility with old handshake_keys
+        if ack.server_public_key and self._handshake_keys and not self.enable_ecdh_key_exchange:
             try:
                 shared_secret = derive_shared_secret(self._handshake_keys[1], ack.server_public_key)
-                derived_mac = hkdf(shared_secret, ack.session_id, "ltp-mac-key")
+                # Use derive_session_keys for consistency
+                _, derived_mac, _ = derive_session_keys(shared_secret, ack.session_id)
                 self._mac_key = derived_mac
                 self.require_signature_verification = True
             except Exception as error:
@@ -441,21 +581,73 @@ class LtpClient:
             affect=self.default_affect,
         )
 
+        timestamp = self._get_timestamp()
+        
+        # Build base envelope
         envelope = LtpEnvelope(
             type=msg_type,
             thread_id=self.thread_id or "",
             session_id=self.session_id or "",
-            timestamp=self._get_timestamp(),
+            timestamp=timestamp,
             payload=payload,
             meta=meta,
             content_encoding="json",  # Default to JSON; TOON support will be added in future
             nonce=self._generate_nonce(),
         )
 
+        # Add hash chaining (v0.5+) - link to previous message
+        if self._last_sent_hash:
+            envelope.prev_message_hash = self._last_sent_hash
+
         message_dict = envelope.to_dict()
 
+        # Metadata encryption (v0.6+) - encrypt thread_id, session_id, timestamp
+        if self.enable_metadata_encryption and self._session_encryption_key:
+            try:
+                metadata_to_encrypt = {
+                    "thread_id": self.thread_id or "",
+                    "session_id": self.session_id or "",
+                    "timestamp": timestamp,
+                }
+                encrypted_metadata = encrypt_metadata(metadata_to_encrypt, self._session_encryption_key)
+                message_dict["encrypted_metadata"] = encrypted_metadata
+                
+                # Generate routing tag for server-side routing without seeing plaintext
+                if self._mac_key:
+                    # Ensure mac_key is in hex format (64 hex chars = 32 bytes)
+                    mac_key_hex = self._mac_key
+                    if not isinstance(mac_key_hex, str) or len(mac_key_hex) != 64:
+                        # Convert to hex if needed
+                        if isinstance(mac_key_hex, bytes):
+                            mac_key_hex = mac_key_hex.hex()
+                        else:
+                            # Use as-is and let generate_routing_tag handle it
+                            mac_key_hex = str(mac_key_hex)
+                    
+                    routing_tag = generate_routing_tag(
+                        self.thread_id or "",
+                        self.session_id or "",
+                        mac_key_hex
+                    )
+                    message_dict["routing_tag"] = routing_tag
+                
+                # Clear plaintext metadata fields when encrypted
+                message_dict["thread_id"] = ""
+                message_dict["session_id"] = ""
+                message_dict["timestamp"] = 0
+            except Exception as e:
+                print(f"[LTP] Warning: Failed to encrypt metadata: {e}")
+                # Continue without encryption
+
+        # Sign message (v0.5+)
         if self._mac_key:
             message_dict["signature"] = sign_message(message_dict, self._mac_key)
+
+        # Compute hash for next message's prev_message_hash (v0.5+ hash chaining)
+        try:
+            self._last_sent_hash = hash_envelope(message_dict)
+        except Exception as e:
+            print(f"[LTP] Warning: Failed to compute message hash: {e}")
 
         return message_dict
 
@@ -540,28 +732,126 @@ class LtpClient:
             del self._seen_nonces[nonce]
 
     def _validate_nonce(self, message: Dict[str, Any]) -> bool:
+        """Validate nonce for replay protection (v0.5+, updated v0.6+).
+        
+        Supports both HMAC-based nonces (v0.6+) and legacy format.
+        """
         nonce = message.get("nonce")
-
+        
         if not isinstance(nonce, str) or not nonce:
             print("[LTP] Missing nonce; rejecting message")
             return False
-
-        self._cleanup_nonces()
-
+        
+        # Check if nonce has already been seen (replay attack)
         if nonce in self._seen_nonces:
             print("[LTP] Replay detected via nonce; rejecting message")
             return False
-
-        self._seen_nonces[nonce] = int(time.time() * 1000)
+        
+        timestamp: int
+        
+        # Check for HMAC-based nonce format (v0.6+): hmac-{32hex}-{timestamp}
+        if nonce.startswith("hmac-"):
+            parts = nonce.split("-")
+            if len(parts) != 3:
+                print("[LTP] Invalid HMAC nonce format")
+                return False
+            
+            _, hmac_part, timestamp_part = parts
+            
+            # Verify HMAC part has correct length (32 hex chars)
+            if not hmac_part or len(hmac_part) != 32 or not all(c in "0123456789abcdefABCDEF" for c in hmac_part):
+                print("[LTP] Invalid HMAC nonce format (bad HMAC)")
+                return False
+            
+            if not timestamp_part:
+                print("[LTP] Invalid HMAC nonce format (missing timestamp)")
+                return False
+            
+            try:
+                timestamp = int(timestamp_part)
+            except ValueError:
+                print("[LTP] Invalid HMAC nonce timestamp")
+                return False
+        else:
+            # Legacy format: clientId-timestamp-randomHex
+            parts = nonce.split("-")
+            if len(parts) != 3:
+                print("[LTP] Invalid nonce format")
+                return False
+            
+            nonce_client_id, nonce_timestamp, random_hex = parts
+            
+            if not nonce_client_id or not nonce_timestamp or not random_hex:
+                print("[LTP] Invalid nonce format (missing parts)")
+                return False
+            
+            # Verify client ID in nonce matches (if available in meta)
+            meta = message.get("meta", {})
+            client_id = meta.get("client_id") if isinstance(meta, dict) else None
+            if client_id and nonce_client_id != client_id:
+                print(f"[LTP] Nonce client ID mismatch (expected: {client_id}, got: {nonce_client_id})")
+                return False
+            
+            # Verify timestamp is reasonable
+            try:
+                timestamp = int(nonce_timestamp)
+            except ValueError:
+                print("[LTP] Invalid nonce timestamp")
+                return False
+            
+            # Verify random component has sufficient entropy (at least 8 hex chars)
+            if len(random_hex) < 8:
+                print("[LTP] Insufficient nonce entropy")
+                return False
+        
+        # Common timestamp validation for both formats
+        now = int(time.time() * 1000)
+        nonce_age = now - timestamp
+        
+        # Reject if nonce is older than max message age
+        if nonce_age > self.max_message_age_ms:
+            print(f"[LTP] Nonce too old (age: {nonce_age}ms)")
+            return False
+        
+        # Reject if nonce is from the future (with 5s clock skew tolerance)
+        if nonce_age < -5000:
+            print("[LTP] Nonce timestamp in future")
+            return False
+        
+        # Add to seen nonces cache
+        self._seen_nonces[nonce] = now
+        
         return True
 
     def _generate_client_id(self) -> str:
         return f"client-{uuid4()}"
 
     def _generate_nonce(self) -> str:
-        """Generate cryptographically secure nonce using secrets module"""
-        random_hex = secrets.token_hex(8)
-        return f"{self.client_id}-{int(time.time() * 1000)}-{random_hex}"
+        """Generate cryptographically secure nonce without leaking client identity.
+        
+        Uses HMAC-based nonce generation (v0.6+) to prevent client ID tracking.
+        Falls back to legacy format for backward compatibility.
+        """
+        timestamp = int(time.time() * 1000)
+        random_hex = secrets.token_hex(16)  # Increased entropy
+        
+        # Get MAC key for HMAC-based nonce
+        mac_key = self._mac_key or self.secret_key
+        
+        if mac_key:
+            # HMAC-based nonce (v0.6+) - NO client ID leak
+            try:
+                input_str = f"{timestamp}-{random_hex}"
+                hmac_result = hmac_sha256(input_str, mac_key)
+                # Format: hmac-{first 32 chars of HMAC}-{timestamp}
+                return f"hmac-{hmac_result[:32]}-{timestamp}"
+            except Exception as e:
+                print(f"Warning: Failed to generate HMAC nonce, falling back to legacy format: {e}")
+        
+        # Legacy format (backward compatibility) - contains client ID
+        # WARNING: This leaks client identity! Use sessionMacKey to enable secure nonces
+        print("Warning: Generating legacy nonce with client ID - use sessionMacKey for privacy")
+        return f"{self.client_id}-{timestamp}-{random_hex}"
 
     def _detect_platform(self) -> str:
         return f"python-{platform.system().lower()}"
