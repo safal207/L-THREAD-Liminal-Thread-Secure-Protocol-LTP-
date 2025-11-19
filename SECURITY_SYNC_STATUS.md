@@ -82,20 +82,45 @@
 
 ---
 
-### ❌ Elixir SDK
-**Status:** ❌ **NOT STARTED** - No v0.6.0 security features
+### ⚠️ Elixir SDK
+**Status:** ⚠️ **PARTIAL** - Cryptographic functions ready, basic ECDH integration (2025-01-18)
 
-- ❌ **ECDH Key Exchange** - **NOT IMPLEMENTED**
-- ❌ **Authenticated ECDH** - **NOT IMPLEMENTED**
-- ❌ **HMAC-based Nonces** - **NOT IMPLEMENTED**
-- ❌ **Metadata Encryption** - **NOT IMPLEMENTED**
-- ❌ **Hash Chaining** - **NOT IMPLEMENTED**
+- ✅ **ECDH Key Exchange** - **BASIC IMPLEMENTATION**
+  - ✅ `generate_ecdh_key_pair()` - Implemented using Erlang :crypto
+  - ✅ `derive_shared_secret()` - Implemented
+  - ✅ `derive_session_keys()` - Implemented with HKDF
+  - ✅ HKDF implementation - RFC 5869 compliant
+  - ⚠️ Basic integration in handshake_init (needs handshake_ack handling)
+  
+- ⚠️ **Authenticated ECDH** - **PARTIAL**
+  - ✅ `sign_ecdh_public_key()` - Implemented
+  - ✅ `verify_ecdh_public_key()` - Implemented
+  - ⚠️ Integrated in handshake_init (needs handshake_ack verification)
+  
+- ❌ **HMAC-based Nonces** - **NOT INTEGRATED**
+  - Functions available but not integrated in message sending
+  
+- ❌ **Metadata Encryption** - **NOT INTEGRATED**
+  - ✅ `encrypt_metadata()` / `decrypt_metadata()` - Implemented
+  - ❌ Not integrated in message sending/receiving
+  
+- ❌ **Hash Chaining** - **NOT INTEGRATED**
+  - ✅ `hash_envelope()` - Implemented
+  - ❌ Not integrated in message sending/receiving
 
 **Files:**
-- `sdk/elixir/lib/ltp/client.ex` - Basic client only
-- `sdk/elixir/lib/ltp/connection.ex` - Basic connection handling
+- `sdk/elixir/lib/ltp/crypto.ex` - ✅ All crypto functions implemented
+- `sdk/elixir/lib/ltp/types.ex` - ✅ Updated type definitions for v0.6.0
+- `sdk/elixir/lib/ltp/connection.ex` - ⚠️ Basic ECDH integration in handshake
+- `sdk/elixir/lib/ltp/client.ex` - ⚠️ Needs integration updates
 
-**Status:** v0.3 feature set only (basic handshake, heartbeat, reconnect)
+**Version:** 0.6.0-alpha.3
+
+**Next Steps:**
+- Complete handshake_ack handling for ECDH key derivation
+- Integrate HMAC-based nonces
+- Integrate metadata encryption
+- Integrate hash chaining
 
 ---
 

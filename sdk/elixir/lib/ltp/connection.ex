@@ -9,7 +9,7 @@ defmodule LTP.Connection do
   use WebSockex
   require Logger
 
-  @ltp_version "0.3"
+  @ltp_version "0.6"
 
   defstruct [
     :url,
@@ -31,7 +31,18 @@ defmodule LTP.Connection do
     :reconnect_timer,
     :reconnect_attempts,
     :is_handshake_complete,
-    :client_pid
+    :client_pid,
+    # v0.6.0 Security features
+    :enable_ecdh_key_exchange,
+    :enable_metadata_encryption,
+    :secret_key,
+    :session_mac_key,
+    :ecdh_private_key,
+    :ecdh_public_key,
+    :session_encryption_key,
+    :last_sent_hash,
+    :last_received_hash,
+    :seen_nonces
   ]
 
   # Public API
@@ -56,7 +67,18 @@ defmodule LTP.Connection do
       default_affect: Keyword.get(opts, :default_affect),
       reconnect_attempts: 0,
       is_handshake_complete: false,
-      client_pid: Keyword.get(opts, :client_pid)
+      client_pid: Keyword.get(opts, :client_pid),
+      # v0.6.0 Security features initialization
+      enable_ecdh_key_exchange: Keyword.get(opts, :enable_ecdh_key_exchange, false),
+      enable_metadata_encryption: Keyword.get(opts, :enable_metadata_encryption, false),
+      secret_key: Keyword.get(opts, :secret_key),
+      session_mac_key: Keyword.get(opts, :session_mac_key),
+      ecdh_private_key: nil,
+      ecdh_public_key: nil,
+      session_encryption_key: nil,
+      last_sent_hash: nil,
+      last_received_hash: nil,
+      seen_nonces: %{}
     }
 
     WebSockex.start_link(state.url, __MODULE__, state, name: Keyword.get(opts, :name))
@@ -73,13 +95,15 @@ defmodule LTP.Connection do
     Logger.info("[LTP] WebSocket connected, initiating handshake...")
 
     # Try resume if we have thread_id, otherwise init
-    if state.thread_id do
-      send_handshake_resume(state)
-    else
-      send_handshake_init(state)
-    end
+    new_state = 
+      if state.thread_id do
+        send_handshake_resume(state)
+        state
+      else
+        send_handshake_init(state)
+      end
 
-    {:ok, state}
+    {:ok, new_state}
   end
 
   @impl WebSockex
@@ -136,6 +160,24 @@ defmodule LTP.Connection do
   # Private helpers
 
   defp send_handshake_init(state) do
+    # Generate ECDH key pair if enabled
+    {ecdh_public_key, ecdh_private_key} = 
+      if state.enable_ecdh_key_exchange do
+        try do
+          {pub, priv} = LTP.Crypto.generate_ecdh_key_pair()
+          {pub, priv}
+        rescue
+          e ->
+            Logger.warn("[LTP] Failed to generate ECDH key pair: #{inspect(e)}")
+            {nil, nil}
+        end
+      else
+        {nil, nil}
+      end
+    
+    # Update state with ECDH keys
+    state = %{state | ecdh_public_key: ecdh_public_key, ecdh_private_key: ecdh_private_key}
+    
     handshake = %{
       type: "handshake_init",
       ltp_version: @ltp_version,
@@ -143,11 +185,46 @@ defmodule LTP.Connection do
       device_fingerprint: state.device_fingerprint,
       intent: state.intent,
       capabilities: state.capabilities,
-      metadata: Map.merge(%{sdk_version: "0.1.0", platform: "elixir"}, state.metadata)
+      metadata: Map.merge(%{sdk_version: "0.6.0-alpha.3", platform: "elixir"}, state.metadata)
     }
+    
+    # Add ECDH public key if available
+    handshake = 
+      if ecdh_public_key do
+        handshake
+        |> Map.put(:client_ecdh_public_key, ecdh_public_key)
+        |> Map.put(:client_public_key, ecdh_public_key)  # Legacy field
+        |> Map.put(:key_agreement, %{
+          algorithm: "secp256r1",
+          method: "ecdh",
+          hkdf: "sha256"
+        })
+      else
+        handshake
+      end
+    
+    # Sign ECDH public key if secret_key is available (v0.6+ authenticated ECDH)
+    handshake =
+      if ecdh_public_key && state.secret_key do
+        try do
+          timestamp = System.system_time(:millisecond)
+          signature = LTP.Crypto.sign_ecdh_public_key(ecdh_public_key, state.client_id, timestamp, state.secret_key)
+          
+          handshake
+          |> Map.put(:client_ecdh_signature, signature)
+          |> Map.put(:client_ecdh_timestamp, timestamp)
+        rescue
+          e ->
+            Logger.warn("[LTP] Failed to sign ECDH public key: #{inspect(e)}")
+            handshake
+        end
+      else
+        handshake
+      end
 
     json = Jason.encode!(handshake)
     WebSockex.send_frame(self(), {:text, json})
+    state
   end
 
   defp send_handshake_resume(state) do

@@ -1,7 +1,7 @@
 defmodule LTP.MixProject do
   use Mix.Project
 
-  @version "0.1.0"
+  @version "0.6.0-alpha.3"
   @source_url "https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-"
 
   def project do

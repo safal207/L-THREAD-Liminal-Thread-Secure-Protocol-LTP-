@@ -12,7 +12,12 @@ defmodule LTP.Types do
           device_fingerprint: String.t() | nil,
           intent: String.t() | nil,
           capabilities: list(String.t()) | nil,
-          metadata: map() | nil
+          metadata: map() | nil,
+          client_public_key: String.t() | nil,  # Legacy field name
+          client_ecdh_public_key: String.t() | nil,  # v0.6+ explicit name
+          client_ecdh_signature: String.t() | nil,  # v0.6+ authenticated ECDH
+          client_ecdh_timestamp: integer() | nil,  # v0.6+ authenticated ECDH
+          key_agreement: map() | nil
         }
 
   @type handshake_resume :: %{
@@ -31,7 +36,12 @@ defmodule LTP.Types do
           resumed: boolean(),
           server_capabilities: list(String.t()) | nil,
           heartbeat_interval_ms: non_neg_integer(),
-          metadata: map() | nil
+          metadata: map() | nil,
+          server_public_key: String.t() | nil,  # Legacy field name
+          server_ecdh_public_key: String.t() | nil,  # v0.6+ explicit name
+          server_ecdh_signature: String.t() | nil,  # v0.6+ authenticated ECDH
+          server_ecdh_timestamp: integer() | nil,  # v0.6+ authenticated ECDH
+          key_agreement: map() | nil
         }
 
   @type handshake_reject :: %{
@@ -50,7 +60,10 @@ defmodule LTP.Types do
           payload: map(),
           meta: map() | nil,
           nonce: String.t() | nil,
-          signature: String.t() | nil
+          signature: String.t() | nil,
+          prev_message_hash: String.t() | nil,  # v0.5+ hash chaining
+          encrypted_metadata: String.t() | nil,  # v0.6+ metadata encryption
+          routing_tag: String.t() | nil  # v0.6+ routing tag for encrypted metadata
         }
 
   @type state_update_payload :: %{
