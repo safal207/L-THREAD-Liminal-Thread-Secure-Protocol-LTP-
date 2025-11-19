@@ -6,7 +6,6 @@
  */
 
 const textEncoder = new TextEncoder();
-const textDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : undefined;
 
 /**
  * Helper to safely extract error message from unknown error
@@ -608,8 +607,7 @@ export async function encryptPayload(
   // Browser environment - Web Crypto API
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
     try {
-      const encoder = new TextEncoder();
-      const dataBuffer = encoder.encode(data);
+      const dataBuffer = textEncoder.encode(data);
 
       // Generate random IV
       const iv = window.crypto.getRandomValues(new Uint8Array(12));
