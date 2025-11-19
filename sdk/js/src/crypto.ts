@@ -5,6 +5,9 @@
  * Provides cryptographic functions for message signing and verification
  */
 
+const textEncoder = new TextEncoder();
+const textDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : undefined;
+
 /**
  * Helper to safely extract error message from unknown error
  */
@@ -23,9 +26,8 @@ export async function hmacSha256(input: string, key: string): Promise<string> {
   // Browser environment - Web Crypto API
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
     try {
-      const encoder = new TextEncoder();
-      const keyData = encoder.encode(key);
-      const inputData = encoder.encode(input);
+      const keyData = textEncoder.encode(key);
+      const inputData = textEncoder.encode(input);
 
       const cryptoKey = await window.crypto.subtle.importKey(
         'raw',
@@ -176,7 +178,6 @@ function serializeCanonical(message: {
 
 /**
  * Generate HMAC-SHA256 signature for LTP message
- * Works in both browser (Web Crypto API) and Node.js (crypto module)
  */
 export async function signMessage(
   message: {
@@ -192,15 +193,11 @@ export async function signMessage(
   },
   secretKey: string
 ): Promise<string> {
-  // Create canonical message representation
   const canonical = serializeCanonical(message);
-
-  // Browser environment - Web Crypto API
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
     try {
-      const encoder = new TextEncoder();
-      const keyData = encoder.encode(secretKey);
-      const messageData = encoder.encode(canonical);
+      const keyData = textEncoder.encode(secretKey);
+      const messageData = textEncoder.encode(canonical);
 
       const cryptoKey = await window.crypto.subtle.importKey(
         'raw',
@@ -211,8 +208,6 @@ export async function signMessage(
       );
 
       const signature = await window.crypto.subtle.sign('HMAC', cryptoKey, messageData);
-
-      // Convert to hex string
       return Array.from(new Uint8Array(signature))
         .map(b => b.toString(16).padStart(2, '0'))
         .join('');
@@ -221,7 +216,6 @@ export async function signMessage(
     }
   }
 
-  // Node.js environment
   if (typeof require !== 'undefined') {
     try {
       const crypto = require('crypto');
@@ -336,8 +330,7 @@ export async function hashEnvelope(message: {
 
   // Browser environment - Web Crypto API
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
-    const encoder = new TextEncoder();
-    const digest = await window.crypto.subtle.digest('SHA-256', encoder.encode(canonical));
+    const digest = await window.crypto.subtle.digest('SHA-256', textEncoder.encode(canonical));
     return bufferToHex(new Uint8Array(digest));
   }
 
