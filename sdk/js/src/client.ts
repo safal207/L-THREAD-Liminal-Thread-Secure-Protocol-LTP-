@@ -552,195 +552,16 @@ export class LtpClient {
   }
 
   private async handleMessageAsync(message: LtpMessage): Promise<void> {
-    // Decrypt metadata if present (v0.6+)
     const envelopeMsg = message as LtpEnvelope;
-    if (envelopeMsg.encrypted_metadata && this.options.sessionEncryptionKey) {
-      try {
-        const decryptedMetadata = await decryptMetadata(
-          envelopeMsg.encrypted_metadata,
-          this.options.sessionEncryptionKey
-        );
+    await this.decryptMetadataIfNeeded(envelopeMsg);
 
-        // Restore decrypted metadata to envelope
-        envelopeMsg.thread_id = decryptedMetadata.thread_id;
-        envelopeMsg.session_id = decryptedMetadata.session_id;
-        envelopeMsg.timestamp = decryptedMetadata.timestamp;
-
-        this.logger.debug('Metadata decrypted successfully');
-      } catch (error) {
-        this.logger.error('Failed to decrypt metadata - using plaintext fallback', error);
-        // Continue with plaintext metadata (backward compatibility)
-      }
-    }
-
-    // Get the MAC key (sessionMacKey takes precedence over deprecated secretKey)
     const macKey = this.options.sessionMacKey || this.options.secretKey;
-
-    // Mandatory signature verification (v0.5+)
-    const shouldVerify =
-      this.options.requireSignatureVerification &&
-      macKey &&
-      message.type !== 'handshake_ack' &&
-      message.type !== 'handshake_reject';
-
-    if (shouldVerify) {
-      const envelopeMessage = message as LtpEnvelope;
-
-      // Check if message has all required fields for verification
-      const hasRequiredFields =
-        'thread_id' in envelopeMessage &&
-        'timestamp' in envelopeMessage &&
-        'nonce' in envelopeMessage &&
-        'payload' in envelopeMessage;
-
-      if (!hasRequiredFields) {
-        this.logger.error('Message missing required fields for signature verification', {
-          type: message.type,
-          hasThreadId: 'thread_id' in message,
-          hasTimestamp: 'timestamp' in message,
-          hasNonce: 'nonce' in message,
-          hasPayload: 'payload' in message,
-        });
-        this.handleError({
-          error_code: 'INVALID_MESSAGE',
-          error_message: 'Message missing required fields for signature verification',
-        });
-        return; // Reject message
-      }
-
-      if (!envelopeMessage.signature) {
-        this.logger.error('Message missing required signature', {
-          type: message.type,
-        });
-        this.handleError({
-          error_code: 'MISSING_SIGNATURE',
-          error_message: 'Message signature is required but missing',
-        });
-        return; // Reject message
-      }
-
-      // Verify signature (blocking - security critical)
-      try {
-        const verifiableMessage = envelopeMessage as any; // Type assertion for verification
-        const result = await verifySignature(verifiableMessage, macKey);
-
-        if (!result.valid) {
-          this.logger.error('Message signature verification failed - REJECTING', {
-            type: message.type,
-            error: result.error,
-          });
-          this.handleError({
-            error_code: 'INVALID_SIGNATURE',
-            error_message: `Signature verification failed: ${result.error}`,
-          });
-          return; // Reject message
-        }
-      } catch (error) {
-        this.logger.error('Failed to verify message signature - REJECTING', error);
-        this.handleError({
-          error_code: 'SIGNATURE_VERIFICATION_ERROR',
-          error_message: 'Failed to verify signature',
-        });
-        return; // Reject message
-      }
-
-      // Timestamp validation for replay protection
-      if ('timestamp' in message && typeof message.timestamp === 'number') {
-        const now = Date.now();
-        const messageAge = now - message.timestamp;
-
-        if (messageAge > (this.options.maxMessageAge || 60000)) {
-          this.logger.error('Message too old - possible replay attack', {
-            type: message.type,
-            messageAge,
-            maxAge: this.options.maxMessageAge,
-          });
-          this.handleError({
-            error_code: 'MESSAGE_TOO_OLD',
-            error_message: `Message timestamp too old (age: ${messageAge}ms)`,
-          });
-          return; // Reject message
-        }
-
-        // Also reject messages from the future (clock skew tolerance: 5 seconds)
-        if (messageAge < -5000) {
-          this.logger.error('Message from future - clock skew', {
-            type: message.type,
-            messageAge,
-          });
-          this.handleError({
-            error_code: 'INVALID_TIMESTAMP',
-            error_message: 'Message timestamp is in the future',
-          });
-          return; // Reject message
-        }
-      }
-
-      this.logger.debug('Message signature verified successfully', {
-        type: message.type,
-      });
-
-      // Nonce validation for replay protection (v0.5+)
-      const clientId = 'meta' in envelopeMessage && envelopeMessage.meta?.client_id
-        ? envelopeMessage.meta.client_id
-        : undefined;
-
-      const nonceError = this.validateNonce(envelopeMessage.nonce, clientId);
-      if (nonceError) {
-        this.logger.error('Nonce validation failed - REJECTING', {
-          type: message.type,
-          error: nonceError,
-          nonce: envelopeMessage.nonce,
-        });
-        this.handleError({
-          error_code: 'INVALID_NONCE',
-          error_message: `Nonce validation failed: ${nonceError}`,
-        });
-        return; // Reject message
-      }
-
-      this.logger.debug('Nonce validated successfully', {
-        type: message.type,
-        nonce: envelopeMessage.nonce,
-      });
-
-      if (this.lastReceivedHash && envelopeMessage.prev_message_hash !== this.lastReceivedHash) {
-        this.logger.error('Hash chain mismatch - REJECTING', {
-          type: message.type,
-          expectedPrev: this.lastReceivedHash,
-          providedPrev: envelopeMessage.prev_message_hash,
-        });
-        this.handleError({
-          error_code: 'HASH_CHAIN_MISMATCH',
-          error_message: 'prev_message_hash does not match last commitment',
-        });
-        return;
-      }
-
-      // Advance hash chain after validation
-      try {
-        this.lastReceivedHash = await hashEnvelope({
-          type: message.type,
-          thread_id: envelopeMessage.thread_id,
-          session_id: envelopeMessage.session_id,
-          timestamp: envelopeMessage.timestamp,
-          nonce: envelopeMessage.nonce!,
-          payload: envelopeMessage.payload,
-          prev_message_hash: envelopeMessage.prev_message_hash,
-        });
-      } catch (error) {
-        this.logger.error('Failed to hash envelope - REJECTING', error);
-        this.handleError({
-          error_code: 'HASH_FAILURE',
-          error_message: 'Unable to hash envelope for chain integrity',
-        });
-        return;
-      }
+    const secure = await this.verifyMessageSecurity(envelopeMsg, macKey);
+    if (!secure) {
+      return;
     }
 
-    if (this.events.onMessage) {
-      this.events.onMessage(message);
-    }
+    this.events.onMessage?.(message);
 
     switch (message.type) {
       case 'handshake_ack':
@@ -774,6 +595,179 @@ export class LtpClient {
       default:
         this.logger.debug('Received message', { type: message.type });
     }
+  }
+
+  private async decryptMetadataIfNeeded(envelope: LtpEnvelope): Promise<void> {
+    if (!envelope.encrypted_metadata || !this.options.sessionEncryptionKey) {
+      return;
+    }
+
+    try {
+      const decryptedMetadata = await decryptMetadata(
+        envelope.encrypted_metadata,
+        this.options.sessionEncryptionKey
+      );
+
+      envelope.thread_id = decryptedMetadata.thread_id;
+      envelope.session_id = decryptedMetadata.session_id;
+      envelope.timestamp = decryptedMetadata.timestamp;
+
+      this.logger.debug('Metadata decrypted successfully');
+    } catch (error) {
+      this.logger.error('Failed to decrypt metadata - using plaintext fallback', error);
+    }
+  }
+
+  private async verifyMessageSecurity(
+    envelope: LtpEnvelope,
+    macKey?: string
+  ): Promise<boolean> {
+    const requiresVerification =
+      this.options.requireSignatureVerification &&
+      macKey &&
+      envelope.type !== 'handshake_ack' &&
+      envelope.type !== 'handshake_reject';
+
+    if (!requiresVerification) {
+      return true;
+    }
+
+    if (
+      envelope.thread_id === undefined ||
+      typeof envelope.timestamp !== 'number' ||
+      !envelope.nonce ||
+      envelope.payload === undefined
+    ) {
+      this.logger.error('Message missing required fields for signature verification', {
+        type: envelope.type,
+        hasThreadId: envelope.thread_id !== undefined,
+        hasTimestamp: typeof envelope.timestamp === 'number',
+        hasNonce: Boolean(envelope.nonce),
+        hasPayload: envelope.payload !== undefined,
+      });
+      this.handleError({
+        error_code: 'INVALID_MESSAGE',
+        error_message: 'Message missing required fields for signature verification',
+      });
+      return false;
+    }
+
+    if (!envelope.signature) {
+      this.logger.error('Message missing required signature', {
+        type: envelope.type,
+      });
+      this.handleError({
+        error_code: 'MISSING_SIGNATURE',
+        error_message: 'Message signature is required but missing',
+      });
+      return false;
+    }
+
+    try {
+      const result = await verifySignature(envelope as any, macKey);
+
+      if (!result.valid) {
+        this.logger.error('Message signature verification failed - REJECTING', {
+          type: envelope.type,
+          error: result.error,
+        });
+        this.handleError({
+          error_code: 'INVALID_SIGNATURE',
+          error_message: `Signature verification failed: ${result.error}`,
+        });
+        return false;
+      }
+    } catch (error) {
+      this.logger.error('Failed to verify message signature - REJECTING', error);
+      this.handleError({
+        error_code: 'SIGNATURE_VERIFICATION_ERROR',
+        error_message: 'Failed to verify signature',
+      });
+      return false;
+    }
+
+    if (typeof envelope.timestamp === 'number') {
+      const now = Date.now();
+      const messageAge = now - envelope.timestamp;
+
+      if (messageAge > (this.options.maxMessageAge || 60000)) {
+        this.logger.error('Message too old - possible replay attack', {
+          type: envelope.type,
+          messageAge,
+          maxAge: this.options.maxMessageAge,
+        });
+        this.handleError({
+          error_code: 'MESSAGE_TOO_OLD',
+          error_message: `Message timestamp too old (age: ${messageAge}ms)`,
+        });
+        return false;
+      }
+
+      if (messageAge < -5000) {
+        this.logger.error('Message from future - clock skew', {
+          type: envelope.type,
+          messageAge,
+        });
+        this.handleError({
+          error_code: 'INVALID_TIMESTAMP',
+          error_message: 'Message timestamp is in the future',
+        });
+        return false;
+      }
+    }
+
+    const clientId = envelope.meta?.client_id;
+    const nonceError = this.validateNonce(envelope.nonce, clientId);
+    if (nonceError) {
+      this.logger.error('Nonce validation failed - REJECTING', {
+        type: envelope.type,
+        error: nonceError,
+        nonce: envelope.nonce,
+      });
+      this.handleError({
+        error_code: 'INVALID_NONCE',
+        error_message: `Nonce validation failed: ${nonceError}`,
+      });
+      return false;
+    }
+
+    if (this.lastReceivedHash && envelope.prev_message_hash !== this.lastReceivedHash) {
+      this.logger.error('Hash chain mismatch - REJECTING', {
+        type: envelope.type,
+        expectedPrev: this.lastReceivedHash,
+        providedPrev: envelope.prev_message_hash,
+      });
+      this.handleError({
+        error_code: 'HASH_CHAIN_MISMATCH',
+        error_message: 'prev_message_hash does not match last commitment',
+      });
+      return false;
+    }
+
+    try {
+      this.lastReceivedHash = await hashEnvelope({
+        type: envelope.type,
+        thread_id: envelope.thread_id!,
+        session_id: envelope.session_id,
+        timestamp: envelope.timestamp,
+        nonce: envelope.nonce!,
+        payload: envelope.payload,
+        prev_message_hash: envelope.prev_message_hash,
+      });
+    } catch (error) {
+      this.logger.error('Failed to hash envelope - REJECTING', error);
+      this.handleError({
+        error_code: 'HASH_FAILURE',
+        error_message: 'Unable to hash envelope for chain integrity',
+      });
+      return false;
+    }
+
+    this.logger.debug('Message security checks passed', {
+      type: envelope.type,
+    });
+
+    return true;
   }
 
   private async handleHandshakeAck(message: HandshakeAckMessage): Promise<void> {
