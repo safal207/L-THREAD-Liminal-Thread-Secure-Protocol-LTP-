@@ -6,9 +6,9 @@
 use hmac::{Hmac, Mac};
 use p256::{
     ecdh::EphemeralSecret,
-    PublicKey, SecretKey,
+    PublicKey, SecretKey, EncodedPoint,
 };
-use p256::elliptic_curve::sec1::ToEncodedPoint;
+use p256::elliptic_curve::sec1::{FromEncodedPoint, ToEncodedPoint};
 use sha2::{Digest, Sha256};
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit, OsRng},
@@ -61,6 +61,8 @@ pub fn derive_shared_secret(
     private_key_hex: &str,
     peer_public_key_hex: &str,
 ) -> Result<String, String> {
+    use p256::elliptic_curve::sec1::FromEncodedPoint;
+    
     // Decode private key
     let private_key_bytes = hex::decode(private_key_hex)
         .map_err(|e| format!("Failed to decode private key: {}", e))?;
@@ -69,15 +71,27 @@ pub fn derive_shared_secret(
         return Err("Invalid private key length".to_string());
     }
     
-    let secret = SecretKey::from_bytes(private_key_bytes.as_slice().into())
+    // Convert to fixed-size array for SecretKey::from_bytes
+    let mut key_array = [0u8; 32];
+    key_array.copy_from_slice(&private_key_bytes);
+    
+    // Use TryFrom trait for SecretKey
+    use p256::elliptic_curve::FieldBytes;
+    let field_bytes = FieldBytes::from(key_array);
+    let secret = SecretKey::from_bytes(&field_bytes)
         .map_err(|e| format!("Failed to parse private key: {}", e))?;
     
     // Decode peer public key (SEC1 format: 0x04 || x || y)
     let peer_public_bytes = hex::decode(peer_public_key_hex)
         .map_err(|e| format!("Failed to decode peer public key: {}", e))?;
     
-    let peer_public = PublicKey::from_sec1_bytes(&peer_public_bytes)
-        .map_err(|e| format!("Failed to parse peer public key: {}", e))?;
+    // Use EncodedPoint to parse the public key
+    // EncodedPoint implements From<&[u8]> or TryFrom
+    let encoded_point = EncodedPoint::from_bytes(&peer_public_bytes)
+        .map_err(|_| "Failed to parse peer public key bytes".to_string())?;
+    
+    let peer_public = PublicKey::from_encoded_point(&encoded_point)
+        .ok_or_else(|| "Invalid peer public key point".to_string())?;
     
     // Derive shared secret using ECDH
     // Create EphemeralSecret from our private key
