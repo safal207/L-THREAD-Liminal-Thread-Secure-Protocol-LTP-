@@ -191,8 +191,16 @@ export class LtpClient {
       ? options.requireSignatureVerification
       : Boolean(macKey);
 
+    // Generate client ID if not provided
+    const clientId = options.clientId || (() => {
+      if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+        return crypto.randomUUID();
+      }
+      return Math.random().toString(36).substring(2, 15);
+    })();
+
     this.options = {
-      clientId: options.clientId || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)),
+      clientId,
       deviceFingerprint: options.deviceFingerprint,
       intent: options.intent || 'resonant_link',
       capabilities: options.capabilities || ['state-update', 'events', 'ping-pong'],
@@ -1501,11 +1509,6 @@ export class LtpClient {
 
   private getTimestamp(): number {
     return Date.now();
-  }
-
-  private generateClientId(): string {
-    const randomHex = this.generateSecureRandomHex(8);
-    return `client-${Date.now()}-${randomHex}`;
   }
 
   private detectPlatform(): string {
