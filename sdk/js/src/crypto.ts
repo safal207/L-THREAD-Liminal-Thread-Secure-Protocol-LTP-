@@ -798,6 +798,10 @@ export async function decryptMetadata(
 
   const [ciphertext, iv, tag] = parts;
 
+  if (!ciphertext || !iv || !tag) {
+    throw new Error('Invalid encrypted metadata format - missing parts');
+  }
+
   // Decrypt using AES-256-GCM
   const decryptedJson = await decryptPayload(ciphertext, encryptionKey, iv, tag);
 

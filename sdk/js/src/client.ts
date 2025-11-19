@@ -9,7 +9,6 @@ import {
   generateKeyPair,
   deriveSharedSecret,
   deriveSessionKeys,
-  hkdf,
   hashEnvelope,
   hmacSha256,
   signEcdhPublicKey,
@@ -141,7 +140,6 @@ export class LtpClient {
 
   private reconnectAttempts = 0;
   private lastReconnectDelayMs = 0;
-  private isConnecting = false;
   private manualDisconnect = false;
 
   private isConnected = false;
@@ -169,14 +167,6 @@ export class LtpClient {
   // Hash chaining for message integrity (v0.5+)
   private lastSentHash: string | null = null;
   private lastReceivedHash: string | null = null;
-
-  // Compatibility alias for handshakeKeys
-  private get handshakeKeys() {
-    if (this.ecdhPrivateKey && this.ecdhPublicKey) {
-      return { privateKey: this.ecdhPrivateKey, publicKey: this.ecdhPublicKey };
-    }
-    return null;
-  }
 
   /**
    * Create a new LTP client
@@ -832,7 +822,7 @@ export class LtpClient {
         );
 
         // Derive session keys
-        const { macKey, encryptionKey, ivKey } = await deriveSessionKeys(
+        const { macKey, encryptionKey } = await deriveSessionKeys(
           sharedSecret,
           this.sessionId
         );
@@ -1245,8 +1235,14 @@ export class LtpClient {
       window.crypto.getRandomValues(bytes);
 
       // Set version (4) and variant bits
-      bytes[6] = (bytes[6] & 0x0f) | 0x40;
-      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const byte6 = bytes[6];
+      const byte8 = bytes[8];
+      if (byte6 !== undefined) {
+        bytes[6] = (byte6 & 0x0f) | 0x40;
+      }
+      if (byte8 !== undefined) {
+        bytes[8] = (byte8 & 0x3f) | 0x80;
+      }
 
       const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
       return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}`;
@@ -1325,8 +1321,12 @@ export class LtpClient {
       const [, hmacPart, timestampPart] = parts;
 
       // Verify HMAC part has correct length (32 hex chars)
-      if (hmacPart.length !== 32 || !/^[0-9a-f]{32}$/i.test(hmacPart)) {
+      if (!hmacPart || hmacPart.length !== 32 || !/^[0-9a-f]{32}$/i.test(hmacPart)) {
         return 'Invalid HMAC nonce format (bad HMAC)';
+      }
+
+      if (!timestampPart) {
+        return 'Invalid HMAC nonce format (missing timestamp)';
       }
 
       timestamp = parseInt(timestampPart, 10);
@@ -1341,6 +1341,10 @@ export class LtpClient {
       }
 
       const [nonceClientId, nonceTimestamp, randomHex] = parts;
+
+      if (!nonceClientId || !nonceTimestamp || !randomHex) {
+        return 'Invalid nonce format (missing parts)';
+      }
 
       // Verify client ID in nonce matches (if available in meta)
       if (clientId && nonceClientId !== clientId) {
