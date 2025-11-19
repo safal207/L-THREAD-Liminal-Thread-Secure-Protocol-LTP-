@@ -581,27 +581,6 @@ export class LtpClient {
     if (!(await this.verifyMessageSecurity(envelopeMsg, macKey))) {
       return;
     }
-  private async decryptMetadataIfNeeded(envelope: LtpEnvelope): Promise<void> {
-    if (!envelope.encrypted_metadata || !this.options.sessionEncryptionKey) {
-      return;
-    }
-
-    try {
-      const decryptedMetadata = await decryptMetadata(
-        envelope.encrypted_metadata,
-        this.options.sessionEncryptionKey
-      );
-
-      envelope.thread_id = decryptedMetadata.thread_id;
-      envelope.session_id = decryptedMetadata.session_id;
-      envelope.timestamp = decryptedMetadata.timestamp;
-
-      this.logger.debug('Metadata decrypted successfully');
-    } catch (error) {
-      this.logger.error('Failed to decrypt metadata - using plaintext fallback', error);
-    }
-  }
-
 
     this.events.onMessage?.(message);
 
