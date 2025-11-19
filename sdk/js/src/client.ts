@@ -123,6 +123,11 @@ const defaultLogger = new ConsoleLogger();
 /**
  * LTP Client for establishing and managing liminal thread sessions
  */
+type SendMetaOptions = {
+  affect?: LtpAffect;
+  contextTag?: string;
+};
+
 export class LtpClient {
   private url: string;
   private options: LtpClientOptions;
@@ -286,27 +291,21 @@ export class LtpClient {
    */
   public sendStateUpdate(
     payload: StateUpdatePayload,
-    options?: { affect?: LtpAffect; contextTag?: string }
+    options?: SendMetaOptions
   ): void {
-    if (!this.hasSessionContext()) {
-      this.logger.error('Cannot send state update before handshake completes');
+    if (!this.ensureReadyForSend('send state update')) {
       return;
     }
 
-    const metaOverrides: LtpMeta = {
-      affect: options?.affect,
-      context_tag: options?.contextTag,
-    };
-
-    // Prepare payload data with TOON encoding if needed
-    const { encoded, encoding } = this.preparePayloadData(payload.data);
-    const encodedPayload: StateUpdatePayload = {
-      ...payload,
-      data: encoded,
-    };
-
-    const envelope = this.buildEnvelope('state_update', encodedPayload, metaOverrides, encoding);
-    this.send(envelope);
+    this.sendStructuredMessage(
+      'state_update',
+      payload.data,
+      (encoded) => ({
+        ...payload,
+        data: encoded,
+      }),
+      options
+    );
   }
 
   /**
@@ -318,34 +317,28 @@ export class LtpClient {
   public sendEvent(
     eventType: string,
     data: Record<string, unknown>,
-    options?: { affect?: LtpAffect; contextTag?: string }
+    options?: SendMetaOptions
   ): void {
-    if (!this.hasSessionContext()) {
-      this.logger.error('Cannot send event before handshake completes');
+    if (!this.ensureReadyForSend('send event')) {
       return;
     }
 
-    // Prepare payload data with TOON encoding if needed
-    const { encoded, encoding } = this.preparePayloadData(data);
-    const payload: EventPayload = {
-      event_type: eventType,
-      data: encoded as Record<string, unknown>,
-    };
-
-    const metaOverrides: LtpMeta = {
-      affect: options?.affect,
-      context_tag: options?.contextTag,
-    };
-
-    this.send(this.buildEnvelope('event', payload, metaOverrides, encoding));
+    this.sendStructuredMessage(
+      'event',
+      data,
+      (encoded) => ({
+        event_type: eventType,
+        data: encoded as Record<string, unknown>,
+      }),
+      options
+    );
   }
 
   /**
    * Send ping message (usually handled automatically by heartbeat)
    */
   public sendPing(): void {
-    if (!this.hasSessionContext()) {
-      this.logger.error('Cannot send ping before handshake completes');
+    if (!this.ensureReadyForSend('send ping')) {
       return;
     }
 
@@ -361,12 +354,41 @@ export class LtpClient {
     meta?: LtpMeta;
     payload: Record<string, unknown>;
   }): void {
-    if (!this.hasSessionContext()) {
-      this.logger.error('Cannot send message before handshake completes');
+    if (!this.ensureReadyForSend('send custom message')) {
       return;
     }
 
     this.send(this.buildEnvelope(message.type as SupportedMessageType, message.payload, message.meta));
+  }
+
+  private ensureReadyForSend(action: string): boolean {
+    if (this.hasSessionContext()) {
+      return true;
+    }
+    this.logger.error(`Cannot ${action} before handshake completes`);
+    return false;
+  }
+
+  private buildMetaOverridesFromOptions(options?: SendMetaOptions): LtpMeta | undefined {
+    if (!options) {
+      return undefined;
+    }
+    return {
+      affect: options.affect,
+      context_tag: options.contextTag,
+    };
+  }
+
+  private sendStructuredMessage<TData, TPayload>(
+    type: SupportedMessageType,
+    dataForEncoding: TData,
+    buildPayload: (encodedData: unknown) => TPayload,
+    options?: SendMetaOptions
+  ): void {
+    const { encoded, encoding } = this.preparePayloadData(dataForEncoding);
+    const payload = buildPayload(encoded);
+    const metaOverrides = this.buildMetaOverridesFromOptions(options);
+    this.send(this.buildEnvelope(type, payload, metaOverrides, encoding));
   }
 
   /**
@@ -556,10 +578,30 @@ export class LtpClient {
     await this.decryptMetadataIfNeeded(envelopeMsg);
 
     const macKey = this.options.sessionMacKey || this.options.secretKey;
-    const secure = await this.verifyMessageSecurity(envelopeMsg, macKey);
-    if (!secure) {
+    if (!(await this.verifyMessageSecurity(envelopeMsg, macKey))) {
       return;
     }
+  private async decryptMetadataIfNeeded(envelope: LtpEnvelope): Promise<void> {
+    if (!envelope.encrypted_metadata || !this.options.sessionEncryptionKey) {
+      return;
+    }
+
+    try {
+      const decryptedMetadata = await decryptMetadata(
+        envelope.encrypted_metadata,
+        this.options.sessionEncryptionKey
+      );
+
+      envelope.thread_id = decryptedMetadata.thread_id;
+      envelope.session_id = decryptedMetadata.session_id;
+      envelope.timestamp = decryptedMetadata.timestamp;
+
+      this.logger.debug('Metadata decrypted successfully');
+    } catch (error) {
+      this.logger.error('Failed to decrypt metadata - using plaintext fallback', error);
+    }
+  }
+
 
     this.events.onMessage?.(message);
 
