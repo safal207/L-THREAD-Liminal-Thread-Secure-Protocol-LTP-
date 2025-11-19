@@ -404,6 +404,11 @@ export class LtpClient {
       this.ws.close();
     }
 
+    if (this.isConnecting) {
+      this.logger.warn('connectWebSocket called while a connection is already in progress');
+      return;
+    }
+
     this.isConnecting = true;
 
     this.ws = new WebSocket(this.url, SUBPROTOCOL);
@@ -438,6 +443,7 @@ export class LtpClient {
 
     this.ws.onclose = () => {
       this.logger.info('WebSocket closed');
+      this.isConnecting = false;
       this.handleDisconnect('closed');
     };
   }
