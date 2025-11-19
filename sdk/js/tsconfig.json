@@ -40,9 +40,6 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     
-    // Type Definitions
-    "types": ["node"],
-    
     // Advanced Options
     "incremental": true,
     "tsBuildInfoFile": "./dist/.tsbuildinfo"

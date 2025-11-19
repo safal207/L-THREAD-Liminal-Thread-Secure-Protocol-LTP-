@@ -47,9 +47,11 @@ export async function hmacSha256(input: string, key: string): Promise<string> {
   }
 
   // Node.js environment - crypto module
-  if (typeof require !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
     try {
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = (globalThis as any).require('crypto');
       const hmac = crypto.createHmac('sha256', key);
       hmac.update(input);
       return hmac.digest('hex');
@@ -215,9 +217,11 @@ export async function signMessage(
     }
   }
 
-  if (typeof require !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
     try {
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = (globalThis as any).require('crypto');
       const hmac = crypto.createHmac('sha256', secretKey);
       hmac.update(canonical);
       return hmac.digest('hex');
@@ -281,18 +285,22 @@ export async function verifySignature(
  */
 function timingSafeEqual(a: string, b: string): boolean {
   // Node.js environment - use native crypto.timingSafeEqual
-  if (typeof require !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
     try {
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = (globalThis as any).require('crypto');
       // Native implementation handles length mismatch safely
       if (a.length !== b.length) {
         // Still do constant-time comparison of same-length dummy values
         // to prevent timing leak from early return
+        const Buffer = (globalThis as any).Buffer;
         const dummyA = Buffer.alloc(32);
         const dummyB = Buffer.alloc(32);
         crypto.timingSafeEqual(dummyA, dummyB);
         return false;
       }
+      const Buffer = (globalThis as any).Buffer;
       return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
     } catch (error) {
       // Fall through to manual implementation
@@ -334,8 +342,10 @@ export async function hashEnvelope(message: {
   }
 
   // Node.js environment
-  if (typeof require !== 'undefined') {
-    const crypto = require('crypto');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const crypto = (globalThis as any).require('crypto');
     const hash = crypto.createHash('sha256');
     hash.update(canonical);
     return hash.digest('hex');
@@ -386,9 +396,11 @@ export async function generateKeyPair(): Promise<{
   }
 
   // Node.js environment
-  if (typeof require !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
     try {
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = (globalThis as any).require('crypto');
       const ecdh = crypto.createECDH('prime256v1'); // P-256
       ecdh.generateKeys();
 
@@ -449,9 +461,12 @@ export async function deriveSharedSecret(
   }
 
   // Node.js environment
-  if (typeof require !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
     try {
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = (globalThis as any).require('crypto');
+      const Buffer = (globalThis as any).Buffer;
       const ecdh = crypto.createECDH('prime256v1');
       ecdh.setPrivateKey(Buffer.from(privateKey, 'hex'));
 
@@ -508,9 +523,12 @@ export async function hkdf(
   }
 
   // Node.js environment - Manual HKDF implementation
-  if (typeof require !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
     try {
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = (globalThis as any).require('crypto');
+      const Buffer = (globalThis as any).Buffer;
 
       // HKDF Extract
       const hmacSalt = crypto.createHmac('sha256', salt || Buffer.alloc(32));
@@ -573,9 +591,12 @@ export async function encryptPayload(
   key: string
 ): Promise<{ ciphertext: string; iv: string; tag: string }> {
   // Node.js environment
-  if (typeof require !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
     try {
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = (globalThis as any).require('crypto');
+      const Buffer = (globalThis as any).Buffer;
 
       // Generate random IV (12 bytes for GCM)
       const iv = crypto.randomBytes(12);
@@ -657,9 +678,12 @@ export async function decryptPayload(
   tag: string
 ): Promise<string> {
   // Node.js environment
-  if (typeof require !== 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
     try {
-      const crypto = require('crypto');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const crypto = (globalThis as any).require('crypto');
+      const Buffer = (globalThis as any).Buffer;
 
       // Create decipher
       const decipher = crypto.createDecipheriv(

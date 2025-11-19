@@ -131,16 +131,16 @@ type SendMetaOptions = {
 export class LtpClient {
   private url: string;
   private options: LtpClientOptions;
-  private events: LtpClientEvents;
+  private events: LtpClientEvents = {};
   private ws: WebSocket | null = null;
 
   private threadId: string | null = null;
   private sessionId: string | null = null;
   private negotiatedHeartbeatMs: number = 15000;
 
-  private heartbeatTimer: NodeJS.Timeout | null = null;
-  private heartbeatTimeout: NodeJS.Timeout | null = null;
-  private reconnectTimer: NodeJS.Timeout | null = null;
+  private heartbeatTimer: ReturnType<typeof setTimeout> | null = null;
+  private heartbeatTimeout: ReturnType<typeof setTimeout> | null = null;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private forcedReconnectReason: string | null = null;
 
   private reconnectAttempts = 0;
@@ -164,7 +164,7 @@ export class LtpClient {
 
   // Nonce cache for replay protection (v0.5+)
   private seenNonces: Map<string, number> = new Map(); // Map<nonce, timestamp>
-  private nonceCacheCleanupTimer: NodeJS.Timeout | null = null;
+  private nonceCacheCleanupTimer: ReturnType<typeof setTimeout> | null = null;
 
   // ECDH key exchange (v0.5+)
   private ecdhPrivateKey: string | null = null;
@@ -192,7 +192,7 @@ export class LtpClient {
       : Boolean(macKey);
 
     this.options = {
-      clientId: options.clientId || this.generateClientId(),
+      clientId: options.clientId || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15)),
       deviceFingerprint: options.deviceFingerprint,
       intent: options.intent || 'resonant_link',
       capabilities: options.capabilities || ['state-update', 'events', 'ping-pong'],
@@ -1228,9 +1228,16 @@ export class LtpClient {
     }
 
     // Node.js environment
-    if (typeof require !== 'undefined') {
+    // Instead of using undeclared 'global' and 'process', check safely for Node features
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nodeCrypto = (typeof window === 'undefined' && typeof (globalThis as any).require === 'function')
+      ? (() => {
+          try { return (globalThis as any).require('crypto'); } catch { return undefined; }
+        })()
+      : undefined;
+    if (nodeCrypto) {
       try {
-        const crypto = require('crypto');
+        const crypto = nodeCrypto;
         return crypto.randomBytes(byteLength).toString('hex');
       } catch (e) {
         this.logger.warn('Crypto module not available, falling back to UUID-based random');
@@ -1502,11 +1509,14 @@ export class LtpClient {
   }
 
   private detectPlatform(): string {
-    if (typeof window !== 'undefined') {
-      return 'web';
+    if (typeof navigator !== 'undefined') {
+      return navigator.platform || navigator.userAgent || 'unknown';
     }
-    if (typeof process !== 'undefined') {
-      return 'node';
+    if (typeof globalThis !== 'undefined' &&
+        typeof (globalThis as any).process !== 'undefined' &&
+        (globalThis as any).process.versions &&
+        (globalThis as any).process.versions.node) {
+      return `nodejs-${(globalThis as any).process.versions.node}`;
     }
     return 'unknown';
   }
