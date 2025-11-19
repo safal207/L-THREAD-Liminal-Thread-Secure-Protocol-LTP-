@@ -140,6 +140,7 @@ export class LtpClient {
 
   private reconnectAttempts = 0;
   private lastReconnectDelayMs = 0;
+  private isConnecting = false;
   private manualDisconnect = false;
 
   private isConnected = false;
@@ -1534,3 +1535,5 @@ export class LtpClient {
     return { encoded: data, encoding: 'json' };
   }
 }
+
+
