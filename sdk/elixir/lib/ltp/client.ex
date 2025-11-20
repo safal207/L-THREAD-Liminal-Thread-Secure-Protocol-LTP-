@@ -311,6 +311,7 @@ defmodule LTP.Client do
   end
 
   defp generate_nonce do
+    # Legacy format - will be replaced with HMAC-based in send_envelope if MAC key available
     :crypto.strong_rand_bytes(16)
     |> Base.encode16(case: :lower)
   end

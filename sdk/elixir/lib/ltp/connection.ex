@@ -142,8 +142,109 @@ defmodule LTP.Connection do
 
   @impl WebSockex
   def handle_info({:send_message, envelope}, state) do
+    # Apply security features (v0.6+)
+    {envelope, new_state} = apply_security_features(envelope, state)
     json = Jason.encode!(envelope)
-    {:reply, {:text, json}, state}
+    {:reply, {:text, json}, new_state}
+  end
+
+  # Apply security features to envelope (v0.6+)
+  defp apply_security_features(envelope, state) do
+    # Generate HMAC-based nonce if MAC key available
+    nonce = generate_nonce(state)
+    envelope = Map.put(envelope, :nonce, nonce)
+
+    # Add prev_message_hash for hash chaining (v0.5+)
+    envelope = Map.put(envelope, :prev_message_hash, state.last_sent_hash)
+
+    # Generate signature if secret_key available
+    envelope =
+      if state.secret_key do
+        try do
+          signature = LTP.Crypto.sign_message(envelope, state.secret_key)
+          Map.put(envelope, :signature, signature)
+        rescue
+          e ->
+            Logger.warn("[LTP] Failed to sign message: #{inspect(e)}")
+            envelope
+        end
+      else
+        envelope
+      end
+
+    # Encrypt metadata if enabled (v0.6+)
+    envelope =
+      if state.enable_metadata_encryption && state.session_encryption_key && state.session_mac_key do
+        try do
+          # Prepare metadata for encryption
+          metadata = %{
+            thread_id: Map.get(envelope, :thread_id, ""),
+            session_id: Map.get(envelope, :session_id, ""),
+            timestamp: Map.get(envelope, :timestamp, 0)
+          }
+
+          # Encrypt metadata
+          encrypted_metadata = LTP.Crypto.encrypt_metadata(metadata, state.session_encryption_key)
+
+          # Generate routing tag
+          routing_tag = LTP.Crypto.generate_routing_tag(
+            Map.get(envelope, :thread_id, ""),
+            Map.get(envelope, :session_id, ""),
+            state.session_mac_key
+          )
+
+          # Replace plaintext metadata with encrypted version
+          envelope
+          |> Map.put(:encrypted_metadata, encrypted_metadata)
+          |> Map.put(:routing_tag, routing_tag)
+          |> Map.put(:thread_id, "")
+          |> Map.put(:session_id, nil)
+          |> Map.put(:timestamp, 0)
+        rescue
+          e ->
+            Logger.warn("[LTP] Failed to encrypt metadata: #{inspect(e)}")
+            envelope
+        end
+      else
+        envelope
+      end
+
+    # Calculate hash for next message (hash chaining)
+    new_state =
+      try do
+        message_hash = LTP.Crypto.hash_envelope(envelope)
+        %{state | last_sent_hash: message_hash}
+      rescue
+        e ->
+          Logger.warn("[LTP] Failed to hash envelope: #{inspect(e)}")
+          state
+      end
+
+    {envelope, new_state}
+  end
+
+  # Generate nonce (HMAC-based if MAC key available, v0.6+)
+  defp generate_nonce(state) do
+    timestamp = System.system_time(:millisecond)
+
+    # Try HMAC-based nonce if MAC key available (v0.6+)
+    if state.session_mac_key do
+      try do
+        random_hex = :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
+        input = "#{timestamp}-#{random_hex}"
+        hmac = LTP.Crypto.hmac_sha256(input, state.session_mac_key)
+        # Format: hmac-{first 32 chars of HMAC}-{timestamp}
+        "hmac-#{String.slice(hmac, 0, 32)}-#{timestamp}"
+      rescue
+        e ->
+          Logger.warn("[LTP] Failed to generate HMAC nonce: #{inspect(e)}")
+          # Fallback to legacy format
+          :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
+      end
+    else
+      # Legacy format (backward compatibility)
+      :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
+    end
   end
 
   @impl WebSockex
@@ -252,15 +353,21 @@ defmodule LTP.Connection do
       resumed: resumed
     })
 
-    new_state = %{
-      state
-      | thread_id: thread_id,
-        session_id: session_id,
-        heartbeat_interval_ms: heartbeat_interval_ms,
-        is_handshake_complete: true,
-        reconnect_attempts: 0,
-        last_pong_time: System.system_time(:millisecond)
-    }
+    # Handle ECDH key exchange if enabled (v0.6+)
+    new_state =
+      if state.enable_ecdh_key_exchange && state.ecdh_private_key do
+        handle_ecdh_key_exchange(ack, state, thread_id, session_id)
+      else
+        %{
+          state
+          | thread_id: thread_id,
+            session_id: session_id,
+            heartbeat_interval_ms: heartbeat_interval_ms,
+            is_handshake_complete: true,
+            reconnect_attempts: 0,
+            last_pong_time: System.system_time(:millisecond)
+        }
+      end
 
     # Notify client process
     if state.client_pid do
@@ -268,6 +375,78 @@ defmodule LTP.Connection do
     end
 
     start_heartbeat(new_state, heartbeat_interval_ms)
+  end
+
+  # Handle ECDH key exchange and derive session keys (v0.6+)
+  defp handle_ecdh_key_exchange(ack, state, thread_id, session_id) do
+    # Get server's ECDH public key
+    server_ecdh_public_key = ack["server_ecdh_public_key"] || ack["server_public_key"]
+
+    if not server_ecdh_public_key do
+      Logger.warn("[LTP] Server did not provide ECDH public key")
+      %{
+        state
+        | thread_id: thread_id,
+          session_id: session_id,
+          heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
+          is_handshake_complete: true,
+          reconnect_attempts: 0,
+          last_pong_time: System.system_time(:millisecond)
+      }
+    end
+
+    # Verify server's ECDH public key signature if available (v0.6+ authenticated ECDH)
+    if ack["server_ecdh_signature"] && ack["server_ecdh_timestamp"] && state.secret_key do
+      try do
+        LTP.Crypto.verify_ecdh_public_key(
+          server_ecdh_public_key,
+          "server", # TODO: Use actual server_id from ack
+          ack["server_ecdh_timestamp"],
+          ack["server_ecdh_signature"],
+          state.secret_key,
+          300_000 # 5 minutes max age
+        )
+      rescue
+        e ->
+          Logger.error("[LTP] ECDH signature verification failed: #{inspect(e)}")
+          # Continue anyway (backward compatibility)
+      end
+    end
+
+    # Derive shared secret
+    try do
+      shared_secret = LTP.Crypto.derive_shared_secret(state.ecdh_private_key, server_ecdh_public_key)
+
+      # Derive session keys using HKDF
+      {encryption_key, mac_key, _iv_key} = LTP.Crypto.derive_session_keys(shared_secret, session_id)
+
+      Logger.info("[LTP] ECDH key exchange completed, session keys derived")
+
+      %{
+        state
+        | thread_id: thread_id,
+          session_id: session_id,
+          heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
+          is_handshake_complete: true,
+          reconnect_attempts: 0,
+          last_pong_time: System.system_time(:millisecond),
+          session_encryption_key: encryption_key,
+          session_mac_key: mac_key
+      }
+    rescue
+      e ->
+        Logger.error("[LTP] Failed to derive session keys: #{inspect(e)}")
+        # Fallback to state without session keys
+        %{
+          state
+          | thread_id: thread_id,
+            session_id: session_id,
+            heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
+            is_handshake_complete: true,
+            reconnect_attempts: 0,
+            last_pong_time: System.system_time(:millisecond)
+        }
+    end
   end
 
   defp handle_message(%{"type" => "handshake_reject"} = reject, state) do
