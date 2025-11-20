@@ -39,7 +39,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd sdk/python
-          pip install -e .
+          pip install -e ".[dev]"
       - name: Test
         run: |
           cd sdk/python
