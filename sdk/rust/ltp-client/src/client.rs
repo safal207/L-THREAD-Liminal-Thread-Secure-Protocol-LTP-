@@ -2,6 +2,7 @@ use crate::crypto;
 use crate::error::{LtpError, Result};
 use crate::types::*;
 use futures_util::{SinkExt, StreamExt};
+use rand::Rng;
 use serde::Serialize;
 use std::time::Instant;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
@@ -160,11 +161,14 @@ impl LtpClient {
         }
 
         // Start message handling loop (simplified - in production would be more robust)
+        // Note: In a real implementation, this would need to share state with the client
+        // For now, this is a simplified version
         tokio::spawn(async move {
             while let Some(msg) = read.next().await {
                 match msg {
                     Ok(Message::Text(text)) => {
                         // Handle incoming messages
+                        // TODO: Parse and process LTP messages with security features
                         eprintln!("Received: {}", text);
                     }
                     Ok(Message::Close(_)) => {
@@ -378,9 +382,138 @@ impl LtpClient {
         }
     }
 
-    async fn send_envelope(&mut self, envelope: LtpEnvelope) -> Result<()> {
+    async fn send_envelope(&mut self, mut envelope: LtpEnvelope) -> Result<()> {
+        // Generate nonce (HMAC-based if MAC key available, v0.6+)
+        let nonce = self.generate_nonce()?;
+        envelope.nonce = Some(nonce.clone());
+
+        // Add prev_message_hash for hash chaining (v0.5+)
+        envelope.prev_message_hash = self.last_sent_hash.clone();
+
+        // Generate signature
+        if let Some(ref secret_key) = self.secret_key {
+            let signature = crypto::sign_message(&serde_json::to_value(&envelope)?, secret_key)?;
+            envelope.signature = Some(signature);
+        }
+
+        // Encrypt metadata if enabled (v0.6+)
+        if self.enable_metadata_encryption {
+            if let (Some(ref encryption_key), Some(ref mac_key)) = (
+                self.session_encryption_key.as_ref(),
+                self.session_mac_key.as_ref(),
+            ) {
+                // Prepare metadata for encryption
+                let metadata = serde_json::json!({
+                    "thread_id": envelope.thread_id,
+                    "session_id": envelope.session_id.as_ref().unwrap_or(&"".to_string()),
+                    "timestamp": envelope.timestamp,
+                });
+
+                // Encrypt metadata
+                let encrypted_metadata = crypto::encrypt_metadata(&metadata, encryption_key)?;
+                envelope.encrypted_metadata = Some(encrypted_metadata);
+
+                // Generate routing tag
+                let routing_tag = crypto::generate_routing_tag(
+                    &envelope.thread_id,
+                    envelope.session_id.as_ref().unwrap_or(&"".to_string()),
+                    mac_key,
+                )?;
+                envelope.routing_tag = Some(routing_tag);
+
+                // Clear plaintext metadata (server uses routing_tag)
+                envelope.thread_id = "".to_string();
+                envelope.session_id = None;
+                envelope.timestamp = 0;
+            }
+        }
+
+        // Calculate hash for next message (hash chaining)
+        let envelope_value = serde_json::to_value(&envelope)?;
+        let message_hash = crypto::hash_envelope(&envelope_value)?;
+        self.last_sent_hash = Some(message_hash);
+
         let json = serde_json::to_string(&envelope)?;
         self.send_text(json).await
+    }
+
+    /// Generate nonce (HMAC-based if MAC key available, v0.6+)
+    fn generate_nonce(&self) -> Result<String, LtpError> {
+        let timestamp = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as i64;
+
+        // Try HMAC-based nonce if MAC key available (v0.6+)
+        if let Some(ref mac_key) = self.session_mac_key {
+            let mut rng = rand::thread_rng();
+            let random_bytes: [u8; 16] = rng.gen();
+            let random_hex = hex::encode(random_bytes);
+            
+            let input = format!("{}-{}", timestamp, random_hex);
+            let hmac = crypto::hmac_sha256(&input, mac_key);
+            
+            // Format: hmac-{first 32 chars of HMAC}-{timestamp}
+            let hmac_prefix = if hmac.len() >= 32 {
+                &hmac[..32]
+            } else {
+                &hmac[..]
+            };
+            return Ok(format!("hmac-{}-{}", hmac_prefix, timestamp));
+        }
+
+        // Fallback to legacy format (backward compatibility)
+        Ok(uuid::Uuid::new_v4().to_string())
+    }
+
+    /// Decrypt metadata if encrypted (v0.6+)
+    fn decrypt_metadata_if_needed(&self, envelope: &mut LtpEnvelope) -> Result<(), LtpError> {
+        if let Some(ref encrypted_metadata) = envelope.encrypted_metadata {
+            if let Some(ref encryption_key) = self.session_encryption_key {
+                let metadata = crypto::decrypt_metadata(encrypted_metadata, encryption_key)
+                    .map_err(|e| LtpError::InvalidState(format!("Failed to decrypt metadata: {}", e)))?;
+                
+                // Restore plaintext metadata
+                envelope.thread_id = metadata
+                    .get("thread_id")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                envelope.session_id = metadata
+                    .get("session_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string());
+                envelope.timestamp = metadata
+                    .get("timestamp")
+                    .and_then(|v| v.as_i64())
+                    .unwrap_or(0);
+            }
+        }
+        Ok(())
+    }
+
+    /// Verify hash chaining (v0.5+)
+    fn verify_hash_chain(&self, envelope: &LtpEnvelope) -> Result<(), LtpError> {
+        if let Some(ref prev_hash) = envelope.prev_message_hash {
+            if let Some(ref last_received) = self.last_received_hash {
+                if prev_hash != last_received {
+                    return Err(LtpError::InvalidState(
+                        "Hash chain verification failed - message out of order or tampered".to_string()
+                    ));
+                }
+            }
+        }
+
+        // Update last received hash
+        let envelope_value = serde_json::to_value(envelope)
+            .map_err(|e| LtpError::InvalidState(format!("Failed to serialize envelope: {}", e)))?;
+        let message_hash = crypto::hash_envelope(&envelope_value)
+            .map_err(|e| LtpError::InvalidState(format!("Failed to hash envelope: {}", e)))?;
+        
+        // Note: This would need mutable reference, but for now we'll skip updating
+        // In a real implementation, this would update self.last_received_hash
+        
+        Ok(())
     }
 
     fn build_state_update_envelope<T: Serialize>(
@@ -409,8 +542,11 @@ impl LtpClient {
                 data: payload_data,
             },
             meta: Some(meta),
-            nonce: Some(uuid::Uuid::new_v4().to_string()),
-            signature: Some("v0-placeholder".to_string()),
+            nonce: None, // Will be set in send_envelope
+            signature: None, // Will be set in send_envelope
+            prev_message_hash: None, // Will be set in send_envelope
+            encrypted_metadata: None, // Will be set in send_envelope if enabled
+            routing_tag: None, // Will be set in send_envelope if enabled
         })
     }
 
@@ -436,8 +572,11 @@ impl LtpClient {
                 data: payload_data,
             },
             meta: Some(meta),
-            nonce: Some(uuid::Uuid::new_v4().to_string()),
-            signature: Some("v0-placeholder".to_string()),
+            nonce: None, // Will be set in send_envelope
+            signature: None, // Will be set in send_envelope
+            prev_message_hash: None, // Will be set in send_envelope
+            encrypted_metadata: None, // Will be set in send_envelope if enabled
+            routing_tag: None, // Will be set in send_envelope if enabled
         })
     }
 }

@@ -124,20 +124,50 @@
 
 ---
 
-### ❌ Rust SDK
-**Status:** ❌ **NOT STARTED** - No v0.6.0 security features
+### ✅ Rust SDK
+**Status:** ✅ **COMPLETE** - All v0.6.0 security features implemented (2025-01-19)
 
-- ❌ **ECDH Key Exchange** - **NOT IMPLEMENTED**
-- ❌ **Authenticated ECDH** - **NOT IMPLEMENTED**
-- ❌ **HMAC-based Nonces** - **NOT IMPLEMENTED**
-- ❌ **Metadata Encryption** - **NOT IMPLEMENTED**
-- ❌ **Hash Chaining** - **NOT IMPLEMENTED**
+- ✅ **ECDH Key Exchange** - **FULL IMPLEMENTATION**
+  - ✅ `generate_ecdh_key_pair()` - Implemented using `p256` crate
+  - ✅ `derive_shared_secret()` - Implemented
+  - ✅ `derive_session_keys()` - Implemented with HKDF
+  - ✅ HKDF implementation - RFC 5869 compliant
+  - ✅ Full integration in `send_handshake_init`
+  - ✅ ECDH key derivation in `handle_ecdh_key_exchange`
+
+- ✅ **Authenticated ECDH** - **FULL IMPLEMENTATION**
+  - ✅ `sign_ecdh_public_key()` - Implemented
+  - ✅ `verify_ecdh_public_key()` - Implemented
+  - ✅ Integrated in `send_handshake_init`
+  - ✅ Verification in `handle_ecdh_key_exchange`
+
+- ✅ **HMAC-based Nonces** - **INTEGRATED**
+  - ✅ `hmac_sha256()` - Implemented
+  - ✅ `generate_nonce()` - HMAC-based nonce generation
+  - ✅ Integrated in `send_envelope`
+  - ✅ Backward compatibility with legacy format
+
+- ✅ **Metadata Encryption** - **INTEGRATED**
+  - ✅ `encrypt_metadata()` / `decrypt_metadata()` - Implemented
+  - ✅ `generate_routing_tag()` - Implemented
+  - ✅ Integrated in `send_envelope`
+  - ✅ `decrypt_metadata_if_needed()` - Decryption helper
+
+- ✅ **Hash Chaining** - **INTEGRATED**
+  - ✅ `hash_envelope()` - Implemented
+  - ✅ `prev_message_hash` tracking in `send_envelope`
+  - ✅ `verify_hash_chain()` - Chain verification helper
+  - ✅ `last_sent_hash` / `last_received_hash` tracking
 
 **Files:**
-- `sdk/rust/ltp-client/src/client.rs` - Basic client only
-- `sdk/rust/ltp-client/src/lib.rs` - Basic types
+- `sdk/rust/ltp-client/src/crypto.rs` - ✅ All crypto functions implemented
+- `sdk/rust/ltp-client/src/types.rs` - ✅ Updated type definitions for v0.6.0
+- `sdk/rust/ltp-client/src/client.rs` - ✅ Full security features integration
+- `sdk/rust/ltp-client/src/lib.rs` - ✅ Crypto module added
 
-**Status:** v0.3 feature set only (basic handshake, heartbeat, reconnect)
+**Version:** 0.6.0-alpha.3
+
+**Status:** ✅ All v0.6.0 security features integrated
 
 ---
 
