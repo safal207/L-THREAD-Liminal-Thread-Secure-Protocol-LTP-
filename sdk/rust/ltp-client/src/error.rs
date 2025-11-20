@@ -23,3 +23,8 @@ pub enum LtpError {
     InvalidState(String),
 }
 
+impl From<String> for LtpError {
+    fn from(value: String) -> Self {
+        LtpError::InvalidState(value)
+    }
+}
