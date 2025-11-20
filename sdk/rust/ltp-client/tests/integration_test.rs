@@ -22,6 +22,9 @@ fn test_envelope_serialization() {
         })),
         nonce: Some("test-nonce".to_string()),
         signature: Some("v0-placeholder".to_string()),
+        prev_message_hash: None,
+        encrypted_metadata: None,
+        routing_tag: None,
     };
 
     let json_str = serde_json::to_string(&envelope).unwrap();
