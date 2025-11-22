@@ -2,7 +2,6 @@ use crate::crypto;
 use crate::error::{LtpError, Result};
 use crate::types::*;
 use futures_util::{SinkExt, StreamExt};
-use rand::Rng;
 use serde::Serialize;
 use std::time::Instant;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
@@ -187,11 +186,7 @@ impl LtpClient {
     }
 
     /// Send a state update
-    pub async fn send_state_update<T: Serialize>(
-        &mut self,
-        kind: &str,
-        data: T,
-    ) -> Result<()> {
+    pub async fn send_state_update<T: Serialize>(&mut self, kind: &str, data: T) -> Result<()> {
         if !self.is_connected {
             return Err(LtpError::NotConnected);
         }
@@ -224,7 +219,7 @@ impl LtpClient {
 
     async fn send_handshake_init(&mut self) -> Result<()> {
         // Generate ECDH key pair if enabled
-        let (ecdh_public_key, ecdh_private_key) = if self.enable_ecdh_key_exchange {
+        let (ecdh_public_key, _ecdh_private_key) = if self.enable_ecdh_key_exchange {
             let (pub_key, priv_key) = crypto::generate_ecdh_key_pair();
             self.ecdh_public_key = Some(pub_key.clone());
             self.ecdh_private_key = Some(priv_key.clone());
@@ -264,14 +259,10 @@ impl LtpClient {
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
                     .as_millis() as i64;
-                
-                let signature = crypto::sign_ecdh_public_key(
-                    pub_key,
-                    &self.client_id,
-                    timestamp,
-                    secret_key,
-                );
-                
+
+                let signature =
+                    crypto::sign_ecdh_public_key(pub_key, &self.client_id, timestamp, secret_key);
+
                 init.client_ecdh_signature = Some(signature);
                 init.client_ecdh_timestamp = Some(timestamp);
             }
@@ -326,7 +317,9 @@ impl LtpClient {
             .server_ecdh_public_key
             .as_ref()
             .or_else(|| ack.server_public_key.as_ref())
-            .ok_or_else(|| LtpError::InvalidState("Server did not provide ECDH public key".to_string()))?;
+            .ok_or_else(|| {
+                LtpError::InvalidState("Server did not provide ECDH public key".to_string())
+            })?;
 
         // Verify server's ECDH public key signature if available (v0.6+ authenticated ECDH)
         if let (Some(ref signature), Some(timestamp)) = (
@@ -344,18 +337,21 @@ impl LtpClient {
                     secret_key,
                     300_000, // 5 minutes max age
                 )
-                .map_err(|e| LtpError::InvalidState(format!("ECDH signature verification failed: {}", e)))?;
+                .map_err(|e| {
+                    LtpError::InvalidState(format!("ECDH signature verification failed: {}", e))
+                })?;
             }
         }
 
         // Derive shared secret
-        let private_key = self
-            .ecdh_private_key
-            .as_ref()
-            .ok_or_else(|| LtpError::InvalidState("Client ECDH private key not found".to_string()))?;
+        let private_key = self.ecdh_private_key.as_ref().ok_or_else(|| {
+            LtpError::InvalidState("Client ECDH private key not found".to_string())
+        })?;
 
         let shared_secret = crypto::derive_shared_secret(private_key, server_ecdh_public_key)
-            .map_err(|e| LtpError::InvalidState(format!("Failed to derive shared secret: {}", e)))?;
+            .map_err(|e| {
+                LtpError::InvalidState(format!("Failed to derive shared secret: {}", e))
+            })?;
 
         // Derive session keys using HKDF
         let session_id = self
@@ -363,8 +359,10 @@ impl LtpClient {
             .as_ref()
             .ok_or_else(|| LtpError::InvalidState("Session ID not available".to_string()))?;
 
-        let (encryption_key, mac_key, _iv_key) = crypto::derive_session_keys(&shared_secret, session_id)
-            .map_err(|e| LtpError::InvalidState(format!("Failed to derive session keys: {}", e)))?;
+        let (encryption_key, mac_key, _iv_key) =
+            crypto::derive_session_keys(&shared_secret, session_id).map_err(|e| {
+                LtpError::InvalidState(format!("Failed to derive session keys: {}", e))
+            })?;
 
         // Store session keys
         self.session_encryption_key = Some(encryption_key);
@@ -438,28 +436,9 @@ impl LtpClient {
     }
 
     /// Generate nonce (HMAC-based if MAC key available, v0.6+)
-    fn generate_nonce(&self) -> Result<String, LtpError> {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
-
-        // Try HMAC-based nonce if MAC key available (v0.6+)
+    fn generate_nonce(&self) -> Result<String> {
         if let Some(ref mac_key) = self.session_mac_key {
-            let mut rng = rand::thread_rng();
-            let random_bytes: [u8; 16] = rng.gen();
-            let random_hex = hex::encode(random_bytes);
-            
-            let input = format!("{}-{}", timestamp, random_hex);
-            let hmac = crypto::hmac_sha256(&input, mac_key);
-            
-            // Format: hmac-{first 32 chars of HMAC}-{timestamp}
-            let hmac_prefix = if hmac.len() >= 32 {
-                &hmac[..32]
-            } else {
-                &hmac[..]
-            };
-            return Ok(format!("hmac-{}-{}", hmac_prefix, timestamp));
+            return Ok(crypto::generate_hmac_nonce(mac_key));
         }
 
         // Fallback to legacy format (backward compatibility)
@@ -467,12 +446,14 @@ impl LtpClient {
     }
 
     /// Decrypt metadata if encrypted (v0.6+)
-    fn decrypt_metadata_if_needed(&self, envelope: &mut LtpEnvelope) -> Result<(), LtpError> {
+    fn decrypt_metadata_if_needed(&self, envelope: &mut LtpEnvelope) -> Result<()> {
         if let Some(ref encrypted_metadata) = envelope.encrypted_metadata {
             if let Some(ref encryption_key) = self.session_encryption_key {
                 let metadata = crypto::decrypt_metadata(encrypted_metadata, encryption_key)
-                    .map_err(|e| LtpError::InvalidState(format!("Failed to decrypt metadata: {}", e)))?;
-                
+                    .map_err(|e| {
+                        LtpError::InvalidState(format!("Failed to decrypt metadata: {}", e))
+                    })?;
+
                 // Restore plaintext metadata
                 envelope.thread_id = metadata
                     .get("thread_id")
@@ -493,14 +474,16 @@ impl LtpClient {
     }
 
     /// Verify hash chaining (v0.5+)
-    fn verify_hash_chain(&self, envelope: &LtpEnvelope) -> Result<(), LtpError> {
-        if let Some(ref prev_hash) = envelope.prev_message_hash {
-            if let Some(ref last_received) = self.last_received_hash {
-                if prev_hash != last_received {
-                    return Err(LtpError::InvalidState(
-                        "Hash chain verification failed - message out of order or tampered".to_string()
-                    ));
-                }
+    fn verify_hash_chain(&mut self, envelope: &LtpEnvelope) -> Result<()> {
+        if let (Some(prev_hash), Some(last_received)) = (
+            &envelope.prev_message_hash,
+            &self.last_received_hash,
+        ) {
+            if prev_hash != last_received {
+                return Err(LtpError::InvalidState(
+                    "Hash chain verification failed - message out of order or tampered"
+                        .to_string(),
+                ));
             }
         }
 
@@ -509,10 +492,9 @@ impl LtpClient {
             .map_err(|e| LtpError::InvalidState(format!("Failed to serialize envelope: {}", e)))?;
         let message_hash = crypto::hash_envelope(&envelope_value)
             .map_err(|e| LtpError::InvalidState(format!("Failed to hash envelope: {}", e)))?;
-        
-        // Note: This would need mutable reference, but for now we'll skip updating
-        // In a real implementation, this would update self.last_received_hash
-        
+
+        self.last_received_hash = Some(message_hash);
+
         Ok(())
     }
 
@@ -542,11 +524,11 @@ impl LtpClient {
                 data: payload_data,
             },
             meta: Some(meta),
-            nonce: None, // Will be set in send_envelope
-            signature: None, // Will be set in send_envelope
-            prev_message_hash: None, // Will be set in send_envelope
+            nonce: None,              // Will be set in send_envelope
+            signature: None,          // Will be set in send_envelope
+            prev_message_hash: None,  // Will be set in send_envelope
             encrypted_metadata: None, // Will be set in send_envelope if enabled
-            routing_tag: None, // Will be set in send_envelope if enabled
+            routing_tag: None,        // Will be set in send_envelope if enabled
         })
     }
 
@@ -572,11 +554,47 @@ impl LtpClient {
                 data: payload_data,
             },
             meta: Some(meta),
-            nonce: None, // Will be set in send_envelope
-            signature: None, // Will be set in send_envelope
-            prev_message_hash: None, // Will be set in send_envelope
+            nonce: None,              // Will be set in send_envelope
+            signature: None,          // Will be set in send_envelope
+            prev_message_hash: None,  // Will be set in send_envelope
             encrypted_metadata: None, // Will be set in send_envelope if enabled
-            routing_tag: None, // Will be set in send_envelope if enabled
+            routing_tag: None,        // Will be set in send_envelope if enabled
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn is_hex(s: &str) -> bool {
+        !s.is_empty() && s.chars().all(|c| c.is_ascii_hexdigit())
+    }
+
+    #[test]
+    fn hmac_nonce_contains_entropy_timestamp_and_mac() {
+        let client = LtpClient::new("ws://example.com", "client-123")
+            .with_session_mac_key("test-mac-key");
+
+        let nonce = client.generate_nonce().expect("nonce should be generated");
+        let parts: Vec<&str> = nonce.split('-').collect();
+
+        assert_eq!(parts.get(0), Some(&"hmac"), "nonce must start with hmac prefix");
+        assert_eq!(parts.len(), 4, "nonce `{}` did not have four segments", nonce);
+
+        let random_hex = parts[1];
+        let timestamp_part = parts[2];
+        let hmac_prefix = parts[3];
+
+        assert_eq!(random_hex.len(), 32, "random hex `{}` must be 32 chars", random_hex);
+        assert!(is_hex(random_hex), "random hex `{}` must be hexadecimal", random_hex);
+
+        let timestamp: i64 = timestamp_part
+            .parse()
+            .expect("timestamp should be numeric milliseconds");
+        assert!(timestamp > 0, "timestamp should be positive");
+
+        assert_eq!(hmac_prefix.len(), 32, "HMAC prefix `{}` must be 32 chars", hmac_prefix);
+        assert!(is_hex(hmac_prefix), "HMAC prefix `{}` must be hexadecimal", hmac_prefix);
     }
 }
