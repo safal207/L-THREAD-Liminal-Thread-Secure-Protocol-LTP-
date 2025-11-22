@@ -494,26 +494,44 @@ impl LtpClient {
     }
 
     /// Verify hash chaining (v0.5+)
-    fn verify_hash_chain(&self, envelope: &LtpEnvelope) -> Result<()> {
-        if let Some(ref prev_hash) = envelope.prev_message_hash {
-            if let Some(ref last_received) = self.last_received_hash {
-                if prev_hash != last_received {
-                    return Err(LtpError::InvalidState(
-                        "Hash chain verification failed - message out of order or tampered"
-                            .to_string(),
-                    ));
+    fn verify_hash_chain(&mut self, envelope: &LtpEnvelope) -> Result<()> {
+        match self.last_received_hash.as_ref() {
+            None => match envelope.prev_message_hash.as_deref() {
+                None => {
+                    eprintln!(
+                        "First message in chain missing prev_message_hash; accepting start of chain."
+                    );
                 }
-            }
+                Some("") => {
+                    eprintln!(
+                        "First message in chain has empty prev_message_hash; accepting start of chain."
+                    );
+                }
+                Some(_) => {}
+            },
+            Some(last_received) => match envelope.prev_message_hash {
+                Some(ref prev_hash) => {
+                    if prev_hash != last_received {
+                        return Err(LtpError::InvalidState(
+                            "Hash chain verification failed - message out of order or tampered"
+                                .to_string(),
+                        ));
+                    }
+                }
+                None => {
+                    return Err(LtpError::InvalidState(
+                        "Missing prev_message_hash for chained message".to_string(),
+                    ))
+                }
+            },
         }
 
         // Update last received hash
         let envelope_value = serde_json::to_value(envelope)
             .map_err(|e| LtpError::InvalidState(format!("Failed to serialize envelope: {}", e)))?;
-        let _message_hash = crypto::hash_envelope(&envelope_value)
+        let message_hash = crypto::hash_envelope(&envelope_value)
             .map_err(|e| LtpError::InvalidState(format!("Failed to hash envelope: {}", e)))?;
-
-        // Note: This would need mutable reference, but for now we'll skip updating
-        // In a real implementation, this would update self.last_received_hash
+        self.last_received_hash = Some(message_hash);
 
         Ok(())
     }
