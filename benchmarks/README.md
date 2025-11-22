@@ -51,6 +51,18 @@ node throughput.js
 - Average latency per message
 - Error rates
 
+### Cross-language SDK Comparison
+
+Run both SDK benchmarks in one go and collect timestamped logs for side-by-side review:
+
+```bash
+cd benchmarks
+chmod +x run_cross_language.sh  # once, if needed
+./run_cross_language.sh
+```
+
+Logs are stored under `benchmarks/results/` (one file per SDK run) so you can diff throughput or encoding/decoding timings across languages.
+
 ### Python Benchmarks
 
 #### JSON vs TOON (`python/json_vs_toon.py`)
@@ -135,7 +147,7 @@ To add new benchmarks:
 ## Future Benchmarks
 
 Planned benchmarks:
-- [ ] Cross-language SDK comparison
+- [x] Cross-language SDK comparison (see `run_cross_language.sh`)
 - [ ] Memory usage benchmarks
 - [ ] Concurrent connection benchmarks
 - [ ] Reconnection performance
