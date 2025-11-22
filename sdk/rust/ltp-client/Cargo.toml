@@ -27,6 +27,7 @@ rand = "0.8"  # Random number generation
 
 [dev-dependencies]
 tokio-test = "0.4"
+regex = "1.10"
 
 [[test]]
 name = "integration_test"
