@@ -1,5 +1,7 @@
 use ltp_client::crypto::{generate_hmac_nonce, hmac_sha256};
 use ltp_client::types::*;
+use ltp_client::LtpClient;
+use regex::Regex;
 use serde_json::json;
 
 fn is_hex(s: &str) -> bool {

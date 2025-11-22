@@ -84,6 +84,12 @@ impl LtpClient {
         self
     }
 
+    /// Set session encryption key directly (v0.6+)
+    pub fn with_session_encryption_key(mut self, encryption_key: impl Into<String>) -> Self {
+        self.session_encryption_key = Some(encryption_key.into());
+        self
+    }
+
     /// Set secret key for authenticated ECDH and signing (v0.6+)
     pub fn with_secret_key(mut self, secret_key: impl Into<String>) -> Self {
         self.secret_key = Some(secret_key.into());
@@ -213,6 +219,17 @@ impl LtpClient {
     /// Get current session ID
     pub fn session_id(&self) -> Option<&String> {
         self.session_id.as_ref()
+    }
+
+    /// Prepare an envelope with all security features applied without sending it over the network.
+    ///
+    /// This is useful for offline signing/inspection and integration testing where a WebSocket
+    /// connection isn't available.
+    pub fn prepare_envelope_for_offline_send(
+        &mut self,
+        envelope: LtpEnvelope,
+    ) -> Result<LtpEnvelope> {
+        self.finalize_envelope(envelope)
     }
 
     // Private helpers
@@ -380,7 +397,14 @@ impl LtpClient {
         }
     }
 
-    async fn send_envelope(&mut self, mut envelope: LtpEnvelope) -> Result<()> {
+    async fn send_envelope(&mut self, envelope: LtpEnvelope) -> Result<()> {
+        let envelope = self.finalize_envelope(envelope)?;
+
+        let json = serde_json::to_string(&envelope)?;
+        self.send_text(json).await
+    }
+
+    fn finalize_envelope(&mut self, mut envelope: LtpEnvelope) -> Result<LtpEnvelope> {
         // Generate nonce (HMAC-based if MAC key available, v0.6+)
         let nonce = self.generate_nonce()?;
         envelope.nonce = Some(nonce.clone());
@@ -431,8 +455,7 @@ impl LtpClient {
         let message_hash = crypto::hash_envelope(&envelope_value)?;
         self.last_sent_hash = Some(message_hash);
 
-        let json = serde_json::to_string(&envelope)?;
-        self.send_text(json).await
+        Ok(envelope)
     }
 
     /// Generate nonce (HMAC-based if MAC key available, v0.6+)
