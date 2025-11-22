@@ -10,6 +10,7 @@ use aes_gcm::{
 use hex;
 use hkdf::Hkdf;
 use hmac::{digest::KeyInit, Hmac, Mac};
+use rand::Rng;
 use p256::elliptic_curve::sec1::ToEncodedPoint;
 use p256::{EncodedPoint, SecretKey};
 use serde_json::Value;
@@ -25,6 +26,34 @@ pub fn hmac_sha256(input: &str, key: &str) -> String {
         .expect("HMAC can take key of any size");
     mac.update(input.as_bytes());
     hex::encode(mac.finalize().into_bytes())
+}
+
+/// Generate a nonce tied to a session MAC key (v0.6+).
+///
+/// Format: `hmac-{random hex}-{timestamp}-{first 32 chars of HMAC}` where
+/// the HMAC is computed over `{timestamp}-{random hex}` using the supplied
+/// `mac_key`. The format ensures uniqueness (random entropy), ordering
+/// (timestamp), and authenticity (HMAC digest prefix).
+pub fn generate_hmac_nonce(mac_key: &str) -> String {
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_millis() as i64;
+
+    let mut rng = rand::thread_rng();
+    let random_bytes: [u8; 16] = rng.gen();
+    let random_hex = hex::encode(random_bytes);
+
+    let input = format!("{}-{}", timestamp, random_hex);
+    let hmac = hmac_sha256(&input, mac_key);
+
+    let hmac_prefix = if hmac.len() >= 32 {
+        &hmac[..32]
+    } else {
+        &hmac[..]
+    };
+
+    format!("hmac-{}-{}-{}", random_hex, timestamp, hmac_prefix)
 }
 
 /// Generate ECDH key pair for key exchange.
