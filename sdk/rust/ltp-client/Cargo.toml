@@ -17,7 +17,7 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 futures-util = "0.3"
 url = "2.5"
 # v0.6.0 Security features
-p256 = "0.13"  # ECDH (secp256r1)
+p256 = { version = "0.13", features = ["ecdh"] }  # ECDH (secp256r1)
 hkdf = "0.12"  # HKDF key derivation
 aes-gcm = "0.10"  # AES-256-GCM encryption
 sha2 = "0.10"  # SHA-256 hashing
