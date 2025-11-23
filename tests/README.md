@@ -68,6 +68,7 @@ cd sdk/rust/ltp-client && cargo test
 ```
 tests/
 ├── cross-sdk/
+│   ├── verify-types.js          # ✅ Type consistency checker (runs in CI)
 │   ├── js-python.test.js
 │   ├── js-elixir.test.js
 │   ├── js-rust.test.js
@@ -85,6 +86,19 @@ tests/
     ├── messages.test.js
     └── errors.test.js
 ```
+
+## 🔄 CI/CD Integration
+
+The `verify-types.js` script is automatically run in GitHub Actions before all SDK tests. This ensures that any type mismatches are caught early in the CI pipeline.
+
+**CI Workflow:**
+1. ✅ **verify-types** - Runs first to check type consistency
+2. ✅ **test-js** - Depends on verify-types
+3. ✅ **test-python** - Depends on verify-types
+4. ✅ **test-elixir** - Depends on verify-types
+5. ✅ **test-rust** - Depends on verify-types
+
+If type verification fails, all SDK tests are skipped to save CI resources.
 
 ## 🔍 Test Coverage Goals
 
