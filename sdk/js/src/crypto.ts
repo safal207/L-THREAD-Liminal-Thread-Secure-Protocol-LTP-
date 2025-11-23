@@ -84,6 +84,52 @@ export async function hmacSha256(input: string, key: string): Promise<string> {
 }
 
 /**
+ * Generate HMAC-based nonce for replay protection (v0.6+)
+ *
+ * Format: HMAC-SHA256(macKey, clientId:timestamp:random)
+ * The random component ensures uniqueness even with same clientId/timestamp
+ *
+ * @param macKey - MAC key for HMAC
+ * @param clientId - Client identifier
+ * @param timestamp - Unix timestamp in seconds
+ * @param randomComponent - Optional random component (32 hex chars). If not provided, generates one.
+ * @returns Hex-encoded HMAC-SHA256 nonce (64 hex characters)
+ */
+export async function generateNonce(
+  macKey: string,
+  clientId: string,
+  timestamp: number,
+  randomComponent?: string
+): Promise<string> {
+  // Generate random component if not provided
+  let random: string;
+  if (randomComponent) {
+    random = randomComponent;
+  } else {
+    // Generate 16 random bytes (32 hex chars)
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      // Use crypto.randomUUID() and convert to hex-like string
+      const uuid = crypto.randomUUID().replace(/-/g, '');
+      random = uuid.substring(0, 32);
+    } else {
+      // Fallback for environments without crypto.randomUUID
+      const nodeCrypto = getNodeCrypto();
+      if (nodeCrypto) {
+        random = nodeCrypto.randomBytes(16).toString('hex');
+      } else {
+        // Last resort fallback
+        random = Array.from({ length: 16 }, () => 
+          Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
+        ).join('');
+      }
+    }
+  }
+
+  const input = `${clientId}:${timestamp}:${random}`;
+  return await hmacSha256(input, macKey);
+}
+
+/**
  * Sign an ECDH public key to prevent MitM attacks (v0.6+)
  *
  * Creates HMAC signature over: publicKey + entityId + timestamp

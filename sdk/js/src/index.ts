@@ -50,4 +50,8 @@ export {
   encryptMetadata,
   decryptMetadata,
   generateRoutingTag,
+  signEcdhPublicKey,
+  verifyEcdhPublicKey,
+  generateNonce,
+  hashEnvelope,
 } from './crypto';
