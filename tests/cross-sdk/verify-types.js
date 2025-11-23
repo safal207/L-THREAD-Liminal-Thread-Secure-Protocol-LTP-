@@ -49,6 +49,7 @@ function readFile(relPath) {
 
 function parseTsInterface({ file, interface: interfaceName }) {
   const content = readFile(file);
+  // Matches "export interface Name<...>" or "interface Name"
   const regex = new RegExp(`interface\\s+${interfaceName}(?:<[^>]+>)?\\s*\\{([\\s\\S]*?)\\n\\}`, 'm');
   const match = content.match(regex);
   if (!match) {
@@ -64,6 +65,7 @@ function parseTsInterface({ file, interface: interfaceName }) {
       return;
     }
     if (depth === 0) {
+      // Matches "fieldName?:" or "fieldName:"
       const fieldMatch = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\??:/);
       if (fieldMatch) {
         fields.push(fieldMatch[1]);
@@ -98,6 +100,7 @@ function parsePythonDataclass({ file, class: className }) {
     }
   }
   if (bodyIndent === null) {
+    // Empty class or something weird
     return [];
   }
 
@@ -112,7 +115,7 @@ function parsePythonDataclass({ file, class: className }) {
         break;
     }
 
-    // Check if we are inside the class body
+    // Check if we are inside the class body (must start with bodyIndent or be empty)
     if (line.length > 0 && !line.startsWith(bodyIndent) && line.trim().length > 0) {
        // Non-empty line that doesn't start with bodyIndent -> end of class
        break;
@@ -120,16 +123,19 @@ function parsePythonDataclass({ file, class: className }) {
 
     const trimmed = line.trim();
     
+    // Handle docstrings
     if (trimmed.startsWith('"""')) {
-      // Toggle docstring
       if (trimmed.length > 3 && trimmed.endsWith('"""') && trimmed !== '"""') {
-          // Single line docstring
+          // Single line docstring, ignore
       } else {
           inDocstring = !inDocstring;
       }
       continue;
     }
     if (inDocstring) {
+      if (trimmed.endsWith('"""')) {
+          inDocstring = false;
+      }
       continue;
     }
 
@@ -139,16 +145,6 @@ function parsePythonDataclass({ file, class: className }) {
     
     // Stop at methods
     if (trimmed.startsWith('def ')) {
-      // But don't break the whole loop, just skip methods? 
-      // Usually methods are at the end, but technically fields can come after methods in Python (though rare/bad style for dataclasses).
-      // However, for this check, we assume fields are before methods or we just parse everything that looks like a field.
-      // But `result: ...` inside `def` looked like a field.
-      // We need to skip the method body.
-      
-      // Since we rely on indentation, and methods are indented, 
-      // and code inside methods is further indented...
-      
-      // If we see `def`, we should probably assume we are done with fields in a dataclass.
       break; 
     }
 
@@ -184,7 +180,8 @@ function parseElixirType({ file, type: typeName }) {
 
 function parseRustStruct({ file, struct }) {
   const content = readFile(file);
-  const regex = new RegExp(`struct\\s+${struct}(?:<[^>]+>)?\\s*\\{([\\s\\S]*?)\\n\\}`, 'm');
+  // Matches "pub struct Name" or "struct Name", optionally with generics
+  const regex = new RegExp(`(?:pub\\s+)?struct\\s+${struct}(?:<[^>]+>)?\\s*\\{([\\s\\S]*?)\\n\\}`, 'm');
   const match = content.match(regex);
   if (!match) {
     throw new Error(`Could not locate Rust struct ${struct} in ${file}`);
