@@ -38,6 +38,9 @@
 # Run all cross-SDK compatibility tests
 npm run test:cross-sdk
 
+# Verify that all SDKs expose identical core types
+node tests/cross-sdk/verify-types.js
+
 # Run security feature tests
 npm run test:security
 

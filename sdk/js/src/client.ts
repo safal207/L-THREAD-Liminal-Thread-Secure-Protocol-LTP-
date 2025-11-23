@@ -490,6 +490,7 @@ export class LtpClient {
       intent: this.options.intent,
       capabilities: this.options.capabilities,
       metadata: this.options.metadata,
+      client_public_key: this.ecdhPublicKey || undefined,
       client_ecdh_public_key: this.ecdhPublicKey || undefined,
       key_agreement: this.ecdhPublicKey ? {
         algorithm: 'secp256r1',
@@ -812,16 +813,18 @@ export class LtpClient {
     this.persistIds();
 
     // ECDH key exchange - derive session keys (v0.5+)
+    const serverPublicKey = message.server_ecdh_public_key || message.server_public_key;
+
     if (this.options.enableEcdhKeyExchange &&
         this.ecdhPrivateKey &&
-        message.server_ecdh_public_key) {
+        serverPublicKey) {
       try {
         // Verify server ECDH key signature (v0.6+) - CRITICAL for MitM protection
         if (message.server_ecdh_signature && message.server_ecdh_timestamp && this.options.secretKey) {
           this.logger.info('Verifying server ECDH key signature...');
 
           const verifyResult = await verifyEcdhPublicKey(
-            message.server_ecdh_public_key,
+            serverPublicKey,
             this.sessionId,
             message.server_ecdh_timestamp,
             message.server_ecdh_signature,
@@ -848,7 +851,7 @@ export class LtpClient {
         // Derive shared secret
         const sharedSecret = await deriveSharedSecret(
           this.ecdhPrivateKey,
-          message.server_ecdh_public_key
+          serverPublicKey
         );
 
         // Derive session keys
@@ -872,7 +875,7 @@ export class LtpClient {
         this.logger.error('Failed to derive session keys from ECDH', error);
         // Continue without automatic key derivation
       }
-    } else if (this.options.enableEcdhKeyExchange && !message.server_ecdh_public_key) {
+    } else if (this.options.enableEcdhKeyExchange && !serverPublicKey) {
       this.logger.warn('ECDH key exchange enabled but server did not provide public key');
     }
 

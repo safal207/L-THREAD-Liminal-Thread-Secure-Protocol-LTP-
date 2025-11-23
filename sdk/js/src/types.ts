@@ -109,6 +109,11 @@ export interface HandshakeInitMessage {
     [key: string]: unknown;
   };
   /**
+   * Legacy public key field (pre-v0.6)
+   * Included for backward compatibility with older servers
+   */
+  client_public_key?: string;
+  /**
    * ECDH P-256 public key for key exchange (v0.5+)
    * Hex-encoded public key for deriving shared secret
    */
@@ -133,8 +138,6 @@ export interface HandshakeInitMessage {
     hkdf?: string;
     [key: string]: unknown;
   };
-  nonce?: string;
-  signature?: string;
 }
 
 /**
@@ -154,6 +157,11 @@ export interface HandshakeAckMessage {
     [key: string]: unknown;
   };
   /**
+   * Legacy public key field (pre-v0.6)
+   * Included for backward compatibility with older clients
+   */
+  server_public_key?: string;
+  /**
    * ECDH P-256 public key for key exchange (v0.5+)
    * Server's hex-encoded public key for deriving shared secret
    */
@@ -169,10 +177,15 @@ export interface HandshakeAckMessage {
    * Used to prevent replay attacks on key exchange
    */
   server_ecdh_timestamp?: number;
-  nonce?: string;
-  signature?: string;
-  timestamp?: number;
-  payload?: any;
+  /**
+   * Key agreement parameters (echoed from server)
+   */
+  key_agreement?: {
+    algorithm?: string;
+    method?: string;
+    hkdf?: string;
+    [key: string]: unknown;
+  };
 }
 
 export interface HandshakeResumeMessage {
