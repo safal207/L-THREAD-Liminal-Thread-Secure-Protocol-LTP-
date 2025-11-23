@@ -15,6 +15,7 @@ try:
     from cryptography.hazmat.primitives.kdf.hkdf import HKDF
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
     CRYPTOGRAPHY_AVAILABLE = True
 except ImportError:
     CRYPTOGRAPHY_AVAILABLE = False
@@ -100,8 +101,8 @@ def generate_ecdh_key_pair() -> Tuple[str, str]:
     # Serialize keys to hex
     private_key_bytes = private_key.private_numbers().private_value.to_bytes(32, "big")
     public_key_bytes = public_key.public_bytes(
-        encoding=ec.encoding.Encoding.X962,
-        format=ec.encoding.PublicFormat.UncompressedPoint
+        encoding=serialization.Encoding.X962,
+        format=serialization.PublicFormat.UncompressedPoint
     )
     
     return public_key_bytes.hex(), private_key_bytes.hex()

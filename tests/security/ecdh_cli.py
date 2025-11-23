@@ -16,7 +16,7 @@ def main():
     command = sys.argv[1]
 
     if command == "generate":
-        private, public = generate_ecdh_key_pair()
+        public, private = generate_ecdh_key_pair()
         print(json.dumps({
             "private": private,
             "public": public
