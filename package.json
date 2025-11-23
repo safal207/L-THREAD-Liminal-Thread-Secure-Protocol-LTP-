@@ -1,0 +1,17 @@
+{
+  "name": "ltp-monorepo",
+  "private": true,
+  "description": "LTP (Liminal Thread Protocol) Monorepo",
+  "scripts": {
+    "test:cross-sdk": "echo \"Running cross-SDK compatibility tests... (WIP)\"",
+    "test:verify-types": "node tests/cross-sdk/verify-types.js",
+    "test:security": "echo \"Running security feature tests... (WIP)\"",
+    "test:protocol": "echo \"Running protocol compliance tests... (WIP)\""
+  },
+  "devDependencies": {
+  },
+  "workspaces": [
+    "sdk/js"
+  ]
+}
+
