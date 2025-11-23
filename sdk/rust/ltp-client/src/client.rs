@@ -2,7 +2,6 @@ use crate::crypto;
 use crate::error::{LtpError, Result};
 use crate::types::*;
 use futures_util::{SinkExt, StreamExt};
-use rand::Rng;
 use serde::Serialize;
 use std::time::Instant;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
@@ -82,6 +81,12 @@ impl LtpClient {
     /// Enable metadata encryption (v0.6+)
     pub fn with_metadata_encryption(mut self, enable: bool) -> Self {
         self.enable_metadata_encryption = enable;
+        self
+    }
+
+    /// Set session encryption key directly (v0.6+)
+    pub fn with_session_encryption_key(mut self, encryption_key: impl Into<String>) -> Self {
+        self.session_encryption_key = Some(encryption_key.into());
         self
     }
 
@@ -214,6 +219,17 @@ impl LtpClient {
     /// Get current session ID
     pub fn session_id(&self) -> Option<&String> {
         self.session_id.as_ref()
+    }
+
+    /// Prepare an envelope with all security features applied without sending it over the network.
+    ///
+    /// This is useful for offline signing/inspection and integration testing where a WebSocket
+    /// connection isn't available.
+    pub fn prepare_envelope_for_offline_send(
+        &mut self,
+        envelope: LtpEnvelope,
+    ) -> Result<LtpEnvelope> {
+        self.finalize_envelope(envelope)
     }
 
     // Private helpers
@@ -381,7 +397,14 @@ impl LtpClient {
         }
     }
 
-    async fn send_envelope(&mut self, mut envelope: LtpEnvelope) -> Result<()> {
+    async fn send_envelope(&mut self, envelope: LtpEnvelope) -> Result<()> {
+        let envelope = self.finalize_envelope(envelope)?;
+
+        let json = serde_json::to_string(&envelope)?;
+        self.send_text(json).await
+    }
+
+    fn finalize_envelope(&mut self, mut envelope: LtpEnvelope) -> Result<LtpEnvelope> {
         // Generate nonce (HMAC-based if MAC key available, v0.6+)
         let nonce = self.generate_nonce()?;
         envelope.nonce = Some(nonce.clone());
@@ -432,33 +455,13 @@ impl LtpClient {
         let message_hash = crypto::hash_envelope(&envelope_value)?;
         self.last_sent_hash = Some(message_hash);
 
-        let json = serde_json::to_string(&envelope)?;
-        self.send_text(json).await
+        Ok(envelope)
     }
 
     /// Generate nonce (HMAC-based if MAC key available, v0.6+)
     fn generate_nonce(&self) -> Result<String> {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as i64;
-
-        // Try HMAC-based nonce if MAC key available (v0.6+)
         if let Some(ref mac_key) = self.session_mac_key {
-            let mut rng = rand::thread_rng();
-            let random_bytes: [u8; 16] = rng.gen();
-            let random_hex = hex::encode(random_bytes);
-
-            let input = format!("{}-{}", timestamp, random_hex);
-            let hmac = crypto::hmac_sha256(&input, mac_key);
-
-            // Format: hmac-{first 32 chars of HMAC}-{timestamp}
-            let hmac_prefix = if hmac.len() >= 32 {
-                &hmac[..32]
-            } else {
-                &hmac[..]
-            };
-            return Ok(format!("hmac-{}-{}", hmac_prefix, timestamp));
+            return Ok(crypto::generate_hmac_nonce(mac_key));
         }
 
         // Fallback to legacy format (backward compatibility)
@@ -494,26 +497,26 @@ impl LtpClient {
     }
 
     /// Verify hash chaining (v0.5+)
-    fn verify_hash_chain(&self, envelope: &LtpEnvelope) -> Result<()> {
-        if let Some(ref prev_hash) = envelope.prev_message_hash {
-            if let Some(ref last_received) = self.last_received_hash {
-                if prev_hash != last_received {
-                    return Err(LtpError::InvalidState(
-                        "Hash chain verification failed - message out of order or tampered"
-                            .to_string(),
-                    ));
-                }
+    fn verify_hash_chain(&mut self, envelope: &LtpEnvelope) -> Result<()> {
+        if let (Some(prev_hash), Some(last_received)) = (
+            &envelope.prev_message_hash,
+            &self.last_received_hash,
+        ) {
+            if prev_hash != last_received {
+                return Err(LtpError::InvalidState(
+                    "Hash chain verification failed - message out of order or tampered"
+                        .to_string(),
+                ));
             }
         }
 
         // Update last received hash
         let envelope_value = serde_json::to_value(envelope)
             .map_err(|e| LtpError::InvalidState(format!("Failed to serialize envelope: {}", e)))?;
-        let _message_hash = crypto::hash_envelope(&envelope_value)
+        let message_hash = crypto::hash_envelope(&envelope_value)
             .map_err(|e| LtpError::InvalidState(format!("Failed to hash envelope: {}", e)))?;
 
-        // Note: This would need mutable reference, but for now we'll skip updating
-        // In a real implementation, this would update self.last_received_hash
+        self.last_received_hash = Some(message_hash);
 
         Ok(())
     }
@@ -580,5 +583,41 @@ impl LtpClient {
             encrypted_metadata: None, // Will be set in send_envelope if enabled
             routing_tag: None,        // Will be set in send_envelope if enabled
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn is_hex(s: &str) -> bool {
+        !s.is_empty() && s.chars().all(|c| c.is_ascii_hexdigit())
+    }
+
+    #[test]
+    fn hmac_nonce_contains_entropy_timestamp_and_mac() {
+        let client = LtpClient::new("ws://example.com", "client-123")
+            .with_session_mac_key("test-mac-key");
+
+        let nonce = client.generate_nonce().expect("nonce should be generated");
+        let parts: Vec<&str> = nonce.split('-').collect();
+
+        assert_eq!(parts.get(0), Some(&"hmac"), "nonce must start with hmac prefix");
+        assert_eq!(parts.len(), 4, "nonce `{}` did not have four segments", nonce);
+
+        let random_hex = parts[1];
+        let timestamp_part = parts[2];
+        let hmac_prefix = parts[3];
+
+        assert_eq!(random_hex.len(), 32, "random hex `{}` must be 32 chars", random_hex);
+        assert!(is_hex(random_hex), "random hex `{}` must be hexadecimal", random_hex);
+
+        let timestamp: i64 = timestamp_part
+            .parse()
+            .expect("timestamp should be numeric milliseconds");
+        assert!(timestamp > 0, "timestamp should be positive");
+
+        assert_eq!(hmac_prefix.len(), 32, "HMAC prefix `{}` must be 32 chars", hmac_prefix);
+        assert!(is_hex(hmac_prefix), "HMAC prefix `{}` must be hexadecimal", hmac_prefix);
     }
 }

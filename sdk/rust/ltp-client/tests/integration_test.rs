@@ -1,5 +1,12 @@
+use ltp_client::crypto::{generate_hmac_nonce, hmac_sha256};
 use ltp_client::types::*;
+use ltp_client::LtpClient;
+use regex::Regex;
 use serde_json::json;
+
+fn is_hex(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_hexdigit())
+}
 
 #[test]
 fn test_envelope_serialization() {
@@ -61,5 +68,37 @@ fn test_content_encoding_enum() {
     let toon_json = r#""toon""#;
     let toon_encoding: ContentEncoding = serde_json::from_str(toon_json).unwrap();
     assert!(matches!(toon_encoding, ContentEncoding::Toon));
+}
+
+#[test]
+fn test_hmac_nonce_format_with_session_mac_key() {
+    let mac_key = "test-mac-key";
+    let nonce = generate_hmac_nonce(mac_key);
+
+    let parts: Vec<&str> = nonce.split('-').collect();
+    assert_eq!(parts.len(), 4, "nonce `{}` did not have four segments", nonce);
+    assert_eq!(parts[0], "hmac", "nonce must start with hmac prefix");
+
+    let random_hex = parts[1];
+    assert_eq!(random_hex.len(), 32, "random hex `{}` must be 32 chars", random_hex);
+    assert!(is_hex(random_hex), "random hex `{}` must be hexadecimal", random_hex);
+
+    let timestamp_str = parts[2];
+    let timestamp: i64 = timestamp_str
+        .parse()
+        .expect("timestamp should be numeric milliseconds");
+    assert!(timestamp > 0, "timestamp should be positive");
+
+    let hmac_prefix = parts[3];
+    assert_eq!(hmac_prefix.len(), 32, "HMAC prefix `{}` must be 32 chars", hmac_prefix);
+    assert!(is_hex(hmac_prefix), "HMAC prefix `{}` must be hexadecimal", hmac_prefix);
+
+    let recomputed = hmac_sha256(&format!("{}-{}", timestamp_str, random_hex), mac_key);
+    assert!(
+        recomputed.starts_with(hmac_prefix),
+        "HMAC prefix `{}` should match computed HMAC `{}`",
+        hmac_prefix,
+        recomputed
+    );
 }
 
