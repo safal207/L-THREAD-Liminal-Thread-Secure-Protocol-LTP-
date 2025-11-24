@@ -266,13 +266,15 @@ def verify_ecdh_public_key(
     """
     # Check timestamp freshness
     now = int(time.time() * 1000)
-    age = now - timestamp
+    timestamp_ms = timestamp * 1000 if timestamp < 1_000_000_000_000 else timestamp
+    age = now - timestamp_ms
+    unit_hint = " (timestamp looks like seconds; expected milliseconds)" if timestamp < 1_000_000_000_000 else ""
     
     if age > max_age_ms:
-        return False, f"ECDH key signature expired (age: {age}ms, max: {max_age_ms}ms)"
+        return False, f"ECDH key signature expired (age: {age}ms, max: {max_age_ms}ms){unit_hint}"
     
     if age < -5000:
-        return False, f"ECDH key signature from future (skew: {-age}ms)"
+        return False, f"ECDH key signature from future (skew: {-age}ms){unit_hint}"
     
     # Compute expected signature
     input_str = f"{public_key}:{entity_id}:{timestamp}"

@@ -55,10 +55,10 @@ def main():
         signature = sys.argv[5]
         secret_key = sys.argv[6]
         
-        result = verify_ecdh_public_key(public_key, client_id, timestamp, signature, secret_key)
+        is_valid, error = verify_ecdh_public_key(public_key, client_id, timestamp, signature, secret_key)
         print(json.dumps({
-            "valid": result["valid"],
-            "error": result.get("error")
+            "valid": is_valid,
+            "error": error
         }))
 
     else:

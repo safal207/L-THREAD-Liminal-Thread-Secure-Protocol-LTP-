@@ -39,7 +39,8 @@ async function testAuthenticatedEcdh() {
 
   const secretKey = 'test-secret-key-for-hmac-signing-32-bytes!!';
   const clientId = 'test-client-123';
-  const timestamp = Math.floor(Date.now() / 1000);
+  // Use millisecond precision to match SDK verify freshness window
+  const timestamp = Date.now();
 
   // 1. Generate ECDH keys in JS
   console.log('  [JS] Generating ECDH key pair...');

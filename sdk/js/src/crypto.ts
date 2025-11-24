@@ -193,14 +193,16 @@ export async function verifyEcdhPublicKey(
 ): Promise<{ valid: boolean; error?: string }> {
   // Check timestamp freshness
   const now = Date.now();
-  const age = now - timestamp;
+  const timestampMs = timestamp < 1e12 ? timestamp * 1000 : timestamp;
+  const age = now - timestampMs;
+  const unitHint = timestamp < 1e12 ? ' (timestamp looks like seconds; expected milliseconds)' : '';
 
   if (age > maxAge) {
-    return { valid: false, error: `ECDH key signature expired (age: ${age}ms, max: ${maxAge}ms)` };
+    return { valid: false, error: `ECDH key signature expired (age: ${age}ms, max: ${maxAge}ms)${unitHint}` };
   }
 
   if (age < -5000) {
-    return { valid: false, error: `ECDH key signature from future (skew: ${-age}ms)` };
+    return { valid: false, error: `ECDH key signature from future (skew: ${-age}ms)${unitHint}` };
   }
 
   // Compute expected signature
