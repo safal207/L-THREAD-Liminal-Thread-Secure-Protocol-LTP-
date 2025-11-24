@@ -31,6 +31,7 @@ def _canonical_message(message: Dict[str, Any]) -> Dict[str, Any]:
         "timestamp": message.get("timestamp", 0),
         "nonce": message.get("nonce", ""),
         "payload": message.get("payload", {}),
+        "prev_message_hash": message.get("prev_message_hash", ""),
         "meta": message.get("meta", {}),
         "content_encoding": message.get("content_encoding", ""),
     }
@@ -197,6 +198,27 @@ def derive_session_keys(
     return encryption_key, mac_key, iv_key
 
 
+def _normalize_encryption_key(encryption_key_hex: str) -> bytes:
+    """Ensure encryption key is a 32-byte hex string (64 hex characters)."""
+    if not isinstance(encryption_key_hex, str):
+        raise ValueError("Encryption key must be provided as a hex string")
+
+    key = encryption_key_hex.strip()
+    if len(key) < 64:
+        raise ValueError("Encryption key too short - expected 64 hex characters (32 bytes)")
+
+    key = key[:64]  # Use first 32 bytes (64 hex chars)
+    try:
+        key_bytes = bytes.fromhex(key)
+    except ValueError as exc:
+        raise ValueError("Encryption key must be hex-encoded") from exc
+
+    if len(key_bytes) != 32:
+        raise ValueError("Encryption key must decode to 32 bytes")
+
+    return key_bytes
+
+
 def sign_ecdh_public_key(
     public_key: str, entity_id: str, timestamp: int, secret_key: str
 ) -> str:
@@ -303,7 +325,7 @@ def encrypt_metadata(
     metadata_json = json.dumps(metadata, separators=(",", ":"))
     
     # Encrypt using AES-256-GCM
-    encryption_key = bytes.fromhex(encryption_key_hex)
+    encryption_key = _normalize_encryption_key(encryption_key_hex)
     aesgcm = AESGCM(encryption_key)
     
     # Generate random IV (12 bytes for GCM)
@@ -348,7 +370,7 @@ def decrypt_metadata(
         raise ValueError("Invalid encrypted metadata format - missing parts")
     
     # Decrypt using AES-256-GCM
-    encryption_key = bytes.fromhex(encryption_key_hex)
+    encryption_key = _normalize_encryption_key(encryption_key_hex)
     aesgcm = AESGCM(encryption_key)
     
     iv = bytes.fromhex(iv_hex)

@@ -40,6 +40,24 @@ function getErrorMessage(error: unknown): string {
 }
 
 /**
+ * Ensure encryption key is a 32-byte hex string (64 hex chars).
+ * Throws a clear error instead of the cryptic "Invalid key length".
+ */
+function normalizeEncryptionKeyHex(encryptionKey: string): string {
+  const key = (encryptionKey || '').trim();
+  if (!key) {
+    throw new Error('Encryption key is required for AES-256-GCM');
+  }
+  if (!/^[0-9a-fA-F]+$/.test(key)) {
+    throw new Error('Encryption key must be hex-encoded (64 hex characters)');
+  }
+  if (key.length < 64) {
+    throw new Error('Encryption key too short - expected 64 hex characters (32 bytes)');
+  }
+  return key.substring(0, 64).toLowerCase();
+}
+
+/**
  * Compute HMAC-SHA256 for any string input
  * Used for secure nonce generation and other HMAC operations
  */
@@ -652,11 +670,13 @@ export async function encryptPayload(
 
       // Generate random IV (12 bytes for GCM)
       const iv = crypto.randomBytes(12);
+      const keyHex = normalizeEncryptionKeyHex(key);
+      const keyBuffer = Buffer.from(keyHex, 'hex');
 
       // Create cipher
       const cipher = crypto.createCipheriv(
         'aes-256-gcm',
-        Buffer.from(key.substring(0, 64), 'hex'), // Use first 32 bytes (64 hex chars)
+        keyBuffer, // 32-byte key for AES-256-GCM
         iv
       );
 
@@ -686,7 +706,8 @@ export async function encryptPayload(
       const iv = window.crypto.getRandomValues(new Uint8Array(12));
 
       // Import key
-      const keyBuffer = hexToBuffer(key.substring(0, 64));
+      const keyHex = normalizeEncryptionKeyHex(key);
+      const keyBuffer = hexToBuffer(keyHex);
       const cryptoKey = await window.crypto.subtle.importKey(
         'raw',
         keyBuffer,
@@ -734,11 +755,13 @@ export async function decryptPayload(
   if (crypto) {
     try {
       const Buffer = (globalThis as any).Buffer || require('buffer').Buffer;
+      const keyHex = normalizeEncryptionKeyHex(key);
+      const keyBuffer = Buffer.from(keyHex, 'hex');
 
       // Create decipher
       const decipher = crypto.createDecipheriv(
         'aes-256-gcm',
-        Buffer.from(key.substring(0, 64), 'hex'),
+        keyBuffer,
         Buffer.from(iv, 'hex')
       );
 
@@ -759,7 +782,8 @@ export async function decryptPayload(
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
     try {
       // Import key
-      const keyBuffer = hexToBuffer(key.substring(0, 64));
+      const keyHex = normalizeEncryptionKeyHex(key);
+      const keyBuffer = hexToBuffer(keyHex);
       const cryptoKey = await window.crypto.subtle.importKey(
         'raw',
         keyBuffer,
@@ -905,3 +929,5 @@ export async function generateRoutingTag(
   // Return first 32 hex characters (16 bytes) for routing tag
   return hmac.substring(0, 32);
 }
+
+export { serializeCanonical };
