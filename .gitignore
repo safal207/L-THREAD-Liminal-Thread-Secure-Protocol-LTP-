@@ -13,6 +13,7 @@ dist/
 build/
 *.egg-info/
 .eggs/
+sdk/rust/ltp-client/target/
 
 # IDE
 .vscode/
