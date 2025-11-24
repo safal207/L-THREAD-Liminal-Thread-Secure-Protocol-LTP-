@@ -52,39 +52,34 @@ async function testHmacNonces() {
   console.log(`  Python Nonce: ${pyResult.nonce.substring(0, 32)}...\n`);
 
   // 3. Verify format (should be hex string, 64 chars)
-  assert(jsNonce.length === 64, 'JS nonce should be 64 hex characters');
-  assert(pyNonce.length === 64, 'Python nonce should be 64 hex characters');
-  assert(/^[0-9a-f]{64}$/i.test(jsNonce), 'JS nonce should be valid hex');
-  assert(/^[0-9a-f]{64}$/i.test(pyNonce), 'Python nonce should be valid hex');
+  assert(jsNonce.length === 64 && /^[0-9a-f]{64}$/i.test(jsNonce), 'JS nonce should be 64 hex characters (hex)');
+  assert(pyNonce.length === 64 && /^[0-9a-f]{64}$/i.test(pyNonce), 'Python nonce should be 64 hex characters (hex)');
   console.log('  ✅ Nonce format validation passed\n');
 
-  // 4. Test that same inputs produce same nonce (deterministic)
-  console.log('  [JS] Testing deterministic nonce generation...');
-  const jsNonce2 = await crypto.generateNonce(macKey, clientId, timestamp);
-  assert(jsNonce === jsNonce2, 'Same inputs should produce same nonce');
-  console.log('  ✅ Deterministic nonce generation verified\n');
+  // 4. Test deterministic nonce generation — только если явно передан randomComponent
+  const fixedRandom = '0123456789abcdef0123456789abcdef'; // 32 hex chars
+  console.log('  [JS] Testing deterministic nonce with fixed random...');
+  const jsDetNonce1 = await crypto.generateNonce(macKey, clientId, timestamp, fixedRandom);
+  const jsDetNonce2 = await crypto.generateNonce(macKey, clientId, timestamp, fixedRandom);
+  assert(jsDetNonce1 === jsDetNonce2, 'Same inputs (incl fixed random) should produce same nonce');
+  console.log('  ✅ Deterministic nonce generation (fixed random) verified\n');
 
-  // 5. Test that different inputs produce different nonces
+  // 5. JS: Test that different inputs produce different nonces
   console.log('  [JS] Testing nonce uniqueness...');
   const jsNonce3 = await crypto.generateNonce(macKey, clientId, timestamp + 1);
   assert(jsNonce !== jsNonce3, 'Different timestamp should produce different nonce');
-  
   const jsNonce4 = await crypto.generateNonce(macKey, 'different-client', timestamp);
   assert(jsNonce !== jsNonce4, 'Different client ID should produce different nonce');
-  
   const differentMacKey = 'different-mac-key-for-nonce-generation-32-bytes!!';
   const jsNonce5 = await crypto.generateNonce(differentMacKey, clientId, timestamp);
   assert(jsNonce !== jsNonce5, 'Different MAC key should produce different nonce');
   console.log('  ✅ Nonce uniqueness verified\n');
 
-  // 6. Test nonce validation (should accept valid nonces)
+  // 6. Validation
   console.log('  [JS] Testing nonce validation...');
-  // Note: In real implementation, validation would check against seen nonces
-  // For this test, we just verify the format
-  const isValidFormat = /^[0-9a-f]{64}$/i.test(jsNonce);
-  assert(isValidFormat, 'Valid nonce should pass format check');
+  assert(/^[0-9a-f]{64}$/i.test(jsNonce), 'Valid nonce should pass format check');
   console.log('  ✅ Nonce validation passed\n');
-
+  
   console.log('✅ All HMAC-based nonce tests passed!');
 }
 

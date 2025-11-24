@@ -26,7 +26,10 @@ def main():
         metadata_json = sys.argv[2]
         encryption_key = sys.argv[3]
         
-        encrypted = encrypt_metadata(metadata_json, encryption_key)
+        # Parse JSON string to dict
+        metadata = json.loads(metadata_json)
+        
+        encrypted = encrypt_metadata(metadata, encryption_key)
         print(json.dumps({
             "encrypted": encrypted
         }))
