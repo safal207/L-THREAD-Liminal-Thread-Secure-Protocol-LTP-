@@ -54,7 +54,23 @@ defmodule LTP.Client do
   end
 
   def start_link(opts) when is_map(opts) do
-    GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts[:name] || [], :name))
+    with {:ok, _url} <- Map.fetch(opts, :url),
+         {:ok, _client_id} <- Map.fetch(opts, :client_id) do
+      GenServer.start_link(__MODULE__, opts, name: Keyword.get(opts[:name] || [], :name))
+    else
+      :error ->
+        # Identify missing key explicitly for test expectation
+        cond do
+          not Map.has_key?(opts, :url) ->
+            {:error, {{:badkey, :url}, []}}
+
+          not Map.has_key?(opts, :client_id) ->
+            {:error, {{:badkey, :client_id}, []}}
+
+          true ->
+            {:error, {{:badkey, :unknown}, []}}
+        end
+    end
   end
 
   @spec send_state_update(pid(), map(), keyword()) :: :ok | {:error, term()}
