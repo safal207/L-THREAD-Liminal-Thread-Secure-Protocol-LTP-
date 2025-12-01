@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>L-THREAD / LTP — Презентация</title>
+  <style>
+    :root {
+      --bg: #0c0f14;
+      --card: #11161f;
+      --accent: #6cf7c5;
+      --muted: #8ea2c0;
+      --text: #e9edf5;
+      --grid: radial-gradient(circle at 20% 20%, rgba(108,247,197,0.08), transparent 25%),
+              radial-gradient(circle at 80% 0%, rgba(108,247,197,0.1), transparent 28%),
+              linear-gradient(120deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0) 40%),
+              linear-gradient(240deg, rgba(108,247,197,0.05) 0%, rgba(108,247,197,0) 50%);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 32px;
+    }
+    .canvas {
+      width: min(1100px, 100%);
+      background: var(--card);
+      border-radius: 18px;
+      overflow: hidden;
+      position: relative;
+      box-shadow: 0 30px 80px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04);
+    }
+    .bg-overlay {
+      position: absolute;
+      inset: 0;
+      background: var(--grid);
+      pointer-events: none;
+      opacity: 0.9;
+    }
+    header {
+      padding: 48px 56px 24px;
+      position: relative;
+      z-index: 1;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(108,247,197,0.12);
+      color: var(--accent);
+      font-weight: 600;
+      letter-spacing: 0.4px;
+    }
+    h1 {
+      margin: 18px 0 12px;
+      font-size: clamp(32px, 5vw, 44px);
+      line-height: 1.1;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 16px;
+      max-width: 780px;
+      line-height: 1.6;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 18px;
+      padding: 0 56px 48px;
+      position: relative;
+      z-index: 1;
+    }
+    .card {
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 18px 18px 14px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(4px);
+    }
+    .card:before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(108,247,197,0.08), rgba(255,255,255,0));
+      opacity: 0.5;
+      pointer-events: none;
+    }
+    .card h3 {
+      margin: 0 0 8px;
+      font-size: 16px;
+      letter-spacing: 0.3px;
+      color: var(--accent);
+    }
+    .card p, .card li {
+      margin: 0;
+      color: var(--text);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+    .card ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0;
+    }
+    .card ul li {
+      padding-left: 12px;
+      position: relative;
+      color: var(--muted);
+    }
+    .card ul li:before {
+      content: "•";
+      color: var(--accent);
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    .cta {
+      display: flex;
+      gap: 12px;
+      padding: 0 56px 48px;
+      position: relative;
+      z-index: 1;
+      flex-wrap: wrap;
+    }
+    .btn {
+      padding: 12px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(108,247,197,0.35);
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 600;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease;
+      background: rgba(108,247,197,0.12);
+    }
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(108,247,197,0.2);
+      background: rgba(108,247,197,0.18);
+    }
+    footer {
+      padding: 0 56px 32px;
+      color: var(--muted);
+      font-size: 13px;
+      position: relative;
+      z-index: 1;
+    }
+    @media (max-width: 720px) {
+      body { padding: 16px; }
+      header, .grid, .cta, footer { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <div class="bg-overlay"></div>
+    <header>
+      <div class="pill">L-THREAD / LTP · Context-first transport</div>
+      <h1>Протокол для осознанных AI-систем и экономии токенов</h1>
+      <p class="subtitle">
+        LTP сохраняет потоковое состояние (thread + session), эмоциональный фон и контекст,
+        шифрует метаданные, цепляет хэши сообщений и экономит 30–60% токенов за счёт TOON-энкодинга.
+      </p>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Уникальные возможности</h3>
+        <ul>
+          <li>Потоковая непрерывность: thread_id + session_id с авто‑resume</li>
+          <li>Аффект и контекст-теги для эмпатичных AI</li>
+          <li>TOON-энкодинг: минус 30–60% токенов vs JSON</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Безопасность по умолчанию</h3>
+        <ul>
+          <li>AES-GCM шифрование метаданных (thread/session/timestamp)</li>
+          <li>HMAC-маршрутизация + HMAC-н�нсы, hash chaining</li>
+          <li>Аутентифицированный ECDH (подпись ключей, проверка давности)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Мульти-SDK & тесты</h3>
+        <ul>
+          <li>JS/TS, Python, Rust, Elixir — единый протокол</li>
+          <li>Кросс-SDK security suite (JS↔Python) и unit-тесты</li>
+          <li>Контейнерные команды для Rust/Elixir тестов</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Бизнес-эффект</h3>
+        <ul>
+          <li>Низкие токенные расходы для LLM API</li>
+          <li>Сохранение контекста и эмоций → более “живые” ассистенты</li>
+          <li>Готовность к enterprise: шифрование, подписи, маршрутизация</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="cta">
+      <a class="btn" href="../tests/security/run_all.js">Security demo (JS)</a>
+      <a class="btn" href="../sdk/js/README.md">SDK JS/TS</a>
+      <a class="btn" href="../sdk/python/README.md">SDK Python</a>
+      <a class="btn" href="../WHITEPAPER.md">Whitepaper</a>
+    </div>
+
+    <footer>
+      Контекст‑ориентированный транспорт для AI: потоковая непрерывность, экономия токенов, встроенная приватность.
+    </footer>
+  </div>
+</body>
+</html>
