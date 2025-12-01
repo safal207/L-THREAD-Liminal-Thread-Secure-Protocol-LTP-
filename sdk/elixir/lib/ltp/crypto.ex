@@ -160,14 +160,16 @@ defmodule LTP.Crypto do
   def verify_ecdh_public_key(public_key, entity_id, timestamp, signature, secret_key, max_age_ms \\ 300_000) do
     # Check timestamp freshness
     now = System.system_time(:millisecond)
-    age = now - timestamp
+    timestamp_ms = if timestamp < 1_000_000_000_000, do: timestamp * 1000, else: timestamp
+    age = now - timestamp_ms
+    unit_hint = if timestamp < 1_000_000_000_000, do: " (timestamp looks like seconds; expected milliseconds)", else: ""
     
     cond do
       age > max_age_ms ->
-        {:error, "ECDH key signature expired (age: #{age}ms, max: #{max_age_ms}ms)"}
+        {:error, "ECDH key signature expired (age: #{age}ms, max: #{max_age_ms}ms)#{unit_hint}"}
       
       age < -5000 ->
-        {:error, "ECDH key signature from future (skew: #{-age}ms)"}
+        {:error, "ECDH key signature from future (skew: #{-age}ms)#{unit_hint}"}
       
       true ->
         # Compute expected signature
@@ -175,7 +177,7 @@ defmodule LTP.Crypto do
         expected_signature = hmac_sha256(input, secret_key)
         
         # Constant-time comparison
-        if :crypto.secure_compare(signature, expected_signature) do
+        if timing_safe_equal(signature, expected_signature) do
           {:ok, nil}
         else
           {:error, "ECDH key signature mismatch"}
@@ -356,11 +358,27 @@ defmodule LTP.Crypto do
       false
     else
       expected_signature = sign_message(message, secret_key)
-      :crypto.secure_compare(provided_signature, expected_signature)
+      timing_safe_equal(provided_signature, expected_signature)
     end
   end
 
   # Private helpers
+
+  defp timing_safe_equal(a, b) when byte_size(a) == byte_size(b) do
+    import Bitwise
+
+    a_bytes = :binary.bin_to_list(a)
+    b_bytes = :binary.bin_to_list(b)
+
+    diff =
+      Enum.reduce(Enum.zip(a_bytes, b_bytes), 0, fn {x, y}, acc ->
+        acc ||| bxor(x, y)
+      end)
+
+    diff == 0
+  end
+
+  defp timing_safe_equal(_a, _b), do: false
 
   defp canonicalize_message(message) do
     # Extract canonical fields used for signing/verification

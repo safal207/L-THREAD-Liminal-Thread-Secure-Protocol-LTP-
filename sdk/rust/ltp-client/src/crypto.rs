@@ -5,7 +5,7 @@
 
 use aes_gcm::{
     aead::{Aead, AeadCore, KeyInit as AesKeyInit, OsRng},
-    Aes256Gcm, Key, Nonce,
+    Aes256Gcm, Nonce,
 };
 use hex;
 use hkdf::Hkdf;
@@ -251,8 +251,8 @@ pub fn encrypt_metadata(metadata: &Value, encryption_key_hex: &str) -> Result<St
     // Decode encryption key
     let key_bytes = hex::decode(encryption_key_hex)
         .map_err(|e| format!("Failed to decode encryption key: {}", e))?;
-    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = Aes256Gcm::new(key);
+    let cipher = Aes256Gcm::new_from_slice(&key_bytes)
+        .map_err(|e| format!("Invalid key length: {}", e))?;
 
     // Generate random IV (12 bytes for GCM)
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
@@ -270,7 +270,7 @@ pub fn encrypt_metadata(metadata: &Value, encryption_key_hex: &str) -> Result<St
     Ok(format!(
         "{}:{}:{}",
         hex::encode(ciphertext_only),
-        hex::encode(nonce.as_slice()),
+        hex::encode(&nonce),
         hex::encode(tag)
     ))
 }
@@ -307,18 +307,17 @@ pub fn decrypt_metadata(
     // Decode encryption key
     let key_bytes = hex::decode(encryption_key_hex)
         .map_err(|e| format!("Failed to decode encryption key: {}", e))?;
-    let key = Key::<Aes256Gcm>::from_slice(&key_bytes);
-    let cipher = Aes256Gcm::new(key);
+    let cipher = Aes256Gcm::new_from_slice(&key_bytes)
+        .map_err(|e| format!("Invalid key length: {}", e))?;
 
-    if nonce_bytes.len() != 12 {
-        return Err("Invalid nonce length (expected 12 bytes)".to_string());
-    }
-
-    let nonce = Nonce::from_slice(&nonce_bytes);
+    let nonce_array: [u8; 12] = nonce_bytes
+        .try_into()
+        .map_err(|_| "Invalid nonce length (expected 12 bytes)".to_string())?;
+    let nonce = Nonce::from(nonce_array);
 
     // Decrypt (ciphertext includes tag at the end)
     let plaintext = cipher
-        .decrypt(nonce, ciphertext.as_ref())
+        .decrypt(&nonce, ciphertext.as_ref())
         .map_err(|e| format!("Decryption failed: {}", e))?;
 
     // Parse JSON back to metadata

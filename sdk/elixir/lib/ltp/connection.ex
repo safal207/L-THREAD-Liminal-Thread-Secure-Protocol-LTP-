@@ -125,7 +125,7 @@ defmodule LTP.Connection do
 
   @impl WebSockex
   def handle_disconnect(%{reason: reason}, state) do
-    Logger.warn("[LTP] WebSocket disconnected: #{inspect(reason)}")
+    Logger.warning("[LTP] WebSocket disconnected: #{inspect(reason)}")
     clear_heartbeat_timers(state)
     schedule_reconnect(state, "disconnected")
   end
@@ -148,6 +148,17 @@ defmodule LTP.Connection do
     {:reply, {:text, json}, new_state}
   end
 
+  @impl WebSockex
+  def handle_info({:reconnect}, state) do
+    Logger.info("[LTP] Attempting reconnect...")
+    {:reconnect, state}
+  end
+
+  @impl WebSockex
+  def handle_info(_msg, state) do
+    {:ok, state}
+  end
+
   # Apply security features to envelope (v0.6+)
   defp apply_security_features(envelope, state) do
     # Generate HMAC-based nonce if MAC key available
@@ -165,7 +176,7 @@ defmodule LTP.Connection do
           Map.put(envelope, :signature, signature)
         rescue
           e ->
-            Logger.warn("[LTP] Failed to sign message: #{inspect(e)}")
+            Logger.warning("[LTP] Failed to sign message: #{inspect(e)}")
             envelope
         end
       else
@@ -202,7 +213,7 @@ defmodule LTP.Connection do
           |> Map.put(:timestamp, 0)
         rescue
           e ->
-            Logger.warn("[LTP] Failed to encrypt metadata: #{inspect(e)}")
+            Logger.warning("[LTP] Failed to encrypt metadata: #{inspect(e)}")
             envelope
         end
       else
@@ -216,7 +227,7 @@ defmodule LTP.Connection do
         %{state | last_sent_hash: message_hash}
       rescue
         e ->
-          Logger.warn("[LTP] Failed to hash envelope: #{inspect(e)}")
+          Logger.warning("[LTP] Failed to hash envelope: #{inspect(e)}")
           state
       end
 
@@ -237,7 +248,7 @@ defmodule LTP.Connection do
         "hmac-#{String.slice(hmac, 0, 32)}-#{timestamp}"
       rescue
         e ->
-          Logger.warn("[LTP] Failed to generate HMAC nonce: #{inspect(e)}")
+          Logger.warning("[LTP] Failed to generate HMAC nonce: #{inspect(e)}")
           # Fallback to legacy format
           :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
       end
@@ -245,17 +256,6 @@ defmodule LTP.Connection do
       # Legacy format (backward compatibility)
       :crypto.strong_rand_bytes(16) |> Base.encode16(case: :lower)
     end
-  end
-
-  @impl WebSockex
-  def handle_info({:reconnect}, state) do
-    Logger.info("[LTP] Attempting reconnect...")
-    {:reconnect, state}
-  end
-
-  @impl WebSockex
-  def handle_info(_msg, state) do
-    {:ok, state}
   end
 
   # Private helpers
@@ -269,7 +269,7 @@ defmodule LTP.Connection do
           {pub, priv}
         rescue
           e ->
-            Logger.warn("[LTP] Failed to generate ECDH key pair: #{inspect(e)}")
+            Logger.warning("[LTP] Failed to generate ECDH key pair: #{inspect(e)}")
             {nil, nil}
         end
       else
@@ -316,7 +316,7 @@ defmodule LTP.Connection do
           |> Map.put(:client_ecdh_timestamp, timestamp)
         rescue
           e ->
-            Logger.warn("[LTP] Failed to sign ECDH public key: #{inspect(e)}")
+            Logger.warning("[LTP] Failed to sign ECDH public key: #{inspect(e)}")
             handshake
         end
       else
@@ -377,81 +377,9 @@ defmodule LTP.Connection do
     start_heartbeat(new_state, heartbeat_interval_ms)
   end
 
-  # Handle ECDH key exchange and derive session keys (v0.6+)
-  defp handle_ecdh_key_exchange(ack, state, thread_id, session_id) do
-    # Get server's ECDH public key
-    server_ecdh_public_key = ack["server_ecdh_public_key"] || ack["server_public_key"]
-
-    if not server_ecdh_public_key do
-      Logger.warn("[LTP] Server did not provide ECDH public key")
-      %{
-        state
-        | thread_id: thread_id,
-          session_id: session_id,
-          heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
-          is_handshake_complete: true,
-          reconnect_attempts: 0,
-          last_pong_time: System.system_time(:millisecond)
-      }
-    end
-
-    # Verify server's ECDH public key signature if available (v0.6+ authenticated ECDH)
-    if ack["server_ecdh_signature"] && ack["server_ecdh_timestamp"] && state.secret_key do
-      try do
-        LTP.Crypto.verify_ecdh_public_key(
-          server_ecdh_public_key,
-          "server", # TODO: Use actual server_id from ack
-          ack["server_ecdh_timestamp"],
-          ack["server_ecdh_signature"],
-          state.secret_key,
-          300_000 # 5 minutes max age
-        )
-      rescue
-        e ->
-          Logger.error("[LTP] ECDH signature verification failed: #{inspect(e)}")
-          # Continue anyway (backward compatibility)
-      end
-    end
-
-    # Derive shared secret
-    try do
-      shared_secret = LTP.Crypto.derive_shared_secret(state.ecdh_private_key, server_ecdh_public_key)
-
-      # Derive session keys using HKDF
-      {encryption_key, mac_key, _iv_key} = LTP.Crypto.derive_session_keys(shared_secret, session_id)
-
-      Logger.info("[LTP] ECDH key exchange completed, session keys derived")
-
-      %{
-        state
-        | thread_id: thread_id,
-          session_id: session_id,
-          heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
-          is_handshake_complete: true,
-          reconnect_attempts: 0,
-          last_pong_time: System.system_time(:millisecond),
-          session_encryption_key: encryption_key,
-          session_mac_key: mac_key
-      }
-    rescue
-      e ->
-        Logger.error("[LTP] Failed to derive session keys: #{inspect(e)}")
-        # Fallback to state without session keys
-        %{
-          state
-          | thread_id: thread_id,
-            session_id: session_id,
-            heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
-            is_handshake_complete: true,
-            reconnect_attempts: 0,
-            last_pong_time: System.system_time(:millisecond)
-        }
-    end
-  end
-
   defp handle_message(%{"type" => "handshake_reject"} = reject, state) do
     reason = reject["reason"]
-    Logger.warn("[LTP] Handshake rejected", %{reason: reason})
+    Logger.warning("[LTP] Handshake rejected", %{reason: reason})
 
     # If resume was rejected, try init
     if state.thread_id do
@@ -517,6 +445,78 @@ defmodule LTP.Connection do
   defp handle_message(message, state) do
     Logger.debug("[LTP] Received message", %{type: message["type"]})
     {:ok, state}
+  end
+
+  # Handle ECDH key exchange and derive session keys (v0.6+)
+  defp handle_ecdh_key_exchange(ack, state, thread_id, session_id) do
+    # Get server's ECDH public key
+    server_ecdh_public_key = ack["server_ecdh_public_key"] || ack["server_public_key"]
+
+    if not server_ecdh_public_key do
+      Logger.warning("[LTP] Server did not provide ECDH public key")
+      %{
+        state
+        | thread_id: thread_id,
+          session_id: session_id,
+          heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
+          is_handshake_complete: true,
+          reconnect_attempts: 0,
+          last_pong_time: System.system_time(:millisecond)
+      }
+    end
+
+    # Verify server's ECDH public key signature if available (v0.6+ authenticated ECDH)
+    if ack["server_ecdh_signature"] && ack["server_ecdh_timestamp"] && state.secret_key do
+      try do
+        LTP.Crypto.verify_ecdh_public_key(
+          server_ecdh_public_key,
+          "server", # TODO: Use actual server_id from ack
+          ack["server_ecdh_timestamp"],
+          ack["server_ecdh_signature"],
+          state.secret_key,
+          300_000 # 5 minutes max age
+        )
+      rescue
+        e ->
+          Logger.error("[LTP] ECDH signature verification failed: #{inspect(e)}")
+          # Continue anyway (backward compatibility)
+      end
+    end
+
+    # Derive shared secret
+    try do
+      shared_secret = LTP.Crypto.derive_shared_secret(state.ecdh_private_key, server_ecdh_public_key)
+
+      # Derive session keys using HKDF
+      {encryption_key, mac_key, _iv_key} = LTP.Crypto.derive_session_keys(shared_secret, session_id)
+
+      Logger.info("[LTP] ECDH key exchange completed, session keys derived")
+
+      %{
+        state
+        | thread_id: thread_id,
+          session_id: session_id,
+          heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
+          is_handshake_complete: true,
+          reconnect_attempts: 0,
+          last_pong_time: System.system_time(:millisecond),
+          session_encryption_key: encryption_key,
+          session_mac_key: mac_key
+      }
+    rescue
+      e ->
+        Logger.error("[LTP] Failed to derive session keys: #{inspect(e)}")
+        # Fallback to state without session keys
+        %{
+          state
+          | thread_id: thread_id,
+            session_id: session_id,
+            heartbeat_interval_ms: ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms,
+            is_handshake_complete: true,
+            reconnect_attempts: 0,
+            last_pong_time: System.system_time(:millisecond)
+        }
+    end
   end
 
   defp send_ping(state) do
@@ -590,7 +590,7 @@ defmodule LTP.Connection do
           max_delay
         )
 
-      Logger.warn("[LTP] Scheduling reconnect", %{delay_ms: delay, reason: reason})
+      Logger.warning("[LTP] Scheduling reconnect", %{delay_ms: delay, reason: reason})
 
       timer = Process.send_after(self(), {:reconnect}, delay)
 
