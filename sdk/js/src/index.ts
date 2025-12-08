@@ -55,3 +55,54 @@ export {
   generateNonce,
   hashEnvelope,
 } from './crypto';
+
+// Thread Life Model (semantic layer)
+export {
+  computeNextPhase,
+  applyTransition,
+  registerNewThread,
+  updateThreadFromEvent,
+} from './threadLifeModel';
+
+export type {
+  ThreadPhase,
+  ThreadScope,
+  ThreadVector,
+  ThreadEvent,
+  ThreadLifeTransition,
+  ThreadMap,
+} from './threadLifeModel.types';
+
+// Consciousness Web (web + orientation shell)
+export {
+  buildConsciousnessWeb,
+  createDefaultOrientationShell,
+  orientWeb,
+} from './consciousnessWeb';
+
+export type {
+  ConsciousnessWeb,
+  ThreadLink,
+  WebNodeMetrics,
+  OrientationShell,
+  OrientationSector,
+} from './consciousnessWeb.types';
+
+// Orientation baseline and web utilities
+export {
+  ORIENTATION_BASELINE,
+  applyWebUpdates,
+  chooseDominantSector,
+  createOrientationShell,
+  createOrientationWeb,
+  normalizeOrientation,
+  updateActiveSector,
+} from './orientation';
+export type {
+  OrientationPhase,
+  OrientationWebSector,
+  OrientationState,
+  OrientationWeb,
+  OrientationWebUpdate,
+  SectorId,
+} from './orientation';
