@@ -106,3 +106,22 @@ export type {
   OrientationWebUpdate,
   SectorId,
 } from './orientation';
+
+// Liminal Time Weave (temporal branches)
+export {
+  appendNodeToBranch,
+  computeBranchTrend,
+  createEmptyWeave,
+  getBranch,
+  summarizeWeave,
+  upsertBranch,
+} from './time/timeWeave';
+export type {
+  ThreadId,
+  TimeBranch,
+  TimeNode,
+  TimePhase,
+  TimeTick,
+  TimeWeave,
+  TimeWeaveSummary,
+} from './time/timeWeaveTypes';
