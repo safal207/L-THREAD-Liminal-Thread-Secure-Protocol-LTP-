@@ -72,3 +72,18 @@ export type {
   ThreadLifeTransition,
   ThreadMap,
 } from './threadLifeModel.types';
+
+// Consciousness Web (web + orientation shell)
+export {
+  buildConsciousnessWeb,
+  createDefaultOrientationShell,
+  orientWeb,
+} from './consciousnessWeb';
+
+export type {
+  ConsciousnessWeb,
+  ThreadLink,
+  WebNodeMetrics,
+  OrientationShell,
+  OrientationSector,
+} from './consciousnessWeb.types';
