@@ -12,6 +12,7 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the 
 - [Deployment Guide](./DEPLOYMENT.md) - Production deployment strategies
 - [API Reference](./API.md) - Complete API documentation for all SDKs
 - [Protocol Specifications](./specs/) - Detailed protocol specifications
+- [Consciousness Web & Orientation Shell](./specs/LTP-ConsciousnessWeb.md) - Semantic graph + focus layer built atop the Thread Life Model
 - [Contributing Guide](./CONTRIBUTING.md) - How to contribute to LTP
 - [Changelog](./CHANGELOG.md) - Version history and changes
 - [Security Policy](./.github/SECURITY.md) - Security reporting and best practices
@@ -46,6 +47,11 @@ LTP operates as a dedicated layer in the LIMINAL stack:
 
 **LTP Role:** Secure transport + context preservation
 **LRI Role:** Semantic layer, resonance patterns, intent processing
+
+### Semantic Layers: Thread Life Model → Consciousness Web
+
+- **Thread Life Model** captures the lifecycle of a single thread (birth → active → weakening → switching → archived) with energy/resonance metadata. SDK reference: [`sdk/js/README.consciousness-web.md`](./sdk/js/README.consciousness-web.md).
+- **Consciousness Web & Orientation Shell** build on top of that lifecycle to map relationships between threads (parent/child, shared scope/tags) and rotate focus across sectors. Specification: [`specs/LTP-ConsciousnessWeb.md`](./specs/LTP-ConsciousnessWeb.md).
 
 ## Key Features (v0.1)
 
