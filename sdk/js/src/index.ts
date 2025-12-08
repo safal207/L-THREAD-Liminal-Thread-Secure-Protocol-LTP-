@@ -87,3 +87,8 @@ export type {
   OrientationShell,
   OrientationSector,
 } from './consciousnessWeb.types';
+
+// Orientation baseline utilities
+export { ORIENTATION_BASELINE } from './orientation/orientationBaseline';
+export { createOrientationShell, normalizeOrientation } from './orientation/orientationShell';
+export type { OrientationState, SectorId } from './orientation/types';
