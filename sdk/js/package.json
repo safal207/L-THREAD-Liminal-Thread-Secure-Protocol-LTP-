@@ -7,8 +7,8 @@
   "scripts": {
     "build": "tsc",
     "lint": "echo \"Lint not configured yet\"",
-    "test": "npm run build && node tests/client.test.js",
-    "test:watch": "node tests/client.test.js"
+    "test": "npm run build && node tests/client.test.js && node tests/threadLifeModel.test.js && node tests/consciousnessWeb.test.js",
+    "test:watch": "node tests/client.test.js && node tests/threadLifeModel.test.js && node tests/consciousnessWeb.test.js"
   },
   "keywords": [
     "ltp",
