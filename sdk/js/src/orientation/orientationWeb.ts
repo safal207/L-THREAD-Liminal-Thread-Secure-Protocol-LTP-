@@ -14,10 +14,6 @@ function clamp01(value: number): number {
   return value;
 }
 
-function isValidPhase(phase: string | undefined): phase is OrientationPhase {
-  return phase === 'rising' || phase === 'stable' || phase === 'falling';
-}
-
 function createDefaultSector(id: SectorId): OrientationWebSector {
   return {
     id,
@@ -61,7 +57,7 @@ export function createOrientationWeb(
 
 export function applyWebUpdates(
   web: OrientationWeb,
-  updates: OrientationWebUpdate[]
+  updates?: OrientationWebUpdate[]
 ): OrientationWeb {
   if (!updates || updates.length === 0) {
     return web; // no movement if the field is quiet
@@ -80,9 +76,14 @@ export function applyWebUpdates(
     const pull = clamp01(existing.pull + (update.deltaPull ?? 0));
     const resonance = clamp01(existing.resonance + (update.deltaResonance ?? 0));
 
-    const phase: OrientationPhase = isValidPhase(update.newPhase)
-      ? update.newPhase
-      : existing.phase;
+    let phase: OrientationPhase = existing.phase;
+    if (
+      update.newPhase === 'rising' ||
+      update.newPhase === 'stable' ||
+      update.newPhase === 'falling'
+    ) {
+      phase = update.newPhase;
+    }
 
     updatedSectors[update.sectorId] = {
       ...existing,
