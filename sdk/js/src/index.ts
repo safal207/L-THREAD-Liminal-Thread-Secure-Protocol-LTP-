@@ -55,3 +55,20 @@ export {
   generateNonce,
   hashEnvelope,
 } from './crypto';
+
+// Thread Life Model (semantic layer)
+export {
+  computeNextPhase,
+  applyTransition,
+  registerNewThread,
+  updateThreadFromEvent,
+} from './threadLifeModel';
+
+export type {
+  ThreadPhase,
+  ThreadScope,
+  ThreadVector,
+  ThreadEvent,
+  ThreadLifeTransition,
+  ThreadMap,
+} from './threadLifeModel.types';
