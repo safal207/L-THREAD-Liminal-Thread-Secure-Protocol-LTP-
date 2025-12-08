@@ -88,7 +88,21 @@ export type {
   OrientationSector,
 } from './consciousnessWeb.types';
 
-// Orientation baseline utilities
-export { ORIENTATION_BASELINE } from './orientation/orientationBaseline';
-export { createOrientationShell, normalizeOrientation } from './orientation/orientationShell';
-export type { OrientationState, SectorId } from './orientation/types';
+// Orientation baseline and web utilities
+export {
+  ORIENTATION_BASELINE,
+  applyWebUpdates,
+  chooseDominantSector,
+  createOrientationShell,
+  createOrientationWeb,
+  normalizeOrientation,
+  updateActiveSector,
+} from './orientation';
+export type {
+  OrientationPhase,
+  OrientationWebSector,
+  OrientationState,
+  OrientationWeb,
+  OrientationWebUpdate,
+  SectorId,
+} from './orientation';
