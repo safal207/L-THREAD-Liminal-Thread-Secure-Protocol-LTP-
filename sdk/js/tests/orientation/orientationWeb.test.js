@@ -89,3 +89,36 @@ runTest('chooseDominantSector keeps current active sector when scores tie', () =
 
   assert.equal(chooseDominantSector(web), 'b');
 });
+
+runTest('applyWebUpdates returns original when updates array is empty', () => {
+  const web = createOrientationWeb(['self', 'family']);
+  const updated = applyWebUpdates(web, []);
+
+  assert.equal(updated, web);
+});
+
+runTest('applyWebUpdates ignores missing sectorId safely', () => {
+  const web = createOrientationWeb(['self', 'family']);
+  const updated = applyWebUpdates(web, [
+    {
+      sectorId: 'work',
+      deltaTension: 0.5,
+    },
+  ]);
+
+  assert.deepEqual(updated.sectors, web.sectors);
+});
+
+runTest('applyWebUpdates ignores invalid phase updates', () => {
+  const web = createOrientationWeb(['self']);
+  const updated = applyWebUpdates(web, [
+    {
+      sectorId: 'self',
+      deltaPull: 0.1,
+      newPhase: 'invalid-phase',
+    },
+  ]);
+
+  assert.equal(updated.sectors.self.phase, 'stable');
+  assert.equal(updated.sectors.self.pull, 0.1);
+});

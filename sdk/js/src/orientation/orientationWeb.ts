@@ -59,14 +59,27 @@ export function applyWebUpdates(
   web: OrientationWeb,
   updates: OrientationWebUpdate[]
 ): OrientationWeb {
+  if (!updates || updates.length === 0) {
+    return web; // no movement if the field is quiet
+  }
+
   const updatedSectors: Record<SectorId, OrientationWebSector> = { ...web.sectors };
 
   updates.forEach((update) => {
-    const existing = updatedSectors[update.sectorId] ?? createDefaultSector(update.sectorId);
+    const existing = updatedSectors[update.sectorId];
+    if (!existing) {
+      // Sector not present — safest behavior is to ignore the update.
+      return;
+    }
+
     const tension = clamp01(existing.tension + (update.deltaTension ?? 0));
     const pull = clamp01(existing.pull + (update.deltaPull ?? 0));
     const resonance = clamp01(existing.resonance + (update.deltaResonance ?? 0));
-    const phase: OrientationPhase = update.newPhase ?? existing.phase;
+
+    let phase: OrientationPhase = existing.phase;
+    if (update.newPhase === 'rising' || update.newPhase === 'stable' || update.newPhase === 'falling') {
+      phase = update.newPhase;
+    }
 
     updatedSectors[update.sectorId] = {
       ...existing,
