@@ -111,6 +111,7 @@ export type {
 export {
   appendNodeToBranch,
   computeBranchTrend,
+  computeTimeWeaveSummary,
   createEmptyWeave,
   getBranch,
   summarizeWeave,
@@ -123,6 +124,7 @@ export type {
   TimePhase,
   TimeTick,
   TimeWeave,
+  TimeWeaveTrendSummary,
   TimeWeaveSummary,
 } from './time/timeWeaveTypes';
 
