@@ -129,7 +129,9 @@ export type {
 // Temporal Orientation Layer (Orientation Web x Time Weave)
 export {
   buildTemporalOrientationView,
+  buildViewFromWebAndAnchors,
   mapSectorToBranchId,
+  pickNextSector,
   suggestNextSector,
 } from './temporalOrientation/temporalOrientationEngine';
 export type {
@@ -139,3 +141,7 @@ export type {
   TemporalOrientationView,
   TemporalTrend,
 } from './temporalOrientation/temporalOrientationTypes';
+export type {
+  TemporalOrientationBuildResult,
+  NextSectorSuggestion,
+} from './temporalOrientation/temporalOrientationEngine';
