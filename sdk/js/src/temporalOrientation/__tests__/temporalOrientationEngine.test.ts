@@ -103,6 +103,24 @@ runTest('detects rising and falling mix', () => {
   assert.strictEqual(view.summary.activeSectorCount, 2);
 });
 
+runTest('summary forwards focus momentum score', () => {
+  const web = createWebWithSectors(['trend']);
+  const weave: TimeWeave = {
+    branches: [
+      buildBranch('trend', [
+        { tick: 1, intensity: 0.1 },
+        { tick: 2, intensity: 0.4 },
+        { tick: 3, intensity: 0.8 },
+      ]),
+    ],
+  };
+
+  const view = buildTemporalOrientationView(web, weave);
+
+  assert.ok(typeof view.summary.focusMomentumScore === 'number');
+  assert.ok((view.summary.focusMomentumScore ?? 0) > 0.3);
+});
+
 runTest('suggests next sector based on rising trend', () => {
   const web = createWebWithSectors(['falling', 'rising']);
   const weave: TimeWeave = {

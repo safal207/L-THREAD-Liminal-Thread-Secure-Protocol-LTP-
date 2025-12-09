@@ -12,6 +12,7 @@ const INTENSITY_MIN = 0;
 const INTENSITY_MAX = 1;
 const TREND_WINDOW = 5;
 const TREND_EPSILON = 0.05;
+const MOMENTUM_WINDOW = 5;
 
 type BranchTrend = 'rising' | 'falling' | 'plateau';
 
@@ -114,6 +115,21 @@ export function computeBranchTrend(branch: TimeBranch): BranchTrend {
   return 'plateau';
 }
 
+function computeBranchMomentum(branch: TimeBranch): number {
+  const nodes = branch.nodes.slice(-MOMENTUM_WINDOW);
+
+  if (nodes.length < 2) {
+    return 0;
+  }
+
+  // Use the average delta between consecutive intensities as a simple, local momentum proxy.
+  const deltas = nodes.slice(1).map((node, index) => node.intensity - nodes[index]!.intensity);
+  const averageDelta = deltas.reduce((sum, value) => sum + value, 0) / deltas.length;
+
+  // Intensities are already normalized between 0 and 1, so the average delta falls in [-1, 1].
+  return clampMinus1To1(averageDelta);
+}
+
 export function summarizeWeave(weave: TimeWeave): TimeWeaveTrendSummary {
   const branchCount = weave.branches.length;
 
@@ -152,8 +168,51 @@ export function summarizeWeave(weave: TimeWeave): TimeWeaveTrendSummary {
   };
 }
 
+export function computeFocusMomentumScore(weave: TimeWeave): number {
+  const branchMomenta = weave.branches
+    .map((branch) => {
+      if (branch.nodes.length < 2) {
+        return null;
+      }
+
+      const momentum = computeBranchMomentum(branch);
+      const lastNode = branch.nodes[branch.nodes.length - 1];
+      const weight = lastNode ? clamp01(lastNode.intensity) : 0;
+
+      return {
+        momentum,
+        // Prefer active branches while keeping inactive ones in the mix with a minimal weight.
+        weight: weight > 0 ? weight : 1,
+      };
+    })
+    .filter((item): item is { momentum: number; weight: number } => Boolean(item));
+
+  if (branchMomenta.length === 0) {
+    return 0;
+  }
+
+  const totalWeight = branchMomenta.reduce((sum, item) => sum + item.weight, 0);
+  const weightedMomentum = branchMomenta.reduce(
+    (sum, item) => sum + item.momentum * item.weight,
+    0,
+  );
+
+  if (totalWeight === 0) {
+    return 0;
+  }
+
+  // Normalized derivative-like signal in [-1, 1] representing how focus is shifting across branches.
+  return clampMinus1To1(weightedMomentum / totalWeight);
+}
+
 function clamp01(value: number): number {
   if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+function clampMinus1To1(value: number): number {
+  if (value < -1) return -1;
   if (value > 1) return 1;
   return value;
 }

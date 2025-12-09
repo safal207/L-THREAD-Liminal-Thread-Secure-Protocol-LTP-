@@ -111,6 +111,7 @@ export type {
 export {
   appendNodeToBranch,
   computeBranchTrend,
+  computeFocusMomentumScore,
   computeTimeWeaveSummary,
   createEmptyWeave,
   getBranch,

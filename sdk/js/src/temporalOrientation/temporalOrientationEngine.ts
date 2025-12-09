@@ -1,5 +1,10 @@
 import type { OrientationWeb, OrientationWebSector } from '../orientation/orientationWeb.types';
-import { computeBranchTrend, computeTimeWeaveSummary, getBranch } from '../time/timeWeave';
+import {
+  computeBranchTrend,
+  computeFocusMomentumScore,
+  computeTimeWeaveSummary,
+  getBranch,
+} from '../time/timeWeave';
 import type { TimeBranch, TimeWeave } from '../time/timeWeaveTypes';
 import { anchorEventsBatch } from '../timeAnchors/timeAnchorEngine';
 import type { OrientationEvent, TimeAnchorContext } from '../timeAnchors/timeAnchorTypes';
@@ -176,9 +181,11 @@ export function buildTemporalOrientationView(web: OrientationWeb, weave: TimeWea
   const sectors = Object.values(web.sectors).map((sector) => buildSectorTemporalSnapshot(sector, weave));
   const summary = buildSummary(sectors);
   const weaveSummary = computeTimeWeaveSummary(weave);
+  const focusMomentumScore = computeFocusMomentumScore(weave);
   const summaryWithDepth: TemporalOrientationSummary = {
     ...summary,
     timeWeaveDepthScore: weaveSummary.depthScore,
+    focusMomentumScore,
   };
 
   return {
