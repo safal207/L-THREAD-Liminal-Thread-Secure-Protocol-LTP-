@@ -148,3 +148,16 @@ export type {
   TemporalOrientationBuildResult,
   NextSectorSuggestion,
 } from './temporalOrientation/temporalOrientationEngine';
+
+// Fuzzy routing (RouteHints + soft priority modes)
+export {
+  buildRouteHintsFromOrientation,
+  computeRouteHintForSector,
+} from './routing/fuzzyRoutingEngine';
+export type {
+  FuzzyRoutingContext,
+  RouteHint,
+  RoutingMode,
+  RoutingPriority,
+  StringMode,
+} from './routing/fuzzyRoutingEngine';
