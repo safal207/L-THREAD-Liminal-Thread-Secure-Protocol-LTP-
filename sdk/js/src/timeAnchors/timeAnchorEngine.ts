@@ -2,7 +2,7 @@ import {
   appendNodeToBranch,
   getBranch,
 } from '../time/timeWeave';
-import type { TimeBranch, TimeNode, TimePhase, TimeTick } from '../time/timeWeaveTypes';
+import type { TimeNode, TimePhase, TimeTick, TimeWeave } from '../time/timeWeaveTypes';
 import type { OrientationEvent, AnchorResult, TimeAnchorContext } from './timeAnchorTypes';
 
 function clampIntensity(value: number): number {

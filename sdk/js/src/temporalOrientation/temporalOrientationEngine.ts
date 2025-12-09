@@ -1,6 +1,8 @@
 import type { OrientationWeb, OrientationWebSector } from '../orientation/orientationWeb.types';
 import { computeBranchTrend, getBranch } from '../time/timeWeave';
 import type { TimeBranch, TimeWeave } from '../time/timeWeaveTypes';
+import { anchorEventsBatch } from '../timeAnchors/timeAnchorEngine';
+import type { OrientationEvent, TimeAnchorContext } from '../timeAnchors/timeAnchorTypes';
 import type {
   SectorTemporalSnapshot,
   NextThreadSuggestion,
@@ -35,6 +37,32 @@ function clampIntensity(intensity: number | undefined): number | undefined {
  */
 export function mapSectorToBranchId(sector: OrientationWebSector): string {
   return sector.id;
+}
+
+export interface TemporalOrientationBuildResult {
+  view: TemporalOrientationView;
+  weave: TimeWeave;
+}
+
+/**
+ * High-level helper that stitches OrientationWeb + OrientationEvents + TimeWeave
+ * into a ready TemporalOrientationView.
+ *
+ * - Anchors incoming events into the weave (unless the list is empty, then it is a no-op).
+ * - Builds a view from the updated weave so higher layers can reason about temporal trends.
+ */
+export function buildViewFromWebAndAnchors(
+  web: OrientationWeb,
+  events: OrientationEvent[],
+  weave: TimeWeave,
+  ctx?: Omit<TimeAnchorContext, 'weave'>,
+): TemporalOrientationBuildResult {
+  const hasEvents = Array.isArray(events) && events.length > 0;
+  const anchorContext: TimeAnchorContext = { weave, ...(ctx ?? {}) };
+  const updatedWeave = hasEvents ? anchorEventsBatch(events, anchorContext) : weave;
+  const view = buildTemporalOrientationView(web, updatedWeave);
+
+  return { view, weave: updatedWeave };
 }
 
 function getBranchSnapshot(branch: TimeBranch | undefined) {
@@ -182,5 +210,65 @@ export function suggestNextSector(
     fromSectorId: currentSectorId,
     suggestedSectorId: undefined,
     reason: 'No strong alternative trend detected; maintain current orientation.',
+  };
+}
+
+export interface NextSectorSuggestion {
+  fromSectorId: string;
+  suggestedSectorId?: string;
+  reason: string;
+}
+
+/**
+ * Convenience wrapper to pick the next sector to focus on, based on temporal trends.
+ * The logic prefers deterministic, upward momentum choices and avoids randomness.
+ */
+export function pickNextSector(
+  view: TemporalOrientationView,
+  currentSectorId: string,
+): NextSectorSuggestion {
+  const currentSnapshot = view.sectors.find((item) => item.sectorId === currentSectorId);
+  const risingTargets = [...view.summary.risingSectors].filter((id) => id !== currentSectorId).sort();
+  const plateauTargets = [...view.summary.plateauSectors].filter((id) => id !== currentSectorId).sort();
+
+  const firstRising = risingTargets[0];
+
+  if (currentSnapshot?.branchTrend === 'falling' && firstRising) {
+    return {
+      fromSectorId: currentSectorId,
+      suggestedSectorId: firstRising,
+      reason: 'Current sector is falling; shift attention toward a rising sector.',
+    };
+  }
+
+  if (currentSnapshot?.branchTrend === 'plateau' && firstRising) {
+    return {
+      fromSectorId: currentSectorId,
+      suggestedSectorId: firstRising,
+      reason: 'Current sector is plateauing; following a rising trend may create momentum.',
+    };
+  }
+
+  if (!currentSnapshot && firstRising) {
+    return {
+      fromSectorId: currentSectorId,
+      suggestedSectorId: firstRising,
+      reason: 'Sector not found in view; defaulting to the earliest rising sector.',
+    };
+  }
+
+  const firstPlateau = plateauTargets[0];
+  if (firstPlateau && !firstRising) {
+    return {
+      fromSectorId: currentSectorId,
+      suggestedSectorId: firstPlateau,
+      reason: 'No rising sectors detected; shifting toward a stable plateau sector.',
+    };
+  }
+
+  return {
+    fromSectorId: currentSectorId,
+    suggestedSectorId: undefined,
+    reason: 'No stronger temporal signal detected; maintain current focus.',
   };
 }
