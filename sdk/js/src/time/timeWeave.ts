@@ -2,8 +2,10 @@ import {
   ThreadId,
   TimeBranch,
   TimeNode,
+  TimeTick,
   TimeWeave,
   TimeWeaveSummary,
+  TimeWeaveTrendSummary,
 } from './timeWeaveTypes';
 
 const INTENSITY_MIN = 0;
@@ -112,7 +114,7 @@ export function computeBranchTrend(branch: TimeBranch): BranchTrend {
   return 'plateau';
 }
 
-export function summarizeWeave(weave: TimeWeave): TimeWeaveSummary {
+export function summarizeWeave(weave: TimeWeave): TimeWeaveTrendSummary {
   const branchCount = weave.branches.length;
 
   const trends = weave.branches.map((branch) => computeBranchTrend(branch));
@@ -133,7 +135,7 @@ export function summarizeWeave(weave: TimeWeave): TimeWeaveSummary {
     { rising: 0, falling: 0, plateau: 0 } as Record<BranchTrend, number>,
   );
 
-  let globalTrend: TimeWeaveSummary['globalTrend'] = 'plateau';
+  let globalTrend: TimeWeaveTrendSummary['globalTrend'] = 'plateau';
 
   if (trendCounts.rising > 0 && trendCounts.falling > 0) {
     globalTrend = 'mixed';
@@ -147,5 +149,84 @@ export function summarizeWeave(weave: TimeWeave): TimeWeaveSummary {
     branchCount,
     activeBranches,
     globalTrend,
+  };
+}
+
+function clamp01(value: number): number {
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+function toTimestamp(tick: TimeTick): number | null {
+  if (typeof tick === 'number' && Number.isFinite(tick)) {
+    return tick;
+  }
+
+  if (typeof tick === 'string') {
+    const asNumber = Number(tick);
+    if (Number.isFinite(asNumber)) {
+      return asNumber;
+    }
+
+    const parsed = Date.parse(tick);
+    if (!Number.isNaN(parsed)) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
+const TARGET_BRANCH_COUNT = 12;
+const TARGET_EVENT_COUNT = 100;
+// One hour is treated as a "rich" span of activity; longer spans saturate the factor.
+const TARGET_TIME_SPAN_MS = 60 * 60 * 1000;
+
+export function computeTimeWeaveSummary(weave: TimeWeave): TimeWeaveSummary {
+  const branchesCount = weave.branches.length;
+  let eventsCount = 0;
+  let minTimestamp: number | null = null;
+  let maxTimestamp: number | null = null;
+
+  weave.branches.forEach((branch) => {
+    eventsCount += branch.nodes.length;
+
+    branch.nodes.forEach((node) => {
+      const timestamp = toTimestamp(node.tick);
+      if (timestamp === null) {
+        return;
+      }
+
+      if (minTimestamp === null || timestamp < minTimestamp) {
+        minTimestamp = timestamp;
+      }
+
+      if (maxTimestamp === null || timestamp > maxTimestamp) {
+        maxTimestamp = timestamp;
+      }
+    });
+  });
+
+  const hasValidTimestamps =
+    minTimestamp !== null &&
+    maxTimestamp !== null &&
+    Number.isFinite(minTimestamp) &&
+    Number.isFinite(maxTimestamp) &&
+    maxTimestamp >= minTimestamp;
+
+  const timeSpanMs = hasValidTimestamps ? maxTimestamp! - minTimestamp! : 0;
+
+  const branchFactor = clamp01(branchesCount / TARGET_BRANCH_COUNT);
+  const eventsFactor = clamp01(eventsCount / TARGET_EVENT_COUNT);
+  const spanFactor = clamp01(timeSpanMs / TARGET_TIME_SPAN_MS);
+
+  const depthScore = branchFactor * 0.4 + eventsFactor * 0.4 + spanFactor * 0.2;
+
+  return {
+    depthScore,
+    branchesCount,
+    eventsCount,
+    timeSpanMs,
   };
 }

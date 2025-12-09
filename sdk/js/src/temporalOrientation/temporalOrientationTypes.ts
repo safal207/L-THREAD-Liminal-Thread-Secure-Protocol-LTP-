@@ -19,6 +19,11 @@ export interface TemporalOrientationSummary {
   risingSectors: string[];
   fallingSectors: string[];
   plateauSectors: string[];
+
+  /**
+   * Optional TimeWeave depth indicator forwarded from TimeWeaveSummary.
+   */
+  timeWeaveDepthScore?: number;
 }
 
 export interface TemporalOrientationView {
