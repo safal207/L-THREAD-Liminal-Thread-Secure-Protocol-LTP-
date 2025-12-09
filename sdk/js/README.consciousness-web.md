@@ -59,5 +59,24 @@ const { activeThreads, dormantThreads } = orientWeb(web, familyShell);
 console.log('Active threads in family context:', activeThreads);
 ```
 
+## Smart Router (Temporal Orientation + Fuzzy Routing)
+
+The JS SDK ships with a minimal **Smart Router** demo that combines:
+
+- `TemporalOrientationView` (time-weave depth + focus momentum)
+- `buildRouteHintsFromOrientation` (fuzzy routing engine)
+
+to suggest the **next best sector** in the Orientation Web.
+
+Run the demo from the JS SDK root:
+
+```bash
+cd sdk/js
+npm install
+npm run demo:smart-router
+```
+
+It prints routing suggestions for several demo clients based on their `timeWeaveDepthScore` and `focusMomentumScore`.
+
 ## Relation to Thread Life Model
 The Consciousness Web does not replace the Thread Life Model. The life model describes how a single thread evolves (birth → active → weakening → switching → archived). The Consciousness Web shows how many threads relate as a network, and the Orientation Shell rotates perspective across that network to emphasize certain sectors.
