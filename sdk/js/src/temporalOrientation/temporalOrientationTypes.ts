@@ -24,6 +24,12 @@ export interface TemporalOrientationSummary {
    * Optional TimeWeave depth indicator forwarded from TimeWeaveSummary.
    */
   timeWeaveDepthScore?: number;
+
+  /**
+   * Global momentum of focus in the TimeWeave.
+   * Range: -1..1 (negative = dissipating, positive = concentrating focus).
+   */
+  focusMomentumScore?: number;
 }
 
 export interface TemporalOrientationView {
