@@ -15,8 +15,24 @@ function runTest(name: string, fn: () => void): void {
 
 runTest('pickBestRouteHint prefers high priority', () => {
   const hints: RouteHint[] = [
-    { sectorId: 'A', priority: 'normal', mode: 'explore', depthScore: 0.6, focusMomentumScore: 0.1, reason: '...' },
-    { sectorId: 'B', priority: 'high', mode: 'stabilize', depthScore: 0.7, focusMomentumScore: 0.2, reason: '...' },
+    {
+      sectorId: 'A',
+      priority: 'normal',
+      mode: 'explore',
+      depthScore: 0.6,
+      focusMomentumScore: 0.1,
+      routeConfidence: 0.5,
+      reason: '...',
+    },
+    {
+      sectorId: 'B',
+      priority: 'high',
+      mode: 'stabilize',
+      depthScore: 0.7,
+      focusMomentumScore: 0.2,
+      routeConfidence: 0.5,
+      reason: '...',
+    },
   ];
 
   const best = pickBestRouteHint(hints);
@@ -25,8 +41,24 @@ runTest('pickBestRouteHint prefers high priority', () => {
 
 runTest('pickBestRouteHint breaks ties by mode order', () => {
   const hints: RouteHint[] = [
-    { sectorId: 'A', priority: 'normal', mode: 'explore', depthScore: 0.5, focusMomentumScore: 0.3, reason: '...' },
-    { sectorId: 'B', priority: 'normal', mode: 'exploit', depthScore: 0.5, focusMomentumScore: 0.3, reason: '...' },
+    {
+      sectorId: 'A',
+      priority: 'normal',
+      mode: 'explore',
+      depthScore: 0.5,
+      focusMomentumScore: 0.3,
+      routeConfidence: 0.6,
+      reason: '...',
+    },
+    {
+      sectorId: 'B',
+      priority: 'normal',
+      mode: 'exploit',
+      depthScore: 0.5,
+      focusMomentumScore: 0.3,
+      routeConfidence: 0.7,
+      reason: '...',
+    },
   ];
 
   const best = pickBestRouteHint(hints);

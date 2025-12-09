@@ -78,5 +78,8 @@ npm run demo:smart-router
 
 It prints routing suggestions for several demo clients based on their `timeWeaveDepthScore` and `focusMomentumScore`.
 
+The demo also surfaces `routeConfidence` (0..1) and applies a light entropy penalty based on how dispersed the active sectors
+are, threading a small amount of temporal soft-context into each hint's reasoning.
+
 ## Relation to Thread Life Model
 The Consciousness Web does not replace the Thread Life Model. The life model describes how a single thread evolves (birth → active → weakening → switching → archived). The Consciousness Web shows how many threads relate as a network, and the Orientation Shell rotates perspective across that network to emphasize certain sectors.

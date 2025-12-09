@@ -7,6 +7,7 @@ import type {
 import type { OrientationWeb } from '../orientation/orientationWeb.types';
 import {
   buildRouteHintsFromOrientation,
+  deriveEntropyFromOrientation,
   type RouteHint,
   type RoutingMode,
   type RoutingPriority,
@@ -180,6 +181,7 @@ function formatEvents(events: string[]): string {
 export function runSmartRouterDemo(): void {
   demoClients.forEach((client) => {
     const view = buildDemoOrientationViewFromClient(client);
+    const entropyLevel = deriveEntropyFromOrientation(view);
     const hints = buildRouteHintsFromOrientation(view);
     const best = pickBestRouteHint(hints);
 
@@ -193,6 +195,7 @@ export function runSmartRouterDemo(): void {
       client.focusMomentumScore.toFixed(2),
     );
     console.log('Total sectors:', hints.length);
+    console.log('Entropy level:', entropyLevel.toFixed(2));
 
     if (!best) {
       console.log('No routing hint available.\n');
@@ -202,6 +205,7 @@ export function runSmartRouterDemo(): void {
     console.log('→ Suggested sector:', best.sectorId);
     console.log('  Priority:', best.priority);
     console.log('  Mode:', best.mode);
+    console.log('  Confidence:', best.routeConfidence.toFixed(2));
     console.log('  Reason:', best.reason);
     console.log();
   });
