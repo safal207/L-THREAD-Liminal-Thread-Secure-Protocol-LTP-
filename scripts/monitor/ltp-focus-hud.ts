@@ -4,8 +4,8 @@ import {
   LtpClientHandlers,
   TimeOrientationBoostPayload,
 } from "../transport/ltpClient";
-import { renderMomentumSparkline } from "../shared/focusSparkline";
-import { detectHudMode, HudMode } from "./hudModes";
+import { detectHudMode } from "./hudModes";
+import { colorizeMode, HudMode, renderSparkline } from "./hudTheme";
 
 export interface FocusHudSnapshot {
   linkHealth: "OK" | "WARN" | "CRIT";
@@ -16,7 +16,7 @@ export interface FocusHudSnapshot {
   focusMomentum?: number;
 }
 
-export const FOCUS_HISTORY_LIMIT = 16;
+export const FOCUS_HISTORY_LIMIT = 20;
 const focusMomentumHistory: number[] = [];
 
 function recordFocusMomentum(value?: number): void {
@@ -34,35 +34,34 @@ export function determineLinkHealth(latencyMs?: number, jitterMs?: number): "OK"
   return "CRIT";
 }
 
+function calculateVolatility(history: number[]): number {
+  if (history.length < 2) return 0;
+  const deltas = history.slice(1).map((value, index) => Math.abs(value - history[index]));
+  const avgDelta = deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length;
+  return Number(avgDelta.toFixed(3));
+}
+
 export function renderFocusHudLine(
   snapshot: FocusHudSnapshot,
   fmHistory: number[],
   mode: HudMode = "calm",
 ): string {
   const { linkHealth, latencyMs, jitterMs, sector, intent, focusMomentum } = snapshot;
-
-  const hbPart =
-    latencyMs != null
-      ? `hb=${latencyMs}ms` + (jitterMs != null ? ` jitter=${jitterMs}ms` : "")
-      : `hb=?`;
-
-  const routingPart =
-    sector || intent
-      ? `routing=${sector ?? "?"} intent=${intent ?? "?"}`
-      : `routing=?`;
-
-  let fmPart = "fm=–";
-
-  if (typeof focusMomentum === "number" && !Number.isNaN(focusMomentum)) {
-    const spark = renderMomentumSparkline(fmHistory);
-    fmPart = spark
-      ? `fm: ${spark} (${focusMomentum >= 0 ? "+" : ""}${focusMomentum.toFixed(2)})`
-      : `fm: (${focusMomentum >= 0 ? "+" : ""}${focusMomentum.toFixed(2)})`;
-  }
-
   const modeTag = mode === "storm" ? "STORM" : mode === "shift" ? "SHIFT" : "CALM";
+  const timestamp = new Date().toISOString();
 
-  return `[${modeTag}][${linkHealth}] ${hbPart} | ${routingPart} | ${fmPart}`;
+  const hbPart = latencyMs != null ? `${latencyMs}ms${jitterMs != null ? `±${jitterMs}` : ""}` : "?";
+  const routingPart = `${sector ?? "?"}/${intent ?? "?"}`;
+  const momentumPart =
+    typeof focusMomentum === "number" && !Number.isNaN(focusMomentum)
+      ? `${focusMomentum >= 0 ? "+" : ""}${focusMomentum.toFixed(3)}`
+      : "?";
+  const volatility = calculateVolatility(fmHistory).toFixed(3);
+  const graph = renderSparkline(fmHistory) || "–";
+
+  const modeSegment = colorizeMode(mode, `mode=${modeTag}`);
+
+  return `[${timestamp}] ${modeSegment} | vol=${volatility} | momentum=${momentumPart} | graph=${graph} | link=${linkHealth}@${hbPart} | route=${routingPart}`;
 }
 
 function renderAndReport(snapshot: FocusHudSnapshot) {
