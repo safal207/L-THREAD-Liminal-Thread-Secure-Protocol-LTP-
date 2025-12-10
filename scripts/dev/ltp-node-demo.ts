@@ -89,24 +89,41 @@ interface DevConsoleSnapshot {
     reason?: string;
     debug?: RouteSuggestionDebug;
   };
-  linkHealth?: "ok" | "stalled" | "sleeping";
+  linkHealth?: "ok" | "warn" | "critical";
 }
 
 const NODE_ADDR = process.env.LTP_NODE_WS_URL ?? "ws://127.0.0.1:7070";
 const CLIENT_ID = process.env.LTP_CLIENT_ID ?? "demo-client-1";
+const ARGS = process.argv.slice(2);
+const SCENARIO_MODE = process.env.SCENARIO_MODE === "1" || ARGS.includes("--scenario");
 
 const HEALTH_CHECK_INTERVAL_MS = 5000;
 const HEALTH_OK_THRESHOLD_MS = 10_000;
-const HEALTH_SLEEPY_THRESHOLD_MS = 30_000;
+const HEALTH_WARN_THRESHOLD_MS = 25_000;
 
-console.log(`Connecting to ${NODE_ADDR} as ${CLIENT_ID}...`);
-
-const ws = new WebSocket(NODE_ADDR);
+let ws: WebSocket | undefined;
 
 let heartbeatInterval: NodeJS.Timeout | undefined;
 let orientationInterval: NodeJS.Timeout | undefined;
 let routeInterval: NodeJS.Timeout | undefined;
 let healthCheckInterval: NodeJS.Timeout | undefined;
+
+function summarizeConsoleState(): string {
+  const summaryParts: Array<string | undefined> = [
+    `link=${devState.snapshot.linkHealth ?? "unknown"}`,
+    devState.snapshot.lastHeartbeatAt
+      ? `hb=${devState.snapshot.lastHeartbeatAt}`
+      : undefined,
+    devState.snapshot.lastOrientationSummary?.direction
+      ? `ori=${devState.snapshot.lastOrientationSummary.direction}`
+      : undefined,
+    devState.snapshot.routing?.suggestedSector
+      ? `route=${devState.snapshot.routing.suggestedSector}`
+      : undefined,
+  ];
+
+  return summaryParts.filter(Boolean).join(" | ");
+}
 
 function logEvent(
   severity: LogSeverity,
@@ -124,7 +141,11 @@ function logEvent(
     ? `\n       ${JSON.stringify(details, null, 2).replace(/\n/g, "\n       ")}`
     : "";
 
-  console.log(`[${event.severity}] ${event.message} @ ${event.timestamp}${detailText}`);
+  const humanSummary = summarizeConsoleState();
+  const formattedLine = `${event.timestamp} | ${event.severity.toUpperCase()} | ${event.message}`;
+  const formattedWithState = humanSummary ? `${formattedLine} | ${humanSummary}` : formattedLine;
+
+  console.log(`${formattedWithState}${detailText}`);
 
   return event;
 }
@@ -152,7 +173,7 @@ type DevConsoleState = {
 const devState: DevConsoleState = {
   connected: false,
   snapshot: {
-    linkHealth: "stalled",
+    linkHealth: "critical",
   },
 };
 
@@ -178,6 +199,10 @@ let orientationIndex = 0;
 
 function sendMessage(msg: LtpIncomingMessage) {
   logInfo("send", { payload: msg });
+  if (!ws) {
+    logWarn("websocket not initialized; skipping send", { type: msg.type });
+    return;
+  }
   ws.send(JSON.stringify(msg));
 }
 
@@ -292,26 +317,34 @@ function recordHeartbeat(timestampMs: number) {
   devState.snapshot.linkHealth = "ok";
 }
 
-function evaluateLinkHealth(nowMs: number = Date.now()) {
-  const lastHeartbeat = devState.snapshot.lastHeartbeatAt
-    ? Date.parse(devState.snapshot.lastHeartbeatAt)
-    : undefined;
+export function determineLinkHealth(
+  lastHeartbeatAt?: string,
+  nowMs: number = Date.now(),
+): DevConsoleSnapshot["linkHealth"] {
+  if (!lastHeartbeatAt) return "critical";
 
-  const elapsedMs = lastHeartbeat ? nowMs - lastHeartbeat : Infinity;
-
-  let nextHealth: DevConsoleSnapshot["linkHealth"] = devState.snapshot.linkHealth;
+  const elapsedMs = nowMs - Date.parse(lastHeartbeatAt);
 
   if (elapsedMs < HEALTH_OK_THRESHOLD_MS) {
-    nextHealth = "ok";
-  } else if (elapsedMs < HEALTH_SLEEPY_THRESHOLD_MS) {
-    nextHealth = "sleeping";
-  } else {
-    nextHealth = "stalled";
+    return "ok";
   }
+  if (elapsedMs < HEALTH_WARN_THRESHOLD_MS) {
+    return "warn";
+  }
+  return "critical";
+}
+
+function evaluateLinkHealth(nowMs: number = Date.now()) {
+  const nextHealth = determineLinkHealth(devState.snapshot.lastHeartbeatAt, nowMs);
 
   if (nextHealth === devState.snapshot.linkHealth) {
     return;
   }
+
+  const lastHeartbeat = devState.snapshot.lastHeartbeatAt
+    ? Date.parse(devState.snapshot.lastHeartbeatAt)
+    : undefined;
+  const elapsedMs = lastHeartbeat ? nowMs - lastHeartbeat : Infinity;
 
   devState.snapshot.linkHealth = nextHealth;
 
@@ -320,12 +353,12 @@ function evaluateLinkHealth(nowMs: number = Date.now()) {
     logInfo(`link health OK (last heartbeat ${seconds}s ago)`, {
       lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
     });
-  } else if (nextHealth === "sleeping") {
-    logWarn(`link seems sleepy (no heartbeat for ${seconds}s)`, {
+  } else if (nextHealth === "warn") {
+    logWarn(`link slowing (no heartbeat for ${seconds}s)`, {
       lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
     });
   } else {
-    logCritical(`link stalled (no heartbeat for ${seconds}s)`, {
+    logCritical(`link critical (no heartbeat for ${seconds}s)`, {
       lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
     });
   }
@@ -417,87 +450,160 @@ function stopLoops() {
   }
 }
 
-ws.on("open", () => {
-  logInfo("[ws] connected");
-  sendMessage({
-    type: "hello",
-    client_id: CLIENT_ID,
-    session_tag: "dev-demo",
+function startRealtimeClient() {
+  console.log(`Connecting to ${NODE_ADDR} as ${CLIENT_ID}...`);
+  ws = new WebSocket(NODE_ADDR);
+
+  ws.on("open", () => {
+    logInfo("[ws] connected");
+    sendMessage({
+      type: "hello",
+      client_id: CLIENT_ID,
+      session_tag: "dev-demo",
+    });
+    logSnapshot("startup");
   });
-  logSnapshot("startup");
-});
 
-ws.on("message", (data) => {
-  try {
-    const parsed = JSON.parse(data.toString()) as LtpOutgoingMessage;
-    logInfo("recv", { payload: parsed });
+  ws.on("message", (data) => {
+    try {
+      const parsed = JSON.parse(data.toString()) as LtpOutgoingMessage;
+      logInfo("recv", { payload: parsed });
 
-    if (parsed.type === "error") {
-      logWarn("node error", { message: parsed.message });
-      return;
-    }
-
-    if (parsed.type === "hello_ack") {
-      if (parsed.accepted) {
-        logInfo(`[hello] accepted by node ${parsed.node_id}`);
-        devState.connected = true;
-        devState.nodeId = parsed.node_id;
-        renderDevConsole("hello accepted", true);
-        startHeartbeatLoop();
-        startOrientationLoop();
-        startRouteLoopFallback();
-        startHealthMonitor();
-      } else {
-        logCritical("[hello] rejected by node");
-        ws.close();
+      if (parsed.type === "error") {
+        logWarn("node error", { message: parsed.message });
+        return;
       }
-      return;
+
+      if (parsed.type === "hello_ack") {
+        if (parsed.accepted) {
+          logInfo(`[hello] accepted by node ${parsed.node_id}`);
+          devState.connected = true;
+          devState.nodeId = parsed.node_id;
+          renderDevConsole("hello accepted", true);
+          startHeartbeatLoop();
+          startOrientationLoop();
+          startRouteLoopFallback();
+          startHealthMonitor();
+        } else {
+          logCritical("[hello] rejected by node");
+          ws?.close();
+        }
+        return;
+      }
+
+      if (parsed.type === "heartbeat_ack") {
+        recordHeartbeat(parsed.timestamp_ms);
+        evaluateLinkHealth();
+        logInfo(`[heartbeat] ack for ${parsed.client_id}`, {
+          at: devState.snapshot.lastHeartbeatAt,
+        });
+        renderDevConsole("heartbeat_ack");
+        return;
+      }
+
+      if (parsed.type === "route_suggestion") {
+        const debug = parsed.debug ?? {};
+        const orientation = debug.time_orientation
+          ? `${debug.time_orientation.direction}(${debug.time_orientation.strength})`
+          : "n/a";
+        const focus = debug.focus_momentum ?? "n/a";
+        logInfo("route_suggestion", {
+          sector: parsed.suggested_sector,
+          reason: parsed.reason ?? "n/a",
+          focusMomentum: focus,
+          orientation,
+        });
+
+        updateRoutingSnapshot(parsed.suggested_sector, parsed.reason, debug);
+        renderDevConsole("route_suggestion", true);
+        return;
+      }
+    } catch (err) {
+      logCritical("[error] failed to parse message", { err });
     }
+  });
 
-    if (parsed.type === "heartbeat_ack") {
-      recordHeartbeat(parsed.timestamp_ms);
-      evaluateLinkHealth();
-      logInfo(`[heartbeat] ack for ${parsed.client_id}`, {
-        at: devState.snapshot.lastHeartbeatAt,
-      });
-      renderDevConsole("heartbeat_ack");
-      return;
-    }
+  ws.on("close", () => {
+    logWarn("[ws] closed");
+    stopLoops();
+    process.exit(0);
+  });
 
-    if (parsed.type === "route_suggestion") {
-      const debug = parsed.debug ?? {};
-      const orientation = debug.time_orientation
-        ? `${debug.time_orientation.direction}(${debug.time_orientation.strength})`
-        : "n/a";
-      const focus = debug.focus_momentum ?? "n/a";
-      logInfo("route_suggestion", {
-        sector: parsed.suggested_sector,
-        reason: parsed.reason ?? "n/a",
-        focusMomentum: focus,
-        orientation,
-      });
-
-      updateRoutingSnapshot(parsed.suggested_sector, parsed.reason, debug);
-      renderDevConsole("route_suggestion", true);
-      return;
-    }
-  } catch (err) {
-    logCritical("[error] failed to parse message", { err });
-  }
-});
-
-ws.on("close", () => {
-  logWarn("[ws] closed");
-  stopLoops();
-  process.exit(0);
-});
-
-ws.on("error", (err) => {
-  logCritical("[ws] error", { err });
-});
+  ws.on("error", (err) => {
+    logCritical("[ws] error", { err });
+  });
+}
 
 process.on("SIGINT", () => {
   logWarn("\n[signal] SIGINT received, shutting down...");
   stopLoops();
-  ws.close();
+  ws?.close();
 });
+
+function runScenarioMode() {
+  logInfo("Starting scenario mode: simulating OK → WARN → CRITICAL link health");
+  devState.connected = true;
+  devState.nodeId = "ltp-simulated-node";
+
+  updateOrientationSnapshot(0.62, { direction: "present", strength: 0.55 });
+  updateRoutingSnapshot("sector.alpha", "demo routing under scenario", {
+    focus_momentum: 0.62,
+    time_orientation: { direction: "present", strength: 0.55 },
+  });
+
+  const baseHeartbeatTs = Date.now();
+  recordHeartbeat(baseHeartbeatTs);
+  renderDevConsole("scenario warmup", true);
+  startHealthMonitor();
+
+  const sendSimHeartbeat = (label: string) => {
+    const ts = Date.now();
+    logInfo(`[scenario] heartbeat ${label}`, { at: ts });
+    recordHeartbeat(ts);
+    renderDevConsole(label);
+  };
+
+  setTimeout(() => sendSimHeartbeat("steady-2"), 1500);
+  setTimeout(() => sendSimHeartbeat("steady-3"), 3500);
+
+  setTimeout(() => {
+    logWarn("[scenario] introducing drift; next heartbeat delayed", {
+      warnAfterMs: HEALTH_OK_THRESHOLD_MS,
+    });
+  }, 8000);
+
+  setTimeout(() => {
+    evaluateLinkHealth();
+    renderDevConsole("warn drift", true);
+  }, HEALTH_OK_THRESHOLD_MS + 5000);
+
+  setTimeout(() => {
+    logCritical("[scenario] holding heartbeat to force critical state", {
+      criticalAfterMs: HEALTH_WARN_THRESHOLD_MS,
+    });
+  }, HEALTH_WARN_THRESHOLD_MS - 3000);
+
+  setTimeout(() => {
+    evaluateLinkHealth();
+    renderDevConsole("critical drift", true);
+  }, HEALTH_WARN_THRESHOLD_MS + 1000);
+
+  setTimeout(() => {
+    logInfo("[scenario] scenario complete; shutting down");
+    stopLoops();
+    process.exit(0);
+  }, HEALTH_WARN_THRESHOLD_MS + 7000);
+}
+
+function main() {
+  if (SCENARIO_MODE) {
+    runScenarioMode();
+    return;
+  }
+
+  startRealtimeClient();
+}
+
+if (require.main === module) {
+  main();
+}

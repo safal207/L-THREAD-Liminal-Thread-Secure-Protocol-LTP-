@@ -39,7 +39,7 @@ pnpm ts-node scripts/dev/ltp-node-demo.ts
 
 You should see `hello/hello_ack`, periodic `heartbeat/heartbeat_ack`, orientation updates, and `route_suggestion` messages that react to the simulated time-focus shifts.
 
-Example live console output (Dev Console v0.1):
+Example live console output (Dev Console v0.2):
 
 ```
 === LTP DEV CONSOLE v0.1 ===
@@ -62,45 +62,45 @@ debug: {"focus_momentum":0.82,"time_orientation":{"direction":"future","strength
 update: route_suggestion
 ```
 
-### LTP Dev Console: severity & health-check
+### LTP Dev Console: severity & health-check + scenario mode
 
 The Dev Console client now emits structured log events with severities and keeps a JSON snapshot of the current link/focus/routing state.
 
 - **Severity levels:**
   - `info` — regular heartbeat/orientation/routing updates.
-  - `warn` — soft alerts (e.g., sleepy link or low focus momentum).
+  - `warn` — soft alerts (e.g., drift detected, low focus momentum).
   - `critical` — stalled link or parse failures.
 - **Link health (`linkHealth` in the snapshot):**
-  - `ok` — heartbeat seen in the last 10s.
-  - `sleeping` — no heartbeat for 10–30s.
-  - `stalled` — silence for 30s+ (auto-logged as `critical`).
+  - `ok` — heartbeat seen in the last 10s (link stable).
+  - `warn` — no heartbeat for ~10–25s (drift or delay building up).
+  - `critical` — silence for 25s+ (link at risk, reroute/reconnect).
 
-Run steps (same as v0.1):
+#### Running the Dev Console in scenario mode (simulated OK → WARN → CRITICAL)
+
+1. Start the Rust node (same as before):
 
 ```bash
 LTP_NODE_ADDR=127.0.0.1:7070 cargo run -p ltp-rust-node
-LTP_NODE_WS_URL=ws://127.0.0.1:7070 \
-LTP_CLIENT_ID=demo-client-1 \
-pnpm ts-node scripts/dev/ltp-node-demo.ts
 ```
 
-Example output highlights:
+2. Launch the Dev Console with scenario mode enabled (no real traffic needed; it simulates heartbeat drift):
+
+```bash
+pnpm ts-node scripts/dev/ltp-node-demo.ts --scenario
+```
+
+Sample 6-line snapshot from the scenario run:
 
 ```
-[info] [ws] connected @ 2025-12-10T12:34:56.000Z
-[info] [heartbeat] ack for demo-client-1 @ 2025-12-10T12:35:01.000Z
-[warn] Low focus momentum – suggest soft routing @ 2025-12-10T12:35:12.000Z
-[critical] link stalled (no heartbeat for 47s) @ 2025-12-10T12:36:00.000Z
-
-=== LTP DEV SNAPSHOT ===
-{
-  "lastHeartbeatAt": "2025-12-10T12:35:01.000Z",
-  "focusMomentum": { "value": 0.18, "trend": "falling" },
-  "timeWeave": { "depthScore": 3 },
-  "routing": { "suggestedSector": "future_planning_high_momentum" },
-  "linkHealth": "sleeping"
-}
+2025-12-10T12:00:00.000Z | INFO | [scenario] heartbeat steady-2 | link=ok | hb=2025-12-10T12:00:00.000Z | ori=present | route=sector.alpha
+2025-12-10T12:00:11.000Z | WARN | link slowing (no heartbeat for 11s) | link=warn | hb=2025-12-10T12:00:00.000Z | ori=present | route=sector.alpha
+2025-12-10T12:00:16.000Z | INFO | Snapshot summary | link=warn | hb=2025-12-10T12:00:00.000Z | ori=present | route=sector.alpha
+2025-12-10T12:00:23.000Z | CRITICAL | [scenario] holding heartbeat to force critical state | link=warn | hb=2025-12-10T12:00:00.000Z | ori=present | route=sector.alpha
+2025-12-10T12:00:26.000Z | CRITICAL | link critical (no heartbeat for 26s) | link=critical | hb=2025-12-10T12:00:00.000Z | ori=present | route=sector.alpha
+2025-12-10T12:00:27.000Z | INFO | [scenario] scenario complete; shutting down | link=critical | hb=2025-12-10T12:00:00.000Z | ori=present | route=sector.alpha
 ```
+
+In plain language: `ok` = link stable; `warn` = delays/drift are starting, watch the path; `critical` = link is in the danger zone — reroute, reconnect, or re-evaluate the node.
 
 ### What Makes LTP Different
 
