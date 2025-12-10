@@ -62,6 +62,46 @@ debug: {"focus_momentum":0.82,"time_orientation":{"direction":"future","strength
 update: route_suggestion
 ```
 
+### LTP Dev Console: severity & health-check
+
+The Dev Console client now emits structured log events with severities and keeps a JSON snapshot of the current link/focus/routing state.
+
+- **Severity levels:**
+  - `info` — regular heartbeat/orientation/routing updates.
+  - `warn` — soft alerts (e.g., sleepy link or low focus momentum).
+  - `critical` — stalled link or parse failures.
+- **Link health (`linkHealth` in the snapshot):**
+  - `ok` — heartbeat seen in the last 10s.
+  - `sleeping` — no heartbeat for 10–30s.
+  - `stalled` — silence for 30s+ (auto-logged as `critical`).
+
+Run steps (same as v0.1):
+
+```bash
+LTP_NODE_ADDR=127.0.0.1:7070 cargo run -p ltp-rust-node
+LTP_NODE_WS_URL=ws://127.0.0.1:7070 \
+LTP_CLIENT_ID=demo-client-1 \
+pnpm ts-node scripts/dev/ltp-node-demo.ts
+```
+
+Example output highlights:
+
+```
+[info] [ws] connected @ 2025-12-10T12:34:56.000Z
+[info] [heartbeat] ack for demo-client-1 @ 2025-12-10T12:35:01.000Z
+[warn] Low focus momentum – suggest soft routing @ 2025-12-10T12:35:12.000Z
+[critical] link stalled (no heartbeat for 47s) @ 2025-12-10T12:36:00.000Z
+
+=== LTP DEV SNAPSHOT ===
+{
+  "lastHeartbeatAt": "2025-12-10T12:35:01.000Z",
+  "focusMomentum": { "value": 0.18, "trend": "falling" },
+  "timeWeave": { "depthScore": 3 },
+  "routing": { "suggestedSector": "future_planning_high_momentum" },
+  "linkHealth": "sleeping"
+}
+```
+
 ### What Makes LTP Different
 
 Unlike traditional HTTPS/WebSocket protocols that treat data as isolated transactions, LTP maintains a continuous **liminal thread session** that:
