@@ -59,8 +59,45 @@ export type LtpOutgoingMessage =
       message: string;
     };
 
+type LogSeverity = "info" | "warn" | "critical";
+
+interface DevConsoleEvent {
+  severity: LogSeverity;
+  message: string;
+  details?: Record<string, unknown>;
+  timestamp: string; // ISO
+}
+
+interface DevConsoleSnapshot {
+  lastHeartbeatAt?: string;
+  lastOrientationSummary?: {
+    sectors?: string[];
+    direction?: TimeOrientationDirectionPayload;
+    strength?: number;
+  };
+  timeWeave?: {
+    depthScore?: number;
+    meta?: unknown;
+  };
+  focusMomentum?: {
+    value?: number;
+    trend?: "rising" | "falling" | "stable" | "unknown";
+  };
+  routing?: {
+    intent?: string;
+    suggestedSector?: string;
+    reason?: string;
+    debug?: RouteSuggestionDebug;
+  };
+  linkHealth?: "ok" | "stalled" | "sleeping";
+}
+
 const NODE_ADDR = process.env.LTP_NODE_WS_URL ?? "ws://127.0.0.1:7070";
 const CLIENT_ID = process.env.LTP_CLIENT_ID ?? "demo-client-1";
+
+const HEALTH_CHECK_INTERVAL_MS = 5000;
+const HEALTH_OK_THRESHOLD_MS = 10_000;
+const HEALTH_SLEEPY_THRESHOLD_MS = 30_000;
 
 console.log(`Connecting to ${NODE_ADDR} as ${CLIENT_ID}...`);
 
@@ -69,23 +106,54 @@ const ws = new WebSocket(NODE_ADDR);
 let heartbeatInterval: NodeJS.Timeout | undefined;
 let orientationInterval: NodeJS.Timeout | undefined;
 let routeInterval: NodeJS.Timeout | undefined;
+let healthCheckInterval: NodeJS.Timeout | undefined;
+
+function logEvent(
+  severity: LogSeverity,
+  message: string,
+  details?: Record<string, unknown>,
+): DevConsoleEvent {
+  const event: DevConsoleEvent = {
+    severity,
+    message,
+    details,
+    timestamp: new Date().toISOString(),
+  };
+
+  const detailText = details && Object.keys(details).length > 0
+    ? `\n       ${JSON.stringify(details, null, 2).replace(/\n/g, "\n       ")}`
+    : "";
+
+  console.log(`[${event.severity}] ${event.message} @ ${event.timestamp}${detailText}`);
+
+  return event;
+}
+
+function logInfo(message: string, details?: Record<string, unknown>): void {
+  logEvent("info", message, details);
+}
+
+function logWarn(message: string, details?: Record<string, unknown>): void {
+  logEvent("warn", message, details);
+}
+
+function logCritical(message: string, details?: Record<string, unknown>): void {
+  logEvent("critical", message, details);
+}
 
 type DevConsoleState = {
   connected: boolean;
   nodeId?: string;
   lastHeartbeatAck?: number;
-  focusMomentum?: number;
-  timeOrientation?: TimeOrientationBoostPayload;
-  depthScore?: number;
-  route?: {
-    sector: string;
-    reason?: string;
-    debug?: RouteSuggestionDebug;
-  };
+  snapshot: DevConsoleSnapshot;
+  routeDebug?: RouteSuggestionDebug;
 };
 
 const devState: DevConsoleState = {
   connected: false,
+  snapshot: {
+    linkHealth: "stalled",
+  },
 };
 
 const orientationPhases: Array<{
@@ -109,7 +177,7 @@ const orientationPhases: Array<{
 let orientationIndex = 0;
 
 function sendMessage(msg: LtpIncomingMessage) {
-  console.log("[send]", JSON.stringify(msg));
+  logInfo("send", { payload: msg });
   ws.send(JSON.stringify(msg));
 }
 
@@ -134,14 +202,15 @@ function sendOrientationAndRoute() {
     time_orientation: phase.time_orientation,
   });
 
-  devState.focusMomentum = phase.focus_momentum;
-  devState.timeOrientation = phase.time_orientation;
-  devState.depthScore = computeDepthScore(phase.focus_momentum, phase.time_orientation);
+  updateOrientationSnapshot(phase.focus_momentum, phase.time_orientation);
 
   sendMessage({
     type: "route_request",
     client_id: CLIENT_ID,
+    hint_sector: devState.snapshot.routing?.suggestedSector,
   });
+
+  logSnapshot("orientation+route dispatched");
 }
 
 function startOrientationLoop() {
@@ -157,6 +226,7 @@ function startRouteLoopFallback() {
     sendMessage({
       type: "route_request",
       client_id: CLIENT_ID,
+      hint_sector: devState.snapshot.routing?.suggestedSector,
     });
   }, 25000);
 }
@@ -171,11 +241,11 @@ function computeDepthScore(
   return Math.min(5, Math.max(0, Math.round(blend)));
 }
 
-function formatTrend(focusMomentum?: number): string {
+function computeFocusTrend(focusMomentum?: number): "rising" | "falling" | "stable" | "unknown" {
   if (focusMomentum === undefined) return "unknown";
-  if (focusMomentum >= 0.75) return `rising (${focusMomentum.toFixed(2)})`;
-  if (focusMomentum >= 0.45) return `stable (${focusMomentum.toFixed(2)})`;
-  return `falling (${focusMomentum.toFixed(2)})`;
+  if (focusMomentum >= 0.75) return "rising";
+  if (focusMomentum >= 0.45) return "stable";
+  return "falling";
 }
 
 function describeDepth(depthScore?: number): string {
@@ -185,20 +255,121 @@ function describeDepth(depthScore?: number): string {
   return `${depthScore} (shallow)`;
 }
 
-function renderDevConsole(reason: string) {
-  const orientationText = devState.timeOrientation
-    ? `${devState.timeOrientation.direction} (${devState.timeOrientation.strength.toFixed(2)})`
-    : "n/a";
-  const depthText = describeDepth(devState.depthScore);
-  const focusText = formatTrend(devState.focusMomentum);
-  const nodeText = devState.connected ? devState.nodeId ?? "(node)" : "disconnected";
-  const routerIntent = devState.route
-    ? devState.route.sector
-    : "awaiting suggestion";
+function updateOrientationSnapshot(
+  focusMomentum?: number,
+  timeOrientation?: TimeOrientationBoostPayload,
+) {
+  const trend = computeFocusTrend(focusMomentum);
+  const depthScore = computeDepthScore(focusMomentum, timeOrientation);
 
-  console.log("\n=== LTP DEV CONSOLE v0.1 ===");
+  devState.snapshot.focusMomentum = {
+    value: focusMomentum,
+    trend,
+  };
+  devState.snapshot.lastOrientationSummary = {
+    sectors: undefined,
+    direction: timeOrientation?.direction,
+    strength: timeOrientation?.strength,
+  };
+  devState.snapshot.timeWeave = {
+    depthScore,
+  };
+}
+
+function updateRoutingSnapshot(suggestedSector: string, reason?: string, debug?: RouteSuggestionDebug) {
+  devState.snapshot.routing = {
+    suggestedSector,
+    intent: devState.snapshot.routing?.intent ?? "router.intent",
+    reason,
+    debug,
+  };
+  devState.routeDebug = debug;
+}
+
+function recordHeartbeat(timestampMs: number) {
+  devState.lastHeartbeatAck = timestampMs;
+  devState.snapshot.lastHeartbeatAt = new Date(timestampMs).toISOString();
+  devState.snapshot.linkHealth = "ok";
+}
+
+function evaluateLinkHealth(nowMs: number = Date.now()) {
+  const lastHeartbeat = devState.snapshot.lastHeartbeatAt
+    ? Date.parse(devState.snapshot.lastHeartbeatAt)
+    : undefined;
+
+  const elapsedMs = lastHeartbeat ? nowMs - lastHeartbeat : Infinity;
+
+  let nextHealth: DevConsoleSnapshot["linkHealth"] = devState.snapshot.linkHealth;
+
+  if (elapsedMs < HEALTH_OK_THRESHOLD_MS) {
+    nextHealth = "ok";
+  } else if (elapsedMs < HEALTH_SLEEPY_THRESHOLD_MS) {
+    nextHealth = "sleeping";
+  } else {
+    nextHealth = "stalled";
+  }
+
+  if (nextHealth === devState.snapshot.linkHealth) {
+    return;
+  }
+
+  devState.snapshot.linkHealth = nextHealth;
+
+  const seconds = Math.round(elapsedMs / 1000);
+  if (nextHealth === "ok") {
+    logInfo(`link health OK (last heartbeat ${seconds}s ago)`, {
+      lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
+    });
+  } else if (nextHealth === "sleeping") {
+    logWarn(`link seems sleepy (no heartbeat for ${seconds}s)`, {
+      lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
+    });
+  } else {
+    logCritical(`link stalled (no heartbeat for ${seconds}s)`, {
+      lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
+    });
+  }
+}
+
+function startHealthMonitor() {
+  evaluateLinkHealth();
+  healthCheckInterval = setInterval(() => {
+    evaluateLinkHealth();
+  }, HEALTH_CHECK_INTERVAL_MS);
+}
+
+function logSnapshot(reason?: string) {
+  console.log("\n=== LTP DEV SNAPSHOT ===");
+  console.log(JSON.stringify(devState.snapshot, null, 2));
+
+  const summary = {
+    linkHealth: devState.snapshot.linkHealth,
+    heartbeat: devState.snapshot.lastHeartbeatAt,
+    focusMomentum: devState.snapshot.focusMomentum,
+    routing: devState.snapshot.routing,
+    depthScore: devState.snapshot.timeWeave?.depthScore,
+    reason,
+  };
+
+  logInfo("Snapshot summary", summary);
+}
+
+function renderDevConsole(reason: string, logState = false) {
+  const orientationText = devState.snapshot.lastOrientationSummary
+    ? `${devState.snapshot.lastOrientationSummary.direction ?? ""} (${(devState.snapshot.lastOrientationSummary.strength ?? 0).toFixed(2)})`
+    : "n/a";
+  const depthText = describeDepth(devState.snapshot.timeWeave?.depthScore);
+  const focusValue = devState.snapshot.focusMomentum?.value;
+  const focusText = devState.snapshot.focusMomentum?.trend
+    ? `${devState.snapshot.focusMomentum.trend} (${focusValue?.toFixed(2) ?? "n/a"})`
+    : "unknown";
+  const nodeText = devState.connected ? devState.nodeId ?? "(node)" : "disconnected";
+  const routerIntent = devState.snapshot.routing?.suggestedSector ?? "awaiting suggestion";
+
+  console.log("\n=== LTP DEV CONSOLE v0.2 ===");
   console.log(`[node] ${nodeText}`);
   console.log(`[heartbeat] last ack: ${devState.lastHeartbeatAck ?? "n/a"}`);
+  console.log(`[link] health: ${devState.snapshot.linkHealth ?? "unknown"}`);
 
   console.log("\n=== ORIENTATION WEB ===");
   console.log(`focusMomentum: ${focusText}`);
@@ -206,22 +377,29 @@ function renderDevConsole(reason: string) {
 
   console.log("\n=== TIMEWEAVE ===");
   console.log(`depthScore: ${depthText}`);
-  if (devState.depthScore !== undefined && devState.depthScore >= 4) {
-    console.log("★ Deep weave – allow speculative routing");
+  if (devState.snapshot.timeWeave?.depthScore !== undefined && devState.snapshot.timeWeave.depthScore >= 4) {
+    logInfo("Deep weave – allow speculative routing", { depthScore: devState.snapshot.timeWeave.depthScore });
   }
 
   console.log("\n=== ROUTING ===");
   console.log(`router.intent → sector: ${routerIntent}`);
-  if (devState.route?.reason) {
-    console.log(`reason: ${devState.route.reason}`);
+  if (devState.snapshot.routing?.reason) {
+    console.log(`reason: ${devState.snapshot.routing.reason}`);
   }
-  if (devState.focusMomentum !== undefined && devState.focusMomentum < 0.45) {
-    console.log("⚠ Low focus momentum – suggest soft routing");
+  if (focusValue !== undefined && focusValue < 0.45) {
+    logWarn("Low focus momentum – suggest soft routing", {
+      focusMomentum: focusValue,
+      trend: devState.snapshot.focusMomentum?.trend,
+    });
   } else {
     console.log("★ Stable focus – normal routing");
   }
-  console.log(`debug: ${JSON.stringify(devState.route?.debug ?? {}, null, 2)}`);
+  console.log(`debug: ${JSON.stringify(devState.snapshot.routing?.debug ?? {}, null, 2)}`);
   console.log(`update: ${reason}`);
+
+  if (logState) {
+    logSnapshot(reason);
+  }
 }
 
 function stopLoops() {
@@ -234,46 +412,54 @@ function stopLoops() {
   if (routeInterval) {
     clearInterval(routeInterval);
   }
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval);
+  }
 }
 
 ws.on("open", () => {
-  console.log("[ws] connected");
+  logInfo("[ws] connected");
   sendMessage({
     type: "hello",
     client_id: CLIENT_ID,
     session_tag: "dev-demo",
   });
+  logSnapshot("startup");
 });
 
 ws.on("message", (data) => {
   try {
     const parsed = JSON.parse(data.toString()) as LtpOutgoingMessage;
-    console.log("[recv]", parsed);
+    logInfo("recv", { payload: parsed });
 
     if (parsed.type === "error") {
-      console.error(`[error] ${parsed.message}`);
+      logWarn("node error", { message: parsed.message });
       return;
     }
 
     if (parsed.type === "hello_ack") {
       if (parsed.accepted) {
-        console.log(`[hello] accepted by node ${parsed.node_id}`);
+        logInfo(`[hello] accepted by node ${parsed.node_id}`);
         devState.connected = true;
         devState.nodeId = parsed.node_id;
-        renderDevConsole("hello accepted");
+        renderDevConsole("hello accepted", true);
         startHeartbeatLoop();
         startOrientationLoop();
         startRouteLoopFallback();
+        startHealthMonitor();
       } else {
-        console.error("[hello] rejected by node");
+        logCritical("[hello] rejected by node");
         ws.close();
       }
       return;
     }
 
     if (parsed.type === "heartbeat_ack") {
-      console.log(`[heartbeat] ack for ${parsed.client_id} at ${parsed.timestamp_ms}`);
-      devState.lastHeartbeatAck = parsed.timestamp_ms;
+      recordHeartbeat(parsed.timestamp_ms);
+      evaluateLinkHealth();
+      logInfo(`[heartbeat] ack for ${parsed.client_id}`, {
+        at: devState.snapshot.lastHeartbeatAt,
+      });
       renderDevConsole("heartbeat_ack");
       return;
     }
@@ -284,35 +470,34 @@ ws.on("message", (data) => {
         ? `${debug.time_orientation.direction}(${debug.time_orientation.strength})`
         : "n/a";
       const focus = debug.focus_momentum ?? "n/a";
-      console.log(
-        `[route] sector=${parsed.suggested_sector} reason="${parsed.reason ?? "n/a"}" ` +
-          `debug: focusMomentum=${focus} orientation=${orientation}`,
-      );
-      devState.route = {
+      logInfo("route_suggestion", {
         sector: parsed.suggested_sector,
-        reason: parsed.reason,
-        debug,
-      };
-      renderDevConsole("route_suggestion");
+        reason: parsed.reason ?? "n/a",
+        focusMomentum: focus,
+        orientation,
+      });
+
+      updateRoutingSnapshot(parsed.suggested_sector, parsed.reason, debug);
+      renderDevConsole("route_suggestion", true);
       return;
     }
   } catch (err) {
-    console.error("[error] failed to parse message", err);
+    logCritical("[error] failed to parse message", { err });
   }
 });
 
 ws.on("close", () => {
-  console.log("[ws] closed");
+  logWarn("[ws] closed");
   stopLoops();
   process.exit(0);
 });
 
 ws.on("error", (err) => {
-  console.error("[ws] error", err);
+  logCritical("[ws] error", { err });
 });
 
 process.on("SIGINT", () => {
-  console.log("\n[signal] SIGINT received, shutting down...");
+  logWarn("\n[signal] SIGINT received, shutting down...");
   stopLoops();
   ws.close();
 });
