@@ -49,3 +49,20 @@ export interface TimeWeaveSummary {
    */
   timeSpanMs: number;
 }
+
+export interface TimeWeaveDepth {
+  totalDepth: number;
+  branchCount: number;
+  avgBranchLength: number;
+  maxBranchLength: number;
+  complexityScore: number;
+  /**
+   * Strength of directional change in the most active, recent segments.
+   * Range: 0..1 (0 = stagnant, 1 = strong coordinated drift)
+   */
+  focusMomentum?: number;
+}
+
+export interface TimeWeaveMeta {
+  depth: TimeWeaveDepth;
+}

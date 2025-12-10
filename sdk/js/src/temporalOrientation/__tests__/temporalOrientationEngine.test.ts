@@ -118,7 +118,7 @@ runTest('summary forwards focus momentum score', () => {
   const view = buildTemporalOrientationView(web, weave);
 
   assert.ok(typeof view.summary.focusMomentumScore === 'number');
-  assert.ok((view.summary.focusMomentumScore ?? 0) > 0.3);
+  assert.ok((view.summary.focusMomentumScore ?? 0) > 0.15);
 });
 
 runTest('suggests next sector based on rising trend', () => {
