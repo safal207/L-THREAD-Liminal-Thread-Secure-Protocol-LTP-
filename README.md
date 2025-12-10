@@ -117,8 +117,8 @@ npm run dev:ltp-node-demo -- --verbose   # add --scenario to simulate OK → WAR
 Sample output (colors appear in the terminal):
 
 ```
-[OK] hb=42ms jitter=6ms | routing=sector.alpha intent=STABLE | focusMomentum=+0.72
-[WARN] hb=410ms | routing=sector.beta intent=ADJUST | fm=–
+[OK] hb=42ms jitter=6ms | routing=sector.alpha intent=STABLE | fm: ▂▄█▆█▅ (0.81)
+[WARN] hb=410ms | routing=sector.beta intent=ADJUST | fm: ▂▃▂▁ (-0.22)
 [CRIT] hb=? | fm=–
 ```
 

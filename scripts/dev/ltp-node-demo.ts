@@ -103,6 +103,9 @@ const ARGS = process.argv.slice(2);
 const SCENARIO_MODE = process.env.SCENARIO_MODE === "1" || ARGS.includes("--scenario");
 const VERBOSE = ARGS.includes("--verbose") || ARGS.includes("-v");
 
+const FOCUS_HISTORY_LIMIT = 16;
+const focusMomentumHistory: number[] = [];
+
 const HEALTH_CHECK_INTERVAL_MS = 5000;
 const HEALTH_OK_THRESHOLD_MS = 10_000;
 const HEALTH_WARN_THRESHOLD_MS = 25_000;
@@ -191,6 +194,31 @@ function formatSigned(value: number): string {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
+const SPARK_BLOCKS = ["▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"] as const;
+
+export function renderMomentumSparkline(history: number[]): string {
+  if (!history.length) return "";
+  const max = Math.max(...history.map((v) => Math.abs(v))) || 1;
+  return history
+    .map((v) => {
+      const norm = Math.min(Math.abs(v) / max, 1);
+      const idx = Math.min(
+        SPARK_BLOCKS.length - 1,
+        Math.floor(norm * (SPARK_BLOCKS.length - 1)),
+      );
+      return SPARK_BLOCKS[idx];
+    })
+    .join("");
+}
+
+function recordFocusMomentum(value: number | undefined): void {
+  if (value === undefined || Number.isNaN(value)) return;
+  focusMomentumHistory.push(value);
+  if (focusMomentumHistory.length > FOCUS_HISTORY_LIMIT) {
+    focusMomentumHistory.shift();
+  }
+}
+
 export function renderDevSnapshot(
   snapshot: DevConsoleSnapshot,
   options?: { verbose?: boolean },
@@ -224,7 +252,9 @@ export function renderDevSnapshot(
   }
 
   if (focusMomentum !== undefined) {
-    sections.push(`| focusMomentum=${formatSigned(focusMomentum)}`);
+    const spark = renderMomentumSparkline(focusMomentumHistory);
+    const sparkPart = spark ? ` ${spark}` : "";
+    sections.push(`| fm:${sparkPart} (${formatSigned(focusMomentum)})`);
   } else {
     sections.push(`| fm=–`);
   }
@@ -348,6 +378,8 @@ function updateOrientationSnapshot(
   const trend = computeFocusTrend(focusMomentum);
   const depthScore = computeDepthScore(focusMomentum, timeOrientation);
 
+  recordFocusMomentum(focusMomentum);
+
   devState.snapshot.focusMomentum = {
     value: focusMomentum,
     trend,
@@ -370,6 +402,10 @@ function updateRoutingSnapshot(suggestedSector: string, reason?: string, debug?:
     debug,
   };
   devState.routeDebug = debug;
+
+  if (debug?.focus_momentum !== undefined) {
+    recordFocusMomentum(debug.focus_momentum);
+  }
 }
 
 function recordHeartbeat(timestampMs: number) {
