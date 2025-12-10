@@ -12,6 +12,7 @@ import {
   type RoutingMode,
   type RoutingPriority,
 } from '../routing/fuzzyRoutingEngine';
+import { computeMomentumMetrics } from '../temporalOrientation/fuzzyMomentum';
 
 interface DemoClientState {
   id: string;
@@ -118,9 +119,13 @@ function buildSnapshots(
   });
 }
 
-function buildDemoOrientationViewFromClient(client: DemoClientState): TemporalOrientationView {
+function buildDemoOrientationViewFromClient(
+  client: DemoClientState,
+  momentumOverride?: number,
+): TemporalOrientationView {
   const web = buildDemoOrientationWeb();
-  const sectors = buildSnapshots(web, client.timeWeaveDepthScore, client.focusMomentumScore);
+  const focusMomentumScore = typeof momentumOverride === 'number' ? momentumOverride : client.focusMomentumScore;
+  const sectors = buildSnapshots(web, client.timeWeaveDepthScore, focusMomentumScore);
 
   const risingSectors = sectors.filter((snapshot) => snapshot.branchTrend === 'rising').map((snapshot) => snapshot.sectorId);
   const fallingSectors = sectors
@@ -131,13 +136,13 @@ function buildDemoOrientationViewFromClient(client: DemoClientState): TemporalOr
     .map((snapshot) => snapshot.sectorId);
 
   const summary: TemporalOrientationSummary = {
-    globalTrend: deriveTrendFromMomentum(client.focusMomentumScore),
+    globalTrend: deriveTrendFromMomentum(focusMomentumScore),
     activeSectorCount: sectors.filter((snapshot) => snapshot.isActive).length,
     risingSectors,
     fallingSectors,
     plateauSectors,
     timeWeaveDepthScore: client.timeWeaveDepthScore,
-    focusMomentumScore: client.focusMomentumScore,
+    focusMomentumScore,
   };
 
   return {
@@ -145,6 +150,18 @@ function buildDemoOrientationViewFromClient(client: DemoClientState): TemporalOr
     sectors,
     summary,
   };
+}
+
+function buildDemoHistoryFromClient(client: DemoClientState): TemporalOrientationView[] {
+  const momentumSeries: Record<string, number[]> = {
+    'client-1': [0.25, 0.45, client.focusMomentumScore],
+    'client-2': [0.15, -0.05, 0.12, client.focusMomentumScore],
+    'client-3': [0.3, 0.15, client.focusMomentumScore],
+  };
+
+  const series = momentumSeries[client.id] ?? [client.focusMomentumScore];
+
+  return series.map((momentumValue) => buildDemoOrientationViewFromClient(client, momentumValue));
 }
 
 const priorityOrder: RoutingPriority[] = ['high', 'normal', 'low'];
@@ -180,9 +197,11 @@ function formatEvents(events: string[]): string {
 
 export function runSmartRouterDemo(): void {
   demoClients.forEach((client) => {
-    const view = buildDemoOrientationViewFromClient(client);
+    const history = buildDemoHistoryFromClient(client);
+    const view = history[history.length - 1] ?? buildDemoOrientationViewFromClient(client);
+    const momentum = computeMomentumMetrics(history.length > 0 ? history : [view]);
     const entropyLevel = deriveEntropyFromOrientation(view);
-    const hints = buildRouteHintsFromOrientation(view);
+    const hints = buildRouteHintsFromOrientation(view, { history: history.length > 0 ? history : [view] });
     const best = pickBestRouteHint(hints);
 
     console.log(`===== Client: ${client.id} =====`);
@@ -194,6 +213,7 @@ export function runSmartRouterDemo(): void {
       'Momentum:',
       client.focusMomentumScore.toFixed(2),
     );
+    console.log('Momentum slope/strength:', momentum.slope, momentum.strength.toFixed(2));
     console.log('Total sectors:', hints.length);
     console.log('Entropy level:', entropyLevel.toFixed(2));
 

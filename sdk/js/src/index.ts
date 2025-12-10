@@ -137,12 +137,15 @@ export {
   pickNextSector,
   suggestNextSector,
 } from './temporalOrientation/temporalOrientationEngine';
+export { computeMomentumMetrics } from './temporalOrientation/fuzzyMomentum';
 export type {
   NextThreadSuggestion,
   SectorTemporalSnapshot,
   TemporalOrientationSummary,
   TemporalOrientationView,
+  TemporalSlope,
   TemporalTrend,
+  MomentumMetrics,
 } from './temporalOrientation/temporalOrientationTypes';
 export type {
   TemporalOrientationBuildResult,
