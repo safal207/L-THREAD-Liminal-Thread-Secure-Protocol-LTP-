@@ -248,7 +248,11 @@ export function computeRouteHintForSector(
   const confidentAfterContext = clamp01(baseConfidence + softContext.confidenceDelta);
   const routeConfidence = applyEntropyPenalty(confidentAfterContext, ctx.entropyLevel);
 
-  const reasonParts = [buildReason(priority, mode), ...softContext.reasonParts];
+  const baseReason = buildReason(priority, mode);
+  const reasonParts = [
+    baseReason,
+    ...softContext.reasonParts,
+  ];
 
   if (ctx.entropyLevel != null && ctx.entropyLevel > 0.8) {
     reasonParts.push('entropy is high, applying safety penalty');
@@ -263,7 +267,8 @@ export function computeRouteHintForSector(
     depthScore: clamp01(ctx.timeWeaveDepthScore),
     focusMomentumScore: clamp(ctx.focusMomentumScore, -1, 1),
     routeConfidence,
-    reason: reasonParts.join('; '),
+    // Combine the base routing explanation with any soft-context notes.
+    reason: reasonParts.filter(Boolean).join('; '),
   };
 }
 
