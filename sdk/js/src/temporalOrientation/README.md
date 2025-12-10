@@ -59,9 +59,26 @@ function pickNextSector(
 ```
 Returns a deterministic `NextSectorSuggestion` based on temporal trends. If the current sector is falling and there is at least one rising sector, it suggests moving to a rising sector. If the current sector is plateau and a rising sector exists, it may suggest the rising sector. If there is no better temporal signal, it recommends staying in place (no suggestion).
 
+### computeMomentumMetrics (Fuzzy Momentum)
+```ts
+function computeMomentumMetrics(
+  history: TemporalOrientationView[],
+  options?: { windowSize?: number },
+): MomentumMetrics
+```
+Calculates a fuzzy momentum vector from a sliding window of recent `TemporalOrientationView` snapshots. The function blends
+trend balance, global trend bias, and focus momentum into a single scalar, then derives:
+
+- `slope`: `'rising' | 'falling' | 'flat' | 'oscillating'` based on the direction and sign changes across the window.
+- `strength`: `0..1` confidence score, amplified when direction is consistent and tempered when oscillating.
+
+Use this to feed adaptive routers or schedulers that need to know whether temporal signals are accelerating, decelerating, or churning. Set `options.windowSize` (default `5`) to tune how many snapshots are considered.
+
 ### Relevant Types
 - `TemporalOrientationView` — top-level view of per-sector snapshots and summary.
 - `TemporalTrend` — `'rising' | 'falling' | 'plateau' | 'mixed'`.
+- `TemporalSlope` — `'rising' | 'falling' | 'flat' | 'oscillating'`.
+- `MomentumMetrics` — `{ slope: TemporalSlope; strength: number }`.
 - `TemporalOrientationBuildResult` — `{ view: TemporalOrientationView; weave: TimeWeave; }`.
 - `NextSectorSuggestion` — `{ fromSectorId: string; suggestedSectorId?: string; reason: string; }`.
 
