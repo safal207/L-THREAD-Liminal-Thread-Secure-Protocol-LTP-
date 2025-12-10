@@ -6,9 +6,14 @@
     "test:cross-sdk": "echo \"Running cross-SDK compatibility tests... (WIP)\"",
     "test:verify-types": "node tests/cross-sdk/verify-types.js",
     "test:security": "echo \"Running security feature tests... (WIP)\"",
-    "test:protocol": "echo \"Running protocol compliance tests... (WIP)\""
+    "test:protocol": "echo \"Running protocol compliance tests... (WIP)\"",
+    "dev:ltp-node-demo": "ts-node scripts/dev/ltp-node-demo.ts"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "ws": "^8.18.3"
   },
   "workspaces": [
     "sdk/js"
