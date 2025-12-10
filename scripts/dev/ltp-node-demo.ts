@@ -1,0 +1,220 @@
+import WebSocket from "ws";
+
+// Shared protocol types mirrored from nodes/ltp-rust-node/src/protocol.rs
+export type TimeOrientationDirectionPayload = "past" | "present" | "future" | "multi";
+
+export interface TimeOrientationBoostPayload {
+  direction: TimeOrientationDirectionPayload;
+  strength: number; // 0..1
+}
+
+export type LtpIncomingMessage =
+  | {
+      type: "hello";
+      client_id: string;
+      session_tag?: string;
+    }
+  | {
+      type: "heartbeat";
+      client_id: string;
+      timestamp_ms: number;
+    }
+  | {
+      type: "orientation";
+      client_id: string;
+      focus_momentum?: number;
+      time_orientation?: TimeOrientationBoostPayload;
+    }
+  | {
+      type: "route_request";
+      client_id: string;
+      hint_sector?: string;
+    };
+
+export type LtpOutgoingMessage =
+  | {
+      type: "hello_ack";
+      node_id: string;
+      accepted: boolean;
+    }
+  | {
+      type: "heartbeat_ack";
+      client_id: string;
+      timestamp_ms: number;
+    }
+  | {
+      type: "route_suggestion";
+      client_id: string;
+      suggested_sector: string;
+      reason?: string;
+      debug?: {
+        focus_momentum?: number;
+        time_orientation?: TimeOrientationBoostPayload;
+      };
+    }
+  | {
+      type: "error";
+      message: string;
+    };
+
+const NODE_ADDR = process.env.LTP_NODE_WS_URL ?? "ws://127.0.0.1:7070";
+const CLIENT_ID = process.env.LTP_CLIENT_ID ?? "demo-client-1";
+
+console.log(`Connecting to ${NODE_ADDR} as ${CLIENT_ID}...`);
+
+const ws = new WebSocket(NODE_ADDR);
+
+let heartbeatInterval: NodeJS.Timeout | undefined;
+let orientationInterval: NodeJS.Timeout | undefined;
+let routeInterval: NodeJS.Timeout | undefined;
+
+const orientationPhases: Array<{
+  focus_momentum: number;
+  time_orientation: TimeOrientationBoostPayload;
+}> = [
+  {
+    focus_momentum: 0.4,
+    time_orientation: { direction: "present", strength: 0.5 },
+  },
+  {
+    focus_momentum: 0.8,
+    time_orientation: { direction: "future", strength: 0.8 },
+  },
+  {
+    focus_momentum: 0.3,
+    time_orientation: { direction: "past", strength: 0.7 },
+  },
+];
+
+let orientationIndex = 0;
+
+function sendMessage(msg: LtpIncomingMessage) {
+  console.log("[send]", JSON.stringify(msg));
+  ws.send(JSON.stringify(msg));
+}
+
+function startHeartbeatLoop() {
+  heartbeatInterval = setInterval(() => {
+    sendMessage({
+      type: "heartbeat",
+      client_id: CLIENT_ID,
+      timestamp_ms: Date.now(),
+    });
+  }, 5000);
+}
+
+function sendOrientationAndRoute() {
+  const phase = orientationPhases[orientationIndex % orientationPhases.length];
+  orientationIndex += 1;
+
+  sendMessage({
+    type: "orientation",
+    client_id: CLIENT_ID,
+    focus_momentum: phase.focus_momentum,
+    time_orientation: phase.time_orientation,
+  });
+
+  sendMessage({
+    type: "route_request",
+    client_id: CLIENT_ID,
+  });
+}
+
+function startOrientationLoop() {
+  // Kick off immediately, then repeat on interval
+  sendOrientationAndRoute();
+  orientationInterval = setInterval(() => {
+    sendOrientationAndRoute();
+  }, 12000);
+}
+
+function startRouteLoopFallback() {
+  routeInterval = setInterval(() => {
+    sendMessage({
+      type: "route_request",
+      client_id: CLIENT_ID,
+    });
+  }, 25000);
+}
+
+function stopLoops() {
+  if (heartbeatInterval) {
+    clearInterval(heartbeatInterval);
+  }
+  if (orientationInterval) {
+    clearInterval(orientationInterval);
+  }
+  if (routeInterval) {
+    clearInterval(routeInterval);
+  }
+}
+
+ws.on("open", () => {
+  console.log("[ws] connected");
+  sendMessage({
+    type: "hello",
+    client_id: CLIENT_ID,
+    session_tag: "dev-demo",
+  });
+});
+
+ws.on("message", (data) => {
+  try {
+    const parsed = JSON.parse(data.toString()) as LtpOutgoingMessage;
+    console.log("[recv]", parsed);
+
+    if (parsed.type === "error") {
+      console.error(`[error] ${parsed.message}`);
+      return;
+    }
+
+    if (parsed.type === "hello_ack") {
+      if (parsed.accepted) {
+        console.log(`[hello] accepted by node ${parsed.node_id}`);
+        startHeartbeatLoop();
+        startOrientationLoop();
+        startRouteLoopFallback();
+      } else {
+        console.error("[hello] rejected by node");
+        ws.close();
+      }
+      return;
+    }
+
+    if (parsed.type === "heartbeat_ack") {
+      console.log(`[heartbeat] ack for ${parsed.client_id} at ${parsed.timestamp_ms}`);
+      return;
+    }
+
+    if (parsed.type === "route_suggestion") {
+      const debug = parsed.debug ?? {};
+      const orientation = debug.time_orientation
+        ? `${debug.time_orientation.direction}(${debug.time_orientation.strength})`
+        : "n/a";
+      const focus = debug.focus_momentum ?? "n/a";
+      console.log(
+        `[route] sector=${parsed.suggested_sector} reason="${parsed.reason ?? "n/a"}" ` +
+          `debug: focusMomentum=${focus} orientation=${orientation}`,
+      );
+      return;
+    }
+  } catch (err) {
+    console.error("[error] failed to parse message", err);
+  }
+});
+
+ws.on("close", () => {
+  console.log("[ws] closed");
+  stopLoops();
+  process.exit(0);
+});
+
+ws.on("error", (err) => {
+  console.error("[ws] error", err);
+});
+
+process.on("SIGINT", () => {
+  console.log("\n[signal] SIGINT received, shutting down...");
+  stopLoops();
+  ws.close();
+});

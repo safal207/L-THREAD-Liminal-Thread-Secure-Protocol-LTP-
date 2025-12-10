@@ -21,6 +21,24 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the 
 - [Investor Pitch](./INVESTOR_PITCH.md) - Executive summary, market opportunity, investment ask
 - [Technical Whitepaper](./WHITEPAPER.md) - Deep technical analysis and research paper
 
+### LTP Rust Node + JS demo client
+
+1. Start the Rust LTP node (assumes WebSocket on `127.0.0.1:7070`):
+
+```bash
+LTP_NODE_ADDR=127.0.0.1:7070 cargo run -p ltp-rust-node
+```
+
+2. In another terminal, run the TypeScript dev client:
+
+```bash
+LTP_NODE_WS_URL=ws://127.0.0.1:7070 \
+LTP_CLIENT_ID=demo-client-1 \
+pnpm ts-node scripts/dev/ltp-node-demo.ts
+```
+
+You should see `hello/hello_ack`, periodic `heartbeat/heartbeat_ack`, orientation updates, and `route_suggestion` messages that react to the simulated time-focus shifts.
+
 ### What Makes LTP Different
 
 Unlike traditional HTTPS/WebSocket protocols that treat data as isolated transactions, LTP maintains a continuous **liminal thread session** that:
