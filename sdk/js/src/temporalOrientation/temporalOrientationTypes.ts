@@ -3,6 +3,13 @@ import type { TimeTick } from '../time/timeWeaveTypes';
 
 export type TemporalTrend = 'rising' | 'falling' | 'plateau' | 'mixed';
 
+export type TemporalSlope = 'rising' | 'falling' | 'flat' | 'oscillating';
+
+export interface MomentumMetrics {
+  slope: TemporalSlope;
+  strength: number; // 0..1
+}
+
 export interface SectorTemporalSnapshot {
   sectorId: string;
   branchId?: string;

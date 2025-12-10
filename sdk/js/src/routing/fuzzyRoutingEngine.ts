@@ -1,16 +1,19 @@
 import type {
+  MomentumMetrics,
   TemporalOrientationSummary,
   TemporalOrientationView,
 } from '../temporalOrientation/temporalOrientationTypes';
+import { computeMomentumMetrics } from '../temporalOrientation/fuzzyMomentum';
 
 export type RoutingPriority = 'low' | 'normal' | 'high';
 export type RoutingMode = 'explore' | 'exploit' | 'stabilize';
 
 export interface FuzzyRoutingContext {
-  timeWeaveDepthScore: number; // 0..1
-  focusMomentumScore: number; // -1..1
+  timeWeaveDepthScore?: number; // 0..1
+  focusMomentumScore?: number; // -1..1
   entropyLevel?: number; // 0..1 optional signal of noise/dispersion
   orientationSummary?: TemporalOrientationSummary;
+  momentum?: MomentumMetrics;
 }
 
 export interface StringMode {
@@ -213,13 +216,40 @@ export function computeRouteHintForSector(
   ctx: FuzzyRoutingContext,
   stringMode?: StringMode,
 ): RouteHint {
-  const dLow = lowDepth(ctx.timeWeaveDepthScore);
-  const dMed = mediumDepth(ctx.timeWeaveDepthScore);
-  const dHigh = highDepth(ctx.timeWeaveDepthScore);
+  const depthScore = clamp01(ctx.timeWeaveDepthScore ?? 0);
+  let focusMomentumScore = ctx.focusMomentumScore ?? 0;
 
-  const mFall = falling(ctx.focusMomentumScore);
-  const mStable = stable(ctx.focusMomentumScore);
-  const mRise = rising(ctx.focusMomentumScore);
+  if (ctx.momentum) {
+    const { slope, strength } = ctx.momentum;
+
+    switch (slope) {
+      case 'rising':
+        focusMomentumScore = strength;
+        break;
+      case 'falling':
+        focusMomentumScore = -strength;
+        break;
+      case 'flat':
+        focusMomentumScore = 0;
+        break;
+      case 'oscillating':
+        focusMomentumScore = -strength * 0.3;
+        break;
+      default:
+        focusMomentumScore = 0;
+        break;
+    }
+  }
+
+  focusMomentumScore = clamp(focusMomentumScore, -1, 1);
+
+  const dLow = lowDepth(depthScore);
+  const dMed = mediumDepth(depthScore);
+  const dHigh = highDepth(depthScore);
+
+  const mFall = falling(focusMomentumScore);
+  const mStable = stable(focusMomentumScore);
+  const mRise = rising(focusMomentumScore);
 
   const priorityScores = {
     high: dHigh * (mRise * 0.7 + mStable * 0.3),
@@ -239,14 +269,28 @@ export function computeRouteHintForSector(
 
   const mode = pickMaxKey<RoutingMode>(modeScores);
 
-  const normalizedMomentum = clamp01((ctx.focusMomentumScore + 1) / 2);
+  const normalizedMomentum = clamp01((focusMomentumScore + 1) / 2);
   const baseConfidence = clamp01(
-    0.4 * clamp01(ctx.timeWeaveDepthScore) + 0.4 * normalizedMomentum + 0.2 * clamp01(priorityScores[priority]),
+    0.4 * depthScore + 0.4 * normalizedMomentum + 0.2 * clamp01(priorityScores[priority]),
   );
 
   const softContext = computeSoftContextAdjustments(ctx, sectorId, mode);
   const confidentAfterContext = clamp01(baseConfidence + softContext.confidenceDelta);
-  const routeConfidence = applyEntropyPenalty(confidentAfterContext, ctx.entropyLevel);
+  let routeConfidence = applyEntropyPenalty(confidentAfterContext, ctx.entropyLevel);
+
+  if (ctx.momentum) {
+    const { slope, strength } = ctx.momentum;
+
+    if (slope === 'rising') {
+      routeConfidence += 0.1 * strength;
+    } else if (slope === 'falling') {
+      routeConfidence -= 0.1 * strength;
+    } else if (slope === 'oscillating') {
+      routeConfidence -= 0.05 * strength;
+    }
+
+    routeConfidence = clamp01(routeConfidence);
+  }
 
   const baseReason = buildReason(priority, mode);
   const reasonParts = [
@@ -264,8 +308,8 @@ export function computeRouteHintForSector(
     sectorId,
     priority,
     mode,
-    depthScore: clamp01(ctx.timeWeaveDepthScore),
-    focusMomentumScore: clamp(ctx.focusMomentumScore, -1, 1),
+    depthScore,
+    focusMomentumScore,
     routeConfidence,
     // Combine the base routing explanation with any soft-context notes.
     reason: reasonParts.filter(Boolean).join('; '),
@@ -282,12 +326,19 @@ export function deriveEntropyFromOrientation(view: TemporalOrientationView): num
   return clamp01(normalizedActive * 0.6 + normalizedDispersion * 0.4);
 }
 
-export function buildRouteHintsFromOrientation(view: TemporalOrientationView): RouteHint[] {
+export function buildRouteHintsFromOrientation(
+  view: TemporalOrientationView,
+  options?: { history?: TemporalOrientationView[] },
+): RouteHint[] {
+  const history = options?.history ?? [view];
+  const momentum = computeMomentumMetrics(history);
+
   const ctx: FuzzyRoutingContext = {
     timeWeaveDepthScore: view.summary.timeWeaveDepthScore ?? 0,
     focusMomentumScore: view.summary.focusMomentumScore ?? 0,
     entropyLevel: deriveEntropyFromOrientation(view),
     orientationSummary: view.summary,
+    momentum,
   };
 
   const sectorIds = Object.values(view.web.sectors).map((sector) => sector.id);
