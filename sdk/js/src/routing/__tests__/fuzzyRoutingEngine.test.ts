@@ -23,6 +23,7 @@ runTest('high depth + rising momentum yields high priority exploit', () => {
 
   assert.equal(hint.priority, 'high');
   assert.equal(hint.mode, 'exploit');
+  assert.ok(hint.routeConfidence >= 0 && hint.routeConfidence <= 1);
 });
 
 runTest('medium depth + rising momentum prefers normal explore', () => {
@@ -31,6 +32,7 @@ runTest('medium depth + rising momentum prefers normal explore', () => {
 
   assert.equal(hint.priority, 'normal');
   assert.equal(hint.mode, 'explore');
+  assert.ok(hint.routeConfidence >= 0 && hint.routeConfidence <= 1);
 });
 
 runTest('high depth + falling momentum leans stabilize', () => {
@@ -73,4 +75,22 @@ runTest('buildRouteHintsFromOrientation emits a hint per sector', () => {
   assert.equal(hints.length, 2);
   assert.ok(hints.find((hint) => hint.sectorId === 'alpha'));
   assert.ok(hints.find((hint) => hint.sectorId === 'beta'));
+  hints.forEach((hint) => {
+    assert.ok(hint.routeConfidence >= 0 && hint.routeConfidence <= 1);
+  });
+});
+
+runTest('routeConfidence decreases with higher entropy', () => {
+  const baseCtx: FuzzyRoutingContext = {
+    timeWeaveDepthScore: 0.7,
+    focusMomentumScore: 0.2,
+    entropyLevel: 0.1,
+  };
+
+  const noisyCtx: FuzzyRoutingContext = { ...baseCtx, entropyLevel: 0.9 };
+
+  const hintLowEntropy = computeRouteHintForSector('sector-E', baseCtx);
+  const hintHighEntropy = computeRouteHintForSector('sector-E', noisyCtx);
+
+  assert.ok(hintHighEntropy.routeConfidence <= hintLowEntropy.routeConfidence);
 });
