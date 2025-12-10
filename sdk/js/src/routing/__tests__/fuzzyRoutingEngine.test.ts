@@ -4,6 +4,7 @@ import {
   buildRouteHintsFromOrientation,
   computeRouteHintForSector,
   FuzzyRoutingContext,
+  routeWithFuzzyEngine,
 } from '../fuzzyRoutingEngine';
 
 function runTest(name: string, fn: () => void): void {
@@ -93,4 +94,36 @@ runTest('routeConfidence decreases with higher entropy', () => {
   const hintHighEntropy = computeRouteHintForSector('sector-E', noisyCtx);
 
   assert.ok(hintHighEntropy.routeConfidence <= hintLowEntropy.routeConfidence);
+});
+
+runTest('low momentum yields stabilize intent with grounding mode', () => {
+  const ctx: FuzzyRoutingContext = { timeWeaveDepthScore: 0.5, focusMomentumScore: 0.05 };
+  const result = routeWithFuzzyEngine(['sector-low'], ctx);
+
+  assert.equal(result.routingIntent, 'stabilize');
+  assert.ok(result.preferredModes?.includes('grounding'));
+});
+
+runTest('mid momentum yields steady-flow intent', () => {
+  const ctx: FuzzyRoutingContext = { timeWeaveDepthScore: 0.5, focusMomentumScore: 0.4 };
+  const result = routeWithFuzzyEngine(['sector-mid'], ctx);
+
+  assert.equal(result.routingIntent, 'steady-flow');
+  assert.ok(result.preferredModes?.includes('small-adjustment'));
+});
+
+runTest('high momentum yields expand intent', () => {
+  const ctx: FuzzyRoutingContext = { timeWeaveDepthScore: 0.5, focusMomentumScore: 0.8 };
+  const result = routeWithFuzzyEngine(['sector-high'], ctx);
+
+  assert.equal(result.routingIntent, 'expand');
+  assert.ok(result.preferredModes?.includes('open-window'));
+});
+
+runTest('missing focus momentum defaults to stabilize intent', () => {
+  const ctx: FuzzyRoutingContext = { timeWeaveDepthScore: 0.5 };
+  const result = routeWithFuzzyEngine(['sector-missing'], ctx);
+
+  assert.equal(result.routingIntent, 'stabilize');
+  assert.ok(result.preferredModes?.includes('grounding'));
 });
