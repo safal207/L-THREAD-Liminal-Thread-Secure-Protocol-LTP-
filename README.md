@@ -102,6 +102,26 @@ Sample 6-line snapshot from the scenario run:
 
 In plain language: `ok` = link stable; `warn` = delays/drift are starting, watch the path; `critical` = link is in the danger zone — reroute, reconnect, or re-evaluate the node.
 
+### Dev Console Visual Health View
+
+The Dev Console now renders a compact, colorized health line on every heartbeat or routing update. Run it with:
+
+```bash
+npm run dev:ltp-node-demo -- --verbose   # add --scenario to simulate OK → WARN → CRIT
+```
+
+- `[OK]` — green, link stable.
+- `[WARN]` — yellow/orange, heartbeat drift building up.
+- `[CRIT]` — red, link is stalling (reroute/reconnect).
+
+Sample output (colors appear in the terminal):
+
+```
+[OK] hb=42ms jitter=6ms | routing=sector.alpha intent=STABLE | focusMomentum=+0.72
+[WARN] hb=410ms | routing=sector.beta intent=ADJUST | fm=–
+[CRIT] hb=? | fm=–
+```
+
 ### What Makes LTP Different
 
 Unlike traditional HTTPS/WebSocket protocols that treat data as isolated transactions, LTP maintains a continuous **liminal thread session** that:

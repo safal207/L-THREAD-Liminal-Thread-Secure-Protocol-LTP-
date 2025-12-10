@@ -1,4 +1,5 @@
 import WebSocket from "ws";
+import { colorByHealth, formatHealthTag, LinkHealth } from "./utils/consoleColors";
 
 // Shared protocol types mirrored from nodes/ltp-rust-node/src/protocol.rs
 export type TimeOrientationDirectionPayload = "past" | "present" | "future" | "multi";
@@ -70,6 +71,10 @@ interface DevConsoleEvent {
 
 interface DevConsoleSnapshot {
   lastHeartbeatAt?: string;
+  heartbeat?: {
+    latencyMs?: number;
+    jitterMs?: number;
+  };
   lastOrientationSummary?: {
     sectors?: string[];
     direction?: TimeOrientationDirectionPayload;
@@ -89,13 +94,14 @@ interface DevConsoleSnapshot {
     reason?: string;
     debug?: RouteSuggestionDebug;
   };
-  linkHealth?: "ok" | "warn" | "critical";
+  linkHealth?: LinkHealth;
 }
 
 const NODE_ADDR = process.env.LTP_NODE_WS_URL ?? "ws://127.0.0.1:7070";
 const CLIENT_ID = process.env.LTP_CLIENT_ID ?? "demo-client-1";
 const ARGS = process.argv.slice(2);
 const SCENARIO_MODE = process.env.SCENARIO_MODE === "1" || ARGS.includes("--scenario");
+const VERBOSE = ARGS.includes("--verbose") || ARGS.includes("-v");
 
 const HEALTH_CHECK_INTERVAL_MS = 5000;
 const HEALTH_OK_THRESHOLD_MS = 10_000;
@@ -137,9 +143,13 @@ function logEvent(
     timestamp: new Date().toISOString(),
   };
 
-  const detailText = details && Object.keys(details).length > 0
-    ? `\n       ${JSON.stringify(details, null, 2).replace(/\n/g, "\n       ")}`
-    : "";
+  const detailText = (() => {
+    if (!details || Object.keys(details).length === 0) return "";
+    if (VERBOSE) {
+      return `\n       ${JSON.stringify(details, null, 2).replace(/\n/g, "\n       ")}`;
+    }
+    return ` | details: ${Object.keys(details).join(", ")}`;
+  })();
 
   const humanSummary = summarizeConsoleState();
   const formattedLine = `${event.timestamp} | ${event.severity.toUpperCase()} | ${event.message}`;
@@ -176,6 +186,57 @@ const devState: DevConsoleState = {
     linkHealth: "critical",
   },
 };
+
+function formatSigned(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
+}
+
+export function renderDevSnapshot(
+  snapshot: DevConsoleSnapshot,
+  options?: { verbose?: boolean },
+): void {
+  const latencyText = snapshot.heartbeat?.latencyMs !== undefined
+    ? `${Math.round(snapshot.heartbeat.latencyMs)}ms`
+    : "?";
+  const jitterText = snapshot.heartbeat?.jitterMs !== undefined
+    ? `${Math.round(snapshot.heartbeat.jitterMs)}ms`
+    : undefined;
+  const routingSegment = [
+    snapshot.routing?.suggestedSector ? `routing=${snapshot.routing.suggestedSector}` : undefined,
+    snapshot.routing?.intent ? `intent=${snapshot.routing.intent}` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const focusMomentum = snapshot.focusMomentum?.value;
+
+  const sections: string[] = [
+    `${formatHealthTag(snapshot.linkHealth)}`,
+    `hb=${latencyText}`,
+  ];
+
+  if (jitterText) {
+    sections.push(`jitter=${jitterText}`);
+  }
+
+  if (routingSegment) {
+    sections.push(`| ${routingSegment}`);
+  }
+
+  if (focusMomentum !== undefined) {
+    sections.push(`| focusMomentum=${formatSigned(focusMomentum)}`);
+  } else {
+    sections.push(`| fm=–`);
+  }
+
+  const line = sections.join(" ").replace(/\s+/g, " ").trim();
+  const coloredLine = colorByHealth(snapshot.linkHealth, line);
+  console.log(coloredLine);
+
+  if (options?.verbose) {
+    console.log(JSON.stringify(snapshot, null, 2));
+  }
+}
 
 const orientationPhases: Array<{
   focus_momentum: number;
@@ -312,8 +373,14 @@ function updateRoutingSnapshot(suggestedSector: string, reason?: string, debug?:
 }
 
 function recordHeartbeat(timestampMs: number) {
+  const now = Date.now();
+  const latencyMs = Math.max(0, now - timestampMs);
+  const previousLatency = devState.snapshot.heartbeat?.latencyMs;
+  const jitterMs = previousLatency !== undefined ? Math.abs(latencyMs - previousLatency) : undefined;
+
   devState.lastHeartbeatAck = timestampMs;
   devState.snapshot.lastHeartbeatAt = new Date(timestampMs).toISOString();
+  devState.snapshot.heartbeat = { latencyMs, jitterMs };
   devState.snapshot.linkHealth = "ok";
 }
 
@@ -349,16 +416,17 @@ function evaluateLinkHealth(nowMs: number = Date.now()) {
   devState.snapshot.linkHealth = nextHealth;
 
   const seconds = Math.round(elapsedMs / 1000);
+  const healthTag = formatHealthTag(nextHealth);
   if (nextHealth === "ok") {
-    logInfo(`link health OK (last heartbeat ${seconds}s ago)`, {
+    logInfo(`${healthTag} link health OK (last heartbeat ${seconds}s ago)`, {
       lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
     });
   } else if (nextHealth === "warn") {
-    logWarn(`link slowing (no heartbeat for ${seconds}s)`, {
+    logWarn(`${healthTag} link slowing (no heartbeat for ${seconds}s)`, {
       lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
     });
   } else {
-    logCritical(`link critical (no heartbeat for ${seconds}s)`, {
+    logCritical(`${healthTag} link critical (no heartbeat for ${seconds}s)`, {
       lastHeartbeatAt: devState.snapshot.lastHeartbeatAt,
     });
   }
@@ -373,64 +441,72 @@ function startHealthMonitor() {
 
 function logSnapshot(reason?: string) {
   console.log("\n=== LTP DEV SNAPSHOT ===");
-  console.log(JSON.stringify(devState.snapshot, null, 2));
+  renderDevSnapshot(devState.snapshot, { verbose: VERBOSE });
 
-  const summary = {
-    linkHealth: devState.snapshot.linkHealth,
-    heartbeat: devState.snapshot.lastHeartbeatAt,
-    focusMomentum: devState.snapshot.focusMomentum,
-    routing: devState.snapshot.routing,
-    depthScore: devState.snapshot.timeWeave?.depthScore,
-    reason,
-  };
+  if (VERBOSE) {
+    const summary = {
+      linkHealth: devState.snapshot.linkHealth,
+      heartbeat: devState.snapshot.lastHeartbeatAt,
+      focusMomentum: devState.snapshot.focusMomentum,
+      routing: devState.snapshot.routing,
+      depthScore: devState.snapshot.timeWeave?.depthScore,
+      reason,
+    };
 
-  logInfo("Snapshot summary", summary);
+    logInfo("Snapshot summary", summary);
+  }
 }
 
 function renderDevConsole(reason: string, logState = false) {
-  const orientationText = devState.snapshot.lastOrientationSummary
-    ? `${devState.snapshot.lastOrientationSummary.direction ?? ""} (${(devState.snapshot.lastOrientationSummary.strength ?? 0).toFixed(2)})`
-    : "n/a";
-  const depthText = describeDepth(devState.snapshot.timeWeave?.depthScore);
-  const focusValue = devState.snapshot.focusMomentum?.value;
-  const focusText = devState.snapshot.focusMomentum?.trend
-    ? `${devState.snapshot.focusMomentum.trend} (${focusValue?.toFixed(2) ?? "n/a"})`
-    : "unknown";
-  const nodeText = devState.connected ? devState.nodeId ?? "(node)" : "disconnected";
-  const routerIntent = devState.snapshot.routing?.suggestedSector ?? "awaiting suggestion";
+  console.log("\n=== LTP DEV CONSOLE v0.3 ===");
+  renderDevSnapshot(devState.snapshot, { verbose: VERBOSE });
 
-  console.log("\n=== LTP DEV CONSOLE v0.2 ===");
-  console.log(`[node] ${nodeText}`);
-  console.log(`[heartbeat] last ack: ${devState.lastHeartbeatAck ?? "n/a"}`);
-  console.log(`[link] health: ${devState.snapshot.linkHealth ?? "unknown"}`);
+  if (VERBOSE) {
+    const orientationText = devState.snapshot.lastOrientationSummary
+      ? `${devState.snapshot.lastOrientationSummary.direction ?? ""} (${(devState.snapshot.lastOrientationSummary.strength ?? 0).toFixed(2)})`
+      : "n/a";
+    const depthText = describeDepth(devState.snapshot.timeWeave?.depthScore);
+    const focusValue = devState.snapshot.focusMomentum?.value;
+    const focusText = devState.snapshot.focusMomentum?.trend
+      ? `${devState.snapshot.focusMomentum.trend} (${focusValue?.toFixed(2) ?? "n/a"})`
+      : "unknown";
+    const nodeText = devState.connected ? devState.nodeId ?? "(node)" : "disconnected";
+    const routerIntent = devState.snapshot.routing?.suggestedSector ?? "awaiting suggestion";
 
-  console.log("\n=== ORIENTATION WEB ===");
-  console.log(`focusMomentum: ${focusText}`);
-  console.log(`timeOrientation: ${orientationText}`);
+    console.log(`node: ${nodeText}`);
+    console.log(`[heartbeat] last ack: ${devState.lastHeartbeatAck ?? "n/a"}`);
+    console.log(`[link] health: ${devState.snapshot.linkHealth ?? "unknown"}`);
 
-  console.log("\n=== TIMEWEAVE ===");
-  console.log(`depthScore: ${depthText}`);
-  if (devState.snapshot.timeWeave?.depthScore !== undefined && devState.snapshot.timeWeave.depthScore >= 4) {
-    logInfo("Deep weave – allow speculative routing", { depthScore: devState.snapshot.timeWeave.depthScore });
-  }
+    console.log("\n=== ORIENTATION WEB ===");
+    console.log(`focusMomentum: ${focusText}`);
+    console.log(`timeOrientation: ${orientationText}`);
 
-  console.log("\n=== ROUTING ===");
-  console.log(`router.intent → sector: ${routerIntent}`);
-  if (devState.snapshot.routing?.reason) {
-    console.log(`reason: ${devState.snapshot.routing.reason}`);
-  }
-  if (focusValue !== undefined && focusValue < 0.45) {
-    logWarn("Low focus momentum – suggest soft routing", {
-      focusMomentum: focusValue,
-      trend: devState.snapshot.focusMomentum?.trend,
-    });
+    console.log("\n=== TIMEWEAVE ===");
+    console.log(`depthScore: ${depthText}`);
+    if (devState.snapshot.timeWeave?.depthScore !== undefined && devState.snapshot.timeWeave.depthScore >= 4) {
+      logInfo("Deep weave – allow speculative routing", { depthScore: devState.snapshot.timeWeave.depthScore });
+    }
+
+    console.log("\n=== ROUTING ===");
+    console.log(`router.intent → sector: ${routerIntent}`);
+    if (devState.snapshot.routing?.reason) {
+      console.log(`reason: ${devState.snapshot.routing.reason}`);
+    }
+    if (focusValue !== undefined && focusValue < 0.45) {
+      logWarn("Low focus momentum – suggest soft routing", {
+        focusMomentum: focusValue,
+        trend: devState.snapshot.focusMomentum?.trend,
+      });
+    } else {
+      console.log("★ Stable focus – normal routing");
+    }
+    console.log(`debug: ${JSON.stringify(devState.snapshot.routing?.debug ?? {}, null, 2)}`);
+    console.log(`update: ${reason}`);
   } else {
-    console.log("★ Stable focus – normal routing");
+    console.log(`update: ${reason}`);
   }
-  console.log(`debug: ${JSON.stringify(devState.snapshot.routing?.debug ?? {}, null, 2)}`);
-  console.log(`update: ${reason}`);
 
-  if (logState) {
+  if (logState && VERBOSE) {
     logSnapshot(reason);
   }
 }
@@ -494,7 +570,8 @@ function startRealtimeClient() {
       if (parsed.type === "heartbeat_ack") {
         recordHeartbeat(parsed.timestamp_ms);
         evaluateLinkHealth();
-        logInfo(`[heartbeat] ack for ${parsed.client_id}`, {
+        const healthTag = formatHealthTag(devState.snapshot.linkHealth);
+        logInfo(`${healthTag} [heartbeat] ack for ${parsed.client_id}`, {
           at: devState.snapshot.lastHeartbeatAt,
         });
         renderDevConsole("heartbeat_ack");
