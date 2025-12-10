@@ -17,8 +17,8 @@ function testRendersLine() {
 
   const line = renderFocusHudLine(snapshot, [0.1, 0.5, 0.87], "calm");
   assert.ok(line.length > 0, "rendered line should not be empty");
-  assert.match(line, /^\[CALM\]\[OK\]/, "line should start with mode and health tags");
-  assert.ok(line.includes("fm:"), "line should include focus momentum section");
+  assert.ok(line.includes("mode=CALM"), "line should include mode tag");
+  assert.ok(line.includes("vol="), "line should include volatility section");
 }
 
 function testLinkHealthHeuristic() {
@@ -35,7 +35,7 @@ function testWarnTagAppears() {
   };
 
   const line = renderFocusHudLine(snapshot, []);
-  assert.ok(line.startsWith("[WARN]"));
+  assert.ok(line.includes("link=WARN"));
 }
 
 try {

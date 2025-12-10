@@ -1,4 +1,6 @@
-export type HudMode = "calm" | "storm" | "shift";
+import type { HudMode } from "./hudTheme";
+
+export type { HudMode } from "./hudTheme";
 
 export interface HudModeContext {
   focusHistory: number[];
