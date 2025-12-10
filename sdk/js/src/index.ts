@@ -118,6 +118,7 @@ export {
   summarizeWeave,
   upsertBranch,
 } from './time/timeWeave';
+export { computeTimeWeaveMeta } from './time/timeWeaveMeta';
 export type {
   ThreadId,
   TimeBranch,
@@ -125,6 +126,8 @@ export type {
   TimePhase,
   TimeTick,
   TimeWeave,
+  TimeWeaveDepth,
+  TimeWeaveMeta,
   TimeWeaveTrendSummary,
   TimeWeaveSummary,
 } from './time/timeWeaveTypes';

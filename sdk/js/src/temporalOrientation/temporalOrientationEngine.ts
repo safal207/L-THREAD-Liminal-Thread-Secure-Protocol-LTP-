@@ -1,13 +1,9 @@
 import type { OrientationWeb, OrientationWebSector } from '../orientation/orientationWeb.types';
-import {
-  computeBranchTrend,
-  computeFocusMomentumScore,
-  computeTimeWeaveSummary,
-  getBranch,
-} from '../time/timeWeave';
+import { computeBranchTrend, computeFocusMomentumScore, getBranch } from '../time/timeWeave';
 import type { TimeBranch, TimeWeave } from '../time/timeWeaveTypes';
 import { anchorEventsBatch } from '../timeAnchors/timeAnchorEngine';
 import type { OrientationEvent, TimeAnchorContext } from '../timeAnchors/timeAnchorTypes';
+import { computeTimeWeaveMeta } from '../time/timeWeaveMeta';
 import type {
   SectorTemporalSnapshot,
   NextThreadSuggestion,
@@ -30,6 +26,22 @@ function clampIntensity(intensity: number | undefined): number | undefined {
   }
 
   return intensity;
+}
+
+function clampMinus1To1(value: number): number {
+  if (value < -1) {
+    return -1;
+  }
+
+  if (value > 1) {
+    return 1;
+  }
+
+  if (Number.isNaN(value)) {
+    return 0;
+  }
+
+  return value;
 }
 
 /**
@@ -180,11 +192,14 @@ function buildSummary(snapshots: SectorTemporalSnapshot[]): TemporalOrientationS
 export function buildTemporalOrientationView(web: OrientationWeb, weave: TimeWeave): TemporalOrientationView {
   const sectors = Object.values(web.sectors).map((sector) => buildSectorTemporalSnapshot(sector, weave));
   const summary = buildSummary(sectors);
-  const weaveSummary = computeTimeWeaveSummary(weave);
-  const focusMomentumScore = computeFocusMomentumScore(weave);
+  const weaveMeta = computeTimeWeaveMeta(weave);
+  const signedFocusMomentum = computeFocusMomentumScore(weave);
+  const focusMomentumScore = clampMinus1To1(
+    signedFocusMomentum * (weaveMeta.depth.focusMomentum ?? 0),
+  );
   const summaryWithDepth: TemporalOrientationSummary = {
     ...summary,
-    timeWeaveDepthScore: weaveSummary.depthScore,
+    timeWeaveDepthScore: weaveMeta.depth.complexityScore,
     focusMomentumScore,
   };
 
