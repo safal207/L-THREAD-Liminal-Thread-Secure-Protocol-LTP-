@@ -15,9 +15,9 @@ function testRendersLine() {
     focusMomentum: 0.87,
   };
 
-  const line = renderFocusHudLine(snapshot, [0.1, 0.5, 0.87]);
+  const line = renderFocusHudLine(snapshot, [0.1, 0.5, 0.87], "calm");
   assert.ok(line.length > 0, "rendered line should not be empty");
-  assert.match(line, /^\[OK\]/, "line should start with OK tag");
+  assert.match(line, /^\[CALM\]\[OK\]/, "line should start with mode and health tags");
   assert.ok(line.includes("fm:"), "line should include focus momentum section");
 }
 

@@ -54,6 +54,21 @@ export type LtpOutgoingMessage =
       debug?: RouteSuggestionDebug;
     }
   | {
+      type: "focus_snapshot";
+      timestamp?: number;
+      focusMomentum?: number;
+      orientationSummary?: {
+        sector?: string;
+        intent?: string;
+        suggestedMode?: string;
+      };
+      linkMeta?: {
+        latencyMs?: number;
+        jitterMs?: number;
+        lossRate?: number;
+      };
+    }
+  | {
       type: "error";
       message: string;
     };
@@ -67,6 +82,7 @@ export interface LtpClientHandlers {
   ) => void;
   onOrientation?: (message: Extract<LtpOutgoingMessage, { type: "orientation" }>) => void;
   onRouteSuggestion?: (message: Extract<LtpOutgoingMessage, { type: "route_suggestion" }>) => void;
+  onFocusSnapshot?: (message: Extract<LtpOutgoingMessage, { type: "focus_snapshot" }>) => void;
   onError?: (message: Extract<LtpOutgoingMessage, { type: "error" }>, raw?: unknown) => void;
   onClose?: () => void;
 }
@@ -141,6 +157,11 @@ export function createLtpClient(
 
       if (parsed.type === "route_suggestion") {
         handlers.onRouteSuggestion?.(parsed);
+        return;
+      }
+
+      if (parsed.type === "focus_snapshot") {
+        handlers.onFocusSnapshot?.(parsed);
         return;
       }
 

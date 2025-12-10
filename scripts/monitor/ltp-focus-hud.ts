@@ -5,6 +5,7 @@ import {
   TimeOrientationBoostPayload,
 } from "../transport/ltpClient";
 import { renderMomentumSparkline } from "../shared/focusSparkline";
+import { detectHudMode, HudMode } from "./hudModes";
 
 export interface FocusHudSnapshot {
   linkHealth: "OK" | "WARN" | "CRIT";
@@ -33,7 +34,11 @@ export function determineLinkHealth(latencyMs?: number, jitterMs?: number): "OK"
   return "CRIT";
 }
 
-export function renderFocusHudLine(snapshot: FocusHudSnapshot, fmHistory: number[]): string {
+export function renderFocusHudLine(
+  snapshot: FocusHudSnapshot,
+  fmHistory: number[],
+  mode: HudMode = "calm",
+): string {
   const { linkHealth, latencyMs, jitterMs, sector, intent, focusMomentum } = snapshot;
 
   const hbPart =
@@ -55,11 +60,20 @@ export function renderFocusHudLine(snapshot: FocusHudSnapshot, fmHistory: number
       : `fm: (${focusMomentum >= 0 ? "+" : ""}${focusMomentum.toFixed(2)})`;
   }
 
-  return `[${linkHealth}] ${hbPart} | ${routingPart} | ${fmPart}`;
+  const modeTag = mode === "storm" ? "STORM" : mode === "shift" ? "SHIFT" : "CALM";
+
+  return `[${modeTag}][${linkHealth}] ${hbPart} | ${routingPart} | ${fmPart}`;
 }
 
 function renderAndReport(snapshot: FocusHudSnapshot) {
-  console.log(renderFocusHudLine(snapshot, focusMomentumHistory));
+  const mode = detectHudMode({
+    focusHistory: focusMomentumHistory,
+    linkHealth: snapshot.linkHealth,
+    lastIntent: snapshot.intent,
+    lastSector: snapshot.sector,
+  });
+
+  console.log(renderFocusHudLine(snapshot, focusMomentumHistory, mode));
 }
 
 function extractIntentFromOrientation(timeOrientation?: TimeOrientationBoostPayload): string | undefined {
@@ -75,7 +89,7 @@ function simulateFocusMomentum(now = Date.now()): number {
 }
 
 function startFocusHud(): LtpClient {
-  const endpoint = process.env.LTP_ENDPOINT ?? "ws://localhost:8080/ltp";
+  const endpoint = process.env.LTP_ENDPOINT ?? "ws://localhost:8080/ws";
   const clientId = process.env.LTP_MONITOR_CLIENT_ID ?? "ltp-focus-hud";
 
   const snapshot: FocusHudSnapshot = {
@@ -107,6 +121,22 @@ function startFocusHud(): LtpClient {
       snapshot.intent = message.time_orientation
         ? extractIntentFromOrientation(message.time_orientation)
         : snapshot.intent;
+      lastFocusUpdateMs = Date.now();
+      renderAndReport(snapshot);
+    },
+    onFocusSnapshot: (message) => {
+      snapshot.focusMomentum = message.focusMomentum ?? snapshot.focusMomentum;
+      recordFocusMomentum(snapshot.focusMomentum);
+
+      snapshot.sector = message.orientationSummary?.sector ?? snapshot.sector;
+      snapshot.intent = message.orientationSummary?.intent ?? snapshot.intent;
+
+      const latency = message.linkMeta?.latencyMs ?? snapshot.latencyMs;
+      const jitter = message.linkMeta?.jitterMs ?? snapshot.jitterMs;
+      snapshot.latencyMs = latency != null ? Math.round(latency) : undefined;
+      snapshot.jitterMs = jitter != null ? Math.round(jitter) : undefined;
+      snapshot.linkHealth = determineLinkHealth(snapshot.latencyMs, snapshot.jitterMs);
+
       lastFocusUpdateMs = Date.now();
       renderAndReport(snapshot);
     },
