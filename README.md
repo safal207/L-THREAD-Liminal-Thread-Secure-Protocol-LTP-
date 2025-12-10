@@ -39,6 +39,29 @@ pnpm ts-node scripts/dev/ltp-node-demo.ts
 
 You should see `hello/hello_ack`, periodic `heartbeat/heartbeat_ack`, orientation updates, and `route_suggestion` messages that react to the simulated time-focus shifts.
 
+Example live console output (Dev Console v0.1):
+
+```
+=== LTP DEV CONSOLE v0.1 ===
+[node] demo-node
+[heartbeat] last ack: 1700000123
+
+=== ORIENTATION WEB ===
+focusMomentum: rising (0.73)
+timeOrientation: future (0.80)
+
+=== TIMEWEAVE ===
+depthScore: 5 (multi-branch)
+★ Deep weave – allow speculative routing
+
+=== ROUTING ===
+router.intent → sector: future_planning_high_momentum
+reason: client oriented to future
+★ Stable focus – normal routing
+debug: {"focus_momentum":0.82,"time_orientation":{"direction":"future","strength":0.8}}
+update: route_suggestion
+```
+
 ### What Makes LTP Different
 
 Unlike traditional HTTPS/WebSocket protocols that treat data as isolated transactions, LTP maintains a continuous **liminal thread session** that:
