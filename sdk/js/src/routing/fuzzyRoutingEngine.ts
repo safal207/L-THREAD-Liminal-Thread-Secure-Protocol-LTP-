@@ -7,13 +7,25 @@ import { computeMomentumMetrics } from '../temporalOrientation/fuzzyMomentum';
 
 export type RoutingPriority = 'low' | 'normal' | 'high';
 export type RoutingMode = 'explore' | 'exploit' | 'stabilize';
+export type RoutingIntent = 'stabilize' | 'steady-flow' | 'expand';
 
 export interface FuzzyRoutingContext {
   timeWeaveDepthScore?: number; // 0..1
-  focusMomentumScore?: number; // -1..1
+  /** 0..1 scalar describing how strong the current focus momentum is. */
+  focusMomentumScore?: number;
   entropyLevel?: number; // 0..1 optional signal of noise/dispersion
   orientationSummary?: TemporalOrientationSummary;
   momentum?: MomentumMetrics;
+}
+
+export interface RoutingResult {
+  bestSectorId: string;
+  routeConfidence: number;
+  focusMomentumScore?: number;
+  routingIntent?: RoutingIntent;
+  /** Optional hint on HOW to move, not just WHERE. */
+  preferredModes?: string[];
+  hints?: RouteHint[];
 }
 
 export interface StringMode {
@@ -40,6 +52,35 @@ function clamp(value: number, min: number, max: number): number {
 
 function clamp01(value: number): number {
   return clamp(value, 0, 1);
+}
+
+/**
+ * Translate the focusMomentumScore into a simple advisory routing intent.
+ * Thresholds are intentionally simple and deterministic to keep behaviour predictable.
+ */
+export function deriveRoutingIntent(
+  ctx: FuzzyRoutingContext,
+): { intent: RoutingIntent; preferredModes: string[] } {
+  const m = ctx.focusMomentumScore ?? 0;
+
+  if (m < 0.2) {
+    return {
+      intent: 'stabilize',
+      preferredModes: ['grounding', 'short-hop'],
+    } satisfies { intent: RoutingIntent; preferredModes: string[] };
+  }
+
+  if (m > 0.6) {
+    return {
+      intent: 'expand',
+      preferredModes: ['open-window', 'branch-explore'],
+    } satisfies { intent: RoutingIntent; preferredModes: string[] };
+  }
+
+  return {
+    intent: 'steady-flow',
+    preferredModes: ['small-adjustment'],
+  } satisfies { intent: RoutingIntent; preferredModes: string[] };
 }
 
 // Depth membership helpers (0..1 → fuzzy membership 0..1)
@@ -344,4 +385,43 @@ export function buildRouteHintsFromOrientation(
   const sectorIds = Object.values(view.web.sectors).map((sector) => sector.id);
 
   return sectorIds.map((sectorId) => computeRouteHintForSector(sectorId, ctx));
+}
+
+function pickBestHint(hints: RouteHint[]): RouteHint {
+  if (hints.length === 0) {
+    throw new Error('Cannot compute route without any candidate sectors.');
+  }
+
+  return hints.reduce((best, candidate) => {
+    if (candidate.routeConfidence > best.routeConfidence) {
+      return candidate;
+    }
+
+    if (candidate.routeConfidence === best.routeConfidence) {
+      return candidate.sectorId < best.sectorId ? candidate : best;
+    }
+
+    return best;
+  }, hints[0]!);
+}
+
+export function routeWithFuzzyEngine(
+  sectorIds: string[],
+  ctx: FuzzyRoutingContext,
+  options?: { stringModes?: Record<string, StringMode> },
+): RoutingResult {
+  const hints = sectorIds.map((sectorId) =>
+    computeRouteHintForSector(sectorId, ctx, options?.stringModes?.[sectorId]),
+  );
+  const bestHint = pickBestHint(hints);
+  const { intent, preferredModes } = deriveRoutingIntent(ctx);
+
+  return {
+    bestSectorId: bestHint.sectorId,
+    routeConfidence: bestHint.routeConfidence,
+    focusMomentumScore: ctx.focusMomentumScore,
+    routingIntent: intent,
+    preferredModes,
+    hints,
+  } satisfies RoutingResult;
 }

@@ -159,11 +159,15 @@ export type {
 export {
   buildRouteHintsFromOrientation,
   computeRouteHintForSector,
+  deriveRoutingIntent,
+  routeWithFuzzyEngine,
 } from './routing/fuzzyRoutingEngine';
 export type {
   FuzzyRoutingContext,
   RouteHint,
   RoutingMode,
   RoutingPriority,
+  RoutingIntent,
+  RoutingResult,
   StringMode,
 } from './routing/fuzzyRoutingEngine';
