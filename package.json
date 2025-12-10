@@ -9,7 +9,7 @@
     "test:protocol": "echo \"Running protocol compliance tests... (WIP)\"",
     "dev:ltp-node-demo": "ts-node scripts/dev/ltp-node-demo.ts",
     "ltp:monitor": "ts-node scripts/monitor/ltp-focus-hud.ts",
-    "test:focus-hud": "ts-node scripts/monitor/__tests__/ltp-focus-hud.test.ts"
+    "test:focus-hud": "ts-node scripts/monitor/__tests__/hudModes.test.ts && ts-node scripts/monitor/__tests__/ltp-focus-hud.test.ts"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
