@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Turtle HUD v1</title>
+    <link rel="stylesheet" href="./hudStyles.css" />
+  </head>
+  <body>
+    <main class="hud-shell">
+      <header class="hud-header">
+        <div>
+          <h1>Turtle HUD v1</h1>
+          <p class="hud-subtitle">Live orientation panel for L-THREAD demo WebSocket</p>
+        </div>
+        <div class="ws-status" id="ws-status">WS: connecting…</div>
+      </header>
+
+      <section class="hud-grid">
+        <div class="hud-card">
+          <div class="card-title">Turtle Orientation Compass</div>
+          <div class="compass">
+            <div class="compass-ring">
+              <div class="compass-segment" data-direction="past">past</div>
+              <div class="compass-segment" data-direction="now">now</div>
+              <div class="compass-segment" data-direction="future">future</div>
+            </div>
+            <div class="axis-block">
+              <span class="label">time:</span>
+              <span class="direction-pill" id="direction-pill">–</span>
+            </div>
+            <div class="axis-block">
+              <span class="label">axis:</span>
+              <span class="axis-pill" id="axis-pill">–</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="hud-card">
+          <div class="card-title">Focus Momentum</div>
+          <div class="focus-row">
+            <div class="focus-bar">
+              <div class="focus-bar-fill" id="focus-bar-fill"></div>
+            </div>
+            <div class="focus-label" id="focus-label">–</div>
+          </div>
+        </div>
+
+        <div class="hud-card">
+          <div class="card-title">TimeWeave Depth &amp; Mode</div>
+          <div class="depth-row">
+            <div class="depth-label" id="depth-label">–</div>
+            <div class="mode-hint" id="mode-hint">mode: –</div>
+          </div>
+          <div class="meta-hint" id="meta-hint"></div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./dist/hud.js"></script>
+  </body>
+</html>
