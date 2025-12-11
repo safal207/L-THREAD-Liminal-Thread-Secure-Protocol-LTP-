@@ -102,6 +102,33 @@ Sample 6-line snapshot from the scenario run:
 
 In plain language: `ok` = link stable; `warn` = delays/drift are starting, watch the path; `critical` = link is in the danger zone — reroute, reconnect, or re-evaluate the node.
 
+### Story-driven HUD demo (Phases A/B/C)
+
+Run a single-client line-of-time demo that walks through calm focus, noisy context switching, and a soft landing while emitting routing previews and HUD lines:
+
+```bash
+npm run demo:story            # defaults to local scripted frames
+DEMO_SPEED=800 npm run demo:story   # speed up playback (ms between frames)
+USE_LOCAL_FRAMES=false npm run demo:story   # placeholder for a future live-gateway feed
+```
+
+Phases inside the scripted story:
+
+- **Phase A – Focused work:** steady positive momentum, router leans to `deep_work`.
+- **Phase B – Context switching / storm:** high volatility with sign flips; alternatives `social`, `rest`, `planning` surface.
+- **Phase C – Recovery / soft landing:** volatility decays, momentum climbs back toward `light_work` or `planning`.
+
+Example slice of the console output:
+
+```
+[PHASE=A | calm | vol=0.07 | momentum=0.82] → route: deep_work
+   options: route: deep_work (conf=0.80) | alt: future_planning? (0.35)
+   phase: Phase A — Focused work | intents: deep_work, future_planning
+[PHASE=B | storm | vol=0.46 | momentum=-0.06] → route: social
+   options: route: social (conf=0.36) | alt: rest? (0.34), planning? (0.30)
+   phase: Phase B — Context switching / storm | intents: rest, social, planning
+```
+
 ### Dev Console Visual Health View
 
 The Dev Console now renders a compact, colorized health line on every heartbeat or routing update. Run it with:
