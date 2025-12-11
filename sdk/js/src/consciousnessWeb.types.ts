@@ -22,6 +22,32 @@ export interface ConsciousnessWeb {
   metrics: WebNodeMetrics[];
 }
 
+export type ConsciousnessZone = 'calm' | 'growth' | 'recovery' | 'storm' | 'shift';
+
+export interface TimeAnchor {
+  offset: number; // relative step, negative for history, positive for projection
+  label: string;
+  confidence?: number; // 0..1
+}
+
+export interface FuturePath {
+  role: 'primary' | 'recover' | 'explore' | string;
+  label: string;
+  path: ConsciousnessZone[];
+  probability: number; // 0..1
+}
+
+export interface ConsciousnessSnapshot {
+  orientation: ConsciousnessZone;
+  focusMomentum: number;
+  volatility: number;
+  resilience: number;
+  tension: number;
+  turbulenceZones?: ConsciousnessZone[];
+  timeAnchors: TimeAnchor[];
+  futurePaths: FuturePath[];
+}
+
 export interface OrientationSector {
   id: string;
   label: string;

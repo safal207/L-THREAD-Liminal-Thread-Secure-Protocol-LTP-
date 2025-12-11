@@ -186,3 +186,28 @@ export function updateThreadFromEvent(
 
   return { ...map, threads };
 }
+
+export function summarizeThreadMap(map: ThreadMap): {
+  averageEnergy: number;
+  averageResonance: number;
+  volatility: number;
+} {
+  if (!map.threads.length) {
+    return { averageEnergy: 0.5, averageResonance: 0.5, volatility: 0.2 };
+  }
+
+  const energyLevels = map.threads.map((thread) => clampLevel(thread.energyLevel));
+  const resonanceLevels = map.threads.map((thread) => clampLevel(thread.resonanceLevel));
+
+  const averageEnergy = energyLevels.reduce((sum, value) => sum + value, 0) / energyLevels.length;
+  const averageResonance = resonanceLevels.reduce((sum, value) => sum + value, 0) / resonanceLevels.length;
+
+  const energyVariance =
+    energyLevels.reduce((variance, value) => variance + (value - averageEnergy) ** 2, 0) / energyLevels.length;
+  const resonanceVariance =
+    resonanceLevels.reduce((variance, value) => variance + (value - averageResonance) ** 2, 0) / resonanceLevels.length;
+
+  const volatility = clampLevel((Math.sqrt(energyVariance + resonanceVariance) * 0.7 + (1 - averageResonance) * 0.3) / 1.5);
+
+  return { averageEnergy, averageResonance, volatility };
+}
