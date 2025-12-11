@@ -66,3 +66,9 @@ export interface TimeWeaveDepth {
 export interface TimeWeaveMeta {
   depth: TimeWeaveDepth;
 }
+
+export interface TimeWeaveAsymmetry {
+  asymmetry: number; // 0..1
+  direction: -1 | 0 | 1;
+  confidence: number; // 0..1
+}

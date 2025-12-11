@@ -119,9 +119,11 @@ export {
   upsertBranch,
 } from './time/timeWeave';
 export { computeTimeWeaveMeta } from './time/timeWeaveMeta';
+export { computeTimeWeaveAsymmetry } from './time/timeWeaveAsymmetry';
 export type {
   ThreadId,
   TimeBranch,
+  TimeWeaveAsymmetry,
   TimeNode,
   TimePhase,
   TimeTick,
