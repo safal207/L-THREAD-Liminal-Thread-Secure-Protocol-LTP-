@@ -7,6 +7,7 @@ import {
   TimeWeaveSummary,
   TimeWeaveTrendSummary,
 } from './timeWeaveTypes';
+import { computeTimeWeaveAsymmetry, detectBranchCollapse } from './timeWeaveAsymmetry';
 
 const INTENSITY_MIN = 0;
 const INTENSITY_MAX = 1;
@@ -242,7 +243,10 @@ const TARGET_EVENT_COUNT = 100;
 // One hour is treated as a "rich" span of activity; longer spans saturate the factor.
 const TARGET_TIME_SPAN_MS = 60 * 60 * 1000;
 
-export function computeTimeWeaveSummary(weave: TimeWeave): TimeWeaveSummary {
+export function computeTimeWeaveSummary(
+  weave: TimeWeave,
+  previousSummary?: TimeWeaveSummary,
+): TimeWeaveSummary {
   const branchesCount = weave.branches.length;
   let eventsCount = 0;
   let minTimestamp: number | null = null;
@@ -282,10 +286,19 @@ export function computeTimeWeaveSummary(weave: TimeWeave): TimeWeaveSummary {
 
   const depthScore = branchFactor * 0.4 + eventsFactor * 0.4 + spanFactor * 0.2;
 
+  const asymmetry = computeTimeWeaveAsymmetry({ branches: weave.branches });
+  const collapse = detectBranchCollapse({
+    asymmetry,
+    branches: weave.branches,
+    previousSummary,
+  });
+
   return {
     depthScore,
     branchesCount,
     eventsCount,
     timeSpanMs,
+    asymmetry,
+    collapse,
   };
 }

@@ -26,6 +26,30 @@ export interface TimeWeaveTrendSummary {
   globalTrend: 'rising' | 'falling' | 'mixed' | 'plateau';
 }
 
+export type TimeWeaveAsymmetryShape =
+  | 'balanced'
+  | 'single-dominant'
+  | 'bi-modal'
+  | 'scattered';
+
+export interface TimeWeaveAsymmetry {
+  /** Share of total branch weight held by the dominant branch. Range: 0..1. */
+  concentration: number;
+  /** Qualitative label for how the branch weights are distributed. */
+  shape: TimeWeaveAsymmetryShape;
+  /** Number of active branches considered in the snapshot. */
+  branchCount: number;
+}
+
+export interface BranchCollapseSignal {
+  hasCollapsed: boolean;
+  mode: 'none' | 'soft-merge' | 'hard-collapse';
+  /** Optional ID of the branch holding the dominant weight, when known. */
+  dominantBranchId?: string;
+  /** Optional human-readable reason for explainability. */
+  reason?: string;
+}
+
 export interface TimeWeaveSummary {
   /**
    * Normalized measure of how “deep” / complex the weave is.
@@ -48,6 +72,12 @@ export interface TimeWeaveSummary {
    * If timestamps are missing or invalid, this may be 0.
    */
   timeSpanMs: number;
+
+  /** Branch weight distribution at the current snapshot. */
+  asymmetry?: TimeWeaveAsymmetry;
+
+  /** Signal describing whether futures have collapsed into one dominant branch. */
+  collapse?: BranchCollapseSignal;
 }
 
 export interface TimeWeaveDepth {

@@ -118,6 +118,7 @@ export {
   summarizeWeave,
   upsertBranch,
 } from './time/timeWeave';
+export { computeTimeWeaveAsymmetry, detectBranchCollapse } from './time/timeWeaveAsymmetry';
 export { computeTimeWeaveMeta } from './time/timeWeaveMeta';
 export type {
   ThreadId,
@@ -126,7 +127,9 @@ export type {
   TimePhase,
   TimeTick,
   TimeWeave,
+  TimeWeaveAsymmetry,
   TimeWeaveDepth,
+  BranchCollapseSignal,
   TimeWeaveMeta,
   TimeWeaveTrendSummary,
   TimeWeaveSummary,
