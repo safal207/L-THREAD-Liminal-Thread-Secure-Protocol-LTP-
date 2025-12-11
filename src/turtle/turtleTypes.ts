@@ -45,6 +45,14 @@ export interface TurtleOrientationView {
   previousFrame?: TurtleFrameId;
 }
 
+export interface TurtleSnapshot {
+  currentFrameId: string;
+  currentFrameLabel: string;
+  frameIndex: number;
+  rotationAngle: number;
+  commitment: number;
+}
+
 export interface TurtleRotationInput {
   targetFrame: TurtleFrameId;
   commitment?: number;

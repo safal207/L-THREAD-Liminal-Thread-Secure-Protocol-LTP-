@@ -1,6 +1,21 @@
+import {
+  buildTurtleSnapshot,
+  createDefaultTurtleMatrix,
+  rotateTurtleMatrix,
+  type TurtleFrameId,
+  type TurtleSnapshot,
+} from "../turtle";
+
 export interface FocusSnapshot {
   sector?: string;
   focusMomentum?: number;
+}
+
+export interface TimeWeaveSummary {
+  futureBias?: number;
+  familyWeight?: number;
+  regulationSignal?: number;
+  divergenceScore?: number;
 }
 
 export interface RoutingDecisionOption {
@@ -26,6 +41,7 @@ export interface TemporalOrientationView {
   focusMomentum: number;
   volatility: number;
   phaseLabel?: string;
+  turtle?: TurtleSnapshot;
 }
 
 export interface FutureWeaveNode {
@@ -126,12 +142,45 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
+function normalizeCommitmentFromMomentum(value?: number): number {
+  const normalized = ((value ?? 0) + 1) / 2;
+  return clamp(Number(normalized.toFixed(3)), 0, 1);
+}
+
 function normalizeLikelihoods(weights: { id: string; weight: number }[]): Record<string, number> {
   const total = weights.reduce((sum, item) => sum + item.weight, 0) || 1;
   return weights.reduce<Record<string, number>>((acc, item) => {
     acc[item.id] = Number((item.weight / total).toFixed(3));
     return acc;
   }, {});
+}
+
+export function chooseTurtleFrameFromTimeWeave(
+  summary: TimeWeaveSummary,
+  focusMomentum?: number,
+): TurtleFrameId {
+  const futureBias = summary.futureBias ?? 0;
+  const familyWeight = summary.familyWeight ?? 0;
+  const regulationSignal = summary.regulationSignal ?? 0;
+  const divergenceScore = summary.divergenceScore ?? 0;
+
+  if (familyWeight >= Math.max(futureBias, regulationSignal, divergenceScore) && familyWeight > 0.45) {
+    return "family_field";
+  }
+
+  if (futureBias > 0.55) {
+    return "deep_time";
+  }
+
+  if (regulationSignal > 0.55 || divergenceScore > 0.6 || (focusMomentum ?? 0) < -0.2) {
+    return "regulation_axis";
+  }
+
+  if ((focusMomentum ?? 0) > 0.65) {
+    return "inner_focus";
+  }
+
+  return "baseline";
 }
 
 function describePrimaryLabel(focusMomentum: number, volatility: number): string {
@@ -169,6 +218,25 @@ function collectSoftenedSectors(path: FutureWeavePath): string[] {
     }
   });
   return Array.from(seen);
+}
+
+export function attachTurtleSnapshotToOrientation(params: {
+  orientation: TemporalOrientationView;
+  timeWeaveSummary?: TimeWeaveSummary;
+  focusMomentumOverride?: number;
+}): TemporalOrientationView {
+  const { orientation, timeWeaveSummary, focusMomentumOverride } = params;
+  if (!timeWeaveSummary) return { ...orientation };
+
+  const focusMomentum = focusMomentumOverride ?? orientation.focusMomentum;
+  const baseMatrix = createDefaultTurtleMatrix();
+  const targetFrame = chooseTurtleFrameFromTimeWeave(timeWeaveSummary, focusMomentum);
+  const orientedMatrix = rotateTurtleMatrix(baseMatrix, {
+    targetFrame,
+    commitment: normalizeCommitmentFromMomentum(focusMomentum),
+  });
+
+  return { ...orientation, turtle: buildTurtleSnapshot(orientedMatrix) };
 }
 
 export function buildMultiPathSuggestion(
