@@ -5,9 +5,12 @@ export {
   type RoutingDecision,
   type RoutingPreview,
   type TemporalOrientationView,
+  type TimeWeaveSummary,
   type FutureWeaveBranch,
   type FutureWeaveBranchRole,
   type FutureWeaveNode,
   type FutureWeavePath,
   type MultiPathSuggestion,
+  attachTurtleSnapshotToOrientation,
+  chooseTurtleFrameFromTimeWeave,
 } from "./focusRoutingPreview";
