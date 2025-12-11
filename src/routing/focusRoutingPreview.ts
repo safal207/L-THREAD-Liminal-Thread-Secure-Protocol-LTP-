@@ -45,9 +45,22 @@ export interface FutureWeavePath {
   narrativeHint?: string;
 }
 
+export type FutureWeaveBranchRole = "primary" | "recovery" | "explore" | (string & {});
+
+export interface FutureWeaveBranch {
+  id: string;
+  role: FutureWeaveBranchRole;
+  label?: string;
+  likelihood: number;
+  momentumHint?: "rising" | "stable" | "falling" | (string & {});
+  volatilityHint?: "low" | "mid" | "high" | (string & {});
+  softenedSectors?: string[];
+}
+
 export interface MultiPathSuggestion {
   primaryPath: FutureWeavePath;
   alternates: FutureWeavePath[];
+  branches: FutureWeaveBranch[];
 }
 
 function selectPrimaryAndAlternatives(decision: RoutingDecision): {
@@ -130,6 +143,32 @@ function describePrimaryLabel(focusMomentum: number, volatility: number): string
   if (moderateMomentum && lowVolatility) return "grow";
   if (moderateMomentum) return "soft-shift";
   return "stabilize";
+}
+
+function resolveMomentumHint(currentMomentum: number, targetMomentum: number):
+  | "rising"
+  | "stable"
+  | "falling" {
+  const delta = targetMomentum - currentMomentum;
+  if (delta > 0.05) return "rising";
+  if (delta < -0.05) return "falling";
+  return "stable";
+}
+
+function resolveVolatilityHint(value: number): "low" | "mid" | "high" {
+  if (value <= 0.25) return "low";
+  if (value <= 0.6) return "mid";
+  return "high";
+}
+
+function collectSoftenedSectors(path: FutureWeavePath): string[] {
+  const seen = new Set<string>();
+  path.nodes.forEach((node) => {
+    if (node.sectorId) {
+      seen.add(node.sectorId);
+    }
+  });
+  return Array.from(seen);
 }
 
 export function buildMultiPathSuggestion(
@@ -255,9 +294,35 @@ export function buildMultiPathSuggestion(
   recoverPath.overallLikelihood = likelihoods.recover;
   explorePath.overallLikelihood = likelihoods.explore;
 
+  const resolveBranchRole = (pathId: string): FutureWeaveBranchRole => {
+    if (pathId === "primary") return "primary";
+    if (pathId === "recover") return "recovery";
+    if (pathId === "explore") return "explore";
+    return pathId as FutureWeaveBranchRole;
+  };
+
+  const createBranch = (path: FutureWeavePath): FutureWeaveBranch => {
+    const lastNode = path.nodes[path.nodes.length - 1] ?? path.nodes[0];
+    const targetMomentum = lastNode?.expectedFocusMomentum ?? baseMomentum;
+    const volatilityHint = resolveVolatilityHint(lastNode?.volatilityHint ?? volatility);
+    return {
+      id: path.pathId,
+      role: resolveBranchRole(path.pathId),
+      label: path.label,
+      likelihood: path.overallLikelihood,
+      momentumHint: resolveMomentumHint(baseMomentum, targetMomentum),
+      volatilityHint,
+      softenedSectors: collectSoftenedSectors(path),
+    };
+  };
+
+  const alternates: FutureWeavePath[] = [recoverPath, explorePath];
+  const branches: FutureWeaveBranch[] = [createBranch(primaryPath), ...alternates.map(createBranch)];
+
   return {
     primaryPath,
-    alternates: [recoverPath, explorePath],
+    alternates,
+    branches,
   };
 }
 
