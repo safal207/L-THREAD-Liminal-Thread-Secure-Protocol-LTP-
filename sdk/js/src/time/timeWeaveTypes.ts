@@ -48,7 +48,17 @@ export interface TimeWeaveAsymmetryMeta {
   direction: TimeWeaveAsymmetryDirection;
   depthScore: number;
   softAsymmetryIndex: number;
+  depthWeightedAsymmetry: number;
+  tenderness: number;
+  posture: TemporalPosture;
 }
+
+export type TemporalPosture =
+  | 'steady_forward'
+  | 'steady_backward'
+  | 'gentle_recovery'
+  | 'storm_shift'
+  | 'neutral_plateau';
 
 export interface TimeWeaveHistorySegment {
   bias: number;

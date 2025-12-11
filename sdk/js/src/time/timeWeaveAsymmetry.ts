@@ -5,6 +5,7 @@ import type {
   TimeWeaveAsymmetryMeta,
   TimeWeaveHistory,
   TimeWeaveSummary,
+  TemporalPosture,
 } from './timeWeaveTypes';
 
 export interface AsymmetryInput {
@@ -19,6 +20,13 @@ interface WeightedBranch {
 function clamp01(value: number): number {
   if (Number.isNaN(value)) return 0;
   if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+function clampSignedUnit(value: number): number {
+  if (Number.isNaN(value)) return 0;
+  if (value < -1) return -1;
   if (value > 1) return 1;
   return value;
 }
@@ -91,6 +99,88 @@ function computeVolatilityScore(segments: NormalizedHistorySegment[]): number {
   return clamp01(flipRate * 0.6 + clamp01(avgDelta) * 0.4);
 }
 
+export interface AsymmetryInputSample {
+  rawAsymmetry: number;
+  depth: number;
+}
+
+export function computeDepthWeightedAsymmetry(samples: AsymmetryInputSample[]): number {
+  if (samples.length === 0) return 0;
+
+  let weightedSum = 0;
+  let totalWeight = 0;
+
+  for (const sample of samples) {
+    const weight = Math.log1p(Math.max(0, sample.depth));
+    if (weight === 0) continue;
+    const clampedAsymmetry = clampSignedUnit(sample.rawAsymmetry);
+    weightedSum += clampedAsymmetry * weight;
+    totalWeight += weight;
+  }
+
+  if (totalWeight === 0) return 0;
+
+  return clampSignedUnit(weightedSum / totalWeight);
+}
+
+export function computeTenderness(asymmetryHistory: number[]): number {
+  if (asymmetryHistory.length < 2) return 1;
+
+  let totalDelta = 0;
+
+  for (let i = 1; i < asymmetryHistory.length; i += 1) {
+    const previous = clampSignedUnit(asymmetryHistory[i - 1]!);
+    const current = clampSignedUnit(asymmetryHistory[i]!);
+    totalDelta += Math.abs(current - previous);
+  }
+
+  const meanDelta = totalDelta / Math.max(1, asymmetryHistory.length - 1);
+
+  // When meanDelta approaches 1, changes are considered turbulent.
+  const maxExpectedDelta = 1.0;
+  const normalized = clamp01(meanDelta / maxExpectedDelta);
+  return clamp01(1 - normalized);
+}
+
+const TEMPORAL_POSTURE_THRESHOLDS = {
+  neutral: 0.15,
+  strong: 0.3,
+  smooth: 0.7,
+  // neutral: below this magnitude, posture is treated as a plateau
+  // strong: above this, the bias is considered firmly oriented
+  // smooth: tenderness above this is considered gentle vs. turbulent
+} as const;
+
+export function classifyTemporalPosture(meta: {
+  rawAsymmetry: number;
+  depthWeightedAsymmetry: number;
+  tenderness: number;
+}): TemporalPosture {
+  const tenderness = clamp01(meta.tenderness);
+  const directionalAsymmetry =
+    meta.depthWeightedAsymmetry !== 0
+      ? clampSignedUnit(meta.depthWeightedAsymmetry)
+      : clampSignedUnit(meta.rawAsymmetry);
+
+  const neutralBoundary = TEMPORAL_POSTURE_THRESHOLDS.neutral;
+  const strongBoundary = TEMPORAL_POSTURE_THRESHOLDS.strong;
+  const smoothBoundary = TEMPORAL_POSTURE_THRESHOLDS.smooth;
+
+  if (Math.abs(directionalAsymmetry) < neutralBoundary) {
+    return 'neutral_plateau';
+  }
+
+  if (directionalAsymmetry > strongBoundary) {
+    return tenderness > smoothBoundary ? 'steady_forward' : 'storm_shift';
+  }
+
+  if (directionalAsymmetry < -strongBoundary) {
+    return tenderness > smoothBoundary ? 'steady_backward' : 'storm_shift';
+  }
+
+  return tenderness > smoothBoundary ? 'gentle_recovery' : 'storm_shift';
+}
+
 export function computeAsymmetryMeta(
   history: TimeWeaveHistory,
   options?: { maxSteps?: number; maxSpanMs?: number },
@@ -98,7 +188,15 @@ export function computeAsymmetryMeta(
   const segments = normalizeHistorySegments(history);
 
   if (segments.length === 0) {
-    return { rawAsymmetry: 0, direction: 'balanced', depthScore: 0, softAsymmetryIndex: 0 };
+    return {
+      rawAsymmetry: 0,
+      direction: 'balanced',
+      depthScore: 0,
+      softAsymmetryIndex: 0,
+      depthWeightedAsymmetry: 0,
+      tenderness: 1,
+      posture: 'neutral_plateau',
+    };
   }
 
   const maxSteps = options?.maxSteps ?? 50;
@@ -142,15 +240,32 @@ export function computeAsymmetryMeta(
   const volatilityScore = computeVolatilityScore(segments);
   const rawAsymmetry = clamp01(latest.asymmetryMagnitude);
 
+  const depthWeightedAsymmetry = computeDepthWeightedAsymmetry(
+    segments.map((segment) => ({ rawAsymmetry: segment.bias, depth: segment.stepCount })),
+  );
+
+  const tenderness = computeTenderness(segments.map((segment) => segment.bias));
+  const signedRawAsymmetry =
+    direction === 'backward' ? -rawAsymmetry : direction === 'forward' ? rawAsymmetry : 0;
+
   const softAsymmetryIndex = clamp01(
     sigmoid(2.2 * rawAsymmetry + 2 * depthScore - 1.4 * volatilityScore),
   );
+
+  const posture = classifyTemporalPosture({
+    rawAsymmetry: signedRawAsymmetry,
+    depthWeightedAsymmetry,
+    tenderness,
+  });
 
   return {
     rawAsymmetry,
     direction,
     depthScore,
     softAsymmetryIndex,
+    depthWeightedAsymmetry,
+    tenderness,
+    posture,
   };
 }
 

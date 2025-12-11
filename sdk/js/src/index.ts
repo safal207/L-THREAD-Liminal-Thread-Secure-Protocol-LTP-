@@ -120,7 +120,10 @@ export {
 } from './time/timeWeave';
 export {
   computeAsymmetryMeta,
+  computeDepthWeightedAsymmetry,
+  computeTenderness,
   computeTimeWeaveAsymmetry,
+  classifyTemporalPosture,
   detectBranchCollapse,
 } from './time/timeWeaveAsymmetry';
 export { computeTimeWeaveMeta } from './time/timeWeaveMeta';
@@ -134,6 +137,7 @@ export type {
   TimeWeaveAsymmetry,
   TimeWeaveAsymmetryMeta,
   TimeWeaveAsymmetryDirection,
+  TemporalPosture,
   TimeWeaveDepth,
   BranchCollapseSignal,
   TimeWeaveMeta,
