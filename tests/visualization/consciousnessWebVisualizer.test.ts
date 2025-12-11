@@ -16,12 +16,12 @@ function snapshot(overrides: PartialSnapshot) {
 }
 
 (function testCalmOrientation() {
-  const output = renderConsciousnessWeb(snapshot({ orientation: "calm" }), { colorize: false });
+  const output = renderConsciousnessWeb(snapshot({ orientation: "calm" }), { colorize: false, mode: "debug" });
   assert.ok(output.includes(">>>>>>> [ CALM ] <<<<<<<"), "Calm sector should be highlighted");
 })();
 
 (function testStormOrientation() {
-  const output = renderConsciousnessWeb(snapshot({ orientation: "storm" }), { colorize: false });
+  const output = renderConsciousnessWeb(snapshot({ orientation: "storm" }), { colorize: false, mode: "debug" });
   assert.ok(output.includes(">>>>>>> [ STORM ] <<<<<<<"), "Storm sector should be highlighted");
 })();
 
@@ -61,6 +61,39 @@ function snapshot(overrides: PartialSnapshot) {
   );
   assert.ok(output.includes("Time Anchors:"));
   assert.ok(output.includes("+1: possible shift"));
+})();
+
+(function testHumanModeRendering() {
+  const output = renderConsciousnessWeb(
+    snapshot({
+      orientation: "growth",
+      futurePaths: [
+        { role: "primary", label: "Forward", path: ["growth", "shift", "calm"], probability: 0.5 },
+        { role: "explore", label: "Alternate", path: ["growth", "storm"], probability: 0.5 },
+      ],
+    }),
+    { colorize: false, mode: "human" },
+  );
+
+  assert.ok(output.includes("HUMAN VIEW"), "Human mode header present");
+  assert.ok(output.includes("Pulse: momentum"), "Pulse line present");
+})();
+
+(function testStoryModeRendering() {
+  const output = renderConsciousnessWeb(
+    snapshot({
+      orientation: "shift",
+      focusMomentum: 0.82,
+      futurePaths: [
+        { role: "primary", label: "Settle", path: ["shift", "calm"], probability: 0.62 },
+        { role: "explore", label: "Branch", path: ["shift", "growth"], probability: 0.38 },
+      ],
+    }),
+    { colorize: false, mode: "story" },
+  );
+
+  assert.ok(output.includes("STORY MODE"), "Story mode header present");
+  assert.ok(output.includes("One strong path opens toward CALM (0.62 chance)."), "Primary narrative rendered");
 })();
 
 console.log("consciousnessWebVisualizer tests passed");

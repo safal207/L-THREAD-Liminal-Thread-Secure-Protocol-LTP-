@@ -1,85 +1,191 @@
-# Consciousness Web & Orientation Shell (JS SDK)
+🧠 LTP Consciousness Web — Passport / README
 
-This layer builds on the Thread Life Model to describe how threads relate as a web and how focus can rotate across that web. It is a lightweight semantic view for engineers integrating L-THREAD in higher-level systems.
+Что это такое?
 
-## What is the Consciousness Web?
-- A semantic graph derived from a `ThreadMap`.
-- **Nodes**: `ThreadVector` instances representing threads with phases and energy/resonance levels.
-- **Links**: semantic connections created from:
-  - `parentThreadId` relationships (parent-child links).
-  - Shared scopes (individual, family, project, system).
-  - Shared tags (overlapping tags create tag links).
-- **Metrics**: each node can carry degree and a centrality-like score that blends link count with energy and resonance to highlight central or dominant threads.
+Consciousness Web (CW) — это визуальный слой L-THREAD, который показывает живую структуру нити сознания в момент времени.
+Он отражает:
 
-## What is the Orientation Shell?
-- An orientation layer that groups threads into **sectors**.
-- Sectors can be scope-based (individual/family/project/system) or tag-based (e.g., `liminal-os`).
-- Adjusting `activeSectorIds` is like rotating a turtle shell: it shifts which sectors, and therefore which threads, are emphasized.
+- связи между состояниями потока (nodes)
+- напряжение и силу связей (tension links)
+- возможные линии будущего (future paths)
+- временные якоря (time anchors)
+- импульс и направление фокуса (momentum)
 
-## Core Types
-- `ConsciousnessWeb`: the built graph including threads, links, and metrics.
-- `ThreadLink`: a connection between two threads (`parent-child`, `shared-scope`, or `shared-tag`) with a simple weight.
-- `WebNodeMetrics`: per-thread metrics such as degree and a centrality score.
-- `OrientationSector`: a sector definition with optional scope or required tags.
-- `OrientationShell`: a collection of sectors plus the currently active sector IDs.
+Это не ML и не психология.
+Это геометрия внутреннего состояния протокола.
 
-## Core Functions
-- `buildConsciousnessWeb(map: ThreadMap): ConsciousnessWeb` — builds the graph from a thread map with links and metrics.
-- `createDefaultOrientationShell(): OrientationShell` — provides a ready set of scope/tag sectors with all sectors active by default.
-- `orientWeb(web, shell): { activeThreads, dormantThreads }` — filters threads into active vs. dormant based on the shell's active sectors.
+---
 
-## Example Usage
+Зачем это нужно?
+
+В LTP это решает три ключевые задачи:
+
+1. Наблюдаемость (Observability)
+
+CW — это “экран паука”.
+Он помогает видеть:
+
+- куда идёт внимание
+- как меняется структура выбора
+- как время разворачивается вокруг пользователя
+
+2. Диагностика маршрутизации
+
+Маршрутизатор теперь может объяснить почему он выбрал конкретный путь:
+
+- какой узел был активен
+- какой будущий путь стал вероятнее
+- какой tension вытеснил остальные
+
+3. Живой интерфейс для человека / агента
+
+CW — это семантическая карта состояния:
+вместо “состояние = объект”,
+ты видишь наблюдаемую топологию выбора.
+
+---
+
+Как работает визуализация
+
+Визуализатор рендерит ASCII-сетку:
+
+[ A ]───(soft)────[ B ]───(strong)──[ C ]
+  │                                │
+  (future?)                      [ anchor ]
+  │                                │
+  [ D ]───────────────(tension)─────┘
+
+Где:
+
+- [X] — узел-нить
+- (soft/strong/tension) — характер связи
+- future? — ветвь будущего
+- [anchor] — временной якорь
+
+---
+
+Метрики в снапшоте
+
+Каждый снапшот содержит:
+
+- nodeTensionMap → напряжение
+- futurePaths.normalized → вероятности будущих линий времени
+- momentum → импульс фокуса
+- volatility → нестабильность внимания
+- temporalDepth → “глубина” восприятия времени
+- orientationSummary → куда система склоняется
+
+---
+
+API
+
 ```ts
-import {
-  buildConsciousnessWeb,
-  createDefaultOrientationShell,
-  orientWeb,
-} from './src';
-import type { ThreadMap } from './src/threadLifeModel.types';
+import { buildConsciousnessSnapshot } from "./consciousnessWeb";
+import { renderConsciousnessWeb } from "../../src/visualization/consciousnessWebVisualizer";
 
-const map: ThreadMap = {
-  ownerId: 'user-123',
-  threads: [
-    // ...ThreadVector entries
-  ],
-};
-
-const web = buildConsciousnessWeb(map);
-const shell = createDefaultOrientationShell();
-
-// Focus only on family-oriented sectors
-const familyShell = {
-  ...shell,
-  activeSectorIds: shell.sectors
-    .filter((s) => s.scope === 'family' || s.id.includes('family'))
-    .map((s) => s.id),
-};
-
-const { activeThreads, dormantThreads } = orientWeb(web, familyShell);
-console.log('Active threads in family context:', activeThreads);
+const snap = buildConsciousnessSnapshot(state);
+console.log(renderConsciousnessWeb(snap));
 ```
 
-## Smart Router (Temporal Orientation + Fuzzy Routing)
+---
 
-The JS SDK ships with a minimal **Smart Router** demo that combines:
+Режимы визуализации (будут добавлены)
 
-- `TemporalOrientationView` (time-weave depth + focus momentum)
-- `buildRouteHintsFromOrientation` (fuzzy routing engine)
+- debug — максимально подробный вывод
+- human-friendly — компактный, понятный человеку
+- story-mode — визуальное повествование, идеально для презентаций
 
-to suggest the **next best sector** in the Orientation Web.
+---
 
-Run the demo from the JS SDK root:
+Где используется
 
-```bash
-cd sdk/js
-npm install
-npm run demo:smart-router
+- Smart Router (fuzzy + semantic routing)
+- Orientation HUD
+- Turtle Mode (перспектива)
+- TimeWeave engine
+
+---
+
+🧵 2) Режимы визуализации (3 готовых режима)
+
+Mode 1. DEBUG MODE (полный режим)
+
+Для разработчиков.
+
+Показывает:
+
+- все tension values
+- силы связей
+- метрики volatility / momentum
+- raw future paths
+- временные якоря с тайм-подписями
+- JSON-пакет сбоку
+
+Пример:
+
+```
+DEBUG VIEW
+Nodes: A,B,C,D
+Tension: A-B:0.4, B-C:0.9 …
+Momentum: 0.72 ↑
+Volatility: 0.33
+...
+[ A ]---(0.4)---[ B ]====(0.9)====[ C ]
+   |                              |
+  (fp:0.12)                   [anchor:t+3]
 ```
 
-It prints routing suggestions for several demo clients based on their `timeWeaveDepthScore` and `focusMomentumScore`.
+Mode 2. HUMAN VIEW (понятный человеку)
 
-The demo also surfaces `routeConfidence` (0..1) and applies a light entropy penalty based on how dispersed the active sectors
-are, threading a small amount of temporal soft-context into each hint's reasoning.
+Минималистичная, эмоционально-интуитивная карта.
 
-## Relation to Thread Life Model
-The Consciousness Web does not replace the Thread Life Model. The life model describes how a single thread evolves (birth → active → weakening → switching → archived). The Consciousness Web shows how many threads relate as a network, and the Orientation Shell rotates perspective across that network to emphasize certain sectors.
+```
+A ——→ B ==→ C
+        \ 
+         ↘ D (future)
+```
+
+Легенда:
+
+- → направление внимания
+- == сильная связь
+- (future) ветвь возможности
+
+Mode 3. STORY MODE (нарративный)
+
+Повествовательная визуализация — для презентаций.
+
+Он соединяет ASCII + подписи:
+
+```
+You are currently between A and B.
+The system senses rising momentum (↑0.72).
+One strong path opens toward C.
+A speculative future branch emerges from D.
+```
+
+В Story Mode визуализатор сам пишет краткую интерпретацию.
+
+---
+
+🔧 Как это оформить в PR?
+
+Task: Add Consciousness Web visualization modes
+
+1. Implement mode switcher:
+   - debug
+   - human
+   - story
+
+2. Extend renderer:
+   - more readable ASCII for human mode
+   - narrative layer for story mode
+   - keep existing rendering for debug
+
+3. Update README.consciousness-web.md:
+   - describe modes
+   - add examples
+
+4. Add tests:
+   - mode selection
+   - stable output snapshots
