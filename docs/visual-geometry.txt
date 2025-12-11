@@ -1,0 +1,16 @@
+VISUAL MANIFEST — GEOMETRY OF MEANING (brief for designers)
+
+- **Spider (Consciousness Web):** lattice of luminous nodes connected by threads; thickness encodes resonance strength.
+- **Turtle (Orientation Shell):** slow, stable guide with a glowing compass ring showing rotationAngle and horizonSpan.
+- **Threads:** translucent paths with pulse amplitude reflecting tension; momentum is shown as arrow flow.
+- **Future Branches:** folded ribbons ahead of the turtle; clarity sharpens their edges, low clarity blurs them.
+- **Resonance:** soft glows between nodes; higher coherence produces brighter interference patterns.
+- **Router Core:** central prism that selects a branch; emits a short caption explaining the chosen path.
+- **Color Language:**
+  - Clarity → cyan
+  - Tension → amber
+  - Momentum → magenta vectors
+  - Stability → deep blue shell
+  - Resonance → violet highlights
+
+Deliverables: hero graphic, minimal icon set, and a timeline strip showing branch selection.
