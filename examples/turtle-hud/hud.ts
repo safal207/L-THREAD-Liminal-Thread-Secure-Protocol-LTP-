@@ -1,6 +1,32 @@
 export type TimeDirection = "past" | "now" | "future";
 export type SocialAxis = "self" | "family" | "world";
 
+export type LtpHudStatus = "connecting" | "live" | "disconnected" | "error";
+
+export interface LtpHudState {
+  status: LtpHudStatus;
+  lastUpdatedAt?: number;
+  snapshot?: TurtleSnapshotLike;
+  focusMomentum?: number;
+}
+
+export const BASELINE_HUD_STATE: LtpHudState = {
+  status: "connecting",
+  lastUpdatedAt: undefined,
+  snapshot: undefined,
+  focusMomentum: 0,
+};
+
+const FALLBACK_SNAPSHOT: TurtleSnapshotLike = {
+  mainTimeDirection: "now",
+  mainSocialAxis: "self",
+  focusMomentumScore: 0,
+  timeWeaveDepthScore: 0,
+  metaHint: "waiting for stream…",
+};
+
+let hudState: LtpHudState = { ...BASELINE_HUD_STATE };
+
 export interface TurtleSnapshotLike {
   mainTimeDirection: TimeDirection;
   mainSocialAxis: SocialAxis;
@@ -23,11 +49,27 @@ const modeHint = typeof document !== "undefined" ? document.getElementById("mode
 const metaHint = typeof document !== "undefined" ? document.getElementById("meta-hint") : null;
 const wsStatus = typeof document !== "undefined" ? document.getElementById("ws-status") : null;
 
-function updateWsStatus(label: string, state?: "connected" | "error") {
+function statusToLabel(status: LtpHudStatus): string {
+  switch (status) {
+    case "live":
+      return "WS: live";
+    case "disconnected":
+      return "WS: disconnected";
+    case "error":
+      return "WS: error";
+    case "connecting":
+    default:
+      return "WS: connecting…";
+  }
+}
+
+function updateWsStatus(status: LtpHudStatus) {
   if (!wsStatus) return;
-  wsStatus.textContent = label;
-  wsStatus.classList.toggle("connected", state === "connected");
-  wsStatus.classList.toggle("error", state === "error");
+  wsStatus.textContent = statusToLabel(status);
+  wsStatus.classList.toggle("connected", status === "live");
+  wsStatus.classList.toggle("error", status === "error");
+  wsStatus.classList.toggle("disconnected", status === "disconnected");
+  wsStatus.classList.toggle("connecting", status === "connecting");
 }
 
 function clampScore(value: number | undefined): number {
@@ -67,34 +109,36 @@ function highlightDirection(direction?: string) {
   });
 }
 
-function renderOrientation(snapshot: TurtleSnapshotLike) {
+function renderOrientation(snapshot?: TurtleSnapshotLike) {
+  const data = snapshot ?? FALLBACK_SNAPSHOT;
+
   if (directionPill) {
-    directionPill.textContent = snapshot.mainTimeDirection;
+    directionPill.textContent = data.mainTimeDirection;
   }
   if (axisPill) {
-    axisPill.textContent = snapshot.mainSocialAxis;
+    axisPill.textContent = data.mainSocialAxis;
   }
 
-  highlightDirection(snapshot.mainTimeDirection);
+  highlightDirection(data.mainTimeDirection);
 
   if (focusBar) {
-    const width = `${Math.round(clampScore(snapshot.focusMomentumScore) * 100)}%`;
+    const width = `${Math.round(clampScore(data.focusMomentumScore) * 100)}%`;
     focusBar.style.width = width;
   }
   if (focusLabel) {
-    focusLabel.textContent = `focus: ${focusMomentumToBand(snapshot.focusMomentumScore)}`;
+    focusLabel.textContent = `focus: ${focusMomentumToBand(data.focusMomentumScore)}`;
   }
 
   if (depthLabel) {
-    depthLabel.textContent = `depth: ${timeWeaveDepthToBand(snapshot.timeWeaveDepthScore)}`;
+    depthLabel.textContent = `depth: ${timeWeaveDepthToBand(data.timeWeaveDepthScore)}`;
   }
 
   if (modeHint) {
-    modeHint.textContent = `mode: ${deriveModeHint(snapshot)}`;
+    modeHint.textContent = `mode: ${deriveModeHint(data)}`;
   }
 
   if (metaHint) {
-    metaHint.textContent = snapshot.metaHint ?? "";
+    metaHint.textContent = data.metaHint ?? "";
   }
 }
 
@@ -187,39 +231,82 @@ function extractSnapshot(raw: any): TurtleSnapshotLike | null {
   return snapshot;
 }
 
+export function normalizeMessagePayload(raw: any): any {
+  if (Array.isArray(raw)) {
+    if (raw.length === 0) return null;
+    return raw[raw.length - 1];
+  }
+  return raw;
+}
+
+export function applySnapshotUpdate(
+  prev: LtpHudState,
+  incoming: TurtleSnapshotLike | TurtleSnapshotLike[] | null | undefined,
+): LtpHudState {
+  if (!incoming) return prev;
+  if (Array.isArray(incoming)) {
+    if (incoming.length === 0) return prev; // Avoid phantom movement on empty batches
+    incoming = incoming[incoming.length - 1];
+  }
+
+  const nextSnapshot: TurtleSnapshotLike = { ...incoming };
+  const focusMomentum = clampScore(incoming.focusMomentumScore ?? prev.focusMomentum ?? 0);
+
+  return {
+    status: "live",
+    lastUpdatedAt: Date.now(),
+    snapshot: nextSnapshot,
+    focusMomentum,
+  };
+}
+
+export function withStatus(prev: LtpHudState, status: LtpHudStatus): LtpHudState {
+  if (prev.status === status) return prev;
+  return { ...prev, status };
+}
+
+function renderHudState(state: LtpHudState) {
+  updateWsStatus(state.status);
+  const snapshot = state.snapshot ?? { ...FALLBACK_SNAPSHOT, focusMomentumScore: state.focusMomentum ?? 0 };
+  renderOrientation(snapshot);
+}
+
+function setHudState(next: LtpHudState) {
+  const shouldRender = next !== hudState;
+  hudState = next;
+  if (shouldRender) {
+    renderHudState(hudState);
+  }
+}
+
 function handleMessage(event: MessageEvent) {
   let parsed: any;
   try {
     parsed = JSON.parse(event.data);
   } catch (error) {
     console.error("Failed to parse WS payload", error);
+    setHudState(withStatus(hudState, "error"));
     return;
   }
 
-  const snapshot = extractSnapshot(parsed);
-  if (snapshot) {
-    renderOrientation(snapshot);
-  }
+  const normalized = normalizeMessagePayload(parsed);
+  const snapshot = normalized ? extractSnapshot(normalized) : null;
+  const nextState = applySnapshotUpdate(hudState, snapshot);
+  setHudState(nextState);
 }
 
 function startWebSocket() {
-  updateWsStatus("WS: connecting…");
+  setHudState(withStatus(hudState, "connecting"));
   const socket = new WebSocket(WS_URL);
 
-  socket.addEventListener("open", () => updateWsStatus("WS: connected", "connected"));
-  socket.addEventListener("error", () => updateWsStatus("WS: error", "error"));
-  socket.addEventListener("close", () => updateWsStatus("WS: closed"));
+  socket.addEventListener("open", () => setHudState(withStatus(hudState, "connecting")));
+  socket.addEventListener("error", () => setHudState(withStatus(hudState, "error")));
+  socket.addEventListener("close", () => setHudState(withStatus(hudState, "disconnected")));
   socket.addEventListener("message", handleMessage);
 }
 
 function bootstrap() {
-  renderOrientation({
-    mainTimeDirection: "now",
-    mainSocialAxis: "self",
-    focusMomentumScore: 0,
-    timeWeaveDepthScore: 0,
-    metaHint: "waiting for stream…",
-  });
+  renderHudState(hudState);
   startWebSocket();
 }
 

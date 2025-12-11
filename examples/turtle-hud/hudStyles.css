@@ -70,6 +70,17 @@ body {
   border: 1px solid rgba(255, 123, 123, 0.35);
 }
 
+.ws-status.disconnected {
+  color: #ffb347;
+  background: rgba(255, 179, 71, 0.08);
+  border: 1px solid rgba(255, 179, 71, 0.35);
+}
+
+.ws-status.connecting {
+  color: var(--muted);
+  border: 1px dashed rgba(255, 255, 255, 0.1);
+}
+
 .hud-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));

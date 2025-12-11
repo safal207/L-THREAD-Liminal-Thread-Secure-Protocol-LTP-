@@ -9,6 +9,8 @@ Minimal, tactical HUD that listens to the L-THREAD WebSocket demo server and vis
 
 The goal is to keep it as a cockpit instrument, not a fancy dashboard.
 
+The HUD always renders a baseline state (connecting) and keeps the last meaningful snapshot visible if the connection drops or an error occurs.
+
 ## Files
 
 ```
