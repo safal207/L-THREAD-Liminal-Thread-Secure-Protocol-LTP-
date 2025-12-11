@@ -96,6 +96,17 @@ runTest('routeConfidence decreases with higher entropy', () => {
   assert.ok(hintHighEntropy.routeConfidence <= hintLowEntropy.routeConfidence);
 });
 
+runTest('soft asymmetry encourages stabilization', () => {
+  const baseCtx: FuzzyRoutingContext = { timeWeaveDepthScore: 0.6, focusMomentumScore: 0.4 };
+  const gentleCtx: FuzzyRoutingContext = { ...baseCtx, softAsymmetryIndex: 0.85 };
+
+  const baseHint = computeRouteHintForSector('sector-soft-base', baseCtx);
+  const gentleHint = computeRouteHintForSector('sector-soft', gentleCtx);
+
+  assert.ok(gentleHint.routeConfidence <= baseHint.routeConfidence + 0.0001);
+  assert.ok(gentleHint.reason.includes('soft asymmetry') || gentleHint.reason.includes('softness'));
+});
+
 runTest('low momentum yields stabilize intent with grounding mode', () => {
   const ctx: FuzzyRoutingContext = { timeWeaveDepthScore: 0.5, focusMomentumScore: 0.05 };
   const result = routeWithFuzzyEngine(['sector-low'], ctx);

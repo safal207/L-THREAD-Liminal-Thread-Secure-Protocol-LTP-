@@ -4,6 +4,7 @@ import type {
   TemporalOrientationView,
 } from '../temporalOrientation/temporalOrientationTypes';
 import { computeMomentumMetrics } from '../temporalOrientation/fuzzyMomentum';
+import type { TimeWeaveAsymmetryMeta } from '../time/timeWeaveTypes';
 
 export type RoutingPriority = 'low' | 'normal' | 'high';
 export type RoutingMode = 'explore' | 'exploit' | 'stabilize';
@@ -16,6 +17,9 @@ export interface FuzzyRoutingContext {
   entropyLevel?: number; // 0..1 optional signal of noise/dispersion
   orientationSummary?: TemporalOrientationSummary;
   momentum?: MomentumMetrics;
+  asymmetryMeta?: TimeWeaveAsymmetryMeta;
+  /** Optional pre-computed softness scalar for routing gentleness. */
+  softAsymmetryIndex?: number;
 }
 
 export interface RoutingResult {
@@ -197,31 +201,49 @@ function computeSoftContextAdjustments(
   mode: RoutingMode,
 ): { confidenceDelta: number; reasonParts: string[] } {
   const summary = ctx.orientationSummary;
-  if (!summary) {
-    return { confidenceDelta: 0, reasonParts: [] };
-  }
-
   const reasonParts: string[] = [];
   let delta = 0;
 
-  if (summary.globalTrend === 'rising' && (mode === 'explore' || mode === 'exploit')) {
-    delta += 0.05;
-    reasonParts.push('orientation trend is rising');
+  if (summary) {
+    if (summary.globalTrend === 'rising' && (mode === 'explore' || mode === 'exploit')) {
+      delta += 0.05;
+      reasonParts.push('orientation trend is rising');
+    }
+
+    if (summary.globalTrend === 'falling' && mode === 'stabilize') {
+      delta += 0.05;
+      reasonParts.push('orientation trend is falling');
+    }
+
+    if (summary.risingSectors?.includes(sectorId)) {
+      delta += 0.04;
+      reasonParts.push('sector is in rising set');
+    }
+
+    if (summary.fallingSectors?.includes(sectorId) && mode === 'stabilize') {
+      delta += 0.03;
+      reasonParts.push('sector shows falling signals');
+    }
   }
 
-  if (summary.globalTrend === 'falling' && mode === 'stabilize') {
-    delta += 0.05;
-    reasonParts.push('orientation trend is falling');
+  const softness = ctx.softAsymmetryIndex ?? ctx.asymmetryMeta?.softAsymmetryIndex;
+  const depth = ctx.asymmetryMeta?.depthScore;
+
+  if (typeof softness === 'number') {
+    const softnessScore = clamp01(softness);
+
+    if (softnessScore > 0.7 && mode !== 'stabilize') {
+      delta -= 0.05 + (softnessScore - 0.7) * 0.1;
+      reasonParts.push('soft asymmetry detected → favor gentle/stable routing');
+    } else if (softnessScore < 0.3 && (mode === 'explore' || mode === 'exploit')) {
+      delta += 0.04;
+      reasonParts.push('softness is low → quick pivots acceptable');
+    }
   }
 
-  if (summary.risingSectors?.includes(sectorId)) {
-    delta += 0.04;
-    reasonParts.push('sector is in rising set');
-  }
-
-  if (summary.fallingSectors?.includes(sectorId) && mode === 'stabilize') {
-    delta += 0.03;
-    reasonParts.push('sector shows falling signals');
+  if (typeof depth === 'number' && depth > 0.8 && mode === 'explore') {
+    delta -= 0.03;
+    reasonParts.push('deep asymmetry corridor → avoid abrupt exploration');
   }
 
   return { confidenceDelta: delta, reasonParts };
@@ -369,7 +391,7 @@ export function deriveEntropyFromOrientation(view: TemporalOrientationView): num
 
 export function buildRouteHintsFromOrientation(
   view: TemporalOrientationView,
-  options?: { history?: TemporalOrientationView[] },
+  options?: { history?: TemporalOrientationView[]; asymmetryMeta?: TimeWeaveAsymmetryMeta },
 ): RouteHint[] {
   const history = options?.history ?? [view];
   const momentum = computeMomentumMetrics(history);
@@ -380,6 +402,8 @@ export function buildRouteHintsFromOrientation(
     entropyLevel: deriveEntropyFromOrientation(view),
     orientationSummary: view.summary,
     momentum,
+    asymmetryMeta: options?.asymmetryMeta,
+    softAsymmetryIndex: options?.asymmetryMeta?.softAsymmetryIndex,
   };
 
   const sectorIds = Object.values(view.web.sectors).map((sector) => sector.id);

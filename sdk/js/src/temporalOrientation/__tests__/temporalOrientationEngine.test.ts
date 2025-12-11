@@ -69,7 +69,7 @@ runTest('marks single rising branch', () => {
   weave = appendNodeToBranch(weave, 'r1', { id: 'n3', tick: 3, intensity: 0.9, phase: 'emerging' });
 
   const view = buildTemporalOrientationView(web, weave);
-  const snapshot = view.sectors[0];
+  const snapshot = view.sectors[0]!;
   assert.ok(snapshot);
 
   assert.strictEqual(snapshot.branchTrend, 'rising');

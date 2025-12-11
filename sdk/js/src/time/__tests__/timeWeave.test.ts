@@ -39,20 +39,20 @@ runTest('upsertBranch inserts and replaces by threadId', () => {
   const branchB: TimeBranch = { threadId: 'thread-1', nodes: [makeNode({ intensity: 0.8 })] };
 
   const afterInsert = upsertBranch(createEmptyWeave(), branchA);
-  const insertedBranch = afterInsert.branches[0];
+  const insertedBranch = afterInsert.branches[0]!;
   assert.ok(insertedBranch);
-  const insertedNode = insertedBranch.nodes[0];
+  const insertedNode = insertedBranch.nodes[0]!;
   assert.ok(insertedNode);
-  const originalNode = branchA.nodes[0];
+  const originalNode = branchA.nodes[0]!;
   assert.ok(originalNode);
   assert.equal(insertedNode.id, originalNode.id);
 
   const afterReplace = upsertBranch(afterInsert, branchB);
-  const replacedBranch = afterReplace.branches[0];
+  const replacedBranch = afterReplace.branches[0]!;
   assert.ok(replacedBranch);
-  const replacedNode = replacedBranch.nodes[0];
+  const replacedNode = replacedBranch.nodes[0]!;
   assert.ok(replacedNode);
-  const replacementNode = branchB.nodes[0];
+  const replacementNode = branchB.nodes[0]!;
   assert.ok(replacementNode);
   assert.equal(replacedNode.id, replacementNode.id);
 });
@@ -68,15 +68,15 @@ runTest('appendNodeToBranch creates missing branch, clamps intensity, and keeps 
   const withMoreNodes = appendNodeToBranch(weaveWithNewBranch, 'thread-2', nodeLow);
   const finalWeave = appendNodeToBranch(withMoreNodes, 'thread-2', nodeHigh);
 
-  const branch = finalWeave.branches[0];
+  const branch = finalWeave.branches[0]!;
   assert.ok(branch);
   assert.equal(branch.nodes.length, 3);
   assert.deepEqual(
     branch.nodes.map((n) => n.tick),
     [5, 7, 10],
   );
-  const firstNode = branch.nodes[0];
-  const lastNode = branch.nodes[2];
+  const firstNode = branch.nodes[0]!;
+  const lastNode = branch.nodes[2]!;
   assert.ok(firstNode);
   assert.ok(lastNode);
   assert.equal(firstNode.intensity, 0);

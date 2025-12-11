@@ -13,6 +13,8 @@ import {
   type RoutingPriority,
 } from '../routing/fuzzyRoutingEngine';
 import { computeMomentumMetrics } from '../temporalOrientation/fuzzyMomentum';
+import { computeAsymmetryMeta } from '../time/timeWeaveAsymmetry';
+import type { TimeWeaveHistory } from '../time/timeWeaveTypes';
 
 interface DemoClientState {
   id: string;
@@ -164,6 +166,24 @@ function buildDemoHistoryFromClient(client: DemoClientState): TemporalOrientatio
   return series.map((momentumValue) => buildDemoOrientationViewFromClient(client, momentumValue));
 }
 
+function buildAsymmetryHistoryFromOrientationHistory(history: TemporalOrientationView[]): TimeWeaveHistory {
+  const baseTimestamp = Date.now();
+  const segments = history.map((snapshot, index) => {
+    const bias = snapshot.summary.focusMomentumScore ?? 0;
+    const magnitude = Math.abs(bias);
+    const stepCount = Math.max(snapshot.summary.activeSectorCount ?? 1, 1);
+
+    return {
+      bias,
+      asymmetryMagnitude: magnitude,
+      stepCount,
+      timestampMs: baseTimestamp + index * 1000,
+    } satisfies TimeWeaveHistory['segments'][number];
+  });
+
+  return { segments } satisfies TimeWeaveHistory;
+}
+
 const priorityOrder: RoutingPriority[] = ['high', 'normal', 'low'];
 const modeOrder: RoutingMode[] = ['exploit', 'explore', 'stabilize'];
 
@@ -200,8 +220,13 @@ export function runSmartRouterDemo(): void {
     const history = buildDemoHistoryFromClient(client);
     const view = history[history.length - 1] ?? buildDemoOrientationViewFromClient(client);
     const momentum = computeMomentumMetrics(history.length > 0 ? history : [view]);
+    const asymmetryHistory = buildAsymmetryHistoryFromOrientationHistory(history.length > 0 ? history : [view]);
+    const asymmetryMeta = computeAsymmetryMeta(asymmetryHistory, { maxSteps: 40, maxSpanMs: 60_000 });
     const entropyLevel = deriveEntropyFromOrientation(view);
-    const hints = buildRouteHintsFromOrientation(view, { history: history.length > 0 ? history : [view] });
+    const hints = buildRouteHintsFromOrientation(view, {
+      history: history.length > 0 ? history : [view],
+      asymmetryMeta,
+    });
     const best = pickBestRouteHint(hints);
 
     console.log(`===== Client: ${client.id} =====`);
@@ -213,6 +238,7 @@ export function runSmartRouterDemo(): void {
       'Momentum:',
       client.focusMomentumScore.toFixed(2),
     );
+    console.log('Asym depth:', asymmetryMeta.depthScore.toFixed(2), 'Softness:', asymmetryMeta.softAsymmetryIndex.toFixed(2));
     console.log('Momentum slope/strength:', momentum.slope, momentum.strength.toFixed(2));
     console.log('Total sectors:', hints.length);
     console.log('Entropy level:', entropyLevel.toFixed(2));

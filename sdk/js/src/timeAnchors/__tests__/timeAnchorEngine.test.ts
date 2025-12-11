@@ -61,7 +61,7 @@ runTest('two events for same sector are sorted by tick', () => {
   const afterFirst = anchorEventToWeave(earlier, ctx);
   const afterSecond = anchorEventToWeave(later, { ...ctx, weave: afterFirst.weave });
 
-  const branch = afterSecond.weave.branches[0];
+  const branch = afterSecond.weave.branches[0]!;
   assert.ok(branch);
   assert.deepEqual(branch.nodes.map((node) => node.tick), [10, 20]);
 });
