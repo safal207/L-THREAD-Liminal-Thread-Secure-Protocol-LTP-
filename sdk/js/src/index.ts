@@ -118,7 +118,11 @@ export {
   summarizeWeave,
   upsertBranch,
 } from './time/timeWeave';
-export { computeTimeWeaveAsymmetry, detectBranchCollapse } from './time/timeWeaveAsymmetry';
+export {
+  computeAsymmetryMeta,
+  computeTimeWeaveAsymmetry,
+  detectBranchCollapse,
+} from './time/timeWeaveAsymmetry';
 export { computeTimeWeaveMeta } from './time/timeWeaveMeta';
 export type {
   ThreadId,
@@ -128,11 +132,15 @@ export type {
   TimeTick,
   TimeWeave,
   TimeWeaveAsymmetry,
+  TimeWeaveAsymmetryMeta,
+  TimeWeaveAsymmetryDirection,
   TimeWeaveDepth,
   BranchCollapseSignal,
   TimeWeaveMeta,
   TimeWeaveTrendSummary,
   TimeWeaveSummary,
+  TimeWeaveHistory,
+  TimeWeaveHistorySegment,
 } from './time/timeWeaveTypes';
 
 // Temporal Orientation Layer (Orientation Web x Time Weave)

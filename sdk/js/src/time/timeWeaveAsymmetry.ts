@@ -2,6 +2,8 @@ import type {
   BranchCollapseSignal,
   TimeBranch,
   TimeWeaveAsymmetry,
+  TimeWeaveAsymmetryMeta,
+  TimeWeaveHistory,
   TimeWeaveSummary,
 } from './timeWeaveTypes';
 
@@ -36,6 +38,120 @@ function computeBranchWeight(branch: TimeBranch): number {
   // Favor recent signal while keeping the branch history in play.
   const recentIntensity = clamp01(last.intensity);
   return Number((recentIntensity * 0.7 + average * 0.3).toFixed(4));
+}
+
+function sigmoid(x: number): number {
+  return 1 / (1 + Math.exp(-x));
+}
+
+interface NormalizedHistorySegment {
+  bias: number;
+  timestampMs?: number;
+  stepCount: number;
+  asymmetryMagnitude: number;
+}
+
+function normalizeHistorySegments(history: TimeWeaveHistory): NormalizedHistorySegment[] {
+  return history.segments.map((segment, index) => {
+    const bias = Number.isFinite(segment.bias) ? segment.bias : 0;
+    const asymmetryMagnitude = clamp01(
+      Number.isFinite(segment.asymmetryMagnitude) ? Math.abs(segment.asymmetryMagnitude!) : Math.abs(bias),
+    );
+
+    return {
+      bias,
+      timestampMs: segment.timestampMs ?? index,
+      stepCount: segment.stepCount && segment.stepCount > 0 ? segment.stepCount : 1,
+      asymmetryMagnitude,
+    } satisfies NormalizedHistorySegment;
+  });
+}
+
+function computeVolatilityScore(segments: NormalizedHistorySegment[]): number {
+  if (segments.length < 2) return 0;
+
+  let signFlips = 0;
+  let deltaSum = 0;
+
+  for (let i = 1; i < segments.length; i += 1) {
+    const prev = segments[i - 1]!;
+    const current = segments[i]!;
+    const prevSign = Math.sign(prev.bias);
+    const currentSign = Math.sign(current.bias);
+
+    if (prevSign !== 0 && currentSign !== 0 && prevSign !== currentSign) {
+      signFlips += 1;
+    }
+
+    deltaSum += Math.abs(current.bias - prev.bias);
+  }
+
+  const flipRate = signFlips / Math.max(segments.length - 1, 1);
+  const avgDelta = deltaSum / Math.max(segments.length - 1, 1);
+  return clamp01(flipRate * 0.6 + clamp01(avgDelta) * 0.4);
+}
+
+export function computeAsymmetryMeta(
+  history: TimeWeaveHistory,
+  options?: { maxSteps?: number; maxSpanMs?: number },
+): TimeWeaveAsymmetryMeta {
+  const segments = normalizeHistorySegments(history);
+
+  if (segments.length === 0) {
+    return { rawAsymmetry: 0, direction: 'balanced', depthScore: 0, softAsymmetryIndex: 0 };
+  }
+
+  const maxSteps = options?.maxSteps ?? 50;
+  const maxSpanMs = options?.maxSpanMs ?? 60 * 60 * 1000;
+
+  const latest = segments[segments.length - 1]!;
+  const direction: TimeWeaveAsymmetryMeta['direction'] =
+    latest.bias > 0.01 ? 'forward' : latest.bias < -0.01 ? 'backward' : 'balanced';
+
+  let depthSteps = 0;
+  let firstTimestamp: number | undefined;
+  let lastTimestamp: number | undefined;
+
+  for (let i = segments.length - 1; i >= 0; i -= 1) {
+    const segment = segments[i]!;
+    const sign = Math.sign(segment.bias);
+
+    if (direction === 'balanced') {
+      if (sign !== 0) break;
+    } else if (sign !== Math.sign(latest.bias)) {
+      break;
+    }
+
+    depthSteps += segment.stepCount;
+    const ts = segment.timestampMs;
+    if (typeof ts === 'number' && Number.isFinite(ts)) {
+      if (firstTimestamp === undefined || ts < firstTimestamp) firstTimestamp = ts;
+      if (lastTimestamp === undefined || ts > lastTimestamp) lastTimestamp = ts;
+    }
+  }
+
+  const depthSpanMs =
+    typeof firstTimestamp === 'number' && typeof lastTimestamp === 'number' && lastTimestamp >= firstTimestamp
+      ? lastTimestamp - firstTimestamp
+      : 0;
+
+  const depthScore = clamp01(
+    0.5 * clamp01(depthSteps / Math.max(maxSteps, 1)) + 0.5 * clamp01(depthSpanMs / Math.max(maxSpanMs, 1)),
+  );
+
+  const volatilityScore = computeVolatilityScore(segments);
+  const rawAsymmetry = clamp01(latest.asymmetryMagnitude);
+
+  const softAsymmetryIndex = clamp01(
+    sigmoid(2.2 * rawAsymmetry + 2 * depthScore - 1.4 * volatilityScore),
+  );
+
+  return {
+    rawAsymmetry,
+    direction,
+    depthScore,
+    softAsymmetryIndex,
+  };
 }
 
 function rankBranches(branches: TimeBranch[]): WeightedBranch[] {

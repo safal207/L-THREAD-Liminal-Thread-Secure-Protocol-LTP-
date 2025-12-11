@@ -32,6 +32,8 @@ export type TimeWeaveAsymmetryShape =
   | 'bi-modal'
   | 'scattered';
 
+export type TimeWeaveAsymmetryDirection = 'forward' | 'backward' | 'balanced';
+
 export interface TimeWeaveAsymmetry {
   /** Share of total branch weight held by the dominant branch. Range: 0..1. */
   concentration: number;
@@ -39,6 +41,24 @@ export interface TimeWeaveAsymmetry {
   shape: TimeWeaveAsymmetryShape;
   /** Number of active branches considered in the snapshot. */
   branchCount: number;
+}
+
+export interface TimeWeaveAsymmetryMeta {
+  rawAsymmetry: number;
+  direction: TimeWeaveAsymmetryDirection;
+  depthScore: number;
+  softAsymmetryIndex: number;
+}
+
+export interface TimeWeaveHistorySegment {
+  bias: number;
+  timestampMs?: number;
+  stepCount?: number;
+  asymmetryMagnitude?: number;
+}
+
+export interface TimeWeaveHistory {
+  segments: TimeWeaveHistorySegment[];
 }
 
 export interface BranchCollapseSignal {
