@@ -112,6 +112,25 @@ DEMO_SPEED=800 npm run demo:story   # speed up playback (ms between frames)
 USE_LOCAL_FRAMES=false npm run demo:story   # placeholder for a future live-gateway feed
 ```
 
+### REST demo: routing explanation endpoint
+
+Spin up a minimal HTTP server that exposes `/demo/explain-routing` for clients that want to inspect why LTP selected a given
+routing branch and see the ASCII future weave graph:
+
+```bash
+npm run demo-server       # defaults to port 4000
+PORT=5050 npm run demo-server
+```
+
+Example request with lightweight overrides:
+
+```bash
+curl "http://localhost:4000/demo/explain-routing?intent=deepen-focus&focusMomentum=0.72&volatility=0.18"
+```
+
+The response returns a formatted explanation, raw `RoutingExplainView`, metrics, and the ASCII weave graph so you can render or
+analyze the chosen routing branch.
+
 Phases inside the scripted story:
 
 - **Phase A – Focused work:** steady positive momentum, router leans to `deep_work`.

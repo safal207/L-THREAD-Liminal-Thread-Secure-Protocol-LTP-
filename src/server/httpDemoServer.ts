@@ -1,0 +1,170 @@
+import http from "http";
+import { URL } from "url";
+import {
+  buildDemoScenario,
+  explainRoutingForScenario,
+  explainRoutingForDemoScenario,
+  formatRoutingExplanation,
+  type RoutingExplainView,
+} from "../demos/explainRoutingDemo";
+import { type FutureWeaveGraphOptions } from "../visualization/futureWeaveGraph";
+import { type TemporalOrientationView, type RoutingDecision } from "../routing/temporal-multipath";
+
+export interface ExplainRoutingResponse {
+  decision: string;
+  formattedExplanation: string;
+  reasons: string[];
+  metrics: {
+    focusMomentum?: number;
+    volatility?: number;
+    likelihoodTop?: number;
+    depthScore?: number;
+    [key: string]: number | undefined;
+  };
+  chosenPathId?: string;
+  chosenBranchLabel?: string | null;
+  graph: string;
+  suggestion: any;
+  rawView: RoutingExplainView;
+}
+
+function parseNumber(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseBoolean(value: string | null): boolean | undefined {
+  if (value === null) return undefined;
+  if (["true", "1", "yes", "on"].includes(value.toLowerCase())) return true;
+  if (["false", "0", "no", "off"].includes(value.toLowerCase())) return false;
+  return undefined;
+}
+
+function buildScenarioFromParams(searchParams: URLSearchParams): {
+  orientation: TemporalOrientationView;
+  routingDecision: RoutingDecision;
+  intent: string;
+  graphOptions?: FutureWeaveGraphOptions;
+} {
+  const base = buildDemoScenario();
+  const orientation: TemporalOrientationView = { ...base.orientation };
+  const routingDecision: RoutingDecision = { options: [...base.routingDecision.options] };
+
+  const intent = searchParams.get("intent") ?? base.intent;
+
+  const focusMomentum = parseNumber(searchParams.get("focusMomentum"));
+  if (focusMomentum !== undefined) {
+    orientation.focusMomentum = focusMomentum;
+  }
+
+  const volatility = parseNumber(searchParams.get("volatility"));
+  if (volatility !== undefined) {
+    orientation.volatility = volatility;
+  }
+
+  const currentSector = searchParams.get("currentSector");
+  if (currentSector) {
+    orientation.currentSector = currentSector;
+  }
+
+  const graphOptions: FutureWeaveGraphOptions = {};
+  const maxBranches = parseNumber(searchParams.get("maxBranches"));
+  if (maxBranches !== undefined) {
+    graphOptions.maxBranches = maxBranches;
+  }
+
+  const showMeta = parseBoolean(searchParams.get("showMeta"));
+  if (showMeta !== undefined) {
+    graphOptions.showMeta = showMeta;
+  }
+
+  return { orientation, routingDecision, intent, graphOptions };
+}
+
+export function handleExplainRoutingRequest(searchParams: URLSearchParams): ExplainRoutingResponse {
+  const mode = searchParams.get("mode");
+
+  const view =
+    mode === "demo" || searchParams.size === 0
+      ? explainRoutingForDemoScenario()
+      : explainRoutingForScenario(buildScenarioFromParams(searchParams));
+
+  const formattedExplanation = formatRoutingExplanation(view);
+  const decisionSummary = `Routing intent: ${view.decision.intent}; chosen path: ${
+    view.decision.chosenBranchLabel ?? view.decision.chosenPathId
+  }`;
+
+  return {
+    decision: decisionSummary,
+    formattedExplanation,
+    reasons: view.decision.reasons,
+    metrics: {
+      focusMomentum: view.decision.metrics.focusMomentum,
+      volatility: view.decision.metrics.volatility,
+      likelihoodTop: view.decision.metrics.likelihood,
+      depthScore: view.decision.metrics.depthScore as number | undefined,
+    },
+    chosenPathId: view.decision.chosenPathId,
+    chosenBranchLabel: view.decision.chosenBranchLabel ?? null,
+    graph: view.graph,
+    suggestion: view.suggestion,
+    rawView: view,
+  };
+}
+
+export function createDemoServer() {
+  return http.createServer((req, res) => {
+    if (!req.url) {
+      res.statusCode = 400;
+      res.end();
+      return;
+    }
+
+    const requestUrl = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
+
+    if (req.method !== "GET") {
+      res.statusCode = 405;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ error: "method_not_allowed" }));
+      return;
+    }
+
+    if (requestUrl.pathname === "/demo/explain-routing") {
+      try {
+        const response = handleExplainRoutingRequest(requestUrl.searchParams);
+        res.statusCode = 200;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify(response, null, 2));
+      } catch (error) {
+        console.error("Failed to handle /demo/explain-routing", error);
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            error: "internal_error",
+            message: "Something went wrong in routing explanation",
+          }),
+        );
+      }
+      return;
+    }
+
+    res.statusCode = 404;
+    res.setHeader("Content-Type", "application/json");
+    res.end(JSON.stringify({ error: "not_found" }));
+  });
+}
+
+function startServer() {
+  const port = Number(process.env.PORT) || 4000;
+  const server = createDemoServer();
+
+  server.listen(port, () => {
+    console.log(`L-THREAD Demo Server listening on http://localhost:${port}`);
+  });
+}
+
+if (require.main === module) {
+  startServer();
+}
