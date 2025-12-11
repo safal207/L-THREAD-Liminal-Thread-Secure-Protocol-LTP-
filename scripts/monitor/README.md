@@ -57,6 +57,28 @@ The HUD now renders colorized modes and a compact sparkline of recent focus mome
 [2024-11-28T08:42:12.392Z] mode=CALM | vol=0.042 | momentum=+0.351 | graph=▁▂▄▆█▆▅ | link=OK@41ms±3 | route=sector.alpha/GROWTH
 ```
 
+### Routing preview HUD
+
+Enable the routing preview compass for additional guidance about suggested sectors:
+
+```bash
+pnpm ltp:monitor -- --show-routing-preview
+# or
+LTP_SHOW_ROUTING_PREVIEW=true pnpm ltp:monitor
+```
+
+Example console block:
+
+```
+[ROUTING PREVIEW]
+ now:     /home/focus/study
+ next:    /home/focus/deep_work
+ alt:     /home/rest/walk
+ mood:    momentum=0.78, volatility=0.21
+ reason:  stable focus, deepening current trajectory
+ path: [STU]→[DEP]→[REST]
+```
+
 Set `NO_COLOR=1` to disable ANSI colors for terminals that do not support them.
 
 ## Example output

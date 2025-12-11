@@ -11,7 +11,7 @@
     "ltp:monitor": "ts-node scripts/monitor/ltp-focus-hud.ts",
     "dev:focus-hud": "ts-node scripts/monitor/ltp-focus-hud.ts",
     "dev:gateway": "ts-node scripts/gateway/ltp-node-gateway.ts",
-    "test:focus-hud": "ts-node scripts/monitor/__tests__/hudModes.test.ts && ts-node scripts/monitor/__tests__/ltp-focus-hud.test.ts && ts-node scripts/monitor/__tests__/hudTheme.test.ts && ts-node scripts/gateway/__tests__/ltp-node-gateway.test.ts"
+    "test:focus-hud": "ts-node scripts/monitor/__tests__/hudModes.test.ts && ts-node scripts/monitor/__tests__/ltp-focus-hud.test.ts && ts-node scripts/monitor/__tests__/hudTheme.test.ts && ts-node scripts/gateway/__tests__/ltp-node-gateway.test.ts && ts-node src/routing/__tests__/focusRoutingPreview.test.ts"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",

@@ -6,6 +6,15 @@ import {
 } from "../transport/ltpClient";
 import { detectHudMode } from "./hudModes";
 import { colorizeMode, HudMode, renderSparkline } from "./hudTheme";
+import {
+  buildRoutingPreview,
+  FocusSnapshot as RoutingPreviewSnapshot,
+  RoutingDecision,
+  RoutingPreview,
+} from "../../src/routing/focusRoutingPreview";
+
+const SHOW_ROUTING_PREVIEW =
+  process.env.LTP_SHOW_ROUTING_PREVIEW === "true" || process.argv.includes("--show-routing-preview");
 
 export interface FocusHudSnapshot {
   linkHealth: "OK" | "WARN" | "CRIT";
@@ -18,12 +27,23 @@ export interface FocusHudSnapshot {
 
 export const FOCUS_HISTORY_LIMIT = 20;
 const focusMomentumHistory: number[] = [];
+const routingPathHistory: string[] = [];
+const ROUTING_HISTORY_LIMIT = 12;
+let lastRoutingDecision: RoutingDecision = { options: [] };
 
 function recordFocusMomentum(value?: number): void {
   if (value === undefined || Number.isNaN(value)) return;
   focusMomentumHistory.push(value);
   if (focusMomentumHistory.length > FOCUS_HISTORY_LIMIT) {
     focusMomentumHistory.shift();
+  }
+}
+
+function recordRoutingPath(value?: string): void {
+  if (!value) return;
+  routingPathHistory.push(value);
+  if (routingPathHistory.length > ROUTING_HISTORY_LIMIT) {
+    routingPathHistory.shift();
   }
 }
 
@@ -39,6 +59,35 @@ function calculateVolatility(history: number[]): number {
   const deltas = history.slice(1).map((value, index) => Math.abs(value - history[index]));
   const avgDelta = deltas.reduce((sum, delta) => sum + delta, 0) / deltas.length;
   return Number(avgDelta.toFixed(3));
+}
+
+function abbreviateSector(sector: string): string {
+  const cleaned = sector.replace(/^\/+/, "");
+  const parts = cleaned.split(/[\\/]/);
+  const tail = parts[parts.length - 1] || sector;
+  const token = tail.length <= 3 ? tail : tail.slice(0, 3);
+  return token.toUpperCase();
+}
+
+function renderRoutingHistoryLine(history: string[]): string {
+  if (!history.length) return "path: –";
+  const segments = history.map((sector) => `[${abbreviateSector(sector)}]`).join("→");
+  return `path: ${segments}`;
+}
+
+function renderRoutingPreviewBlock(preview: RoutingPreview): string {
+  const alt = preview.alternativeSectors.length ? preview.alternativeSectors.join(", ") : "–";
+  const momentumText = preview.focusMomentum.toFixed(2);
+  const volatilityText = preview.volatility.toFixed(2);
+  return [
+    "[ROUTING PREVIEW]",
+    ` now:     ${preview.currentSector}`,
+    ` next:    ${preview.primaryNextSector}`,
+    ` alt:     ${alt}`,
+    ` mood:    momentum=${momentumText}, volatility=${volatilityText}`,
+    ` reason:  ${preview.reason}`,
+    ` ${renderRoutingHistoryLine(routingPathHistory)}`,
+  ].join("\n");
 }
 
 export function renderFocusHudLine(
@@ -73,12 +122,54 @@ function renderAndReport(snapshot: FocusHudSnapshot) {
   });
 
   console.log(renderFocusHudLine(snapshot, focusMomentumHistory, mode));
+
+  if (SHOW_ROUTING_PREVIEW) {
+    const routingDecision = lastRoutingDecision.options.length
+      ? lastRoutingDecision
+      : snapshot.sector
+        ? { options: [{ sector: snapshot.sector, score: 0.5 }] }
+        : { options: [] };
+
+    if (routingDecision.options.length) {
+      const volatility = calculateVolatility(focusMomentumHistory);
+      const routingSnapshot: RoutingPreviewSnapshot = {
+        sector: snapshot.sector,
+        focusMomentum: snapshot.focusMomentum,
+      };
+
+      const preview = buildRoutingPreview({
+        snapshot: routingSnapshot,
+        routingDecision,
+        volatilityScore: volatility,
+      });
+
+      recordRoutingPath(preview.primaryNextSector);
+      console.log(renderRoutingPreviewBlock(preview));
+    }
+  }
 }
 
 function extractIntentFromOrientation(timeOrientation?: TimeOrientationBoostPayload): string | undefined {
   return timeOrientation?.direction
     ? `${timeOrientation.direction}${timeOrientation.strength !== undefined ? `@${timeOrientation.strength}` : ""}`
     : undefined;
+}
+
+function updateRoutingDecisionFromSuggestion(suggestedSector: string, snapshot: FocusHudSnapshot) {
+  const options: RoutingDecision["options"] = [{ sector: suggestedSector, score: 1 }];
+
+  if (snapshot.sector && snapshot.sector !== suggestedSector) {
+    options.push({ sector: snapshot.sector, score: 0.65 });
+  }
+
+  if (routingPathHistory.length) {
+    const previous = routingPathHistory[routingPathHistory.length - 1];
+    if (previous && !options.some((option) => option.sector === previous)) {
+      options.push({ sector: previous, score: 0.45 });
+    }
+  }
+
+  lastRoutingDecision = { options };
 }
 
 function simulateFocusMomentum(now = Date.now()): number {
@@ -140,6 +231,7 @@ function startFocusHud(): LtpClient {
       renderAndReport(snapshot);
     },
     onRouteSuggestion: (message) => {
+      updateRoutingDecisionFromSuggestion(message.suggested_sector, snapshot);
       snapshot.sector = message.suggested_sector ?? snapshot.sector;
       snapshot.intent = message.reason ?? snapshot.intent;
       const fm = message.debug?.focus_momentum;
