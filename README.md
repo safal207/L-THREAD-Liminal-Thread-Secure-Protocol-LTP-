@@ -135,6 +135,16 @@ The demo now emits a **multi-path suggestion** per frame: one primary branch plu
 It is a deterministic heuristic layered on top of the routing preview—no randomness or ML—so you can see how the protocol would
 stabilize, re-anchor, or explore lighter sectors a few steps into the future.
 
+### Future Weave Graph demo
+
+You can render a compact ASCII graph of the primary / recovery / explore branches with normalized likelihoods, momentum, and volatility hints:
+
+```bash
+npm run demo:future-weave
+```
+
+This prints a multi-branch Future Weave graph for stable, storm, and recovery scenarios directly in the console.
+
 ### Dev Console Visual Health View
 
 The Dev Console now renders a compact, colorized health line on every heartbeat or routing update. Run it with:
