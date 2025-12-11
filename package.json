@@ -18,12 +18,15 @@
     "dev:gateway": "ts-node scripts/gateway/ltp-node-gateway.ts",
     "test:focus-hud": "ts-node scripts/monitor/__tests__/hudModes.test.ts && ts-node scripts/monitor/__tests__/ltp-focus-hud.test.ts && ts-node scripts/monitor/__tests__/hudTheme.test.ts && ts-node scripts/gateway/__tests__/ltp-node-gateway.test.ts && ts-node src/routing/__tests__/focusRoutingPreview.test.ts && ts-node tests/visualization/futureWeaveGraph.test.ts",
     "test:future-weave-graph": "ts-node tests/visualization/futureWeaveGraph.test.ts",
-    "test:explain-routing": "ts-node src/demos/__tests__/explainRoutingDemo.test.ts"
+    "test:explain-routing": "ts-node src/demos/__tests__/explainRoutingDemo.test.ts",
+    "test": "vitest run",
+    "test:turtle": "vitest run src/turtle/__tests__"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
+    "vitest": "^2.0.5",
     "ws": "^8.18.3"
   },
   "workspaces": [
