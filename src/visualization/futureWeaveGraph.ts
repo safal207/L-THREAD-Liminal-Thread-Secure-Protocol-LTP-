@@ -18,6 +18,17 @@ export type FutureWeaveGraphOptions = {
    * Defaults to true.
    */
   readonly normalizeLikelihoods?: boolean;
+
+  /**
+   * Highlight specific path or branch ids in the graph output.
+   */
+  readonly highlightedPathIds?: string[];
+
+  /**
+   * Custom label appended to highlighted lines.
+   * Defaults to "CHOSEN".
+   */
+  readonly highlightLabel?: string;
 };
 
 const ROLE_ORDER = ["primary", "recovery", "explore"] as const;
@@ -57,21 +68,25 @@ function formatBranchLine(params: {
   percent: number;
   roleWidth: number;
   showMeta: boolean;
+  highlighted: boolean;
+  highlightLabel: string;
 }): string {
-  const { branch, percent, roleWidth, showMeta } = params;
+  const { branch, percent, roleWidth, showMeta, highlighted, highlightLabel } = params;
   const percentText = `${percent.toString().padStart(2, " ")}%`;
   const arrows = ">".repeat(clamp(Math.round((percent / 100) * 10), 1, 10));
   const roleText = `${branch.role}`.padEnd(roleWidth, " ");
+  const prefix = highlighted ? "* " : "";
+  const suffix = highlighted ? `  (${highlightLabel})` : "";
 
   if (!showMeta) {
-    return `${roleText} (${percentText})  ${arrows}`.trimEnd();
+    return `${prefix}${roleText} (${percentText})  ${arrows}${suffix}`.trimEnd();
   }
 
   const sectors = branch.softenedSectors?.length ? branch.softenedSectors.join(",") : "???";
   const momentum = branch.momentumHint ?? "?";
   const volatility = branch.volatilityHint ?? "?";
 
-  return `${roleText} (${percentText})  ${arrows}  mom: ${momentum}  vol: ${volatility}  sectors: ${sectors}`;
+  return `${prefix}${roleText} (${percentText})  ${arrows}  mom: ${momentum}  vol: ${volatility}  sectors: ${sectors}${suffix}`;
 }
 
 function ensureBranches(suggestion: MultiPathSuggestion): FutureWeaveBranch[] {
@@ -102,16 +117,30 @@ export function renderFutureWeaveGraph(
   suggestion: MultiPathSuggestion,
   options?: FutureWeaveGraphOptions,
 ): string {
-  const { maxBranches = 3, showMeta = true, normalizeLikelihoods = true } = options ?? {};
+  const {
+    maxBranches = 3,
+    showMeta = true,
+    normalizeLikelihoods = true,
+    highlightedPathIds = [],
+    highlightLabel = "CHOSEN",
+  } = options ?? {};
   const branches = sortBranches(ensureBranches(suggestion));
   const percents = normalizePercents(branches, normalizeLikelihoods);
   const roleWidth = branches.reduce((width, branch) => Math.max(width, `${branch.role}`.length), 0);
+  const highlighted = new Set(highlightedPathIds);
 
   const visibleBranches = branches.slice(0, maxBranches);
   const visiblePercents = percents.slice(0, maxBranches);
 
   const lines = visibleBranches.map((branch, idx) =>
-    formatBranchLine({ branch, percent: visiblePercents[idx] ?? 0, roleWidth, showMeta }),
+    formatBranchLine({
+      branch,
+      percent: visiblePercents[idx] ?? 0,
+      roleWidth,
+      showMeta,
+      highlighted: highlighted.has(branch.id),
+      highlightLabel,
+    }),
   );
 
   const hiddenCount = branches.length - visibleBranches.length;
