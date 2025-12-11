@@ -201,31 +201,29 @@ function computeSoftContextAdjustments(
   mode: RoutingMode,
 ): { confidenceDelta: number; reasonParts: string[] } {
   const summary = ctx.orientationSummary;
-  if (!summary) {
-    return { confidenceDelta: 0, reasonParts: [] };
-  }
-
   const reasonParts: string[] = [];
   let delta = 0;
 
-  if (summary.globalTrend === 'rising' && (mode === 'explore' || mode === 'exploit')) {
-    delta += 0.05;
-    reasonParts.push('orientation trend is rising');
-  }
+  if (summary) {
+    if (summary.globalTrend === 'rising' && (mode === 'explore' || mode === 'exploit')) {
+      delta += 0.05;
+      reasonParts.push('orientation trend is rising');
+    }
 
-  if (summary.globalTrend === 'falling' && mode === 'stabilize') {
-    delta += 0.05;
-    reasonParts.push('orientation trend is falling');
-  }
+    if (summary.globalTrend === 'falling' && mode === 'stabilize') {
+      delta += 0.05;
+      reasonParts.push('orientation trend is falling');
+    }
 
-  if (summary.risingSectors?.includes(sectorId)) {
-    delta += 0.04;
-    reasonParts.push('sector is in rising set');
-  }
+    if (summary.risingSectors?.includes(sectorId)) {
+      delta += 0.04;
+      reasonParts.push('sector is in rising set');
+    }
 
-  if (summary.fallingSectors?.includes(sectorId) && mode === 'stabilize') {
-    delta += 0.03;
-    reasonParts.push('sector shows falling signals');
+    if (summary.fallingSectors?.includes(sectorId) && mode === 'stabilize') {
+      delta += 0.03;
+      reasonParts.push('sector shows falling signals');
+    }
   }
 
   const softness = ctx.softAsymmetryIndex ?? ctx.asymmetryMeta?.softAsymmetryIndex;
