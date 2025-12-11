@@ -1,4 +1,10 @@
-import { buildRoutingPreview, RoutingDecision } from "../../src/routing/focusRoutingPreview";
+import {
+  buildMultiPathSuggestion,
+  buildRoutingPreview,
+  MultiPathSuggestion,
+  RoutingDecision,
+  TemporalOrientationView,
+} from "../../src/routing/focusRoutingPreview";
 import { detectHudMode, HudMode } from "../monitor/hudModes";
 import {
   FocusHudSnapshot,
@@ -200,6 +206,24 @@ function formatRouting(decision: RoutingDecision): string {
   return `route: ${primary?.sector ?? "?"}${confidence}${altSegment}`;
 }
 
+function formatMultiPathSuggestion(suggestion: MultiPathSuggestion): string {
+  const formatPath = (label: string, nodes: string, likelihood: number) =>
+    `${label} (${(likelihood * 100).toFixed(0)}%) → [${nodes}]`;
+
+  const primaryNodes = suggestion.primaryPath.nodes.map((node) => node.sectorId).join(" → ");
+  const altSegments = suggestion.alternates
+    .map((alt) => formatPath(alt.label, alt.nodes.map((node) => node.sectorId).join(" → "), alt.overallLikelihood))
+    .join(" | ");
+
+  const primarySegment = formatPath(
+    suggestion.primaryPath.label,
+    primaryNodes,
+    suggestion.primaryPath.overallLikelihood,
+  );
+
+  return `${primarySegment} || ${altSegments}`;
+}
+
 function formatStoryLine(params: {
   frame: StoryFrame;
   mode: HudMode;
@@ -221,11 +245,20 @@ function logStoryFrame(frame: StoryFrame, focusHistory: number[]) {
       lastSector: frame.sector,
     });
 
+  const orientation: TemporalOrientationView = {
+    currentSector: frame.sector,
+    focusMomentum: frame.focusMomentum,
+    volatility: frame.volatility || calculateVolatility(focusHistory),
+    phaseLabel: frame.phase,
+  };
+
   const preview = buildRoutingPreview({
     snapshot: { sector: frame.sector, focusMomentum: frame.focusMomentum },
     routingDecision: frame.routingDecision,
-    volatilityScore: frame.volatility || calculateVolatility(focusHistory),
+    volatilityScore: orientation.volatility,
   });
+
+  const multiPath = buildMultiPathSuggestion(orientation, frame.routingDecision);
 
   const storyLine = formatStoryLine({
     frame,
@@ -236,6 +269,7 @@ function logStoryFrame(frame: StoryFrame, focusHistory: number[]) {
 
   console.log(storyLine);
   console.log(`   options: ${formatRouting(frame.routingDecision)}`);
+  console.log(`   branches: ${formatMultiPathSuggestion(multiPath)}`);
   console.log(`   phase: ${PHASE_LABELS[frame.phase]} | intents: ${PHASE_ROUTING_HELPERS[frame.phase].join(", ")}`);
 
   const snapshot: FocusHudSnapshot = {

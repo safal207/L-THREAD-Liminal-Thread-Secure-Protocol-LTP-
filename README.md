@@ -123,11 +123,17 @@ Example slice of the console output:
 ```
 [PHASE=A | calm | vol=0.07 | momentum=0.82] → route: deep_work
    options: route: deep_work (conf=0.80) | alt: future_planning? (0.35)
+   branches: stabilize (63%) → [deep_work → deep_work] || recover (19%) → [deep_work → rest] | explore (18%) → [deep_work → planning]
    phase: Phase A — Focused work | intents: deep_work, future_planning
 [PHASE=B | storm | vol=0.46 | momentum=-0.06] → route: social
    options: route: social (conf=0.36) | alt: rest? (0.34), planning? (0.30)
+   branches: soft-shift (55%) → [social → planning] || recover (27%) → [social → rest] | explore (18%) → [social → planning]
    phase: Phase B — Context switching / storm | intents: rest, social, planning
 ```
+
+The demo now emits a **multi-path suggestion** per frame: one primary branch plus at least two alternatives (recover + explore).
+It is a deterministic heuristic layered on top of the routing preview—no randomness or ML—so you can see how the protocol would
+stabilize, re-anchor, or explore lighter sectors a few steps into the future.
 
 ### Dev Console Visual Health View
 
