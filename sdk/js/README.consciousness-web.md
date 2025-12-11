@@ -102,7 +102,7 @@ console.log(renderConsciousnessWeb(snap));
 - Smart Router (fuzzy + semantic routing)
 - Orientation HUD
 - Turtle Mode (перспектива)
-- TimeWeave engine
+- TimeWeave engine (summary now tracks asymmetry + branch collapse detection)
 
 ---
 
