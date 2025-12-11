@@ -18,6 +18,65 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the 
 - [Changelog](./CHANGELOG.md) - Version history and changes
 - [Security Policy](./.github/SECURITY.md) - Security reporting and best practices
 
+## 🔰 LTP Dev Playground (Quickstart)
+
+Spin up a local Rust LTP node, run HTTP/WS demos, and watch a live HUD in a few commands.
+
+### 1. Install dependencies
+
+```bash
+pnpm install
+# or
+npm install
+```
+
+### 2. Run the Rust LTP node
+
+```bash
+cd nodes/ltp-rust-node
+LTP_NODE_ADDR=127.0.0.1:7070 cargo run -p ltp-rust-node
+```
+
+The node listens on `ws://127.0.0.1:7070` by default and supports the core streams: `hello`, `heartbeat`, `orientation`, and `route_request/route_suggestion`.
+
+### 3. Start demo clients
+
+REST routing explanation (HTTP):
+
+```bash
+npm run demo-server       # default: http://localhost:4000
+```
+
+What it shows: an HTTP endpoint that accepts a request, computes temporal orientation and a routing preview, and responds with an explanation plus an ASCII future-weave graph.
+
+WebSocket routing stream:
+
+```bash
+npm run ws-demo-server    # default: ws://localhost:4001/ws/orientation-demo
+```
+
+What it shows: a live stream with heartbeats, orientation updates, and routing previews over a persistent channel.
+
+### 4. HUD / Monitor
+
+```bash
+npm run ltp:monitor       # console HUD for focus + mode
+# or
+npm run dev:gateway       # gateway-style view if you prefer a relay
+```
+
+What you’ll see: current mode (`calm / storm / shift`), volatility, focus momentum, and sparkline-style history for quick situational awareness.
+
+### Demo commands
+
+| Command                      | What it does                                      |
+|------------------------------|---------------------------------------------------|
+| `npm run demo-server`        | REST demo that explains routing decisions         |
+| `npm run ws-demo-server`     | WebSocket demo (heartbeat + orientation + routing)|
+| `npm run ltp:monitor`        | Console HUD showing focus/mode metrics            |
+| `npm run dev:gateway`        | Gateway relay sample (connects node ↔ clients)    |
+| `cargo run -p ltp-rust-node` | Starts the Rust LTP node (WebSocket endpoint)     |
+
 📊 **For Investors & Experts:**
 - [Investor Pitch](./INVESTOR_PITCH.md) - Executive summary, market opportunity, investment ask
 - [Technical Whitepaper](./WHITEPAPER.md) - Deep technical analysis and research paper
