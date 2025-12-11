@@ -131,6 +131,23 @@ curl "http://localhost:4000/demo/explain-routing?intent=deepen-focus&focusMoment
 The response returns a formatted explanation, raw `RoutingExplainView`, metrics, and the ASCII weave graph so you can render or
 analyze the chosen routing branch.
 
+### WebSocket demo: live routing explanation stream
+The WebSocket demo mirrors the REST endpoint and streams orientation decisions in real time.
+
+```bash
+npm run ws-demo-server            # defaults to port 4001
+WS_PORT=5055 npm run ws-demo-server
+```
+
+Connect with any WebSocket client (for example, `wscat`):
+
+```bash
+wscat -c ws://localhost:4001/ws/orientation-demo
+> { "type": "explain_demo" }
+```
+
+You will receive a JSON payload containing the decision summary, reasons, metrics, ASCII future weave graph, and the raw `RoutingExplainView` for further inspection.
+
 Phases inside the scripted story:
 
 - **Phase A – Focused work:** steady positive momentum, router leans to `deep_work`.
