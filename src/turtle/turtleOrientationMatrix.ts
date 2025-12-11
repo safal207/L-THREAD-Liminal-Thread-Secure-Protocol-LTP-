@@ -90,12 +90,25 @@ function normalizeAngle(value: number): number {
   return normalized >= 0 ? normalized : normalized + 360;
 }
 
+function normalizeIndex(value: number, length: number): number {
+  const normalized = ((value % length) + length) % length;
+  return normalized;
+}
+
 export function getFrameDescriptor(id: TurtleFrameId): TurtleFrameDescriptor {
   const frame = TURTLE_FRAMES.find((candidate) => candidate.id === id);
   if (!frame) {
     throw new Error(`Unknown TurtleFrameId: ${id}`);
   }
   return frame;
+}
+
+/**
+ * Returns all Turtle frame descriptors in their ring order.
+ * Consumers should treat the returned array as read-only.
+ */
+export function listFrames(): TurtleFrameDescriptor[] {
+  return [...TURTLE_FRAMES];
 }
 
 export function createDefaultTurtleMatrix(): TurtleOrientationMatrix {
@@ -132,6 +145,26 @@ export function rotateTurtleMatrix(
     frameIndex: targetDescriptor.index,
     commitment: commitment === undefined ? matrix.commitment : clamp(commitment, 0, 1),
   };
+}
+
+/**
+ * Rotate by a numeric step across the 12-frame ring.
+ * Positive steps move forward, negative steps move backward.
+ */
+export function rotateByStep(
+  matrix: TurtleOrientationMatrix,
+  step: number,
+  commitment?: number,
+): TurtleOrientationMatrix {
+  if (!Number.isFinite(step)) {
+    throw new Error("Rotation step must be a finite number");
+  }
+
+  const frameCount = TURTLE_FRAMES.length;
+  const nextIndex = normalizeIndex(matrix.frameIndex + step, frameCount);
+  const targetFrame = TURTLE_FRAMES[nextIndex].id;
+
+  return rotateTurtleMatrix(matrix, { targetFrame, commitment });
 }
 
 export function getTurtleOrientationView(matrix: TurtleOrientationMatrix): TurtleOrientationView {
