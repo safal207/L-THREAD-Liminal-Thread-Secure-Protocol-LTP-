@@ -14,9 +14,27 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the 
 - [Protocol Specifications](./specs/) - Detailed protocol specifications
 - [Liminal Web Overview](./specs/LTP-Liminal-Web-Overview.md) - How thread, time, and consciousness layers fit together
 - [Consciousness Web & Orientation Shell](./specs/LTP-ConsciousnessWeb.md) - Semantic graph + focus layer built atop the Thread Life Model
+- [LTP Flow v0.1 (Draft)](./specs/LTP-Flow-v0.1.md) - Living, orientable motion of frames across time
 - [Contributing Guide](./CONTRIBUTING.md) - How to contribute to LTP
 - [Changelog](./CHANGELOG.md) - Version history and changes
 - [Security Policy](./.github/SECURITY.md) - Security reporting and best practices
+
+LTP Flow v0.1 is the connective tissue for how frames travel, branch, and survive reconnects without assuming storage or ML; it keeps routing explainable while letting silence and load shape the rhythm. Read it as a living standard alongside the Frames spec to orient any client, node, or HUD quickly.
+
+### 30s Flow diagram (draft)
+
+```
+Client / Agent                     Node / HUD
+    | -- hello ------------------>     |
+    | <-- hello ------------------     |
+    | <-- orientation / snapshot ~     |
+    | -- heartbeat ~~~~~~~>            |
+    | <~ heartbeat ~~~~~~~             |
+    | -- route_request ------------>   |
+    | <-- route_response (branches)    |
+    | <-- focus_snapshot (optional)    |
+    | -- reconnect → hello ----------> |
+```
 
 ## 🔰 LTP Dev Playground (Quickstart)
 
