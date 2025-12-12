@@ -2,6 +2,7 @@
   "name": "@liminal/ltp-client",
   "version": "0.6.0-alpha.3",
   "description": "LTP (Liminal Thread Protocol) client SDK with metadata encryption and privacy protection",
+  "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
