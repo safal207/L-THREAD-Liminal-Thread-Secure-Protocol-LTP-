@@ -10,7 +10,11 @@ import {
 import { type FutureWeaveGraphOptions } from "../visualization/futureWeaveGraph";
 import { type TemporalOrientationView, type RoutingDecision } from "../routing/temporal-multipath";
 import { resolveSelfTestMode, runSelfTest } from "../../sdk/js/src/conformance/selfTest";
-import { verifyConformance } from "./conformanceVerifier";
+import {
+  type ConformanceVerifyRequest,
+  type ConformanceVerifyResponse,
+  verifyConformance,
+} from "./conformanceVerifier";
 
 export interface ExplainRoutingResponse {
   decision: string;
@@ -195,14 +199,49 @@ export function createDemoServer() {
 
     if (req.method === "POST" && requestUrl.pathname === "/conformance/verify") {
       const chunks: Buffer[] = [];
+      const MAX_BODY_BYTES = 512 * 1024; // 512 KiB
+      let receivedBytes = 0;
+
       req
-        .on("data", (chunk) => chunks.push(chunk))
+        .on("data", (chunk) => {
+          receivedBytes += chunk.length;
+          if (receivedBytes > MAX_BODY_BYTES) {
+            res.statusCode = 413;
+            res.setHeader("Content-Type", "application/json");
+            res.end(
+              JSON.stringify({
+                ok: false,
+                error: "payload_too_large",
+                message: "Payload exceeds maximum size of 512 KiB",
+              }),
+            );
+            req.destroy();
+            return;
+          }
+
+          chunks.push(chunk);
+        })
         .on("end", () => {
           try {
             const bodyText = Buffer.concat(chunks).toString("utf-8");
-            const payload = bodyText.length > 0 ? JSON.parse(bodyText) : {};
-            const verification = verifyConformance((payload as { frames?: unknown }).frames);
-            res.statusCode = verification.ok ? 200 : 400;
+            const payload: ConformanceVerifyRequest = bodyText.length > 0 ? JSON.parse(bodyText) : { frames: [] };
+
+            const verification: ConformanceVerifyResponse & { httpStatus: number } = verifyConformance(payload.frames);
+
+            if (verification.frameCount > 5000) {
+              res.statusCode = 413;
+              res.setHeader("Content-Type", "application/json");
+              res.end(
+                JSON.stringify({
+                  ok: false,
+                  error: "payload_too_large",
+                  message: "Frame count exceeds safety limit of 5000",
+                }),
+              );
+              return;
+            }
+
+            res.statusCode = verification.httpStatus;
             res.setHeader("Content-Type", "application/json");
             res.end(JSON.stringify(verification, null, 2));
           } catch (error) {
