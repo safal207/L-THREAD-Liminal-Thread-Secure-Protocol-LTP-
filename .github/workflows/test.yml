@@ -28,18 +28,26 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           node-version: '18'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 8
       - name: Install dependencies
         run: |
-          cd sdk/js
-          npm install
+          pnpm -w install --no-frozen-lockfile
       - name: Build
         run: |
-          cd sdk/js
-          npm run build
+          pnpm --filter @liminal/ltp-client run build
       - name: Test
         run: |
-          cd sdk/js
-          npm test
+          pnpm --filter @liminal/ltp-client test
+      - name: Generate conformance self-test artifact
+        run: |
+          pnpm --filter @liminal/ltp-client exec ltp-client self-test --mode calm > self-test.json
+      - name: Upload conformance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ltp-self-test-report
+          path: self-test.json
 
   test-python:
     name: Test Python SDK

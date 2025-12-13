@@ -97,6 +97,36 @@ What you’ll see: current mode (`calm / storm / shift`), volatility, focus mome
 | `npm run dev:gateway`        | Gateway relay sample (connects node ↔ clients)    |
 | `cargo run -p ltp-rust-node` | Starts the Rust LTP node (WebSocket endpoint)     |
 
+## ✅ LTP Conformance (self-test)
+
+We ship a deterministic conformance self-test with **three demo modes** to mirror the HUD: `calm`, `storm`, and `recovery`. The report always includes the conformance level and a `determinismHash` so you can verify the same sequence locally and in CI.
+
+**CLI (from the JS SDK workspace):**
+
+```bash
+pnpm --filter @liminal/ltp-client exec ltp-client self-test --mode calm
+pnpm --filter @liminal/ltp-client exec ltp-client self-test --mode storm
+pnpm --filter @liminal/ltp-client exec ltp-client self-test --mode recovery
+```
+
+**HTTP endpoint (served by `npm run demo:conformance:server`):**
+
+```bash
+curl "http://localhost:4000/conformance/self-test?mode=storm"
+```
+
+**WebSocket command (served by `npm run demo:conformance:ws`):**
+
+```bash
+node scripts/demo/conformanceWsClient.ts storm
+# under the hood it sends
+# { "type": "conformance_self_test", "v": "0.1", "payload": { "mode": "storm" } }
+```
+
+**CI artifact:** The GitHub Actions test workflow uploads `ltp-self-test-report` with `self-test.json` generated via the CLI. The same determinism hash should match the REST/WS responses above.
+
+Specs for reference: [LTP Conformance v0.1](./specs/LTP-Conformance-v0.1.md) and [LTP Self-Test v0.1](./specs/LTP-SelfTest-v0.1.md).
+
 📊 **For Investors & Experts:**
 - [Investor Pitch](./INVESTOR_PITCH.md) - Executive summary, market opportunity, investment ask
 - [Technical Whitepaper](./WHITEPAPER.md) - Deep technical analysis and research paper

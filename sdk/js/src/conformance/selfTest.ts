@@ -13,11 +13,15 @@ export interface SelfTestReport {
   dedupedFrames: number;
   errors: string[];
   determinismHash: string;
+  mode: SelfTestMode;
 }
 
 export interface SelfTestOptions {
   frames?: unknown[];
+  mode?: SelfTestMode;
 }
+
+export type SelfTestMode = 'calm' | 'storm' | 'recovery';
 
 interface FlowState {
   helloSeen: boolean;
@@ -161,6 +165,90 @@ export const buildCanonicalSelfTestFrames = (): unknown[] => {
   return framesFromDisk ?? inlineCanonicalFrames;
 };
 
+const cloneFrames = (frames: unknown[]): unknown[] => JSON.parse(JSON.stringify(frames));
+
+const applyStormMode = (frames: unknown[]): unknown[] => {
+  const augmented = cloneFrames(frames);
+
+  return [
+    ...augmented.map((frame) => {
+      if (typeof frame !== 'object' || frame === null) return frame;
+      const typed = frame as { type?: unknown; payload?: any };
+      if (typed.type === 'heartbeat' && typed.payload?.status === 'ok') {
+        return { ...typed, payload: { ...typed.payload, status: 'storm_warning' } };
+      }
+      if (typed.type === 'route_response') {
+        return {
+          ...typed,
+          payload: {
+            ...typed.payload,
+            selection: 'recover',
+            branches: {
+              ...(typed.payload?.branches ?? {}),
+              stabilize: { path: ['omega'], confidence: 0.48, rationale: 'storm-route' },
+            },
+          },
+        };
+      }
+      return typed;
+    }),
+    {
+      v: '0.1',
+      id: 'f-heartbeat-4',
+      ts: 11,
+      type: 'heartbeat',
+      payload: { seq: 4, status: 'stabilizing' },
+    },
+  ];
+};
+
+const applyRecoveryMode = (frames: unknown[]): unknown[] =>
+  cloneFrames(frames).map((frame) => {
+    if (typeof frame !== 'object' || frame === null) return frame;
+    const typed = frame as { type?: unknown; payload?: any };
+    if (typed.type === 'orientation') {
+      return {
+        ...typed,
+        payload: {
+          ...typed.payload,
+          mode: 'recovery',
+          checkpoint: 'stabilize',
+        },
+      };
+    }
+    if (typed.type === 'focus_snapshot') {
+      return { ...typed, payload: { ...typed.payload, signal: 0.82, rationale: 'recovery-lock' } };
+    }
+    if (typed.type === 'route_response') {
+      return {
+        ...typed,
+        payload: {
+          ...typed.payload,
+          selection: 'recover',
+        },
+      };
+    }
+    return typed;
+  });
+
+export const resolveSelfTestMode = (value?: string | null): SelfTestMode => {
+  if (value === 'storm' || value === 'recovery' || value === 'calm') {
+    return value;
+  }
+  return 'calm';
+};
+
+export const buildSelfTestFramesForMode = (mode: SelfTestMode = 'calm'): unknown[] => {
+  const canonical = buildCanonicalSelfTestFrames();
+  if (mode === 'storm') {
+    return applyStormMode(canonical);
+  }
+  if (mode === 'recovery') {
+    return applyRecoveryMode(canonical);
+  }
+  return cloneFrames(canonical);
+};
+
 const validateHeartbeatOrder = (
   state: FlowState,
   frame: LTPFrame & { type: 'heartbeat'; payload: HeartbeatPayload },
@@ -284,7 +372,8 @@ const determineConformanceLevel = (state: FlowState, ok: boolean): SelfTestRepor
 };
 
 export const runSelfTest = (options: SelfTestOptions = {}): { ok: boolean; report: SelfTestReport } => {
-  const frames = options.frames ?? buildCanonicalSelfTestFrames();
+  const mode = resolveSelfTestMode(options.mode);
+  const frames = options.frames ?? buildSelfTestFramesForMode(mode);
   const seenIds = new Set<string>();
   const state = createInitialState();
 
@@ -329,6 +418,7 @@ export const runSelfTest = (options: SelfTestOptions = {}): { ok: boolean; repor
     dedupedFrames: state.deduped,
     errors: state.errors,
     determinismHash,
+    mode,
   };
 
   return { ok: report.ok, report };
