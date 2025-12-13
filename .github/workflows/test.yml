@@ -11,8 +11,8 @@ jobs:
     name: Verify Cross-SDK Type Consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
       - name: Verify types across all SDKs
@@ -24,13 +24,30 @@ jobs:
     runs-on: ubuntu-latest
     needs: verify-types
     steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '18'
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 8
+      - name: Debug env
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "SHELL=$SHELL"
+          echo "PATH=$PATH"
+          which node || true
+          node -v || true
+          which npm || true
+          npm -v || true
+          which pnpm || true
+          pnpm -v || true
+          corepack --version || true
+      - name: Enable Corepack + pnpm
+        shell: bash
+        run: |
+          set -euxo pipefail
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+          pnpm -v
       - name: Install dependencies
         run: |
           pnpm -w install --no-frozen-lockfile
@@ -54,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: verify-types
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
@@ -72,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: verify-types
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: erlef/setup-elixir@v1
         with:
           elixir-version: '1.14'
@@ -95,7 +112,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: verify-types
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install system dependencies
         run: |
           sudo apt-get update
