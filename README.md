@@ -129,7 +129,7 @@ node scripts/demo/conformanceWsClient.ts storm
 
 ## ✅ LTP Conformance Verifier (HTTP)
 
-The demo HTTP server exposes a deterministic verifier for arbitrary frame captures at `POST /conformance/verify`. It evaluates the incoming sequence against the rules in `specs/LTP-Conformance-v0.1.md` (hello-first, version check, id uniqueness per sender, ordering, and tolerance for unknown frame types).
+The demo HTTP server exposes a deterministic verifier for arbitrary frame captures at `POST /conformance/verify`. It evaluates the incoming sequence against the rules in [`specs/LTP-Conformance-Endpoint-v0.1.md`](./specs/LTP-Conformance-Endpoint-v0.1.md) (hello-first, version check, id uniqueness per sender, ordering, and tolerance for unknown frame types). Requests are constrained by a 512 KiB body limit and a 5,000-frame cap to discourage abusive payloads; deployers should pair it with a lightweight rate limiter for production use.
 
 **Try it locally:**
 
@@ -147,9 +147,9 @@ curl -X POST http://localhost:4000/conformance/verify \\
       }'
 ```
 
-The response includes `{ ok, score, errors, warnings, passed, hints }` and is fully deterministic for a given input.
+The response includes `{ ok, score, errors, warnings, passed, hints, annotations, frameCount }` and is fully deterministic for a given input.
 
-Specs for reference: [LTP Conformance v0.1](./specs/LTP-Conformance-v0.1.md) and [LTP Self-Test v0.1](./specs/LTP-SelfTest-v0.1.md).
+Specs for reference: [LTP Conformance Endpoint v0.1](./specs/LTP-Conformance-Endpoint-v0.1.md) and [LTP Self-Test v0.1](./specs/LTP-SelfTest-v0.1.md).
 
 📊 **For Investors & Experts:**
 - [Investor Pitch](./INVESTOR_PITCH.md) - Executive summary, market opportunity, investment ask

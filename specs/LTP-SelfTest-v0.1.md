@@ -34,7 +34,7 @@ A successful run of the canonical harness produces a report with:
 - Count of **emitted** frames (responses produced by the harness itself).
 - **Branch count** observed in the `route_response` (≥2 required).
 - A stable **determinism hash** derived from the canonical flow state.
-- A **conformance level** derived from `specs/LTP-Conformance-v0.1.md` and attached to the report:
+- A **conformance level** derived from `specs/LTP-Conformance-Endpoint-v0.1.md` and attached to the report:
   - **LTP-Core** – basic frame handling and ordering enforced (hello gating, version check, dedupe).
   - **LTP-Flow** – LTP-Core + canonical routing behavior (route_request/route_response with ≥2 branches).
   - **LTP-Canonical** – LTP-Flow + fully passing self-test (no errors, deterministic outcomes).

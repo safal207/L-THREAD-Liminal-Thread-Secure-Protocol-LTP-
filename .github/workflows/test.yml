@@ -51,6 +51,9 @@ jobs:
       - name: Install dependencies
         run: |
           pnpm -w install --no-frozen-lockfile
+      - name: Conformance verifier smoke test
+        run: |
+          pnpm -w test:conformance
       - name: Build
         run: |
           pnpm --filter @liminal/ltp-client run build

@@ -24,6 +24,7 @@ describe("verifyConformance", () => {
     ]);
 
     expect(result.ok).toBe(false);
+    expect(result.httpStatus).toBe(422);
     expect(result.errors.some((msg) => msg.includes("hello"))).toBe(true);
   });
 
@@ -43,6 +44,7 @@ describe("verifyConformance", () => {
     ]);
 
     expect(result.ok).toBe(false);
+    expect(result.httpStatus).toBe(400);
     expect(result.errors.some((msg) => msg.includes("unsupported version"))).toBe(true);
   });
 
@@ -55,5 +57,34 @@ describe("verifyConformance", () => {
 
     expect(result.ok).toBe(true);
     expect(result.warnings.some((msg) => msg.includes("duplicate frame id"))).toBe(true);
+  });
+
+  it("is deterministic for identical inputs", () => {
+    const flow = [
+      helloFrame,
+      heartbeatFrame,
+      { ...heartbeatFrame, id: "c", ts: 3, type: "heartbeat", payload: { seq: 2 } },
+    ];
+
+    const first = verifyConformance(flow);
+    const second = verifyConformance(flow);
+
+    expect(first.score).toBe(second.score);
+    expect(first.annotations).toEqual(second.annotations);
+  });
+
+  it("rejects oversized frame collections", () => {
+    const frames = Array.from({ length: 5001 }, (_, idx) => ({
+      ...heartbeatFrame,
+      id: `f-${idx}`,
+      ts: idx + 1,
+    }));
+    frames[0] = helloFrame;
+
+    const result = verifyConformance(frames);
+
+    expect(result.ok).toBe(false);
+    expect(result.httpStatus).toBe(413);
+    expect(result.errors.some((msg) => msg.includes("frame count exceeds maximum"))).toBe(true);
   });
 });
