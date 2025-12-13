@@ -10,6 +10,7 @@
     "dev:ltp-node-demo": "ts-node scripts/dev/ltp-node-demo.ts",
     "demo:story": "ts-node scripts/demo/ltp-story-demo.ts",
     "demo:future-weave": "NODE_PATH=node_modules ts-node scripts/dev/story-multipath-demo.ts",
+    "demo:canonical": "ts-node examples/canonical-flow.ts",
     "demo:explain-routing": "ts-node src/demos/explainRoutingDemo.ts",
     "demo-server": "ts-node ./src/server/httpDemoServer.ts",
     "ws-demo-server": "ts-node ./src/server/wsDemoServer.ts",
