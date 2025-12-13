@@ -25,7 +25,8 @@
     "test:future-weave-graph": "ts-node tests/visualization/futureWeaveGraph.test.ts",
     "test:explain-routing": "ts-node src/demos/__tests__/explainRoutingDemo.test.ts",
     "test": "vitest run",
-    "test:turtle": "vitest run src/turtle/__tests__"
+    "test:turtle": "vitest run src/turtle/__tests__",
+    "conformance:report": "ts-node scripts/conformance/generateConformanceReport.ts"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
