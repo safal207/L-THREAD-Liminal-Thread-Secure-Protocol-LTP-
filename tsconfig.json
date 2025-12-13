@@ -9,6 +9,6 @@
     "skipLibCheck": true,
     "types": ["node"]
   },
-  "include": ["scripts/**/*.ts", "sdk/js/**/*.ts", "src/**/*.ts"],
+  "include": ["scripts/**/*.ts", "sdk/js/**/*.ts", "src/**/*.ts", "tools/**/*.ts", "tests/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

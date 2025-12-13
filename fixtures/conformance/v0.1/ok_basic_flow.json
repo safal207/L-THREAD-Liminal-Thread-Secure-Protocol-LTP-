@@ -1,0 +1,52 @@
+{
+  "frames": [
+    {
+      "v": "0.1",
+      "id": "hello-1",
+      "ts": 1,
+      "type": "hello",
+      "payload": { "role": "client", "message": "basic" }
+    },
+    {
+      "v": "0.1",
+      "id": "hb-1",
+      "ts": 2,
+      "type": "heartbeat",
+      "payload": { "seq": 1, "status": "ok" }
+    },
+    {
+      "v": "0.1",
+      "id": "ori-1",
+      "ts": 3,
+      "type": "orientation",
+      "payload": { "origin": "alpha", "destination": "beta", "mode": "demo" }
+    },
+    {
+      "v": "0.1",
+      "id": "req-1",
+      "ts": 4,
+      "type": "route_request",
+      "payload": { "goal": "demo", "context": ["seed"] }
+    },
+    {
+      "v": "0.1",
+      "id": "resp-1",
+      "ts": 5,
+      "type": "route_response",
+      "payload": {
+        "branches": [
+          { "path": ["alpha", "beta"], "confidence": 0.9 },
+          { "path": ["beta", "gamma"], "confidence": 0.6 }
+        ],
+        "selection": "primary"
+      }
+    },
+    {
+      "v": "0.1",
+      "id": "focus-1",
+      "ts": 6,
+      "type": "focus_snapshot",
+      "payload": { "focus": "navigation", "signal": 0.92 }
+    }
+  ]
+}

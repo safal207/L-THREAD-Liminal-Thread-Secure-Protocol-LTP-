@@ -54,6 +54,9 @@ jobs:
       - name: Conformance verifier smoke test
         run: |
           pnpm -w test:conformance
+      - name: LTP conformance kit (fixtures)
+        run: |
+          pnpm -w ltp:conformance verify:dir fixtures/conformance/v0.1 --out reports/ci-report.json
       - name: Build
         run: |
           pnpm --filter @liminal/ltp-client run build
@@ -71,6 +74,11 @@ jobs:
         with:
           name: conformance-report
           path: artifacts/conformance-report.json
+      - name: Upload conformance kit reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: ltp-conformance-kit
+          path: reports/*
 
   test-python:
     name: Test Python SDK

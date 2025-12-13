@@ -1,0 +1,66 @@
+import type { FrameType } from '../../../sdk/js/src/frames/frameSchema';
+
+export type LTPFrameShape = {
+  v?: unknown;
+  id?: unknown;
+  ts?: unknown;
+  type?: unknown;
+  payload?: unknown;
+  from?: unknown;
+  to?: unknown;
+};
+
+export type NormalizedFrame = {
+  v: string;
+  id: string;
+  ts: number;
+  type: FrameType | string;
+  payload: unknown;
+  from?: string;
+  to?: string;
+};
+
+export interface Issue {
+  code: string;
+  message: string;
+  at?: number;
+  frameId?: string;
+}
+
+export interface ConformanceReport {
+  v: '0.1';
+  ok: boolean;
+  score: number;
+  frameCount: number;
+  passed: string[];
+  warnings: Issue[];
+  errors: Issue[];
+  hints: string[];
+  annotations?: Record<string, unknown>;
+  meta: {
+    timestamp: number;
+    tool: 'ltp-conformance-kit';
+    toolVersion: string;
+    inputName?: string;
+    inputHash?: string;
+  };
+}
+
+export interface ConformanceReportBatch {
+  v: '0.1';
+  ok: boolean;
+  score: number;
+  reports: ConformanceReport[];
+  summary: {
+    total: number;
+    passed: number;
+    warned: number;
+    failed: number;
+  };
+  meta: ConformanceReport['meta'];
+}
+
+export type VerifyOutcome = {
+  report: ConformanceReport;
+  exitCode: number;
+};
