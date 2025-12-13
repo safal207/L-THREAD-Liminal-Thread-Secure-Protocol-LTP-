@@ -1,9 +1,4 @@
-import {
-  FRAME_TYPES_V0_1,
-  LTP_VERSION,
-  isKnownFrameType,
-  type FrameTypeV0_1,
-} from "./protocolSurface.v0.1";
+import { LTP_VERSION, isKnownFrameType, type FrameTypeV0_1 } from "./protocolSurface.v0.1";
 
 export type FrameType = FrameTypeV0_1;
 
