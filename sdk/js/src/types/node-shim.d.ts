@@ -1,26 +1,19 @@
-// Minimal Node.js type shims to support builds without @types/node
-
-declare var require: {
-  (id: string): any;
-  main?: unknown;
-};
-
-declare var module: {
-  exports: unknown;
-};
-
-declare namespace NodeJS {
-  interface Process {
-    exitCode?: number;
-    env: Record<string, string | undefined>;
+declare module 'crypto' {
+  interface Hash {
+    update(data: string | ArrayBufferView): Hash;
+    digest(encoding: 'hex'): string;
   }
+
+  function createHash(algorithm: string): Hash;
+
+  export { createHash };
 }
-
-declare var process: NodeJS.Process;
-
-declare var Buffer: typeof import('buffer').Buffer;
 
 declare module 'node:assert/strict' {
-  import assert from 'assert';
-  export = assert;
+  const assert: any;
+  export default assert;
 }
+
+declare const process: { exitCode?: number };
+declare const require: any;
+declare const module: any;
