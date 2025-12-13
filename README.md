@@ -30,10 +30,43 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving co
   - `pnpm -w ltp:conformance verify:dir fixtures/conformance/v0.1 --out reports/ci-report.json`
   - `pnpm -w ltp:conformance selftest --mode calm`
 
-## Run the canonical demo
+## Release v0.1 quickstart (always works)
 
-- `pnpm -w demo:canonical-v0.1`
-- Outputs: frame timeline, normalized routing branches with confidences, short explainability factors.
+1. Install dependencies: `pnpm -w install` (fallback: `npm install`).
+2. Run the frozen canonical demo: `pnpm -w demo:canonical-v0.1` (or `pnpm run demo:all` / `make demo`).
+3. Expected log: `hello -> heartbeat -> orientation -> route_request -> route_response` plus routing branches and explainability.
+
+Sample output (from `make demo`):
+
+```
+LTP v0.1 Canonical Flow
+========================
+
+Sequence: hello -> heartbeat -> orientation -> route_request -> route_response (locked)
+
+Frame timeline (v0.1)
+---------------------
+1. 2023-11-14T22:13:20.025Z :: hello (message=init canonical demo)
+2. 2023-11-14T22:13:20.050Z :: heartbeat (seq=1)
+3. 2023-11-14T22:13:20.075Z :: orientation (origin=client.demo)
+4. 2023-11-14T22:13:20.100Z :: route_request (goal=deliver canonical flow)
+5. 2023-11-14T22:13:20.125Z :: route_response (selection=primary)
+
+Routing branches
+----------------
+primary: 64.0% path=primary -> ship (steady delivery)
+recover: 22.0% path=recover -> stabilize (fallback ready)
+explore: 14.0% path=explore -> test (light exploration)
+
+Explainability factors
+---------------------
+version locked: 0.1
+orientation: client.demo -> ltp-core (canonical)
+chosen branch: primary @ 64.0% (primary -> ship)
+confidence delta vs next: +42bps
+rationales: primary=steady delivery; recover=fallback ready; explore=light exploration
+surface includes: hello, heartbeat, orientation, route_request, route_response, focus_snapshot
+```
 
 ## Roadmap (v0.2 preview)
 
@@ -61,6 +94,7 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [Consciousness Web & Orientation Shell](./specs/LTP-ConsciousnessWeb.md) - Semantic graph + focus layer built atop the Thread Life Model
 - [LTP Flow v0.1 (Draft)](./specs/LTP-Flow-v0.1.md) - Living, orientable motion of frames across time
 - [LTP Canonical Flow v0.1 (Draft/Frozen)](./specs/LTP-Canonical-Flow-v0.1.md) - Deterministic reference sequence for routing
+- [LTP v0.1 Release Slice](./specs/LTP-v0.1-Release-Slice.md) - One-page contract for artifacts, badges, and demo expectations
 - [Project Map](./PROJECT_MAP.md) - Single entry point for specs, SDKs, nodes, and demos. **If you're new, start here.**
 - [Contributing Guide](./CONTRIBUTING.md) - How to contribute to LTP
 - [Changelog](./CHANGELOG.md) - Version history and changes
@@ -183,17 +217,21 @@ pnpm -w install
 pnpm -w ltp:conformance verify fixtures/conformance/v0.1/ok_basic_flow.json
 pnpm -w ltp:conformance verify:dir fixtures/conformance/v0.1 --out reports/ci-report.json
 pnpm -w ltp:conformance selftest --mode calm
+# Non-vitest path (pure ts-node):
+pnpm -w test:conformance:kit:node
 ```
 
 Outputs:
-- Machine-readable report at `reports/ltp-conformance-report.json` (override with `--out`).
-- Badge-ready payload at `reports/ltp-conformance-badge.json` following [`specs/LTP-Conformance-Report-v0.1.md`](./specs/LTP-Conformance-Report-v0.1.md).
+- Machine-readable report at `reports/ci-report.json` (override with `--out`, default `reports/ltp-conformance-report.json`).
+- Badge-ready payloads at `reports/badge.json` (canonical) and `reports/ltp-conformance-badge.json` following [`specs/LTP-Conformance-Report-v0.1.md`](./specs/LTP-Conformance-Report-v0.1.md).
 
 Example (text format):
 
 ```
 ok_basic_flow.json -> OK score=1.000 errors=0 warnings=0 (report: reports/ltp-conformance-report.json)
 ```
+
+**CI artifacts:** GitHub Actions uploads `reports/ci-report.json`, `reports/badge.json`, and `artifacts/conformance-report.json` on every run (workflow: **Test LTP SDKs** → artifacts `ltp-conformance-kit` + `conformance-report`).
 
 Add your own fixtures under `fixtures/conformance/v0.1/` as `{ "frames": [...] }` JSON files; the `verify:dir` command picks them up in sorted order and aggregates results for CI.
 

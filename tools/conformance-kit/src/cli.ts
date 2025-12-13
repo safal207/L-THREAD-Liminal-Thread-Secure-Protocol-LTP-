@@ -9,7 +9,10 @@ import { ConformanceReport, ConformanceReportBatch } from './types';
 import { verifyDirectoryReports, verifyFrames, writeReport } from './verify';
 
 const DEFAULT_REPORT_PATH = path.resolve(process.cwd(), 'reports/ltp-conformance-report.json');
-const DEFAULT_BADGE_PATH = path.resolve(process.cwd(), 'reports/ltp-conformance-badge.json');
+const DEFAULT_BADGE_PATHS = [
+  path.resolve(process.cwd(), 'reports/badge.json'),
+  path.resolve(process.cwd(), 'reports/ltp-conformance-badge.json'),
+];
 
 const log = (message: string): void => {
   // eslint-disable-next-line no-console
@@ -21,7 +24,7 @@ const formatSummary = (report: ConformanceReport): string => {
   return `${state} score=${report.score.toFixed(3)} errors=${report.errors.length} warnings=${report.warnings.length}`;
 };
 
-const writeBadge = (targetPath: string, report: ConformanceReport | ConformanceReportBatch): void => {
+const writeBadge = (targetPaths: string | string[], report: ConformanceReport | ConformanceReportBatch): void => {
   const hasErrors = 'reports' in report ? report.reports.some((r) => r.errors.length > 0) : report.errors.length > 0;
   const hasWarnings = 'reports' in report
     ? report.reports.some((r) => r.errors.length === 0 && r.warnings.length > 0)
@@ -33,8 +36,12 @@ const writeBadge = (targetPath: string, report: ConformanceReport | ConformanceR
     color: hasErrors ? 'red' : hasWarnings ? 'yellow' : 'brightgreen',
   };
 
-  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  fs.writeFileSync(targetPath, `${JSON.stringify(badge, null, 2)}\n`, 'utf-8');
+  const destinations = Array.isArray(targetPaths) ? targetPaths : [targetPaths];
+
+  destinations.forEach((targetPath) => {
+    fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+    fs.writeFileSync(targetPath, `${JSON.stringify(badge, null, 2)}\n`, 'utf-8');
+  });
 };
 
 const verifyFile = (filePath: string, options: { outPath?: string; format?: string; strict?: boolean }) => {
@@ -44,7 +51,7 @@ const verifyFile = (filePath: string, options: { outPath?: string; format?: stri
   const outcome = verifyFrames(frames, { inputName: path.basename(resolved), inputHash, strict: options.strict });
   const reportPath = path.resolve(process.cwd(), options.outPath ?? DEFAULT_REPORT_PATH);
   writeReport(reportPath, outcome.report);
-  writeBadge(DEFAULT_BADGE_PATH, outcome.report);
+  writeBadge(DEFAULT_BADGE_PATHS, outcome.report);
 
   if (options.format === 'json') {
     log(JSON.stringify(outcome.report, null, 2));
@@ -61,7 +68,7 @@ const verifyDirectory = (dirPath: string, options: { outPath?: string; format?: 
 
   const reportPath = path.resolve(process.cwd(), options.outPath ?? DEFAULT_REPORT_PATH);
   writeReport(reportPath, batch);
-  writeBadge(DEFAULT_BADGE_PATH, batch);
+  writeBadge(DEFAULT_BADGE_PATHS, batch);
 
   if (options.format === 'json') {
     log(JSON.stringify(batch, null, 2));
@@ -120,7 +127,7 @@ const runSelfTestCommand = (options: { outPath?: string; format?: string; strict
 
   const reportPath = path.resolve(process.cwd(), options.outPath ?? DEFAULT_REPORT_PATH);
   writeReport(reportPath, conformance);
-  writeBadge(DEFAULT_BADGE_PATH, conformance);
+  writeBadge(DEFAULT_BADGE_PATHS, conformance);
 
   if (options.format === 'json') {
     log(JSON.stringify(conformance, null, 2));

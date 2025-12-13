@@ -157,10 +157,14 @@ export const renderCanonicalDemo = (): string => {
   const frames = buildCanonicalFrames();
   const routeResponse = frames.find((frame) => frame.type === "route_response")?.payload as RouteResponsePayload;
   const orientation = frames.find((frame) => frame.type === "orientation")?.payload as OrientationPayload;
+  const sequence = frames.map((frame) => frame.type).join(" -> ");
+  const expectedSequence = "hello -> heartbeat -> orientation -> route_request -> route_response";
 
   const sections = [
     "LTP v0.1 Canonical Flow",
     "========================",
+    "",
+    `Sequence: ${sequence}${sequence === expectedSequence ? " (locked)" : " (check ordering)"}`,
     "",
     formatTimeline(frames),
     formatRoutingResult(routeResponse),
