@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import path from 'node:path';
 import { buildCanonicalSelfTestFrames, runSelfTest } from '../selfTest';
 
 function runTest(name: string, fn: () => void): void {
@@ -18,6 +20,7 @@ runTest('canonical self-test passes deterministically', () => {
 
   assert.equal(first.ok, true);
   assert.equal(second.ok, true);
+  assert.equal(first.report.level, 'LTP-Canonical');
   assert.equal(first.report.processedFrames, 8);
   assert.equal(first.report.receivedFrames, 10);
   assert.equal(first.report.dedupedFrames, 1);
@@ -39,6 +42,7 @@ runTest('rejects non-hello first frame', () => {
   const result = runSelfTest({ frames });
 
   assert.equal(result.ok, false);
+  assert.equal(result.report.level, 'LTP-Core');
   assert.ok(result.report.errors.some((error) => error.includes('first frame must be hello')));
 });
 
@@ -60,4 +64,16 @@ runTest('deduplicates repeated ids to avoid side effects', () => {
   assert.equal(result.ok, true);
   assert.equal(result.report.dedupedFrames >= 1, true);
   assert.equal(result.report.processedFrames, 8);
+});
+
+runTest('cli self-test command emits canonical report', () => {
+  const cliPath = path.resolve(__dirname, '../../cli.js');
+  const result = spawnSync('node', [cliPath], { encoding: 'utf-8' });
+
+  assert.equal(result.status, 0);
+  const output = JSON.parse(result.stdout);
+  assert.equal(output.ok, true);
+  assert.equal(output.level, 'LTP-Canonical');
+  assert.equal(output.branches >= 2, true);
+  assert.ok(typeof output.determinismHash === 'string');
 });

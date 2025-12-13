@@ -1,8 +1,11 @@
 import { createHash } from 'crypto';
+import fs from 'fs';
+import path from 'path';
 import { HeartbeatPayload, RouteResponsePayload, isLTPFrame, LTPFrame } from '../frames/frameSchema';
 
 export interface SelfTestReport {
   ok: boolean;
+  level: 'LTP-Core' | 'LTP-Flow' | 'LTP-Canonical';
   receivedFrames: number;
   processedFrames: number;
   emittedFrames: number;
@@ -54,7 +57,9 @@ const createInitialState = (): FlowState => ({
   errors: [],
 });
 
-export const buildCanonicalSelfTestFrames = (): unknown[] => [
+const CANONICAL_VECTOR_FILENAME = 'self-test-canonical.v0.1.json';
+
+const inlineCanonicalFrames: unknown[] = [
   {
     v: '0.1',
     id: 'f-hello',
@@ -133,6 +138,28 @@ export const buildCanonicalSelfTestFrames = (): unknown[] => [
     payload: { seq: 2, status: 'duplicate' },
   },
 ];
+
+const readJsonVectors = (): unknown[] | undefined => {
+  const vectorPath = path.resolve(__dirname, '../../specs/vectors', CANONICAL_VECTOR_FILENAME);
+  if (!fs.existsSync(vectorPath)) {
+    return undefined;
+  }
+
+  try {
+    const raw = fs.readFileSync(vectorPath, 'utf-8');
+    const parsed = JSON.parse(raw) as { frames?: unknown };
+    return Array.isArray(parsed.frames) ? parsed.frames : undefined;
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.warn(`Failed to load canonical vectors from ${vectorPath}:`, error);
+    return undefined;
+  }
+};
+
+export const buildCanonicalSelfTestFrames = (): unknown[] => {
+  const framesFromDisk = readJsonVectors();
+  return framesFromDisk ?? inlineCanonicalFrames;
+};
 
 const validateHeartbeatOrder = (
   state: FlowState,
@@ -243,6 +270,19 @@ const hashReport = (state: FlowState, receivedFrames: number): string => {
   return createHash('sha256').update(serialized).digest('hex');
 };
 
+const determineConformanceLevel = (state: FlowState, ok: boolean): SelfTestReport['level'] => {
+  if (ok) {
+    return 'LTP-Canonical';
+  }
+
+  const flowEligible = state.helloSeen && state.routeRequested && state.routeResponseBranches >= 2;
+  if (flowEligible) {
+    return 'LTP-Flow';
+  }
+
+  return 'LTP-Core';
+};
+
 export const runSelfTest = (options: SelfTestOptions = {}): { ok: boolean; report: SelfTestReport } => {
   const frames = options.frames ?? buildCanonicalSelfTestFrames();
   const seenIds = new Set<string>();
@@ -278,8 +318,10 @@ export const runSelfTest = (options: SelfTestOptions = {}): { ok: boolean; repor
   }
 
   const determinismHash = hashReport(state, frames.length);
+  const ok = state.errors.length === 0;
   const report: SelfTestReport = {
-    ok: state.errors.length === 0,
+    ok,
+    level: determineConformanceLevel(state, ok),
     receivedFrames: frames.length,
     processedFrames: state.processed,
     emittedFrames: state.emittedFrames,

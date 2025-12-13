@@ -4,7 +4,7 @@ This document defines the canonical self-test sequence that any node, SDK, or HU
 
 ## Canonical sequence
 
-The self-test uses a fixed sequence of frames. All timestamps are deterministic integers and the protocol version is pinned to `v=0.1`.
+The self-test uses a fixed sequence of frames stored in `specs/vectors/self-test-canonical.v0.1.json`. All timestamps are deterministic integers and the protocol version is pinned to `v=0.1`.
 
 1. **hello** — must be the first frame. Establishes the session and gates all subsequent frames.
 2. **heartbeat ×3** — three heartbeats with strictly increasing `seq` values (1, 2, 3).
@@ -34,6 +34,10 @@ A successful run of the canonical harness produces a report with:
 - Count of **emitted** frames (responses produced by the harness itself).
 - **Branch count** observed in the `route_response` (≥2 required).
 - A stable **determinism hash** derived from the canonical flow state.
+- A **conformance level** derived from `specs/LTP-Conformance-v0.1.md` and attached to the report:
+  - **LTP-Core** – basic frame handling and ordering enforced (hello gating, version check, dedupe).
+  - **LTP-Flow** – LTP-Core + canonical routing behavior (route_request/route_response with ≥2 branches).
+  - **LTP-Canonical** – LTP-Flow + fully passing self-test (no errors, deterministic outcomes).
 - An empty **errors** list; any violation marks the run as failed and explains the reason.
 
 The harness performs no network I/O and uses only deterministic data so CI results are reproducible.

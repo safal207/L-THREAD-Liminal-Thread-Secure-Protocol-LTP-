@@ -1,0 +1,84 @@
+{
+  "name": "LTP canonical self-test v0.1",
+  "description": "Deterministic conformance harness frames for hello → heartbeats → orientation → routing → focus.",
+  "version": "0.1",
+  "frames": [
+    {
+      "v": "0.1",
+      "id": "f-hello",
+      "ts": 1,
+      "type": "hello",
+      "payload": { "role": "client", "message": "ltp-self-test" }
+    },
+    {
+      "v": "0.1",
+      "id": "f-heartbeat-1",
+      "ts": 2,
+      "type": "heartbeat",
+      "payload": { "seq": 1, "status": "ok" }
+    },
+    {
+      "v": "0.1",
+      "id": "f-heartbeat-2",
+      "ts": 3,
+      "type": "heartbeat",
+      "payload": { "seq": 2, "status": "ok" }
+    },
+    {
+      "v": "0.1",
+      "id": "f-heartbeat-3",
+      "ts": 4,
+      "type": "heartbeat",
+      "payload": { "seq": 3, "status": "steady" }
+    },
+    {
+      "v": "0.1",
+      "id": "f-orientation",
+      "ts": 5,
+      "type": "orientation",
+      "payload": { "origin": "node-A", "destination": "node-B", "mode": "survey" }
+    },
+    {
+      "v": "0.1",
+      "id": "f-route-request",
+      "ts": 6,
+      "type": "route_request",
+      "payload": { "goal": "reach-destination", "context": ["safety", "speed"] }
+    },
+    {
+      "v": "0.1",
+      "id": "f-route-response",
+      "ts": 7,
+      "type": "route_response",
+      "payload": {
+        "branches": {
+          "primary": { "path": ["alpha", "beta"], "confidence": 0.8, "rationale": "fastest" },
+          "recover": { "path": ["alpha", "gamma"], "confidence": 0.55, "rationale": "fallback" },
+          "explore": { "path": ["delta"], "confidence": 0.35, "rationale": "discover" }
+        },
+        "selection": "primary"
+      }
+    },
+    {
+      "v": "0.1",
+      "id": "f-focus",
+      "ts": 8,
+      "type": "focus_snapshot",
+      "payload": { "focus": "navigation", "signal": 0.92, "rationale": "post-route" }
+    },
+    {
+      "v": "0.1",
+      "id": "f-unknown",
+      "ts": 9,
+      "type": "unknown_frame",
+      "payload": { "note": "ignored" }
+    },
+    {
+      "v": "0.1",
+      "id": "f-heartbeat-2",
+      "ts": 10,
+      "type": "heartbeat",
+      "payload": { "seq": 2, "status": "duplicate" }
+    }
+  ]
+}
