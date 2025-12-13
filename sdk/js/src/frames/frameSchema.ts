@@ -1,4 +1,9 @@
-import { FRAME_TYPES_V0_1, LTP_VERSION, type FrameTypeV0_1 } from "./protocolSurface.v0.1";
+import {
+  FRAME_TYPES_V0_1,
+  LTP_VERSION,
+  isKnownFrameType,
+  type FrameTypeV0_1,
+} from "./protocolSurface.v0.1";
 
 export type FrameType = FrameTypeV0_1;
 
@@ -149,9 +154,11 @@ export const isLTPFrame = (frame: unknown): frame is LTPFrame => {
   if (typeof frame.type !== "string") return false;
   if (!("payload" in frame)) return false;
 
-  if (!FRAME_TYPES_V0_1.includes(frame.type)) return false;
+  const frameType = frame.type;
 
-  switch (frame.type) {
+  if (!isKnownFrameType(frameType)) return false;
+
+  switch (frameType) {
     case "hello":
       return isHelloPayload(frame.payload);
     case "heartbeat":
