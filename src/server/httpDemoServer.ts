@@ -10,6 +10,7 @@ import {
 import { type FutureWeaveGraphOptions } from "../visualization/futureWeaveGraph";
 import { type TemporalOrientationView, type RoutingDecision } from "../routing/temporal-multipath";
 import { resolveSelfTestMode, runSelfTest } from "../../sdk/js/src/conformance/selfTest";
+import { verifyConformance } from "./conformanceVerifier";
 
 export interface ExplainRoutingResponse {
   decision: string;
@@ -124,82 +125,111 @@ export function createDemoServer() {
 
     const requestUrl = new URL(req.url, `http://${req.headers.host ?? "localhost"}`);
 
-    if (req.method !== "GET") {
-      res.statusCode = 405;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ error: "method_not_allowed" }));
-      return;
-    }
-
-    if (requestUrl.pathname === "/health") {
-      res.statusCode = 200;
-      res.setHeader("Content-Type", "application/json");
-      res.end(JSON.stringify({ ok: true }));
-      return;
-    }
-
-    if (requestUrl.pathname === "/conformance/self-test") {
-      try {
-        const mode = resolveSelfTestMode(requestUrl.searchParams.get("mode"));
-        const { report } = runSelfTest({ mode });
-        res.statusCode = report.ok ? 200 : 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify(
-            {
-              ok: report.ok,
-              level: report.level,
-              determinismHash: report.determinismHash,
-              branches: report.branchesCount,
-              errors: report.errors,
-              mode: report.mode,
-              received: report.receivedFrames,
-              processed: report.processedFrames,
-              emitted: report.emittedFrames,
-              deduped: report.dedupedFrames,
-            },
-            null,
-            2,
-          ),
-        );
-      } catch (error) {
-        console.error("Failed to handle /conformance/self-test", error);
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            ok: false,
-            error: "internal_error",
-            message: "Failed to run LTP conformance self-test",
-          }),
-        );
-      }
-      return;
-    }
-
-    if (requestUrl.pathname === "/demo/explain-routing") {
-      try {
-        const response = handleExplainRoutingRequest(requestUrl.searchParams);
+    if (req.method === "GET") {
+      if (requestUrl.pathname === "/health") {
         res.statusCode = 200;
         res.setHeader("Content-Type", "application/json");
-        res.end(JSON.stringify(response, null, 2));
-      } catch (error) {
-        console.error("Failed to handle /demo/explain-routing", error);
-        res.statusCode = 500;
-        res.setHeader("Content-Type", "application/json");
-        res.end(
-          JSON.stringify({
-            error: "internal_error",
-            message: "Something went wrong in routing explanation",
-          }),
-        );
+        res.end(JSON.stringify({ ok: true }));
+        return;
       }
+
+      if (requestUrl.pathname === "/conformance/self-test") {
+        try {
+          const mode = resolveSelfTestMode(requestUrl.searchParams.get("mode"));
+          const { report } = runSelfTest({ mode });
+          res.statusCode = report.ok ? 200 : 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify(
+              {
+                ok: report.ok,
+                level: report.level,
+                determinismHash: report.determinismHash,
+                branches: report.branchesCount,
+                errors: report.errors,
+                mode: report.mode,
+                received: report.receivedFrames,
+                processed: report.processedFrames,
+                emitted: report.emittedFrames,
+                deduped: report.dedupedFrames,
+              },
+              null,
+              2,
+            ),
+          );
+        } catch (error) {
+          console.error("Failed to handle /conformance/self-test", error);
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({
+              ok: false,
+              error: "internal_error",
+              message: "Failed to run LTP conformance self-test",
+            }),
+          );
+        }
+        return;
+      }
+
+      if (requestUrl.pathname === "/demo/explain-routing") {
+        try {
+          const response = handleExplainRoutingRequest(requestUrl.searchParams);
+          res.statusCode = 200;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify(response, null, 2));
+        } catch (error) {
+          console.error("Failed to handle /demo/explain-routing", error);
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(
+            JSON.stringify({
+              error: "internal_error",
+              message: "Something went wrong in routing explanation",
+            }),
+          );
+        }
+        return;
+      }
+    }
+
+    if (req.method === "POST" && requestUrl.pathname === "/conformance/verify") {
+      const chunks: Buffer[] = [];
+      req
+        .on("data", (chunk) => chunks.push(chunk))
+        .on("end", () => {
+          try {
+            const bodyText = Buffer.concat(chunks).toString("utf-8");
+            const payload = bodyText.length > 0 ? JSON.parse(bodyText) : {};
+            const verification = verifyConformance((payload as { frames?: unknown }).frames);
+            res.statusCode = verification.ok ? 200 : 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(JSON.stringify(verification, null, 2));
+          } catch (error) {
+            console.error("Failed to verify conformance", error);
+            res.statusCode = 400;
+            res.setHeader("Content-Type", "application/json");
+            res.end(
+              JSON.stringify({
+                ok: false,
+                error: "invalid_request",
+                message: "Unable to parse request body as JSON",
+              }),
+            );
+          }
+        })
+        .on("error", (error) => {
+          console.error("Failed to read request body", error);
+          res.statusCode = 500;
+          res.setHeader("Content-Type", "application/json");
+          res.end(JSON.stringify({ ok: false, error: "stream_error" }));
+        });
       return;
     }
 
-    res.statusCode = 404;
+    res.statusCode = 405;
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: "not_found" }));
+    res.end(JSON.stringify({ error: "not_found_or_method_not_allowed" }));
   });
 }
 
