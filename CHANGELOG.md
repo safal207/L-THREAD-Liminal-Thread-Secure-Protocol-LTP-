@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-language SDK comparison benchmarks
 - Production-ready TOON codec implementations
 
+## [0.1.0] - 2025-02-20
+
+### Added
+- **Frames (frozen v0.1 surface):** `hello`, `heartbeat`, `orientation`, `route_request`, `route_response`, `focus_snapshot` documented as stable for partners.
+- **Canonical flow:** Locked reference path `hello → heartbeat → orientation → route_request → route_response` with deterministic IDs and timestamps for demo parity.
+- **Conformance kit artifacts:** Deterministic report (`reports/ci-report.json`) and badge payload (`reports/badge.json`) emitted by `pnpm -w ltp:conformance verify:dir fixtures/conformance/v0.1 --out ...`.
+- **Demo servers & quickstart:** One-command `make demo` / `pnpm demo:all` to print the canonical flow; README quickstart updated with install + demo instructions.
+
 ## [0.6.0-alpha.3] - 2025-01-18
 
 ### 🔒 HIGH PRIORITY SECURITY FIX - Metadata Encryption (Privacy Protection)
