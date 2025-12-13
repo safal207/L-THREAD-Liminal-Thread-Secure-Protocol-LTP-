@@ -12,18 +12,32 @@ import {
   validateFrameOrThrow,
 } from "../frameSchema";
 
-function isBranchMap(
-  branches: RouteBranch[] | RouteBranchMap
-): branches is RouteBranchMap {
+type Branches = RouteBranch[] | RouteBranchMap;
+
+function isBranchMap(branches: Branches): branches is RouteBranchMap {
   return !Array.isArray(branches);
 }
 
-function getBranch(
-  branches: RouteBranch[] | RouteBranchMap,
-  id: string
-): RouteBranch | undefined {
+function branchKeyOf(branch: unknown): string | undefined {
+  if (!branch || typeof branch !== "object") return undefined;
+  const anyBranch = branch as Record<string, unknown>;
+  const candidates = ["id", "key", "name", "branch", "branchId", "slot"];
+  for (const candidate of candidates) {
+    const value = anyBranch[candidate];
+    if (typeof value === "string") return value;
+  }
+  return undefined;
+}
+
+function getBranch(branches: Branches, id: string): RouteBranch | undefined {
   if (isBranchMap(branches)) return branches[id];
-  return branches.find((branch) => branch.id === id);
+  return branches.find((branch) => branchKeyOf(branch) === id);
+}
+
+function assertDefined<T>(value: T, message: string): asserts value is NonNullable<T> {
+  if (value === undefined || value === null) {
+    throw new Error(message);
+  }
 }
 
 function runTest(name: string, fn: () => void): void {
@@ -94,9 +108,9 @@ runTest("route_response branch confidences sum to 1", () => {
   const recover = getBranch(branches, "recover");
   const explore = getBranch(branches, "explore");
 
-  assert.ok(primary, "primary branch must exist");
-  assert.ok(recover, "recover branch must exist");
-  assert.ok(explore, "explore branch must exist");
+  assertDefined(primary, "route_response missing 'primary' branch");
+  assertDefined(recover, "route_response missing 'recover' branch");
+  assertDefined(explore, "route_response missing 'explore' branch");
 
   const sum = primary.confidence + recover.confidence + explore.confidence;
   const epsilon = 1e-6;
