@@ -28,6 +28,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '18'
+      - name: Set npm registry
+        run: |
+          npm config set registry https://registry.npmjs.org/
       - name: Debug env
         shell: bash
         run: |
@@ -56,7 +59,16 @@ jobs:
           pnpm -w test:conformance
       - name: LTP conformance kit (fixtures)
         run: |
+          set -euxo pipefail
+          exit_code=0
+          set +e
           pnpm -w ltp:conformance verify:dir fixtures/conformance/v0.1 --out reports/ci-report.json
+          exit_code=$?
+          set -e
+          echo "Conformance kit exit code: ${exit_code}"
+          if [ "${exit_code}" -gt 1 ]; then
+            exit "${exit_code}"
+          fi
       - name: Build
         run: |
           pnpm --filter @liminal/ltp-client run build
