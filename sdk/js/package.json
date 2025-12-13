@@ -5,11 +5,14 @@
   "type": "commonjs",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "ltp-client": "dist/cli.js"
+  },
   "scripts": {
     "build": "tsc",
     "lint": "echo \"Lint not configured yet\"",
-    "test": "npm run build && node dist/time/__tests__/timeWeave.test.js && node dist/temporalOrientation/__tests__/temporalOrientationEngine.test.js && node dist/temporalOrientation/__tests__/fuzzyMomentum.test.js && node dist/routing/__tests__/fuzzyRoutingEngine.test.js && node dist/examples/__tests__/smartRouterDemo.test.js && node dist/examples/__tests__/canonicalFlow.test.js && node tests/client.test.js && node tests/threadLifeModel.test.js && node tests/consciousnessWeb.test.js && node tests/orientation/orientWeb.test.js && node tests/orientation/orientationShell.test.js && node tests/orientation/orientationWeb.test.js",
-    "test:watch": "node dist/time/__tests__/timeWeave.test.js && node dist/temporalOrientation/__tests__/temporalOrientationEngine.test.js && node dist/temporalOrientation/__tests__/fuzzyMomentum.test.js && node dist/routing/__tests__/fuzzyRoutingEngine.test.js && node dist/examples/__tests__/smartRouterDemo.test.js && node dist/examples/__tests__/canonicalFlow.test.js && node tests/client.test.js && node tests/threadLifeModel.test.js && node tests/consciousnessWeb.test.js && node tests/orientation/orientWeb.test.js && node tests/orientation/orientationShell.test.js && node tests/orientation/orientationWeb.test.js",
+    "test": "npm run build && node dist/time/__tests__/timeWeave.test.js && node dist/temporalOrientation/__tests__/temporalOrientationEngine.test.js && node dist/temporalOrientation/__tests__/fuzzyMomentum.test.js && node dist/routing/__tests__/fuzzyRoutingEngine.test.js && node dist/examples/__tests__/smartRouterDemo.test.js && node dist/examples/__tests__/canonicalFlow.test.js && node dist/conformance/__tests__/selfTest.test.js && node tests/client.test.js && node tests/threadLifeModel.test.js && node tests/consciousnessWeb.test.js && node tests/orientation/orientWeb.test.js && node tests/orientation/orientationShell.test.js && node tests/orientation/orientationWeb.test.js",
+    "test:watch": "node dist/time/__tests__/timeWeave.test.js && node dist/temporalOrientation/__tests__/temporalOrientationEngine.test.js && node dist/temporalOrientation/__tests__/fuzzyMomentum.test.js && node dist/routing/__tests__/fuzzyRoutingEngine.test.js && node dist/examples/__tests__/smartRouterDemo.test.js && node dist/examples/__tests__/canonicalFlow.test.js && node dist/conformance/__tests__/selfTest.test.js && node tests/client.test.js && node tests/threadLifeModel.test.js && node tests/consciousnessWeb.test.js && node tests/orientation/orientWeb.test.js && node tests/orientation/orientationShell.test.js && node tests/orientation/orientationWeb.test.js",
     "demo:smart-router": "npm run build && node dist/examples/smartRouterDemo.js",
     "demo:flow": "npm run build && node dist/demos/flowGoldenDemo.js",
     "test:flow-contract": "npm run build && node dist/frames/__tests__/flowContract.v0.1.test.js"
