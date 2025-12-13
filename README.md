@@ -7,6 +7,13 @@
 
 L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the LIMINAL ecosystem. It serves as a "liminal thread" - a protected communication channel between human devices and LIMINAL OS that preserves context, intent, and inner state throughout the interaction.
 
+### Ethos
+
+> I am not building a system that knows for you.
+> I am creating a space where you can see where you are and choose your own path.
+
+LTP was created by Aleksey Safonov, inviting builders to orient themselves and choose the path that fits their context.
+
 📖 **Documentation:**
 - [Architecture Overview](./ARCHITECTURE.md) - Ecosystem architecture and SDK comparison
 - [Deployment Guide](./DEPLOYMENT.md) - Production deployment strategies
