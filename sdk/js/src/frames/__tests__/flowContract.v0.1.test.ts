@@ -5,7 +5,26 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 import { buildFlowGoldenFrames } from "../../demos/flowGoldenDemo";
-import { LTPFrame, validateFrameOrThrow } from "../frameSchema";
+import {
+  LTPFrame,
+  RouteBranch,
+  RouteBranchMap,
+  validateFrameOrThrow,
+} from "../frameSchema";
+
+function isBranchMap(
+  branches: RouteBranch[] | RouteBranchMap
+): branches is RouteBranchMap {
+  return !Array.isArray(branches);
+}
+
+function getBranch(
+  branches: RouteBranch[] | RouteBranchMap,
+  id: string
+): RouteBranch | undefined {
+  if (isBranchMap(branches)) return branches[id];
+  return branches.find((branch) => branch.id === id);
+}
 
 function runTest(name: string, fn: () => void): void {
   Promise.resolve()
@@ -68,10 +87,16 @@ runTest("route_response branch confidences sum to 1", () => {
   assert.ok(routeResponse, "route_response frame must exist");
 
   const {
-    payload: {
-      branches: { primary, recover, explore },
-    },
+    payload: { branches },
   } = routeResponse as Extract<LTPFrame, { type: "route_response" }>;
+
+  const primary = getBranch(branches, "primary");
+  const recover = getBranch(branches, "recover");
+  const explore = getBranch(branches, "explore");
+
+  assert.ok(primary, "primary branch must exist");
+  assert.ok(recover, "recover branch must exist");
+  assert.ok(explore, "explore branch must exist");
 
   const sum = primary.confidence + recover.confidence + explore.confidence;
   const epsilon = 1e-6;
