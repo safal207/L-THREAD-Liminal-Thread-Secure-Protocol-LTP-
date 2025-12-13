@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
-import { buildCanonicalSelfTestFrames, runSelfTest } from '../selfTest';
+import { buildCanonicalSelfTestFrames, resolveSelfTestMode, runSelfTest } from '../selfTest';
 
 function runTest(name: string, fn: () => void): void {
   Promise.resolve()
@@ -28,6 +28,7 @@ runTest('canonical self-test passes deterministically', () => {
   assert.equal(first.report.emittedFrames, 3);
   assert.deepEqual(first.report.errors, []);
   assert.equal(first.report.determinismHash, second.report.determinismHash);
+  assert.equal(first.report.mode, 'calm');
 });
 
 runTest('rejects non-hello first frame', () => {
@@ -66,6 +67,18 @@ runTest('deduplicates repeated ids to avoid side effects', () => {
   assert.equal(result.report.processedFrames, 8);
 });
 
+runTest('modes produce deterministic but distinct reports', () => {
+  const calm = runSelfTest({ mode: 'calm' });
+  const storm = runSelfTest({ mode: 'storm' });
+  const recovery = runSelfTest({ mode: 'recovery' });
+
+  assert.equal(calm.report.mode, 'calm');
+  assert.equal(storm.report.mode, 'storm');
+  assert.equal(recovery.report.mode, 'recovery');
+  assert.notEqual(calm.report.determinismHash, storm.report.determinismHash);
+  assert.notEqual(storm.report.determinismHash, recovery.report.determinismHash);
+});
+
 runTest('cli self-test command emits canonical report', () => {
   const cliPath = path.resolve(__dirname, '../../cli.js');
   const result = spawnSync('node', [cliPath], { encoding: 'utf-8' });
@@ -76,4 +89,5 @@ runTest('cli self-test command emits canonical report', () => {
   assert.equal(output.level, 'LTP-Canonical');
   assert.equal(output.branches >= 2, true);
   assert.ok(typeof output.determinismHash === 'string');
+  assert.equal(resolveSelfTestMode(output.mode), output.mode);
 });

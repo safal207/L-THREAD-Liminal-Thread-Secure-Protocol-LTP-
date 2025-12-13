@@ -46,6 +46,10 @@ function performGet(port: number, path: string): Promise<{ status: number; body:
   await new Promise<void>((resolve) => server.listen(0, resolve));
   const port = (server.address() as AddressInfo).port;
 
+  const healthResult = await performGet(port, "/health");
+  assert.strictEqual(healthResult.status, 200);
+  assert.strictEqual(healthResult.body.ok, true);
+
   const defaultResult = await performGet(port, "/demo/explain-routing");
   assert.strictEqual(defaultResult.status, 200, "default request should succeed");
   assert.ok(typeof defaultResult.body.decision === "string" && defaultResult.body.decision.length > 0);
@@ -62,6 +66,11 @@ function performGet(port: number, path: string): Promise<{ status: number; body:
     Math.abs((customResult.body.rawView?.decision?.metrics?.focusMomentum ?? 0) - 0.3) < 1e-6,
     "focusMomentum should reflect override",
   );
+
+  const conformanceResult = await performGet(port, "/conformance/self-test?mode=storm");
+  assert.strictEqual(conformanceResult.status, 200, "self-test should succeed for storm mode");
+  assert.strictEqual(conformanceResult.body.mode, "storm");
+  assert.ok(typeof conformanceResult.body.determinismHash === "string");
 
   server.close();
 })();

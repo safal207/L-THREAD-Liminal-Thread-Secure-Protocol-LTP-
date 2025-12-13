@@ -1,13 +1,17 @@
 #!/usr/bin/env node
-import { runSelfTest } from './conformance/selfTest';
+import { resolveSelfTestMode, runSelfTest } from './conformance/selfTest';
 
 const printUsage = (): void => {
   // eslint-disable-next-line no-console
-  console.error('Usage: ltp-client self-test');
+  console.error('Usage: ltp-client self-test [--mode calm|storm|recovery]');
 };
 
 const main = (): void => {
-  const command = process.argv[2] ?? 'self-test';
+  const args = process.argv.slice(2);
+  const command = args[0] ?? 'self-test';
+  const modeFlagIndex = args.indexOf('--mode');
+  const requestedMode = modeFlagIndex >= 0 ? args[modeFlagIndex + 1] : undefined;
+  const mode = resolveSelfTestMode(requestedMode);
 
   if (command !== 'self-test') {
     printUsage();
@@ -15,7 +19,7 @@ const main = (): void => {
     return;
   }
 
-  const { report } = runSelfTest();
+  const { report } = runSelfTest({ mode });
   const output = {
     ok: report.ok,
     level: report.level,
@@ -26,6 +30,7 @@ const main = (): void => {
     emitted: report.emittedFrames,
     deduped: report.dedupedFrames,
     errors: report.errors,
+    mode: report.mode,
   };
 
   // eslint-disable-next-line no-console

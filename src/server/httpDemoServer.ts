@@ -9,6 +9,7 @@ import {
 } from "../demos/explainRoutingDemo";
 import { type FutureWeaveGraphOptions } from "../visualization/futureWeaveGraph";
 import { type TemporalOrientationView, type RoutingDecision } from "../routing/temporal-multipath";
+import { resolveSelfTestMode, runSelfTest } from "../../sdk/js/src/conformance/selfTest";
 
 export interface ExplainRoutingResponse {
   decision: string;
@@ -127,6 +128,52 @@ export function createDemoServer() {
       res.statusCode = 405;
       res.setHeader("Content-Type", "application/json");
       res.end(JSON.stringify({ error: "method_not_allowed" }));
+      return;
+    }
+
+    if (requestUrl.pathname === "/health") {
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "application/json");
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    if (requestUrl.pathname === "/conformance/self-test") {
+      try {
+        const mode = resolveSelfTestMode(requestUrl.searchParams.get("mode"));
+        const { report } = runSelfTest({ mode });
+        res.statusCode = report.ok ? 200 : 500;
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify(
+            {
+              ok: report.ok,
+              level: report.level,
+              determinismHash: report.determinismHash,
+              branches: report.branchesCount,
+              errors: report.errors,
+              mode: report.mode,
+              received: report.receivedFrames,
+              processed: report.processedFrames,
+              emitted: report.emittedFrames,
+              deduped: report.dedupedFrames,
+            },
+            null,
+            2,
+          ),
+        );
+      } catch (error) {
+        console.error("Failed to handle /conformance/self-test", error);
+        res.statusCode = 500;
+        res.setHeader("Content-Type", "application/json");
+        res.end(
+          JSON.stringify({
+            ok: false,
+            error: "internal_error",
+            message: "Failed to run LTP conformance self-test",
+          }),
+        );
+      }
       return;
     }
 
