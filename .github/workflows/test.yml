@@ -59,17 +59,15 @@ jobs:
           pnpm --filter @liminal/ltp-client test
       - name: Generate conformance self-test artifact
         shell: bash
-        working-directory: sdk/js
         run: |
           set -euxo pipefail
-          pnpm exec node dist/cli.js self-test --mode calm > ../self-test.json \
-            || (cat ../self-test.json 2>/dev/null || true; exit 1)
-          cat ../self-test.json
+          pnpm run conformance:report -- --mode calm
+          cat artifacts/conformance-report.json
       - name: Upload conformance report
         uses: actions/upload-artifact@v4
         with:
-          name: ltp-self-test-report
-          path: self-test.json
+          name: conformance-report
+          path: artifacts/conformance-report.json
 
   test-python:
     name: Test Python SDK
