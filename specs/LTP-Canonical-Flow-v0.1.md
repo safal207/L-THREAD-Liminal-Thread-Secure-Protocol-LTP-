@@ -1,6 +1,6 @@
-# LTP Canonical Flow v0.1 (Normative)
+# LTP Canonical Flow v0.1 — Status: Draft (Normative intent, Frozen for v0.1)
 
-**Status:** Draft (Normative intent)  
+**Status:** Draft (Normative intent, frozen at v0.1 for shape compatibility)
 **Depends on:** `specs/LTP-Frames-v0.1.md`, `specs/LTP-Flow-v0.1.md`
 
 ## Purpose
@@ -21,6 +21,17 @@ Canonical flow is used for:
    - ordering
 3. **Transport-agnostic:** this flow MUST be representable over WebSocket and REST.
 4. **Storage-agnostic:** no database is required to execute the flow.
+
+## Session semantics
+- **REST session:** the lifetime of a canonical session is the full HTTP request chain identified by a stable `Correlation-Id`
+  (or equivalent trace header). Retries with the **same** correlation id MUST be treated as the **same session**; servers MUST
+  return the same deterministic `route_response` payload to idempotent retried calls.
+- **WebSocket session:** the lifetime of a canonical session is the WebSocket connection identified by its connection id.
+  Reconnects with a **new** connection id start a **new** session; reconnect attempts that reuse a **previous connection id**
+  MUST be rejected to avoid ambiguity.
+- **Reconnect + duplicates:** if a client reconnects with a **new id**, the node MAY replay the last known `orientation` or
+  `focus_snapshot` for continuity but MUST NOT re-emit `route_response` without a fresh `route_request`. Duplicate frame ids
+  MUST be ignored while keeping the underlying session open.
 
 ## Canonical sequence (v0.1)
 A canonical session is a sequence of frames exchanged between:
@@ -63,7 +74,7 @@ If emitted, it MUST include:
 - `health` in `{ OK, WARN, CRITICAL }`
 - optional extended metrics (e.g. `volatility`, `depth`, `tenderness`)
 
-## Conformance checklist
+## Conformance v0.1 checklist — Status: Draft (stabilizing for v0.1 freeze)
 An implementation is canonical-flow compliant if it can:
 - complete Steps 1–5 successfully
 - produce stable branch ordering for the same input

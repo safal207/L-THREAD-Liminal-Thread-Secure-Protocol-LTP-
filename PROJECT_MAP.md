@@ -12,8 +12,8 @@ A secure, deterministic protocol stack (LTP) with specs, reference SDKs/nodes, a
 ```
 specs/
   LTP-Frames-v0.1.md (frame shapes)
-  LTP-Flow-v0.1.md (flow semantics)
-  LTP-Canonical-Flow-v0.1.md (deterministic sequence)
+  LTP-Flow-v0.1.md (Flow v0.1 semantics)
+  LTP-Canonical-Flow-v0.1.md (Canonical Flow v0.1 deterministic sequence)
   flow/ (supporting drafts)
 sdk/js/
   src/ (routing, orientation, time, frames)
@@ -33,8 +33,8 @@ scripts/
 
 ## 4. LTP Core (Frozen for v0.1)
 - `specs/LTP-Frames-v0.1.md`: authoritative frame contracts (frozen; only clarifications/bugfixes until v0.2).
-- `specs/LTP-Flow-v0.1.md`: motion/ordering rules for frames across time (frozen for v0.1).
-- `specs/LTP-Canonical-Flow-v0.1.md`: deterministic hello→heartbeat→orientation→routing reference sequence for conformance.
+- `specs/LTP-Flow-v0.1.md`: Flow v0.1 motion/ordering rules for frames across time (frozen for v0.1).
+- `specs/LTP-Canonical-Flow-v0.1.md`: Canonical Flow v0.1 deterministic hello→heartbeat→orientation→routing reference sequence for conformance (includes the Conformance v0.1 checklist).
 - `specs/LTP-Spec-v0.1.md`: consolidated spec entry point tying frames and flow together.
 - Frozen means no shape changes or new required fields until v0.2; compatibility and determinism have priority.
 
@@ -67,3 +67,13 @@ scripts/
 4) Start REST demo server: `npm run demo-server` then call `http://localhost:4000/demo/explain-routing`.
 5) Stream WS routing demo: `npm run ws-demo-server` and connect to `ws://localhost:4001/ws/orientation-demo`.
 6) Observe HUD metrics: `npm run ltp:monitor` to watch focus/mode snapshots.
+
+## 10. Golden path in 60 seconds
+```bash
+npm install
+npm run demo:canonical
+```
+Expected output (condensed):
+- Terminal log starts with `hello`/`heartbeat` frames, followed by an `orientation` snapshot.
+- A `route_request` is issued and a deterministic `route_response` is printed with ordered `branches[]`.
+- Optional `focus_snapshot` metrics appear, confirming the Canonical Flow v0.1 path end-to-end.
