@@ -5,7 +5,7 @@
       "id": "dup-1",
       "ts": 1,
       "type": "hello",
-      "payload": { "role": "client" },
+      "payload": { "role": "client", "message": "duplicate test" },
       "from": "node-a"
     },
     {

@@ -32,7 +32,7 @@ export interface OrientationPayload {
 
 export interface RouteRequestPayload {
   goal: string;
-  context: string[];
+  context?: string[];
 }
 
 export interface RouteBranch {
@@ -41,13 +41,11 @@ export interface RouteBranch {
   rationale?: string;
 }
 
+export type RouteBranchMap = Record<string, RouteBranch>;
+
 export interface RouteResponsePayload {
-  branches: {
-    primary: RouteBranch;
-    recover: RouteBranch;
-    explore: RouteBranch;
-  };
-  selection: "primary" | "recover" | "explore";
+  branches: RouteBranch[] | RouteBranchMap;
+  selection?: string;
 }
 
 export interface FocusSnapshotPayload {
@@ -110,27 +108,31 @@ const isRouteResponsePayload = (
   payload: unknown
 ): payload is RouteResponsePayload => {
   if (!isObject(payload)) return false;
-  if (!isObject(payload.branches)) return false;
-  const { branches } = payload;
-  if (
-    !isRouteBranch(branches.primary) ||
-    !isRouteBranch(branches.recover) ||
-    !isRouteBranch(branches.explore)
-  ) {
+  const { branches } = payload as { branches?: unknown };
+  const hasArrayBranches =
+    Array.isArray(branches) && branches.every((branch) => isRouteBranch(branch));
+  const hasMapBranches =
+    isObject(branches) &&
+    Object.values(branches as Record<string, unknown>).every((branch) => isRouteBranch(branch));
+
+  if (!hasArrayBranches && !hasMapBranches) {
     return false;
   }
-  return (
-    payload.selection === "primary" ||
-    payload.selection === "recover" ||
-    payload.selection === "explore"
-  );
+
+  if ("selection" in payload && payload.selection !== undefined) {
+    if (typeof payload.selection !== "string") return false;
+  }
+
+  return true;
 };
 
 const isRouteRequestPayload = (
   payload: unknown
 ): payload is RouteRequestPayload => {
   if (!isObject(payload)) return false;
-  return typeof payload.goal === "string" && isStringArray(payload.context);
+  const hasValidContext =
+    payload.context === undefined || isStringArray(payload.context);
+  return typeof payload.goal === "string" && hasValidContext;
 };
 
 const isFocusSnapshotPayload = (
