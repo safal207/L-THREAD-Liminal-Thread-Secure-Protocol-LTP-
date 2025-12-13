@@ -287,9 +287,11 @@ const validateRouteResponse = (
     state.errors.push(`route_response at position ${index} without request`);
   }
   const { branches } = frame.payload;
-  const branchCount = ['primary', 'recover', 'explore'].reduce((count, key) => {
-    return branches && (branches as Record<string, unknown>)[key] ? count + 1 : count;
-  }, 0);
+  const branchCount = Array.isArray(branches)
+    ? branches.length
+    : branches && typeof branches === 'object'
+      ? Object.keys(branches).length
+      : 0;
   state.routeResponseBranches = branchCount;
   state.emittedFrames += 1;
   if (branchCount < 2) {

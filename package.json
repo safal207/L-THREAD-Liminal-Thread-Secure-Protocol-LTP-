@@ -8,6 +8,7 @@
     "test:security": "echo \"Running security feature tests... (WIP)\"",
     "test:protocol": "echo \"Running protocol compliance tests... (WIP)\"",
     "test:conformance": "vitest run src/server/conformanceVerifier.test.ts src/server/httpConformanceVerify.integration.test.ts",
+    "test:conformance:kit": "vitest run tools/conformance-kit/tests",
     "dev:ltp-node-demo": "ts-node scripts/dev/ltp-node-demo.ts",
     "demo:story": "ts-node scripts/demo/ltp-story-demo.ts",
     "demo:future-weave": "NODE_PATH=node_modules ts-node scripts/dev/story-multipath-demo.ts",
@@ -27,7 +28,9 @@
     "test:explain-routing": "ts-node src/demos/__tests__/explainRoutingDemo.test.ts",
     "test": "vitest run",
     "test:turtle": "vitest run src/turtle/__tests__",
-    "conformance:report": "ts-node scripts/conformance/generateConformanceReport.ts"
+    "conformance:report": "ts-node scripts/conformance/generateConformanceReport.ts",
+    "ltp:conformance": "ts-node tools/conformance-kit/src/cli.ts",
+    "conformance:verify": "pnpm -w ltp:conformance verify"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
@@ -37,7 +40,8 @@
     "ws": "^8.18.3"
   },
   "workspaces": [
-    "sdk/js"
+    "sdk/js",
+    "tools/conformance-kit"
   ]
 }
 

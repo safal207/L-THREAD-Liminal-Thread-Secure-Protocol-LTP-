@@ -1,0 +1,47 @@
+{
+  "frames": [
+    {
+      "v": "0.1",
+      "id": "dup-1",
+      "ts": 1,
+      "type": "hello",
+      "payload": { "role": "client", "message": "duplicate test" },
+      "from": "node-a"
+    },
+    {
+      "v": "0.1",
+      "id": "dup-1",
+      "ts": 2,
+      "type": "heartbeat",
+      "payload": { "seq": 1 },
+      "from": "node-a"
+    },
+    {
+      "v": "0.1",
+      "id": "ori-1",
+      "ts": 3,
+      "type": "orientation",
+      "payload": { "origin": "alpha", "destination": "beta", "mode": "demo" }
+    },
+    {
+      "v": "0.1",
+      "id": "req-1",
+      "ts": 4,
+      "type": "route_request",
+      "payload": { "goal": "demo" }
+    },
+    {
+      "v": "0.1",
+      "id": "resp-1",
+      "ts": 5,
+      "type": "route_response",
+      "payload": {
+        "branches": [
+          { "path": ["alpha", "beta"], "confidence": 0.7 },
+          { "path": ["beta", "gamma"], "confidence": 0.5 }
+        ],
+        "selection": "primary"
+      }
+    }
+  ]
+}

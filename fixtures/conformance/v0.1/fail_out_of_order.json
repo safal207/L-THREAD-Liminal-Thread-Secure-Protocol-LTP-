@@ -1,0 +1,25 @@
+{
+  "frames": [
+    {
+      "v": "0.1",
+      "id": "req-early",
+      "ts": 1,
+      "type": "route_request",
+      "payload": { "goal": "rush" }
+    },
+    {
+      "v": "0.1",
+      "id": "hello-late",
+      "ts": 2,
+      "type": "hello",
+      "payload": { "role": "client", "message": "late" }
+    },
+    {
+      "v": "0.1",
+      "id": "resp-early",
+      "ts": 3,
+      "type": "route_response",
+      "payload": { "branches": [], "selection": "primary" }
+    }
+  ]
+}

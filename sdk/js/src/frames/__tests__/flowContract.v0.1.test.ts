@@ -5,7 +5,40 @@ const assert = require("node:assert/strict");
 const fs = require("fs");
 const path = require("path");
 import { buildFlowGoldenFrames } from "../../demos/flowGoldenDemo";
-import { LTPFrame, validateFrameOrThrow } from "../frameSchema";
+import {
+  LTPFrame,
+  RouteBranch,
+  RouteBranchMap,
+  validateFrameOrThrow,
+} from "../frameSchema";
+
+type Branches = RouteBranch[] | RouteBranchMap;
+
+function isBranchMap(branches: Branches): branches is RouteBranchMap {
+  return !Array.isArray(branches);
+}
+
+function branchKeyOf(branch: unknown): string | undefined {
+  if (!branch || typeof branch !== "object") return undefined;
+  const anyBranch = branch as Record<string, unknown>;
+  const candidates = ["id", "key", "name", "branch", "branchId", "slot"];
+  for (const candidate of candidates) {
+    const value = anyBranch[candidate];
+    if (typeof value === "string") return value;
+  }
+  return undefined;
+}
+
+function getBranch(branches: Branches, id: string): RouteBranch | undefined {
+  if (isBranchMap(branches)) return branches[id];
+  return branches.find((branch) => branchKeyOf(branch) === id);
+}
+
+function assertDefined<T>(value: T, message: string): asserts value is NonNullable<T> {
+  if (value === undefined || value === null) {
+    throw new Error(message);
+  }
+}
 
 function runTest(name: string, fn: () => void): void {
   Promise.resolve()
@@ -68,10 +101,16 @@ runTest("route_response branch confidences sum to 1", () => {
   assert.ok(routeResponse, "route_response frame must exist");
 
   const {
-    payload: {
-      branches: { primary, recover, explore },
-    },
+    payload: { branches },
   } = routeResponse as Extract<LTPFrame, { type: "route_response" }>;
+
+  const primary = getBranch(branches, "primary");
+  const recover = getBranch(branches, "recover");
+  const explore = getBranch(branches, "explore");
+
+  assertDefined(primary, "route_response missing 'primary' branch");
+  assertDefined(recover, "route_response missing 'recover' branch");
+  assertDefined(explore, "route_response missing 'explore' branch");
 
   const sum = primary.confidence + recover.confidence + explore.confidence;
   const epsilon = 1e-6;

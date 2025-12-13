@@ -1,0 +1,11 @@
+{
+  "name": "ltp-conformance-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "src/cli.ts",
+  "scripts": {
+    "cli": "ts-node src/cli.ts",
+    "test": "vitest run"
+  }
+}

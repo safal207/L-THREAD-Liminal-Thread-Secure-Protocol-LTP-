@@ -1,0 +1,18 @@
+{
+  "frames": [
+    {
+      "v": "0.0",
+      "id": "hello-legacy",
+      "ts": 1,
+      "type": "hello",
+      "payload": { "role": "client", "message": "legacy" }
+    },
+    {
+      "v": "0.0",
+      "id": "hb-legacy",
+      "ts": 2,
+      "type": "heartbeat",
+      "payload": { "seq": 1 }
+    }
+  ]
+}
