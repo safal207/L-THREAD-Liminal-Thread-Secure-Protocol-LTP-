@@ -28,10 +28,13 @@ Implementations MAY support:
 
 ## Flow Requirements
 An implementation MUST:
-- Accept a `hello` before any other frame on a connection/session.
+- Accept a `hello` before any other frame on a connection/session or request chain.
 - Tolerate missing optional frames without breaking the flow.
 - Preserve frame ordering per connection/session.
 - Treat silence as a signal (no forced responses for absence).
+- Ignore unknown frame types (forward-compatible), MAY log.
+- Validate protocol version `v: "0.1"` (or compatible); otherwise reject or ignore.
+- Treat `id` as unique per sender scope to avoid duplicate side effects on retries.
 
 ---
 
