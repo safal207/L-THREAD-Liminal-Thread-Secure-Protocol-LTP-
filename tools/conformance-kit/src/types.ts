@@ -1,5 +1,9 @@
 import type { FrameType } from '../../../sdk/js/src/frames/frameSchema';
 
+export type ExpectedOutcome = 'OK' | 'WARN' | 'FAIL';
+export type CaseStatus = 'OK' | 'WARN' | 'FAIL_EXPECTED' | 'FAIL_UNEXPECTED';
+export type ReportStatus = 'OK' | 'WARN' | 'FAIL';
+
 export type LTPFrameShape = {
   v?: unknown;
   id?: unknown;
@@ -27,11 +31,10 @@ export interface Issue {
   frameId?: string;
 }
 
-export type OutcomeStatus = 'OK' | 'WARN' | 'FAIL';
-
 export interface ConformanceReport {
   v: '0.1';
   ok: boolean;
+  status: ReportStatus;
   score: number;
   frameCount: number;
   passed: string[];
@@ -39,6 +42,7 @@ export interface ConformanceReport {
   errors: Issue[];
   hints: string[];
   annotations?: Record<string, unknown>;
+  file?: string;
   meta: {
     timestamp: number;
     tool: 'ltp-conformance-kit';
@@ -50,8 +54,8 @@ export interface ConformanceReport {
 
 export interface ConformanceCaseResult {
   fileName: string;
-  expected: OutcomeStatus;
-  actual: OutcomeStatus;
+  expected: ExpectedOutcome;
+  actual: CaseStatus;
   matches: boolean;
   report: ConformanceReport;
 }
@@ -67,6 +71,7 @@ export interface ConformanceReportBatch {
     passedCount: number;
     warnCount: number;
     failedCount: number;
+    expectedFailCount: number;
     unexpectedCount: number;
   };
   meta: ConformanceReport['meta'];

@@ -33,10 +33,13 @@ describe('LTP Conformance Kit verification', () => {
 
     expect(ok.report.ok).toBe(true);
     expect(ok.report.warnings).toHaveLength(0);
+    expect(ok.report.status).toBe('OK');
     expect(warn.report.ok).toBe(true);
     expect(warn.report.warnings.length).toBeGreaterThan(0);
+    expect(warn.report.status).toBe('WARN');
     expect(fail.report.ok).toBe(false);
     expect(fail.report.errors.length).toBeGreaterThan(0);
+    expect(fail.report.status).toBe('FAIL');
   });
 
   it('exposes correct exit codes from the CLI', () => {
@@ -67,7 +70,9 @@ describe('LTP Conformance Kit verification', () => {
     const { batch, exitCode } = verifyDirectoryReports(fixturesDir, { now: () => 1700000000000 });
 
     expect(batch.summary.unexpectedCount).toBe(0);
-    expect(batch.summary.failedCount).toBeGreaterThan(0);
+    expect(batch.summary.expectedFailCount).toBeGreaterThan(0);
+    const expectedFail = batch.cases.find((entry) => entry.fileName.startsWith('fail_'));
+    expect(expectedFail?.actual).toBe('FAIL_EXPECTED');
     expect(exitCode).toBe(0);
   });
 

@@ -1,4 +1,5 @@
-import { FrameType, isLTPFrame } from "../../sdk/js/src/frames/frameSchema";
+import { LTP_VERSION, isKnownFrameType } from "../../sdk/js/src/frames/protocolSurface.v0.1";
+import { isLTPFrame } from "../../sdk/js/src/frames/frameSchema";
 
 export interface VerificationResult {
   ok: boolean;
@@ -27,15 +28,6 @@ interface MinimalFrameShape {
   from?: unknown;
   to?: unknown;
 }
-
-const knownTypes: FrameType[] = [
-  "hello",
-  "heartbeat",
-  "orientation",
-  "route_request",
-  "route_response",
-  "focus_snapshot",
-];
 
 const isNonDecreasing = (current: number, previous: number | undefined): boolean => {
   if (previous === undefined) return true;
@@ -170,7 +162,7 @@ export function verifyConformance(inputFrames: unknown): ConformanceVerifyRespon
       }
     }
 
-    if (validated?.v !== "0.1") {
+    if (validated?.v !== LTP_VERSION) {
       const error = `frame ${index} has unsupported version: ${String(validated?.v)}`;
       result.errors.push(error);
       addAnnotation(meta.annotations, "error", error);
@@ -191,7 +183,7 @@ export function verifyConformance(inputFrames: unknown): ConformanceVerifyRespon
     }
 
     const typeValue = validated?.type;
-    const isKnownType = typeof typeValue === "string" && knownTypes.includes(typeValue as FrameType);
+    const isKnownType = typeof typeValue === "string" && isKnownFrameType(typeValue);
     if (!isKnownType) {
       if (typeof typeValue === "string") {
         const warning = `frame ${index} has unknown type: ${typeValue}`;
