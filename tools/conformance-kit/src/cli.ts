@@ -52,7 +52,7 @@ const verifyFile = (filePath: string, options: { outPath?: string; format?: stri
     log(`${path.basename(resolved)} -> ${formatSummary(outcome.report)} (report: ${path.relative(process.cwd(), reportPath)})`);
   }
 
-  process.exitCode = Math.max(process.exitCode ?? 0, outcome.exitCode);
+  process.exitCode = Math.max(Number(process.exitCode) || 0, outcome.exitCode);
 };
 
 const verifyDirectory = (dirPath: string, options: { outPath?: string; format?: string; strict?: boolean }) => {
@@ -116,7 +116,7 @@ const verifyDirectory = (dirPath: string, options: { outPath?: string; format?: 
     log(`saved ${reports.length} reports to ${path.relative(process.cwd(), reportPath)}`);
   }
 
-  process.exitCode = Math.max(process.exitCode ?? 0, highestExit);
+  process.exitCode = Math.max(Number(process.exitCode) || 0, highestExit);
 };
 
 const runSelfTestCommand = (options: { outPath?: string; format?: string; strict?: boolean; mode?: string }) => {
@@ -156,7 +156,7 @@ const runSelfTestCommand = (options: { outPath?: string; format?: string; strict
     log(`selftest(${mode}) -> ${formatSummary(conformance)} (report: ${path.relative(process.cwd(), reportPath)})`);
   }
 
-  process.exitCode = Math.max(process.exitCode ?? 0, exitCode);
+  process.exitCode = Math.max(Number(process.exitCode) || 0, exitCode);
 };
 
 const printHelp = (): void => {
