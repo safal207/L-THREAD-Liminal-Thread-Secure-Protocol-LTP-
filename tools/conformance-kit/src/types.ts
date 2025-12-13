@@ -27,6 +27,8 @@ export interface Issue {
   frameId?: string;
 }
 
+export type OutcomeStatus = 'OK' | 'WARN' | 'FAIL';
+
 export interface ConformanceReport {
   v: '0.1';
   ok: boolean;
@@ -46,16 +48,26 @@ export interface ConformanceReport {
   };
 }
 
+export interface ConformanceCaseResult {
+  fileName: string;
+  expected: OutcomeStatus;
+  actual: OutcomeStatus;
+  matches: boolean;
+  report: ConformanceReport;
+}
+
 export interface ConformanceReportBatch {
   v: '0.1';
   ok: boolean;
   score: number;
   reports: ConformanceReport[];
+  cases: ConformanceCaseResult[];
   summary: {
     total: number;
-    passed: number;
-    warned: number;
-    failed: number;
+    passedCount: number;
+    warnCount: number;
+    failedCount: number;
+    unexpectedCount: number;
   };
   meta: ConformanceReport['meta'];
 }

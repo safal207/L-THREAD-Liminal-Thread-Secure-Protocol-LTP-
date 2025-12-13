@@ -6,7 +6,7 @@ import kitPackage from '../package.json';
 import { clamp01 } from './utils/math';
 import { normalizeFramesFromValue, readJsonFile } from './utils/files';
 import { ConformanceReport, ConformanceReportBatch } from './types';
-import { verifyFrames, writeReport } from './verify';
+import { verifyDirectoryReports, verifyFrames, writeReport } from './verify';
 
 const DEFAULT_REPORT_PATH = path.resolve(process.cwd(), 'reports/ltp-conformance-report.json');
 const DEFAULT_BADGE_PATH = path.resolve(process.cwd(), 'reports/ltp-conformance-badge.json');
@@ -57,52 +57,7 @@ const verifyFile = (filePath: string, options: { outPath?: string; format?: stri
 
 const verifyDirectory = (dirPath: string, options: { outPath?: string; format?: string; strict?: boolean }) => {
   const resolvedDir = path.resolve(process.cwd(), dirPath);
-  const files = fs
-    .readdirSync(resolvedDir)
-    .filter((file) => file.endsWith('.json'))
-    .sort((a, b) => a.localeCompare(b));
-
-  const reports: ConformanceReport[] = [];
-  let highestExit = 0;
-
-  files.forEach((file) => {
-    const { value, inputHash } = readJsonFile(path.join(resolvedDir, file));
-    const frames = normalizeFramesFromValue(value);
-    const { report, exitCode } = verifyFrames(frames, { inputName: file, inputHash, strict: options.strict });
-    reports.push(report);
-    highestExit = Math.max(highestExit, exitCode);
-    if (options.format !== 'json') {
-      log(`${file} -> ${formatSummary(report)}`);
-    }
-  });
-
-  const summary = {
-    total: reports.length,
-    passed: reports.filter((r) => r.errors.length === 0 && r.warnings.length === 0).length,
-    warned: reports.filter((r) => r.errors.length === 0 && r.warnings.length > 0).length,
-    failed: reports.filter((r) => r.errors.length > 0).length,
-  };
-
-  const batch: ConformanceReportBatch = {
-    v: '0.1',
-    ok: summary.failed === 0,
-    score: reports.length
-      ? Number(
-          (
-            reports.reduce((total, current) => total + current.score, 0) /
-            Math.max(1, reports.length)
-          ).toFixed(3)
-        )
-      : 0,
-    reports,
-    summary,
-    meta: {
-      timestamp: Date.now(),
-      tool: 'ltp-conformance-kit',
-      toolVersion: kitPackage.version,
-      inputName: path.basename(resolvedDir),
-    },
-  };
+  const { batch, exitCode } = verifyDirectoryReports(resolvedDir, { strict: options.strict });
 
   const reportPath = path.resolve(process.cwd(), options.outPath ?? DEFAULT_REPORT_PATH);
   writeReport(reportPath, batch);
@@ -111,12 +66,20 @@ const verifyDirectory = (dirPath: string, options: { outPath?: string; format?: 
   if (options.format === 'json') {
     log(JSON.stringify(batch, null, 2));
   } else {
-    const state = summary.failed > 0 ? 'FAIL' : summary.warned > 0 ? 'WARN' : 'OK';
-    log(`summary -> ${state} score=${batch.score.toFixed(3)} errors=${summary.failed} warnings=${summary.warned}`);
-    log(`saved ${reports.length} reports to ${path.relative(process.cwd(), reportPath)}`);
+    batch.cases.forEach((entry) => {
+      log(
+        `${entry.fileName} -> expected=${entry.expected} actual=${entry.actual} ${entry.matches ? 'MATCH' : 'UNEXPECTED'} ${formatSummary(entry.report)}`,
+      );
+    });
+    const state = batch.summary.unexpectedCount > 0 ? 'UNEXPECTED' : batch.summary.failedCount > 0 ? 'FAIL' : batch.summary.warnCount > 0 ? 'WARN' : 'OK';
+    log(
+      `summary -> ${state} score=${batch.score.toFixed(3)} unexpected=${batch.summary.unexpectedCount} ` +
+        `errors=${batch.summary.failedCount} warnings=${batch.summary.warnCount}`,
+    );
+    log(`saved ${batch.reports.length} reports to ${path.relative(process.cwd(), reportPath)}`);
   }
 
-  process.exitCode = Math.max(Number(process.exitCode) || 0, highestExit);
+  process.exitCode = Math.max(Number(process.exitCode) || 0, exitCode);
 };
 
 const runSelfTestCommand = (options: { outPath?: string; format?: string; strict?: boolean; mode?: string }) => {

@@ -1,14 +1,17 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import { isLTPFrame, FrameType } from '../../../sdk/js/src/frames/frameSchema';
 import kitPackage from '../package.json';
 import { clamp01 } from './utils/math';
-import { ensureDirectory } from './utils/files';
+import { ensureDirectory, normalizeFramesFromValue, readJsonFile } from './utils/files';
 import type {
   ConformanceReport,
   ConformanceReportBatch,
+  ConformanceCaseResult,
   Issue,
   LTPFrameShape,
   NormalizedFrame,
+  OutcomeStatus,
   VerifyOutcome,
 } from './types';
 
@@ -63,6 +66,18 @@ const deriveExitCode = (report: ConformanceReport, strict?: boolean): number => 
     return strict ? 1 : 2;
   }
   return 0;
+};
+
+export const expectedFromName = (name: string): OutcomeStatus => {
+  if (name.startsWith('fail_')) return 'FAIL';
+  if (name.startsWith('warn_')) return 'WARN';
+  return 'OK';
+};
+
+export const statusFromReport = (report: ConformanceReport): OutcomeStatus => {
+  if (report.errors.length > 0) return 'FAIL';
+  if (report.warnings.length > 0) return 'WARN';
+  return 'OK';
 };
 
 export const verifyFrames = (frames: LTPFrameShape[] | null, options: VerifyOptions = {}): VerifyOutcome => {
@@ -357,4 +372,76 @@ export const writeReport = (targetPath: string, report: ConformanceReport | Conf
   ensureDirectory(targetPath);
   const serialized = `${JSON.stringify(report, null, 2)}\n`;
   fs.writeFileSync(targetPath, serialized, 'utf-8');
+};
+
+export const verifyDirectoryReports = (
+  dirPath: string,
+  options: { strict?: boolean; now?: () => number } = {},
+): { batch: ConformanceReportBatch; exitCode: number } => {
+  const files = fs
+    .readdirSync(dirPath)
+    .filter((file) => file.endsWith('.json'))
+    .sort((a, b) => a.localeCompare(b));
+
+  const cases: ConformanceCaseResult[] = files.map((file) => {
+    const { value, inputHash } = readJsonFile(path.join(dirPath, file));
+    const frames = normalizeFramesFromValue(value);
+    const expected = expectedFromName(file);
+    const { report } = verifyFrames(frames, {
+      inputName: file,
+      inputHash,
+      strict: options.strict,
+      now: options.now,
+    });
+    const actual = statusFromReport(report);
+    const matches =
+      expected === actual ||
+      (expected === 'WARN' && actual === 'OK');
+
+    return {
+      fileName: file,
+      expected,
+      actual,
+      matches,
+      report,
+    };
+  });
+
+  const unexpectedCount = cases.filter((c) => !c.matches).length;
+  const passedCount = cases.filter((c) => c.actual === 'OK').length;
+  const warnCount = cases.filter((c) => c.actual === 'WARN').length;
+  const failedCount = cases.filter((c) => c.actual === 'FAIL').length;
+
+  const positiveCases = cases.filter((c) => c.expected !== 'FAIL');
+  const score = positiveCases.length
+    ? Number(
+        (
+          positiveCases.reduce((total, current) => total + current.report.score, 0) /
+          Math.max(1, positiveCases.length)
+        ).toFixed(3),
+      )
+    : 1;
+
+  const batch: ConformanceReportBatch = {
+    v: '0.1',
+    ok: unexpectedCount === 0,
+    score,
+    reports: cases.map((c) => c.report),
+    cases,
+    summary: {
+      total: cases.length,
+      passedCount,
+      warnCount,
+      failedCount,
+      unexpectedCount,
+    },
+    meta: {
+      timestamp: options.now ? options.now() : Date.now(),
+      tool: 'ltp-conformance-kit',
+      toolVersion: kitPackage.version,
+      inputName: path.basename(dirPath),
+    },
+  };
+
+  return { batch, exitCode: unexpectedCount > 0 ? 2 : 0 };
 };

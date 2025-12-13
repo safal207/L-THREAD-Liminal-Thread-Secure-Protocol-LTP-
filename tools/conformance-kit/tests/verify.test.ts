@@ -1,9 +1,11 @@
-import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import fs from 'node:fs/promises';
+import fsSync from 'node:fs';
+import os from 'node:os';
 import { normalizeFramesFromValue, readJsonFile } from '../src/utils/files';
-import { verifyFrames } from '../src/verify';
+import { verifyDirectoryReports, verifyFrames } from '../src/verify';
 
 const fixturesDir = path.resolve(__dirname, '../../../fixtures/conformance/v0.1');
 const getFrames = (filename: string) => {
@@ -57,7 +59,26 @@ describe('LTP Conformance Kit verification', () => {
     expect(fail.status).toBe(1);
 
     [path.join(fixturesDir, 'tmp-ok.json'), path.join(fixturesDir, 'tmp-warn.json'), path.join(fixturesDir, 'tmp-fail.json')].forEach((file) => {
-      if (fs.existsSync(file)) fs.unlinkSync(file);
+      if (fsSync.existsSync(file)) fsSync.unlinkSync(file);
     });
+  });
+
+  it('treats fail_* fixtures as expected failures when verifying directories', () => {
+    const { batch, exitCode } = verifyDirectoryReports(fixturesDir, { now: () => 1700000000000 });
+
+    expect(batch.summary.unexpectedCount).toBe(0);
+    expect(batch.summary.failedCount).toBeGreaterThan(0);
+    expect(exitCode).toBe(0);
+  });
+
+  it('surfaces unexpected outcomes from directory verification', async () => {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'ltp-conformance-'));
+    const badCapturePath = path.join(tmpDir, 'ok_should_fail.json');
+    await fs.writeFile(badCapturePath, JSON.stringify([{ type: 'heartbeat' }], null, 2));
+
+    const { batch, exitCode } = verifyDirectoryReports(tmpDir, { now: () => 1700000000000 });
+
+    expect(batch.summary.unexpectedCount).toBe(1);
+    expect(exitCode).toBe(2);
   });
 });
