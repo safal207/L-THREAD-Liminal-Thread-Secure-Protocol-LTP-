@@ -1,13 +1,9 @@
-export type FrameType =
-  | "hello"
-  | "heartbeat"
-  | "orientation"
-  | "route_request"
-  | "route_response"
-  | "focus_snapshot";
+import { LTP_VERSION, isKnownFrameType, type FrameTypeV0_1 } from "./protocolSurface.v0.1";
+
+export type FrameType = FrameTypeV0_1;
 
 export interface BaseFrame {
-  v: "0.1";
+  v: typeof LTP_VERSION;
   id: string;
   ts: number;
   type: FrameType;
@@ -147,13 +143,17 @@ const isFocusSnapshotPayload = (
 
 export const isLTPFrame = (frame: unknown): frame is LTPFrame => {
   if (!isObject(frame)) return false;
-  if (frame.v !== "0.1") return false;
+  if (frame.v !== LTP_VERSION) return false;
   if (typeof frame.id !== "string" || frame.id.length === 0) return false;
   if (!isNumber(frame.ts)) return false;
   if (typeof frame.type !== "string") return false;
   if (!("payload" in frame)) return false;
 
-  switch (frame.type) {
+  const frameType = frame.type;
+
+  if (!isKnownFrameType(frameType)) return false;
+
+  switch (frameType) {
     case "hello":
       return isHelloPayload(frame.payload);
     case "heartbeat":

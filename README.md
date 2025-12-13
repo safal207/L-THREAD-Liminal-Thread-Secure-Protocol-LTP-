@@ -3,6 +3,44 @@
 **Version:** 0.6.0-alpha.3
 **Status:** Production-Ready (Enterprise) | Security Hardened
 
+## What is LTP
+
+L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving context, intent, and inner state between LIMINAL nodes and clients. v0.1 is frozen as a small, deterministic frame surface so demos, SDKs, and conformance tools stay in lockstep.
+
+## v0.1 protocol surface (frozen)
+
+- Version: `0.1`
+- Frames: `hello`, `heartbeat`, `orientation`, `route_request`, `route_response`, `focus_snapshot`
+- Guardrails: known type check, required `id / ts / payload`, payload must be an object, unknown types logged as warnings.
+
+## Canonical flow (reference)
+
+1. `hello` (client → server)
+2. `heartbeat`
+3. `orientation`
+4. `route_request`
+5. `route_response` with branches: `primary`, `recover`, `explore` (array or map accepted; normalized internally)
+
+## Conformance kit (v0.1)
+
+- Expected-negative fixtures: `ok_*` must pass, `warn_*` should warn (but not fail), `fail_*` are expected failures.
+- Badge + report: writes JSON to `reports/ci-report.json` and badge JSON alongside.
+- Commands:
+  - `pnpm -w ltp:conformance verify fixtures/conformance/v0.1/ok_basic_flow.json`
+  - `pnpm -w ltp:conformance verify:dir fixtures/conformance/v0.1 --out reports/ci-report.json`
+  - `pnpm -w ltp:conformance selftest --mode calm`
+
+## Run the canonical demo
+
+- `pnpm -w demo:canonical-v0.1`
+- Outputs: frame timeline, normalized routing branches with confidences, short explainability factors.
+
+## Roadmap (v0.2 preview)
+
+- Broader routing semantics (without adding new v0.1 frame types)
+- Optional richer explainability tags
+- Interop harness expansion; no promises beyond deterministic v0.1 support
+
 ## Overview
 
 L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the LIMINAL ecosystem. It serves as a "liminal thread" - a protected communication channel between human devices and LIMINAL OS that preserves context, intent, and inner state throughout the interaction.

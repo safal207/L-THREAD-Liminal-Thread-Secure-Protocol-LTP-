@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { isLTPFrame, FrameType } from '../../../sdk/js/src/frames/frameSchema';
+import { FRAME_TYPES_V0_1, LTP_VERSION, isKnownFrameType } from '../../../sdk/js/src/frames/protocolSurface.v0.1';
+import { isLTPFrame } from '../../../sdk/js/src/frames/frameSchema';
 import kitPackage from '../package.json';
 import { clamp01 } from './utils/math';
 import { ensureDirectory, normalizeFramesFromValue, readJsonFile } from './utils/files';
@@ -11,11 +12,11 @@ import type {
   Issue,
   LTPFrameShape,
   NormalizedFrame,
-  OutcomeStatus,
+  ExpectedOutcome,
+  CaseStatus,
+  ReportStatus,
   VerifyOutcome,
 } from './types';
-
-const knownTypes: FrameType[] = ['hello', 'heartbeat', 'orientation', 'route_request', 'route_response', 'focus_snapshot'];
 
 interface VerifyOptions {
   inputName?: string;
@@ -68,13 +69,13 @@ const deriveExitCode = (report: ConformanceReport, strict?: boolean): number => 
   return 0;
 };
 
-export const expectedFromName = (name: string): OutcomeStatus => {
+export const expectedFromName = (name: string): ExpectedOutcome => {
   if (name.startsWith('fail_')) return 'FAIL';
   if (name.startsWith('warn_')) return 'WARN';
   return 'OK';
 };
 
-export const statusFromReport = (report: ConformanceReport): OutcomeStatus => {
+export const statusFromReport = (report: ConformanceReport): ReportStatus => {
   if (report.errors.length > 0) return 'FAIL';
   if (report.warnings.length > 0) return 'WARN';
   return 'OK';
@@ -85,6 +86,7 @@ export const verifyFrames = (frames: LTPFrameShape[] | null, options: VerifyOpti
   const baseReport: ConformanceReport = {
     v: '0.1',
     ok: true,
+    status: 'OK',
     score: 1,
     frameCount: Array.isArray(frames) ? frames.length : 0,
     passed: [],
@@ -92,6 +94,7 @@ export const verifyFrames = (frames: LTPFrameShape[] | null, options: VerifyOpti
     errors: [],
     hints: [],
     annotations: options.annotations,
+    file: options.inputName,
     meta: {
       timestamp,
       tool: 'ltp-conformance-kit',
@@ -133,7 +136,7 @@ export const verifyFrames = (frames: LTPFrameShape[] | null, options: VerifyOpti
       return;
     }
 
-    if (normalized.v !== '0.1') {
+    if (normalized.v !== LTP_VERSION) {
       addIssue(baseReport.errors, {
         code: 'ltp.version.unsupported',
         message: `frame ${index} has unsupported version ${String(normalized.v)}`,
@@ -206,11 +209,11 @@ export const verifyFrames = (frames: LTPFrameShape[] | null, options: VerifyOpti
       });
     }
 
-    const isKnownType = knownTypes.includes(normalized.type as FrameType);
+    const isKnownType = isKnownFrameType(normalized.type as string);
     if (!isKnownType) {
       addIssue(baseReport.warnings, {
         code: 'ltp.type.unknown',
-        message: `frame ${index} has unknown type ${normalized.type}`,
+        message: `frame ${index} has unknown type ${normalized.type}; expected one of ${FRAME_TYPES_V0_1.join(', ')}`,
         at: index,
         frameId,
       });
@@ -353,6 +356,7 @@ export const verifyFrames = (frames: LTPFrameShape[] | null, options: VerifyOpti
   }
 
   baseReport.ok = baseReport.errors.length === 0;
+  baseReport.status = statusFromReport(baseReport);
   const errorPenalty = baseReport.errors.length * 0.2;
   const warningPenalty = baseReport.warnings.length * 0.05;
   baseReport.score = clamp01(1 - errorPenalty - warningPenalty);
@@ -393,10 +397,18 @@ export const verifyDirectoryReports = (
       strict: options.strict,
       now: options.now,
     });
-    const actual = statusFromReport(report);
+    const baseStatus = statusFromReport(report);
+    const actual: CaseStatus =
+      baseStatus === 'FAIL'
+        ? expected === 'FAIL'
+          ? 'FAIL_EXPECTED'
+          : 'FAIL_UNEXPECTED'
+        : baseStatus;
+
     const matches =
-      expected === actual ||
-      (expected === 'WARN' && actual === 'OK');
+      (expected === 'FAIL' && baseStatus === 'FAIL') ||
+      (expected === 'WARN' && (baseStatus === 'WARN' || baseStatus === 'OK')) ||
+      (expected === 'OK' && baseStatus === 'OK');
 
     return {
       fileName: file,
@@ -410,7 +422,8 @@ export const verifyDirectoryReports = (
   const unexpectedCount = cases.filter((c) => !c.matches).length;
   const passedCount = cases.filter((c) => c.actual === 'OK').length;
   const warnCount = cases.filter((c) => c.actual === 'WARN').length;
-  const failedCount = cases.filter((c) => c.actual === 'FAIL').length;
+  const expectedFailCount = cases.filter((c) => c.actual === 'FAIL_EXPECTED').length;
+  const failedCount = cases.filter((c) => c.actual === 'FAIL_UNEXPECTED').length;
 
   const positiveCases = cases.filter((c) => c.expected !== 'FAIL');
   const score = positiveCases.length
@@ -433,6 +446,7 @@ export const verifyDirectoryReports = (
       passedCount,
       warnCount,
       failedCount,
+      expectedFailCount,
       unexpectedCount,
     },
     meta: {

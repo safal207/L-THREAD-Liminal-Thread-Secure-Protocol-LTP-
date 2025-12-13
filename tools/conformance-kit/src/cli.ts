@@ -71,10 +71,19 @@ const verifyDirectory = (dirPath: string, options: { outPath?: string; format?: 
         `${entry.fileName} -> expected=${entry.expected} actual=${entry.actual} ${entry.matches ? 'MATCH' : 'UNEXPECTED'} ${formatSummary(entry.report)}`,
       );
     });
-    const state = batch.summary.unexpectedCount > 0 ? 'UNEXPECTED' : batch.summary.failedCount > 0 ? 'FAIL' : batch.summary.warnCount > 0 ? 'WARN' : 'OK';
+    const state =
+      batch.summary.unexpectedCount > 0
+        ? 'UNEXPECTED'
+        : batch.summary.failedCount > 0
+          ? 'FAIL'
+          : batch.summary.warnCount > 0
+            ? 'WARN'
+            : batch.summary.expectedFailCount > 0
+              ? 'FAIL_EXPECTED'
+              : 'OK';
     log(
       `summary -> ${state} score=${batch.score.toFixed(3)} unexpected=${batch.summary.unexpectedCount} ` +
-        `errors=${batch.summary.failedCount} warnings=${batch.summary.warnCount}`,
+        `errors=${batch.summary.failedCount} expected_failures=${batch.summary.expectedFailCount} warnings=${batch.summary.warnCount}`,
     );
     log(`saved ${batch.reports.length} reports to ${path.relative(process.cwd(), reportPath)}`);
   }
