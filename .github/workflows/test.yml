@@ -7,6 +7,18 @@ on:
     branches: [ main, develop ]
 
 jobs:
+  docs-hygiene:
+    name: Docs Hygiene Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Check for hidden Unicode characters
+        run: |
+          ./scripts/check-no-bidi.mjs
+
   verify-types:
     name: Verify Cross-SDK Type Consistency
     runs-on: ubuntu-latest
