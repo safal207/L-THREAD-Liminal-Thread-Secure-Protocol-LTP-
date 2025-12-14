@@ -1,0 +1,54 @@
+name: RFC Proposal
+description: Propose a new idea for the Liminal Thread Protocol.
+title: "[RFC Proposal]: "
+labels: ["rfc-proposal", "discussion"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for your interest in improving LTP! This template will help you structure your idea.
+        Please read the [RFC Process](./governance/rfcs/PROCESS.md) before submitting.
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem are you trying to solve? Why is this change important? What are the primary use cases?
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary of Proposal
+      description: Provide a high-level summary of your proposed change. How does it work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Backwards Compatibility
+      description: How does this proposal impact backward compatibility? If it introduces a breaking change, please provide a strong justification and a migration strategy.
+    validations:
+      required: true
+
+  - type: textarea
+    id: security
+    attributes:
+      label: Security Considerations
+      description: What are the security implications of this proposal? Does it introduce new attack surfaces? How will they be mitigated?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: conformance-impact
+    attributes:
+      label: Conformance Impact
+      description: Does this proposal affect the LTP Core protocol and require changes to the conformance test suite?
+      options:
+        - "Yes"
+        - "No"
+        - "Unsure"
+    validations:
+      required: true
