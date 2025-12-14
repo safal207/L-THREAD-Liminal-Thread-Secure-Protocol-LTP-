@@ -22,13 +22,13 @@ This specification does not grant authority to any single organization, node, or
 - **Advisory Board:** issues non-binding guidance, reviews alignment with neutrality, and provides annual retrospectives.
 
 ## Process Coupling
-- Protocol changes follow [`governance/RFC-Process.md`](./RFC-Process.md) with explicit compatibility and conformance impact statements.
+- Protocol changes follow [`governance/rfcs/PROCESS.md`](./rfcs/PROCESS.md) with explicit compatibility and conformance impact statements.
 - Version policy is tracked in [`governance/LTP-Versioning.md`](./LTP-Versioning.md) to ensure market stability.
 - Neutrality guarantees are codified in [`governance/LTP-Neutrality.md`](./LTP-Neutrality.md) and apply to any hosted service or product claiming LTP compatibility.
 
 ## Enforcement
 - Conformance kits and public fixtures are the first line of governance enforcement.
-- Disagreements are logged per [`governance/Decision-Process.md`](./Decision-Process.md); silence is a signal, but documented dissent is preserved.
+- Decisions are logged per [`governance/adr/PROCESS.md`](./adr/PROCESS.md); silence is a signal, but documented dissent is preserved.
 - Forks are permitted when necessary; fragmentation is discouraged via compatibility profiles and shared fixtures.
 
 ## Commitments
