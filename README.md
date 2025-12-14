@@ -105,19 +105,17 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [Status](./STATUS.md) - Protocol maturity and compatibility policy
 - Governance / RFC Process → [governance/README.md](./governance/README.md)
 
-## Governance & Standardization
+## Protocol Stability & Governance
 
-LTP is governed through an open RFC process, a frozen minimal core, and an advisory board model designed to preserve neutrality, stability, and long-term evolution.
+> “LTP Core v0.1 is frozen and governed via an open RFC process.”
 
-See:
-- [governance/LTP-Governance.md](./governance/LTP-Governance.md)
-- [governance/rfcs/PROCESS.md](./governance/rfcs/PROCESS.md)
-- [governance/rfcs/RFC_TEMPLATE.md](./governance/rfcs/RFC_TEMPLATE.md)
-- [governance/adr/PROCESS.md](./governance/adr/PROCESS.md)
-- [governance/adr/ADR_TEMPLATE.md](./governance/adr/ADR_TEMPLATE.md)
-- [governance/advisory-board/CHARTER.md](./governance/advisory-board/CHARTER.md)
+LTP is governed through a transparent RFC process to ensure stability and predictability. The protocol's evolution is managed through formal documentation, clear release policies, and a commitment to backward compatibility. This structure provides a reliable foundation for enterprise contracts, SDK development, and ecosystem growth.
 
-LTP Flow v0.1 is the connective tissue for how frames travel, branch, and survive reconnects without assuming storage or ML; it keeps routing explainable while letting silence and load shape the rhythm. Read it as a living standard alongside the Frames spec to orient any client, node, or HUD quickly.
+See the following for more details:
+- **[RFC-0001: LTP Core v0.1 (Frozen)](./governance/rfcs/RFC-0001-LTP-Core-v0.1.md)**: The foundational document that freezes the v0.1 core.
+- **[Release Policy](./governance/RELEASE_POLICY.md)**: Rules for versioning, releases, and compatibility.
+- **[RFC Process](./governance/rfcs/PROCESS.md)**: The process for proposing and accepting changes.
+- **[Full Governance Documentation](./governance/README.md)**: An overview of the entire governance model.
 
 ### 30s Flow diagram (draft)
 
