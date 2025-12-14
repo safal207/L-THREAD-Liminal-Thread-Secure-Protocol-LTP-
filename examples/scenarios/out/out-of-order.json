@@ -1,0 +1,9 @@
+{
+  "description": "route_request is emitted before hello completes.",
+  "expected": "FAIL in conformance kit",
+  "frames": [
+    { "v": "0.1", "id": "req-ooo", "ts": 1730000001060, "type": "route_request", "payload": { "goal": "skip hello" } },
+    { "v": "0.1", "id": "hello-ooo", "ts": 1730000001075, "type": "hello", "payload": { "role": "client", "message": "late hello" } },
+    { "v": "0.1", "id": "hb-ooo", "ts": 1730000001090, "type": "heartbeat", "payload": { "seq": 1 } }
+  ]
+}
