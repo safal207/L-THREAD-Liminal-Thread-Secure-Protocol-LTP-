@@ -1,10 +1,10 @@
 # LTP Advisory Board
 
-This document outlines the purpose, membership, and operating model of the LTP Advisory Board.
+## Role: Strategic Guidance, Not Control
 
-## Purpose
+The LTP Advisory Board is a small group of distinguished, independent experts from across the industry. Their role is to provide strategic, non-binding guidance to the LTP Maintainers on high-level technical direction, security landscape, and long-term ecosystem health.
 
-The Advisory Board serves as a source of independent, expert guidance for the LTP Maintainers. Its primary role is to ensure the protocol's long-term health, neutrality, and strategic alignment with the broader technology landscape. The board's influence is purely advisory; it does not have direct control over the project.
+Crucially, the Advisory Board has **no direct authority or veto power** over the RFC process. Its influence is derived solely from the weight and wisdom of its advice. This separation ensures that the board serves as a source of credibility and strategic insight, without compromising the open, community-driven nature of the governance model.
 
 ## Membership Criteria
 
@@ -16,12 +16,12 @@ Members are invited by the LTP Maintainers based on their expertise and reputati
 - **Developer Experience (DX):** A strong background in building and advocating for developer-centric tools and APIs.
 - **Standards Bodies:** Experience working with formal standards organizations (e.g., IETF, W3C).
 
-## Expectations
+## Membership and Process
 
-- **Provide Strategic Review:** Offer feedback on high-impact RFCs, particularly those with long-term architectural or security implications.
-- **Maintain Neutrality:** Help ensure that the protocol does not become biased toward any single vendor or implementation.
-- **Act as Ambassadors:** Optionally, represent LTP in public forums and help build connections with other standards bodies and communities.
-- **Time Commitment:** Participate in periodic (e.g., quarterly) reviews and be available for occasional ad-hoc discussions.
+-   **Invitation:** Members are invited by a unanimous decision of the LTP Maintainers.
+-   **Term:** Advisors serve renewable two-year terms to ensure a regular influx of fresh perspectives.
+-   **Meetings:** The board meets quarterly with the Maintainers to discuss the protocol's roadmap, major RFCs, and the broader technology landscape.
+-   **Transparency:** The list of board members is public. Summaries of advisory discussions may be published, respecting confidentiality where necessary.
 
 ## Placeholder Seats
 

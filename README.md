@@ -112,7 +112,8 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 LTP is governed through a transparent RFC process to ensure stability and predictability. The protocol's evolution is managed through formal documentation, clear release policies, and a commitment to backward compatibility. This structure provides a reliable foundation for enterprise contracts, SDK development, and ecosystem growth.
 
 See the following for more details:
-- **[RFC-0001: LTP Core v0.1 (Frozen)](./governance/rfcs/RFC-0001-LTP-Core-v0.1.md)**: The foundational document that freezes the v0.1 core.
+- **[RFC-0001: Orientation over Answers](./governance/rfcs/RFC-0001-Orientation-over-Answers.md)**: The foundational principle of the protocol.
+- **[RFC-0002: LTP Core v0.1 (Frozen)](./governance/rfcs/RFC-0002-LTP-Core-v0.1.md)**: The technical specification that freezes the v0.1 core.
 - **[Release Policy](./governance/RELEASE_POLICY.md)**: Rules for versioning, releases, and compatibility.
 - **[RFC Process](./governance/rfcs/PROCESS.md)**: The process for proposing and accepting changes.
 - **[Full Governance Documentation](./governance/README.md)**: An overview of the entire governance model.
