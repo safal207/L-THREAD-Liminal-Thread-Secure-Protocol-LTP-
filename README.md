@@ -121,7 +121,7 @@ See the following for more details:
 
 All substantive changes to LTP are managed through a transparent, community-driven RFC (Request for Comments) process. This ensures that the protocol evolves in a stable, predictable, and collaborative manner.
 
-- **To propose a change,** open an [RFC Proposal issue](https://github.com/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/issues/new?template=rfc-proposal.yml).
+- **To propose a change,** open an [RFC Proposal issue](/issues/new?template=rfc-proposal.yml).
 - **To learn about the process,** read the [LTP Governance](./governance/GOVERNANCE.md) and [RFC Process](./governance/rfcs/PROCESS.md) documents.
 
 ### 30s Flow diagram (draft)
