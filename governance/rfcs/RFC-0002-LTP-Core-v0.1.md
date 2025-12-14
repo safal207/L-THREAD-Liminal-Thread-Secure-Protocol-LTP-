@@ -1,6 +1,6 @@
-# RFC-0001: LTP Core v0.1
+# RFC-0002: LTP Core v0.1
 
-- **RFC ID:** 0001
+- **RFC ID:** 0002
 - **Status:** Draft
 - **Owner:** @-
 - **Reviewers:** @-

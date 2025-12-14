@@ -1,6 +1,17 @@
-# LTP Governance
+# LTP Governance Model
 
-This document outlines the governance model for the Liminal Thread Protocol (LTP). It defines roles, responsibilities, and the decision-making process to ensure the protocol's long-term stability, neutrality, and evolution.
+## Philosophy: Stewardship, Not Ownership
+
+The Liminal Thread Protocol (LTP) is intended to be a neutral, open standard for the entire industry. As such, its governance is founded on the principle of **stewardship, not ownership**. No single company or individual owns LTP. Instead, a group of stewards (Maintainers, RFC Editors, and Advisors) is entrusted with guiding its evolution in a way that serves the entire ecosystem, not just the interests of a single party.
+
+This model is inspired by the successful governance of foundational internet technologies and open-source projects like those managed by the IETF, CNCF, and the Rust Foundation.
+
+## Core Tenets
+
+1.  **Open Participation:** Anyone can contribute to LTP by proposing RFCs, participating in discussions, and reviewing changes.
+2.  **Transparent Decision-Making:** All decisions regarding the protocol's evolution are made publicly through the RFC process.
+3.  **Conservative Pace:** Stability is the most critical feature of a protocol. The governance model is designed to favor slow, deliberate, and backward-compatible changes.
+4.  **Separation of Concerns:** There is a clear and intentional separation between the protocol specification, the software that implements it, and any commercial services built upon it.
 
 ## Roles and Responsibilities
 
