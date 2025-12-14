@@ -104,6 +104,15 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
 - [Status](./STATUS.md) - Protocol maturity and compatibility policy
 
+## Governance & Standardization
+
+LTP is governed through an open RFC process, a frozen minimal core, and an advisory board model designed to preserve neutrality, stability, and long-term evolution.
+
+See:
+- [governance/LTP-Governance.md](./governance/LTP-Governance.md)
+- [governance/RFC-Process.md](./governance/RFC-Process.md)
+- [governance/Advisory-Board.md](./governance/Advisory-Board.md)
+
 LTP Flow v0.1 is the connective tissue for how frames travel, branch, and survive reconnects without assuming storage or ML; it keeps routing explainable while letting silence and load shape the rhythm. Read it as a living standard alongside the Frames spec to orient any client, node, or HUD quickly.
 
 ### 30s Flow diagram (draft)
