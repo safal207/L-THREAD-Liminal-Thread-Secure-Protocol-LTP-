@@ -99,6 +99,10 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [Contributing Guide](./CONTRIBUTING.md) - How to contribute to LTP
 - [Changelog](./CHANGELOG.md) - Version history and changes
 - [Security Policy](./.github/SECURITY.md) - Security reporting and best practices
+- [LTP Adoption Guide](./docs/LTP-Adoption-Guide.md) - 30-minute evaluation flow (read → run → verify → decide)
+- [LTP Positioning](./docs/LTP-Positioning.md) - What LTP is and is not
+- [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
+- [Status](./STATUS.md) - Protocol maturity and compatibility policy
 
 LTP Flow v0.1 is the connective tissue for how frames travel, branch, and survive reconnects without assuming storage or ML; it keeps routing explainable while letting silence and load shape the rhythm. Read it as a living standard alongside the Frames spec to orient any client, node, or HUD quickly.
 
