@@ -13,6 +13,9 @@ Liminal Thread Protocol (LTP) governance establishes a stable core, additive evo
 - **Explainability over Intelligence.** Protocol state is observable and reasoned about; opaque or probabilistic behaviors are discouraged in the core.
 - **Governance over Authority.** Decisions are documented, consensus-driven, and appealable through the RFC process rather than centralized mandates.
 
+## Non-Authority Principle
+This specification does not grant authority to any single organization, node, or vendor. Governance processes are intended to coordinate evolution, not to control implementations.
+
 ## Governance Bodies
 - **Contributors & Implementers:** propose RFCs, run conformance kits, and operate nodes.
 - **Maintainers:** curate repos, apply RFC decisions, and guard protocol invariants.
