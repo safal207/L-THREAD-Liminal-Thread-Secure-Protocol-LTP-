@@ -1,0 +1,9 @@
+{
+  "description": "Two frames share the same identifier within one flow.",
+  "expected": "FAIL in conformance kit",
+  "frames": [
+    { "v": "0.1", "id": "dup-001", "ts": 1730000001015, "type": "hello", "payload": { "role": "client", "message": "dup id" } },
+    { "v": "0.1", "id": "dup-001", "ts": 1730000001030, "type": "heartbeat", "payload": { "seq": 1 } },
+    { "v": "0.1", "id": "ori-dup", "ts": 1730000001045, "type": "orientation", "payload": { "origin": "x", "destination": "y", "mode": "demo" } }
+  ]
+}

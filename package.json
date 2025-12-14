@@ -17,6 +17,7 @@
     "demo:canonical": "ts-node examples/canonical-flow.ts",
     "demo:explain-routing": "ts-node src/demos/explainRoutingDemo.ts",
     "demo:canonical-v0.1": "ts-node src/demos/canonicalFlowDemo.v0.1.ts",
+    "demo:scenarios": "ts-node examples/scenarios/runScenarios.ts",
     "demo:all": "pnpm -w demo:canonical-v0.1",
     "demo-server": "ts-node ./src/server/httpDemoServer.ts",
     "ws-demo-server": "ts-node ./src/server/wsDemoServer.ts",

@@ -1,0 +1,8 @@
+{
+  "description": "Client speaks an unsupported protocol version.",
+  "expected": "FAIL in conformance kit",
+  "frames": [
+    { "v": "9.9", "id": "hello-wrong", "ts": 1730000001105, "type": "hello", "payload": { "role": "client", "message": "wrong version" } },
+    { "v": "9.9", "id": "hb-wrong", "ts": 1730000001120, "type": "heartbeat", "payload": { "seq": 1, "status": "ok" } }
+  ]
+}
