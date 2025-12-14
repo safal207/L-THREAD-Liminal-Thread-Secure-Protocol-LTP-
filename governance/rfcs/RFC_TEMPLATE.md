@@ -9,27 +9,31 @@
 > Keep it short, additive, and explicit about interoperability.
 
 ## Summary
-One paragraph on the change and who it serves.
+A brief, one-paragraph summary of the change and its purpose.
 
-## Problem Statement
-What is broken or missing? Why now?
+## Motivation
+What problem is this RFC solving? Why is this change necessary now? What use cases does it support?
 
-## Proposal
-What is being changed? Include diagrams or examples if needed.
+## Detailed Design / Specification
+This is the core of the RFC. Describe the change in enough detail that it can be implemented cleanly. This may include:
+- New algorithms, data structures, or frame types.
+- Specific API changes (if applicable).
+- Diagrams, examples, and formal specifications.
 
-## Compatibility / Interop Impact
-- Backwards/forwards compatibility expectations.
-- Negotiation, defaults, and rollout expectations.
-- Impact on existing nodes/SDKs/operators.
-
-## Conformance Impact
-Tests, fixtures, and tooling updates required for acceptance.
+## Backwards Compatibility
+How does this change impact existing clients, nodes, and the ecosystem? All RFCs must address this. Breaking changes require an extremely strong motivation and a detailed migration plan.
 
 ## Security Considerations
-Threats, mitigations, and disclosure/operational notes.
+What are the security implications of this change? Does it introduce new attack surfaces? How are these risks mitigated? All RFCs must address this.
 
-## Alternatives Considered
-Brief list of other approaches and why they were rejected.
+## Test Vectors / Conformance Impact
+What specific test cases or conformance fixtures are required to validate this change? For changes to the LTP Core, this section is mandatory and must be detailed.
 
 ## Rollout Plan
-Milestones, telemetry/validation, and exit criteria for general availability.
+How will this change be rolled out to the ecosystem? This might include stages (e.g., alpha, beta, stable), feature flags, or coordination with key ecosystem partners.
+
+## Alternatives Considered
+What alternative designs were considered, and why were they rejected?
+
+## References
+Links to related RFCs, ADRs, external research, or other relevant documents.
