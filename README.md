@@ -102,6 +102,7 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [LTP Adoption Guide](./docs/LTP-Adoption-Guide.md) - 30-minute evaluation flow (read → run → verify → decide)
 - [LTP THINKS](./specs/LTP-THINKS-v0.1.md) - The core philosophy and boundaries of the protocol. **Start here.**
 - [LTP Positioning](./docs/vision/LTP-Positioning.md) - What LTP is and is not
+- [LTP Economics & Market Roles](./economics/LTP-Economics-and-Market-Roles-v0.1.md) - How value is created around the protocol.
 - [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
 - [LTP Adoption & Certification Levels](./specs/LTP-ADOPTION-v0.1.md) - Defines adoption levels for the ecosystem.
 - [Status](./STATUS.md) - Protocol maturity and compatibility policy
