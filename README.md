@@ -99,6 +99,7 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [Contributing Guide](./CONTRIBUTING.md) - How to contribute to LTP
 - [Changelog](./CHANGELOG.md) - Version history and changes
 - [Security Policy](./.github/SECURITY.md) - Security reporting and best practices
+- [LTP Adoption Playbook](./adoption/LTP-Adoption-Playbook-v0.1.md) - How to adopt LTP without replacing existing systems.
 - [LTP Adoption Guide](./docs/LTP-Adoption-Guide.md) - 30-minute evaluation flow (read → run → verify → decide)
 - [LTP THINKS](./specs/LTP-THINKS-v0.1.md) - The core philosophy and boundaries of the protocol. **Start here.**
 - [LTP vs Existing Paradigms](./positioning/LTP-vs-Existing-Paradigms-v0.1.md) - How LTP differs from ML, Web3, SaaS.
