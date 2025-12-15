@@ -105,15 +105,7 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
 - [LTP Adoption & Certification Levels](./specs/LTP-ADOPTION-v0.1.md) - Defines adoption levels for the ecosystem.
 - [Status](./STATUS.md) - Protocol maturity and compatibility policy
-- Governance / RFC Process → [governance/README.md](./governance/README.md)
-
-## Governance
-
-LTP is an open protocol with a lightweight, process-oriented governance model designed for stability and vendor neutrality.
-
-- **[GOVERNANCE.md](./GOVERNANCE.md)**: High-level principles of the LTP initiative.
-- **[specs/LTP-Governance-v0.1.md](./specs/LTP-Governance-v0.1.md)**: The formal governance model.
-- **[specs/LTP-RFC-Process.md](./specs/LTP-RFC-Process.md)**: The process for proposing and accepting changes.
+- [LTP Governance & RFC Process](./governance/LTP-Governance-and-RFC-v0.1.md) - How the protocol evolves.
 
 ### 30s Flow diagram (draft)
 

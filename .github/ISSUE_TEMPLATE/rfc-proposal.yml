@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thank you for your interest in improving LTP! This template will help you structure your idea.
-        Please read the [RFC Process](./specs/LTP-RFC-Process.md) before submitting.
+        Please read the [RFC Process](./governance/LTP-Governance-and-RFC-v0.1.md) before submitting.
 
   - type: textarea
     id: motivation
