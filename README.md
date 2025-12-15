@@ -105,25 +105,13 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [Status](./STATUS.md) - Protocol maturity and compatibility policy
 - Governance / RFC Process → [governance/README.md](./governance/README.md)
 
-## Protocol Stability & Governance
+## Governance
 
-> “LTP Core v0.1 is frozen and governed via an open RFC process.”
+LTP is an open protocol with a lightweight, process-oriented governance model designed for stability and vendor neutrality.
 
-LTP is governed through a transparent RFC process to ensure stability and predictability. The protocol's evolution is managed through formal documentation, clear release policies, and a commitment to backward compatibility. This structure provides a reliable foundation for enterprise contracts, SDK development, and ecosystem growth.
-
-See the following for more details:
-- **[RFC-0001: Orientation over Answers](./governance/rfcs/RFC-0001-Orientation-over-Answers.md)**: The foundational principle of the protocol.
-- **[RFC-0002: LTP Core v0.1 (Frozen)](./governance/rfcs/RFC-0002-LTP-Core-v0.1.md)**: The technical specification that freezes the v0.1 core.
-- **[Release Policy](./governance/RELEASE_POLICY.md)**: Rules for versioning, releases, and compatibility.
-- **[RFC Process](./governance/rfcs/PROCESS.md)**: The process for proposing and accepting changes.
-- **[Full Governance Documentation](./governance/README.md)**: An overview of the entire governance model.
-
-## How Changes Happen
-
-All substantive changes to LTP are managed through a transparent, community-driven RFC (Request for Comments) process. This ensures that the protocol evolves in a stable, predictable, and collaborative manner.
-
-- **To propose a change,** open an [RFC Proposal issue](/issues/new?template=rfc-proposal.yml).
-- **To learn about the process,** read the [LTP Governance](./governance/GOVERNANCE.md) and [RFC Process](./governance/rfcs/PROCESS.md) documents.
+- **[GOVERNANCE.md](./GOVERNANCE.md)**: High-level principles of the LTP initiative.
+- **[specs/LTP-Governance-v0.1.md](./specs/LTP-Governance-v0.1.md)**: The formal governance model.
+- **[specs/LTP-RFC-Process.md](./specs/LTP-RFC-Process.md)**: The process for proposing and accepting changes.
 
 ### 30s Flow diagram (draft)
 
