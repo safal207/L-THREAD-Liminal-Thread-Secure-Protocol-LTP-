@@ -1,233 +1,237 @@
-# LTP Governance & RFC Process v0.1
+# LTP Governance & RFC Lifecycle v0.1
 
-## How the Liminal Thread Protocol Evolves
+## How Liminal Thread Protocol Evolves Without Losing Its Soul
 
 ### Purpose
 
-This document defines the governance model and RFC (Request for Comments) process for the Liminal Thread Protocol (LTP).
+This document defines how the Liminal Thread Protocol (LTP) evolves over time without fragmentation, capture, or central control.
 
-Its goal is to ensure:
-
-- long-term stability,
-- architectural coherence,
-- resistance to capture by single vendors or interests,
-- gradual, explainable evolution.
-
-LTP is intended to become a de-facto standard.
-Standards require governance.
+The goal of LTP governance is stability with growth, not velocity for its own sake.
 
 ---
 
-### Core Principles of Governance
+### Core Governance Principle
 
-**1. Protocol First, Implementations Second**
+> LTP is governed by constraints, not by power.
 
-The protocol defines truth.
-
-SDKs, nodes, clients, and HUDs follow the protocol — never the opposite.
-
-No implementation may redefine LTP semantics unilaterally.
+No single company, individual, or organization owns the protocol.
+Influence is earned through clarity, usefulness, and demonstrated alignment with the protocol’s principles.
 
 ---
 
-**2. Open but Conservative Evolution**
+### What Governance Is (and Is Not)
 
-LTP evolves:
+Governance IS:
 
-- slowly,
-- explicitly,
-- with backward compatibility as a priority.
+- A way to prevent protocol drift
+- A method to ensure cross-implementation compatibility
+- A memory of why design decisions were made
+- A trust signal for adopters
 
-Innovation happens around the protocol, not inside it by default.
+Governance IS NOT:
 
----
-
-**3. Neutrality & Non-Capture**
-
-LTP governance is designed to prevent:
-
-- corporate capture,
-- single-vendor dominance,
-- hidden proprietary extensions.
-
-No entity “owns” the protocol.
+- A steering committee for business interests
+- A centralized roadmap authority
+- A voting popularity contest
+- A gatekeeping mechanism
 
 ---
 
-### Governance Structure
+### Governance Layers
 
-**1. LTP Core Maintainers**
+**1. Protocol Core (Very Small)**
 
-Responsibilities:
+Includes:
 
-- steward protocol integrity,
-- approve RFCs,
-- maintain reference specifications,
-- arbitrate conflicts.
+- Frame contract (LTP-Frames)
+- Canonical flow semantics
+- Versioning rules
+- Conformance definitions
 
-Constraints:
-
-- no unilateral semantic changes,
-- decisions must be documented and traceable.
+Changes here are rare and conservative.
 
 ---
 
-**2. Advisory Board (Non-Binding)**
+**2. Extension Surface (Open)**
 
-The Advisory Board:
+Includes:
 
-- provides strategic and cross-domain perspective,
-- reviews major RFCs,
-- highlights risks (technical, ethical, ecosystem).
+- New frame types
+- New metrics
+- Optional flows
+- Domain-specific semantics
 
-Advisory opinions are public but non-binding.
+Extensions MUST:
 
----
-
-**3. Implementers & Community**
-
-Anyone may:
-
-- implement LTP,
-- submit RFCs,
-- publish extensions,
-- build products.
-
-Conformance determines legitimacy — not status.
+- Be additive
+- Be ignorable by older implementations
+- Never break core flows
 
 ---
 
-### RFC Process (LTP-RFC)
+**3. Implementations (Unrestricted)**
 
-#### RFC Scope
+SDKs, nodes, HUDs, visualizers, diagnostics, services.
 
-RFCs may propose:
+Governance does not control:
 
-- new frame types,
-- clarifications of semantics,
-- conformance rules,
-- versioning strategy,
-- deprecation paths.
-
-RFCs may NOT:
-
-- silently redefine existing semantics,
-- break conformance guarantees without a version bump.
+- UX decisions
+- Business models
+- Hosting strategies
+- Language choice
 
 ---
 
-#### RFC Lifecycle
+### LTP RFC Process
+
+**RFC Definition**
+
+An LTP RFC is a structured proposal that introduces, modifies, or clarifies protocol behavior.
+
+RFCs exist to:
+
+- Capture intent
+- Enable review
+- Preserve rationale over time
+
+---
+
+### RFC Lifecycle
 
 **1. Draft**
 
-RFC is submitted as a document.
+Author publishes an RFC document
 
-Marked as Draft.
+Clearly states:
 
-Open for discussion.
+- Motivation
+- Problem
+- Proposed change
+- Compatibility impact
+
+Status: Draft
+
+---
 
 **2. Review**
 
-Maintainers and community review.
+- Community feedback
+- Implementation experiments encouraged
+- No voting, only arguments
 
-Concerns and alternatives documented.
-
-**3. Accepted / Rejected / Deferred**
-
-Accepted → scheduled for a protocol version.
-
-Rejected → rationale documented.
-
-Deferred → valid idea, insufficient maturity.
-
-**4. Implemented**
-
-Reference specification updated.
-
-Conformance rules adjusted if needed.
+Status: Review
 
 ---
 
-#### RFC Format (Minimal)
+**3. Acceptance**
 
-Each RFC MUST include:
+RFC is marked accepted when:
 
-- Motivation
-- Problem Statement
-- Proposed Change
-- Backward Compatibility Analysis
-- Impact on Conformance
-- Alternatives Considered
+- At least two independent implementations exist
+- No core principles are violated
+- Backward compatibility is preserved
 
----
-
-### Versioning Policy
-
-- Semantic meaning changes → new protocol version
-- Additive, optional features → same version
-- Experimental ideas → extensions, not core
+Status: Accepted
 
 ---
 
-### Extensions Policy
+**4. Canonicalization**
 
-- Extensions MUST NOT masquerade as core LTP.
-- Extensions MUST be clearly namespaced.
-- Core LTP remains minimal.
+RFC is referenced by:
+
+- Conformance rules
+- Canonical flow definitions
+
+Optional for extensions
+
+Status: Canonical
+
+---
+
+**5. Deprecation (Rare)**
+
+- Old behavior marked discouraged
+- No forced removal
+- Long sunset periods
+
+Status: Deprecated
+
+---
+
+### Decision Authority Model
+
+There is no central ruler.
+
+Authority emerges from:
+
+- Consistent contributions
+- High-quality reasoning
+- Successful implementations
+- Respect for constraints
+
+This mirrors:
+
+- TCP/IP evolution
+- UNIX philosophy
+- Kubernetes SIG dynamics
 
 ---
 
 ### Conflict Resolution
 
-When disagreement arises:
+When disagreement occurs:
 
-1. Protocol principles override convenience.
-2. Conformance overrides popularity.
-3. Explicit documentation overrides implicit behavior.
+1. Favor backward compatibility
+2. Favor smaller surface area
+3. Favor explainability over performance
+4. Favor multiple branches over single “best” answers
 
-If needed, maintainers may freeze changes temporarily.
+If unresolved:
 
----
-
-### Transparency Requirements
-
-- All decisions are public.
-- All RFC discussions are archived.
-- No closed-door semantic changes.
+- Competing extensions may coexist
+- Reality (adoption) decides
 
 ---
 
-### Relationship to Other Standards Bodies
+### Governance Anti-Patterns (Explicitly Rejected)
 
-LTP governance is compatible with:
-
-- IETF-style RFC processes,
-- W3C consensus models,
-- Open-source meritocratic governance.
-
-LTP does not require formal incorporation to function.
+- ❌ Mandatory compliance fees
+- ❌ Corporate veto power
+- ❌ Roadmap centralization
+- ❌ Fast-breaking innovation
+- ❌ “Winning” through dominance
 
 ---
 
-### Stability Commitment
+### Relationship to Implementations
 
-Once a version is declared stable:
+Implementations MAY:
 
-- its semantics will not change,
-- only clarifications may be added.
+- Claim LTP conformance
+- Display conformance badges
+- Offer governance participation
 
-Breaking changes require a new version.
+They MUST NOT:
+
+- Redefine protocol meaning
+- Introduce incompatible forks under the same name
+
+---
+
+### Long-Term Vision
+
+LTP governance is designed to survive:
+
+- Founder absence
+- Corporate pressure
+- Market cycles
+- Technological shifts
+
+If LTP succeeds, it should eventually feel boring, stable, and inevitable.
 
 ---
 
 ### Declaration
 
-Any system that:
-
-- follows the RFC process,
-- respects governance rules,
-- maintains conformance,
-
-may claim:
-
-> “This implementation follows LTP Governance & RFC Process (v0.1).”
+> LTP is governed by continuity, not control.
+> If it grows, it must grow gently.
