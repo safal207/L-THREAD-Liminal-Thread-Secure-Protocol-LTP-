@@ -5,7 +5,7 @@ import path from 'path';
 import process from 'process';
 
 const BIDI_REGEX = /[\u202A-\u202E\u2066-\u2069\u200B]/;
-const DIRS_TO_SCAN = ['governance', 'specs'];
+const DIRS_TO_SCAN = ['docs', 'specs'];
 const EXTENSIONS_TO_SCAN = ['.md'];
 
 let filesWithBidi = [];
