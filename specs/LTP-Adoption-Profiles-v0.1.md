@@ -12,6 +12,9 @@ These profiles are:
 - **Composable**
 - **Evolvable without protocol changes**
 
+Adoption Profiles describe *how value emerges* from LTP in different contexts,
+without constraining implementation or governance.
+
 This document establishes standard reference patterns for LTP usage across different scales and purposes.
 
 ---
@@ -82,7 +85,7 @@ This document establishes standard reference patterns for LTP usage across diffe
 - LTP acts as a decision fabric, not an ML model
 
 **Value Proposition**
-> LTP allows systems to orient themselves in real-time rather than storing everything.
+> LTP reduces dependency on brittle, data-heavy decision pipelines.
 
 ---
 
@@ -140,6 +143,17 @@ Any implementation may:
 - Correspond to multiple profiles
 - Evolve between profiles over time
 - Create new profiles without changing the standard
+
+---
+
+## Economic Note (Non-Normative)
+
+LTP profiles reflect different cost surfaces:
+- Reduced data retention
+- Delayed decision materialization
+- Lower coordination overhead
+
+Value is created not by prediction accuracy, but by timely orientation and graceful degradation.
 
 ---
 
