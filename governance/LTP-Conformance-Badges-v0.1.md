@@ -101,6 +101,19 @@ An implementation MAY claim a badge if it:
    - Version
    - Test date
    - Test command or report
+
+   *Example `self-test.json`:*
+   ```json
+   {
+     "implementation": "ltp-rs",
+     "version": "0.4.2",
+     "badge_claimed": "LTP-Flow v0.1",
+     "test_date": "2023-10-27T10:00:00Z",
+     "test_command": "cargo test --features conformance",
+     "result": "PASS"
+   }
+   ```
+
 3. Does not modify protocol semantics
 
 Claims MUST be:
@@ -128,7 +141,7 @@ Reality removes badges.
 
 Additional (non-mandatory) signals:
 
-- Public CI pipelines
+- Public CI pipelines (e.g., `[![Build Status](https://github.com/user/repo/actions/workflows/test.yml/badge.svg)](...)`)
 - Reproducible builds
 - Cross-SDK test matrices
 - Independent confirmations
