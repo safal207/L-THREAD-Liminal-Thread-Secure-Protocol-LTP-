@@ -92,6 +92,24 @@ They describe features, not authority.
 
 ---
 
+## Example Profiles (Archetypes)
+
+Different implementations target different badges:
+
+1. **The Minimalist (IoT / Embedded)**
+   - *Goal:* Low footprint, basic connectivity.
+   - *Target:* `LTP-Core`
+
+2. **The Backbone (Router / Switch)**
+   - *Goal:* High throughput, correct flow semantics.
+   - *Target:* `LTP-Flow`
+
+3. **The Standard (Reference / Enterprise)**
+   - *Goal:* Total predictability and auditability.
+   - *Target:* `LTP-Canonical` + `LTP-Explainable`
+
+---
+
 ## Badge Claim Requirements
 
 An implementation MAY claim a badge if it:
@@ -156,6 +174,16 @@ These strengthen credibility but are not required.
 ❌ Central badge issuer
 ❌ Exclusive trust lists
 ❌ Vendor-controlled compliance
+
+---
+
+## Legal Status: Non-binding Guidance
+
+All badges, signals, and conformance claims described in this document constitute **Non-binding Guidance**.
+
+- They do not create warranties of merchantability or fitness for a particular purpose.
+- They do not establish a contractual relationship.
+- Trust remains the sole responsibility of the adopter.
 
 ---
 
