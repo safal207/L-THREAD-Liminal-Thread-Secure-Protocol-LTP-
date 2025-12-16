@@ -104,6 +104,7 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [LTP THINKS](./specs/LTP-THINKS-v0.1.md) - The core philosophy and boundaries of the protocol. **Start here.**
 - [LTP vs Existing Paradigms](./positioning/LTP-vs-Existing-Paradigms-v0.1.md) - How LTP differs from ML, Web3, SaaS.
 - [LTP Positioning](./docs/vision/LTP-Positioning.md) - What LTP is and is not
+- [What LTP Is Not](./specs/LTP-What-It-Is-Not.md) - Negative contours and non-goals of the protocol.
 - [LTP Economics & Market Roles](./economics/LTP-Economics-and-Market-Roles-v0.1.md) - How value is created around the protocol.
 - [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
 - [LTP Adoption & Certification Levels](./specs/LTP-ADOPTION-v0.1.md) - Defines adoption levels for the ecosystem.

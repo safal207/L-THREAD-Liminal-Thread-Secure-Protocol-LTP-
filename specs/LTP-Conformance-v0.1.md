@@ -56,6 +56,7 @@ An implementation MUST:
 - No requirement for ML or LLM usage.
 - No requirement for persistence or global state.
 - No mandate for a specific UX/HUD.
+- See also: [What LTP Is Not](./LTP-What-It-Is-Not.md) for detailed boundaries.
 
 ---
 

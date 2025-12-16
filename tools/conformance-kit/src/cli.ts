@@ -109,6 +109,7 @@ const runSelfTestCommand = (options: { outPath?: string; format?: string; strict
   const conformance: ConformanceReport = {
     v: '0.1',
     ok: issues.length === 0,
+    status: issues.length === 0 ? 'OK' : 'FAIL',
     score: clamp01(1 - issues.length * 0.2),
     frameCount: selfTest.report.receivedFrames,
     passed: issues.length === 0 ? [`selftest ${mode} passed at level ${selfTest.report.level}`] : [],
