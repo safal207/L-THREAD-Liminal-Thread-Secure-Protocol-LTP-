@@ -3,7 +3,7 @@
   "private": true,
   "description": "LTP (Liminal Thread Protocol) Monorepo",
   "scripts": {
-    "build": "pnpm --recursive run build --if-present",
+    "build": "pnpm --recursive run build",
     "test:cross-sdk": "echo \"Running cross-SDK compatibility tests... (WIP)\"",
     "test:verify-types": "node tests/cross-sdk/verify-types.js",
     "test:security": "echo \"Running security feature tests... (WIP)\"",
