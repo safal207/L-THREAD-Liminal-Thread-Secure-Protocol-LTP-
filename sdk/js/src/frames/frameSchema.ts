@@ -37,12 +37,19 @@ export interface RouteBranch {
   rationale?: string;
 }
 
-export type RouteBranchMap = Record<string, RouteBranch>;
+export type RouteBranchMap = Partial<Record<"primary" | "recover" | "explore" | string, RouteBranch>>;
 
 export interface RouteResponsePayload {
   branches: RouteBranch[] | RouteBranchMap;
   selection?: string;
 }
+
+export const toBranchArray = (branches: RouteBranch[] | RouteBranchMap): RouteBranch[] => {
+  if (Array.isArray(branches)) {
+    return branches;
+  }
+  return Object.values(branches).filter((b): b is RouteBranch => b !== undefined && b !== null);
+};
 
 export interface FocusSnapshotPayload {
   focus: string;

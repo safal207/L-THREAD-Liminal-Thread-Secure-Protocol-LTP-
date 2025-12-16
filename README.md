@@ -111,6 +111,19 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [Status](./STATUS.md) - Protocol maturity and compatibility policy
 - [LTP Governance & RFC Process](./governance/LTP-Governance-and-RFC-v0.1.md) - How the protocol evolves.
 
+### Governance Mapping (v0.1 Release Slice)
+
+This codebase represents the **v0.1 Frozen Core** (see RFC-0002).
+- **Frames v0.1**: Frozen in `sdk/js/src/frames/protocolSurface.v0.1.ts`.
+- **Canonical Flow**: Verified by `pnpm -w demo:canonical-v0.1`.
+- **Conformance**: Enforced by `pnpm -w ltp:conformance verify`.
+
+To validate this release candidate against the governance track:
+```bash
+pnpm -w ltp:conformance selftest --mode calm
+pnpm -w ltp:conformance verify:dir fixtures/conformance/v0.1
+```
+
 ### 30s Flow diagram (draft)
 
 ```
