@@ -14,6 +14,17 @@ LTP is NOT:
 **Version:** 0.6.0-alpha.3
 **Status:** Production-Ready (Enterprise) | Security Hardened
 
+## Quick Verify (30 seconds)
+
+```
+pnpm install
+pnpm -w ltp:verify
+```
+
+- JS SDK works
+- Canonical flow works
+- v0.1 conformance fixtures pass
+
 ## Protocol Status
 
 LTP v0.1 is officially released as a frozen core standard.
