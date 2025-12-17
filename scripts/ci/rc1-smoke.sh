@@ -27,7 +27,7 @@ run_step "Conformance fixtures (v0.1)" pnpm -w ltp:conformance verify:dir fixtur
 run_step "JS SDK build" pnpm --filter @liminal/ltp-client run build
 run_step "Rust SDK tests" bash -c "cd sdk/rust/ltp-client && cargo test"
 run_step "Python SDK tests" bash -c "cd sdk/python && python -m pytest tests"
-run_step "Elixir SDK tests" bash -c "cd sdk/elixir && mix test --trace"
+run_step "Elixir SDK tests" bash -c "cd sdk/elixir && mix deps.get && mix test --trace"
 run_step "Cross-SDK type consistency" node tests/cross-sdk/verify-types.js
 
 if [ ${#failures[@]} -eq 0 ]; then
