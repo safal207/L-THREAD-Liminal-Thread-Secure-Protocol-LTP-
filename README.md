@@ -1,7 +1,43 @@
-# L-THREAD / LTP (Liminal Thread Protocol)
+# LTP — Liminal Thread Protocol
+
+LTP is a deterministic, explainable routing protocol for stateful systems.
+
+It helps systems answer:
+“What are the plausible next paths, given where we are now — and why?”
+
+LTP is NOT:
+- a recommendation engine
+- an ML model
+- a black-box decision system
 
 **Version:** 0.6.0-alpha.3
 **Status:** Production-Ready (Enterprise) | Security Hardened
+
+## Two-Layer Terminology
+
+- **Orientation** — current semantic state (aka Liminal Position)
+- **Route Response** — multiple plausible paths (aka Meaning Branches)
+- **Focus Snapshot** — state telemetry for diagnostics
+
+Use the primary terms in code and APIs; secondary names in parentheses are acceptable in docs.
+
+## Where LTP Fits
+
+Primary:
+- DevTools / Observability
+- Explainable routing
+- Stateful agent systems
+
+Secondary:
+- Fintech decision flows
+- Content personalization
+- AI-agent coordination
+
+LTP is infrastructure, not an application.
+
+## Design Principles (Optional)
+
+For the philosophical framing and design motivations, see [docs/LTP-PHILOSOPHY.md](./docs/LTP-PHILOSOPHY.md).
 
 ## What is LTP
 
@@ -80,16 +116,14 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the 
 
 ### Ethos
 
-> I am not building a system that knows for you.
-> I am creating a space where you can see where you are and choose your own path.
-
-LTP was created by Aleksey Safonov, inviting builders to orient themselves and choose the path that fits their context.
+LTP was created by Aleksey Safonov to keep routing deterministic and explainable. For the full philosophical context and design motivations, read [LTP Philosophy](./docs/LTP-PHILOSOPHY.md).
 
 📖 **Documentation:**
 - [Architecture Overview](./ARCHITECTURE.md) - Ecosystem architecture and SDK comparison
 - [Deployment Guide](./DEPLOYMENT.md) - Production deployment strategies
 - [API Reference](./API.md) - Complete API documentation for all SDKs
 - [Protocol Specifications](./specs/) - Detailed protocol specifications
+- [Two-Layer Terminology Glossary](./specs/GLOSSARY.md) - Primary naming for orientations, route responses, and focus snapshots
 - [Liminal Web Overview](./specs/LTP-Liminal-Web-Overview.md) - How thread, time, and consciousness layers fit together
 - [Consciousness Web & Orientation Shell](./specs/LTP-ConsciousnessWeb.md) - Semantic graph + focus layer built atop the Thread Life Model
 - [LTP Flow v0.1 (Draft)](./specs/LTP-Flow-v0.1.md) - Living, orientable motion of frames across time
@@ -105,6 +139,7 @@ LTP was created by Aleksey Safonov, inviting builders to orient themselves and c
 - [LTP vs Existing Paradigms](./positioning/LTP-vs-Existing-Paradigms-v0.1.md) - How LTP differs from ML, Web3, SaaS.
 - [LTP Positioning](./docs/vision/LTP-Positioning.md) - What LTP is and is not
 - [What LTP Is Not](./specs/LTP-What-It-Is-Not.md) - Negative contours and non-goals of the protocol.
+- [LTP Philosophy](./docs/LTP-PHILOSOPHY.md) - Optional design framing and ethos
 - [LTP Economics & Market Roles](./economics/LTP-Economics-and-Market-Roles-v0.1.md) - How value is created around the protocol.
 - [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
 - [LTP Adoption & Certification Levels](./specs/LTP-ADOPTION-v0.1.md) - Defines adoption levels for the ecosystem.
