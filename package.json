@@ -36,10 +36,13 @@
     "conformance:report": "ts-node scripts/conformance/generateConformanceReport.ts",
     "ltp:conformance": "ts-node tools/conformance-kit/src/cli.ts",
     "conformance:verify": "pnpm -w ltp:conformance verify",
-    "ltp:verify": "ts-node --project scripts/tsconfig.verify.json scripts/verify/ltpVerify.ts"
+    "ltp:verify": "ts-node --project scripts/tsconfig.verify.json scripts/verify/ltpVerify.ts",
+    "ltp:report:validate": "ts-node --project scripts/tsconfig.verify.json scripts/verify/validateConformanceReport.ts"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "vitest": "^2.0.5",

@@ -3,86 +3,113 @@ import path from 'node:path';
 import { resolveSelfTestMode, runSelfTest, SelfTestMode } from '../../sdk/js/src/conformance/selfTest';
 import packageJson from '../../sdk/js/package.json';
 
-export interface ConformanceCheck {
-  name: string;
-  ok: boolean;
-  level: 'LTP-Core' | 'LTP-Flow' | 'LTP-Canonical';
-  mode: SelfTestMode;
-  determinismHash: string;
-  stats: {
-    received: number;
-    processed: number;
-    emitted: number;
-    deduped: number;
-    branches: number;
-  };
-  errors: string[];
+type ReportResult = 'OK' | 'WARN' | 'FAIL';
+
+interface ReportCheck {
+  id: string;
+  result: ReportResult;
+  details?: string;
 }
 
-export interface ConformanceReport {
-  ok: boolean;
-  version: string;
-  timestamp: {
-    epoch_ms: number;
-    iso: string;
-  };
-  checks: ConformanceCheck[];
+interface ReportSuite {
+  id: string;
+  result: ReportResult;
+  checks: ReportCheck[];
+}
+
+export interface ConformanceReportV01 {
+  schemaVersion: 'v0.1';
+  protocolVersion: 'v0.1';
+  toolingVersion: string;
+  overall: ReportResult;
+  determinismHash: string;
   summary: {
-    total: number;
     passed: number;
+    warnings: number;
     failed: number;
-    determinismHash: string;
+  };
+  suites: ReportSuite[];
+  timings: {
+    startedAt: string;
+    finishedAt: string;
+    durationMs: number;
+  };
+  environment: {
+    runtime?: string;
+    os?: string;
+    ci?: boolean;
+  };
+  artifacts: {
+    reportPath: string;
+    logs: string[];
   };
 }
 
 interface GenerateOptions {
   mode?: SelfTestMode;
   timestampMs?: number;
+  outputPath?: string;
 }
 
-export const generateConformanceReport = (options: GenerateOptions = {}): ConformanceReport => {
+const sanitizeToolingVersion = (version: string): string => version.split('-')[0] || '0.0.0';
+
+const formatHash = (hash: string): string => (hash.startsWith('sha256:') ? hash : `sha256:${hash}`);
+
+export const generateConformanceReport = (options: GenerateOptions = {}): ConformanceReportV01 => {
   const mode = resolveSelfTestMode(options.mode);
+  const startedMs = options.timestampMs ?? Date.now();
+  const finishedMs = startedMs;
   const { report } = runSelfTest({ mode });
-  const epochMs = options.timestampMs ?? Date.now();
-  const iso = new Date(epochMs).toISOString();
+  const overall: ReportResult = report.ok ? 'OK' : 'FAIL';
 
-  const check: ConformanceCheck = {
-    name: 'ltp-node-self-test',
-    ok: report.ok,
-    level: report.level,
-    mode: report.mode,
-    determinismHash: report.determinismHash,
-    stats: {
-      received: report.receivedFrames,
-      processed: report.processedFrames,
-      emitted: report.emittedFrames,
-      deduped: report.dedupedFrames,
-      branches: report.branchesCount,
+  const suites: ReportSuite[] = [
+    {
+      id: 'ltp-self-test',
+      result: overall,
+      checks: [
+        {
+          id: 'ltp-node-self-test',
+          result: overall,
+          details: `mode=${report.mode} level=${report.level}`,
+        },
+      ],
     },
-    errors: report.errors,
-  };
-
-  const summary = {
-    total: 1,
-    passed: check.ok ? 1 : 0,
-    failed: check.ok ? 0 : 1,
-    determinismHash: report.determinismHash,
-  };
+  ];
 
   return {
-    ok: check.ok,
-    version: packageJson.version,
-    timestamp: { epoch_ms: epochMs, iso },
-    checks: [check],
-    summary,
+    schemaVersion: 'v0.1',
+    protocolVersion: 'v0.1',
+    toolingVersion: sanitizeToolingVersion(packageJson.version),
+    overall,
+    determinismHash: formatHash(report.determinismHash),
+    summary: {
+      passed: report.ok ? 1 : 0,
+      warnings: 0,
+      failed: report.ok ? 0 : 1,
+    },
+    suites,
+    timings: {
+      startedAt: new Date(startedMs).toISOString(),
+      finishedAt: new Date(finishedMs).toISOString(),
+      durationMs: finishedMs - startedMs,
+    },
+    environment: {
+      runtime: `node@${process.versions.node}`,
+      os: process.platform,
+      ci: process.env.CI === 'true' || process.env.CI === '1',
+    },
+    artifacts: {
+      reportPath: path.resolve(process.cwd(), options.outputPath ?? 'artifacts/conformance-report.json'),
+      logs: [],
+    },
   };
 };
 
 export const writeConformanceReport = (
   targetPath: string,
   options: GenerateOptions = {}
-): ConformanceReport => {
-  const report = generateConformanceReport(options);
+): ConformanceReportV01 => {
+  const report = generateConformanceReport({ ...options, outputPath: targetPath });
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   fs.writeFileSync(targetPath, `${JSON.stringify(report, null, 2)}\n`, 'utf-8');
   return report;
@@ -108,7 +135,7 @@ if (require.main === module) {
   // eslint-disable-next-line no-console
   console.log(JSON.stringify(report, null, 2));
 
-  if (!report.ok) {
+  if (report.overall !== 'OK') {
     process.exitCode = 1;
   }
 }
