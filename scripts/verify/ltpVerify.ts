@@ -132,6 +132,8 @@ function isMainModule(): boolean {
   const mainHref = pathToFileURL(argvPath).href;
   const currentHref = getCurrentModuleHref();
 
+  if (!currentHref) return false;
+
   return mainHref === currentHref;
 }
 
