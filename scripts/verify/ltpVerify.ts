@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { renderCanonicalDemo } from '../../src/demos/canonicalFlowDemo.v0.1';
 import { verifyDirectoryReports } from '../../tools/conformance-kit/src/verify';
 import type { ConformanceReportBatch } from '../../tools/conformance-kit/src/types';
@@ -23,7 +24,7 @@ export interface VerifySummary {
 }
 
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
-const CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
+const DEFAULT_CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
 
 const summarizeConformance = (batch: ConformanceReportBatch): ConformanceResult => {
   const { score, summary } = batch;
@@ -47,9 +48,9 @@ const runCanonicalFlow = (): CanonicalResult => {
   }
 };
 
-const runConformanceSuite = (): ConformanceResult => {
+const runConformanceSuite = (conformanceDir: string): ConformanceResult => {
   try {
-    const { batch } = verifyDirectoryReports(CONFORMANCE_FIXTURES);
+    const { batch } = verifyDirectoryReports(conformanceDir);
     return summarizeConformance(batch);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -68,7 +69,7 @@ const deriveOverall = (canonical: VerifyStatus, conformance: VerifyStatus): Veri
   return 'OK';
 };
 
-export const formatSummary = (summary: VerifySummary): string => {
+export const formatSummaryText = (summary: VerifySummary): string => {
   const lines = [
     'LTP v0.1 verify',
     '---------------',
@@ -81,9 +82,13 @@ export const formatSummary = (summary: VerifySummary): string => {
   return lines.join('\n');
 };
 
-export const runVerify = (): VerifySummary => {
+export const formatSummary = formatSummaryText;
+
+export const formatSummaryJson = (summary: VerifySummary): string => JSON.stringify(summary, null, 2);
+
+export const runVerify = async (conformanceDir: string): Promise<VerifySummary> => {
   const canonical = runCanonicalFlow();
-  const conformance = runConformanceSuite();
+  const conformance = runConformanceSuite(conformanceDir);
   const overall = deriveOverall(canonical.status, conformance.status);
 
   const summary: VerifySummary = {
@@ -92,15 +97,66 @@ export const runVerify = (): VerifySummary => {
     overall,
   };
 
-  const summaryText = formatSummary(summary);
-  // eslint-disable-next-line no-console
-  console.log(summaryText);
-
-  process.exitCode = overall === 'FAIL' ? 2 : 0;
-
   return summary;
 };
 
-if (require.main === module) {
-  runVerify();
+function resolveConformanceDir(argv: string[]): string | undefined {
+  const eq = argv.find((arg) => arg.startsWith('--dir='));
+  if (eq) return path.resolve(eq.slice('--dir='.length));
+
+  const idx = argv.indexOf('--dir');
+  if (idx === -1) return undefined;
+
+  const value = argv[idx + 1];
+  if (!value || value.startsWith('--')) {
+    throw new Error('Missing value for --dir. Usage: --dir <path> or --dir=<path>');
+  }
+  return path.resolve(value);
+}
+
+export const getCurrentModuleHref = (): string | undefined => {
+  try {
+    // eslint-disable-next-line no-eval
+    return (0, eval)('import.meta.url') as string;
+  } catch {
+    return pathToFileURL(__filename).href;
+  }
+};
+
+export function isMainModule(
+  argvPath: string | undefined = process.argv[1],
+  currentHrefGetter: () => string | undefined = getCurrentModuleHref,
+): boolean {
+  if (!argvPath) return false;
+
+  const mainHref = pathToFileURL(argvPath).href;
+  const currentHref = currentHrefGetter();
+
+  if (!currentHref) return false;
+
+  return mainHref === currentHref;
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  const dirFromArg = resolveConformanceDir(argv);
+  const envDir = process.env.LTP_CONFORMANCE_DIR ? path.resolve(process.env.LTP_CONFORMANCE_DIR) : undefined;
+  const conformanceDir = dirFromArg ?? envDir ?? DEFAULT_CONFORMANCE_FIXTURES;
+
+  const summary = await runVerify(conformanceDir);
+
+  if (process.env.LTP_VERIFY_JSON === '1') {
+    console.log(formatSummaryJson(summary));
+  } else {
+    console.log(formatSummaryText(summary));
+  }
+
+  process.exitCode = summary.overall === 'FAIL' ? 2 : 0;
+}
+
+// If executed directly: node scripts/verify/ltpVerify.ts ...
+if (isMainModule()) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
 }
