@@ -2,6 +2,8 @@
 
 This note clarifies which parts of LTP are frozen core and which are optional extensions.
 
+LTP Core is intentionally small. If you are unsure whether a feature belongs to Core — it does not.
+
 ## LTP Core (Frozen v0.1)
 - **Frame surface:** `hello`, `heartbeat`, `orientation`, `route_request`, `route_response`, `focus_snapshot`.
 - **Determinism:** Canonical flow and guardrails must remain stable for interop and explainability.
