@@ -1,5 +1,5 @@
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { renderCanonicalDemo } from '../../src/demos/canonicalFlowDemo.v0.1';
 import { verifyDirectoryReports } from '../../tools/conformance-kit/src/verify';
 import type { ConformanceReportBatch } from '../../tools/conformance-kit/src/types';
@@ -116,9 +116,23 @@ function resolveConformanceDir(argv: string[]): string | undefined {
   return path.resolve(value);
 }
 
+const getCurrentModuleHref = (): string | undefined => {
+  try {
+    // eslint-disable-next-line no-eval
+    return (0, eval)('import.meta.url') as string;
+  } catch {
+    return pathToFileURL(__filename).href;
+  }
+};
+
 function isMainModule(): boolean {
-  // ESM-safe "am I the entrypoint?"
-  return import.meta.url === `file://${process.argv[1]}`;
+  const argvPath = process.argv[1];
+  if (!argvPath) return false;
+
+  const mainHref = pathToFileURL(argvPath).href;
+  const currentHref = getCurrentModuleHref();
+
+  return mainHref === currentHref;
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {
