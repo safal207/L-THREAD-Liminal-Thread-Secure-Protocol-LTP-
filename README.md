@@ -102,21 +102,11 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving co
 
 ## Quick verify (one command)
 
-- Run: `pnpm -w ltp:verify` (minimal output; add `--verbose` to stream sub-command logs).
-- End-of-run summary is stable and grep-friendly:
-
-  ```
-  LTP VERIFY SUMMARY (v0.1)
-  build: OK
-  js-sdk-tests: OK
-  conformance: OK
-  cross-sdk-types: OK
-  demos: OK
-  overall: OK
-  ```
-
-- JSON for CI: `pnpm -w ltp:verify -- --out reports/verify.json` (creates directories as needed).
-- Exit codes: `overall=OK -> 0`, `overall=WARN -> 1`, `overall=FAIL -> 2`.
+- Run: `pnpm -w ltp:verify`
+- Actions: replays the frozen Canonical Flow v0.1 and verifies `fixtures/conformance/v0.1` via the conformance kit.
+- Output: compact summary showing canonical status, conformance status + score/errors, and overall status.
+- Exit codes: `OK`/`WARN` -> 0, `FAIL` -> 2 (suitable for CI pipelines).
+- Overrides: set `LTP_CONFORMANCE_DIR` or pass `--dir <path>` to point at custom fixture packages; set `LTP_VERIFY_JSON=1` to emit a JSON summary instead of text.
 
 ## Release v0.1 quickstart (always works)
 

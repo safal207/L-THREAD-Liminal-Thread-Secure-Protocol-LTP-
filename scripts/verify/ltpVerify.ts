@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { spawn } from 'node:child_process';
+import { renderCanonicalDemo } from '../../src/demos/canonicalFlowDemo.v0.1';
 import { verifyDirectoryReports } from '../../tools/conformance-kit/src/verify';
 import type { ConformanceReportBatch } from '../../tools/conformance-kit/src/types';
 
@@ -33,104 +33,6 @@ const VERSION = '0.1';
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
 const DEFAULT_CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
 
-const CHECK_ORDER: VerifyCheckName[] = ['build', 'js-sdk-tests', 'conformance', 'cross-sdk-types', 'demos'];
-
-const deriveOverall = (checks: VerifyCheck[]): VerifyStatus => {
-  if (checks.some((check) => check.status === 'FAIL')) {
-    return 'FAIL';
-  }
-
-  if (checks.some((check) => check.status === 'WARN')) {
-    return 'WARN';
-  }
-
-  return 'OK';
-};
-
-const formatConformanceDetails = (details: Record<string, unknown> | undefined): string => {
-  if (!details) {
-    return '';
-  }
-
-  const score = typeof details.score === 'number' ? (details.score as number).toFixed(3) : undefined;
-  const errors = details.errors as number | undefined;
-  const warnings = details.warnings as number | undefined;
-
-  const parts = [
-    score !== undefined ? `score=${score}` : undefined,
-    errors !== undefined ? `errors=${errors}` : undefined,
-    warnings !== undefined ? `warnings=${warnings}` : undefined,
-  ].filter(Boolean);
-
-  return parts.length > 0 ? ` ${parts.join(' ')}` : '';
-};
-
-export const formatSummary = (report: VerifyReport): string => {
-  const lines = [`LTP VERIFY SUMMARY (v${report.version})`];
-
-  CHECK_ORDER.forEach((name) => {
-    const check = report.checks.find((entry) => entry.name === name);
-
-    if (!check) return;
-
-    const detailSuffix = check.name === 'conformance' ? formatConformanceDetails(check.details) : '';
-    lines.push(`${check.name}: ${check.status}${detailSuffix}`);
-  });
-
-  lines.push(`overall: ${report.overall}`);
-
-  return lines.join('\n');
-};
-
-const spawnCommand = async (
-  name: VerifyCheckName,
-  command: string,
-  args: string[],
-  options: { verbose: boolean; cwd: string },
-): Promise<VerifyCheck> => {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, {
-      cwd: options.cwd,
-      shell: process.platform === 'win32',
-      stdio: options.verbose ? 'inherit' : 'pipe',
-    });
-
-    let combinedOutput = '';
-
-    if (!options.verbose) {
-      child.stdout?.on('data', (data) => {
-        combinedOutput += data.toString();
-      });
-
-      child.stderr?.on('data', (data) => {
-        combinedOutput += data.toString();
-      });
-    }
-
-    const finalize = (status: VerifyStatus) => {
-      resolve({
-        name,
-        status,
-        output: combinedOutput.trim() || undefined,
-      });
-    };
-
-    child.on('close', (code) => {
-      finalize(code === 0 ? 'OK' : 'FAIL');
-    });
-
-    child.on('error', () => {
-      finalize('FAIL');
-    });
-  });
-};
-
-const summarizeConformance = (batch: ConformanceReportBatch): VerifyCheck => {
-  const errors = batch.summary.failedCount + batch.summary.unexpectedCount;
-  const warnings = batch.summary.warnCount + batch.summary.expectedFailCount;
-
-  const status: VerifyStatus = errors > 0 ? 'FAIL' : warnings > 0 ? 'WARN' : 'OK';
-
   return {
     name: 'conformance',
     status,
@@ -155,9 +57,15 @@ const runConformance = (): VerifyCheck => {
   }
 };
 
-const ensureDirectory = (targetPath: string): void => {
-  const dir = path.dirname(targetPath);
-  fs.mkdirSync(dir, { recursive: true });
+const runConformanceSuite = (conformanceDir: string): ConformanceResult => {
+  try {
+    const { batch } = verifyDirectoryReports(conformanceDir);
+    return summarizeConformance(batch);
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Conformance verification failed', error);
+    return { status: 'FAIL', score: 0, errors: 1, warnings: 0 };
+  }
 };
 
 const defaultSteps = (
@@ -175,10 +83,15 @@ const writeJsonReport = (outPath: string, report: VerifyReport): void => {
   fs.writeFileSync(outPath, `${JSON.stringify(report, null, 2)}\n`, 'utf-8');
 };
 
-export const runLtpVerify = async (options: VerifyOptions = {}): Promise<VerifyReport> => {
-  const verbose = Boolean(options.verbose);
-  const cwd = options.cwd ?? ROOT_DIR;
-  const steps = defaultSteps({ verbose, cwd });
+export const formatSummaryText = (summary: VerifySummary): string => {
+  const lines = [
+    'LTP v0.1 verify',
+    '---------------',
+    `canonical: ${summary.canonical.status}`,
+    `conformance: ${summary.conformance.status} score=${summary.conformance.score.toFixed(3)} ` +
+      `errors=${summary.conformance.errors} warnings=${summary.conformance.warnings}`,
+    `overall: ${summary.overall}`,
+  ];
 
   const checks: VerifyCheck[] = [];
   // eslint-disable-next-line no-console
@@ -214,15 +127,14 @@ const getCurrentModuleHref = (): string | undefined => {
   }
 };
 
-function isMainModule(): boolean {
-  const argvPath = process.argv[1];
-  if (!argvPath) return false;
-  const mainHref = pathToFileURL(argvPath).href;
-  const currentHref = getCurrentModuleHref();
-  return Boolean(currentHref) && mainHref === currentHref;
-}
+export const formatSummary = formatSummaryText;
 
-type CliArgs = { verbose: boolean; outPath?: string; help: boolean };
+export const formatSummaryJson = (summary: VerifySummary): string => JSON.stringify(summary, null, 2);
+
+export const runVerify = async (conformanceDir: string): Promise<VerifySummary> => {
+  const canonical = runCanonicalFlow();
+  const conformance = runConformanceSuite(conformanceDir);
+  const overall = deriveOverall(canonical.status, conformance.status);
 
 const parseCliArgs = (argv: string[]): CliArgs => {
   const outIndex = argv.indexOf('--out');
@@ -235,54 +147,65 @@ const parseCliArgs = (argv: string[]): CliArgs => {
   };
 };
 
-const printHelp = (): void => {
-  // eslint-disable-next-line no-console
-  console.log(`Usage: pnpm -w ltp:verify [--verbose] [--out <path>]
-Runs build, JS SDK tests, conformance fixtures, cross-SDK type checks, and canonical demos.
-Summary is always printed; exit codes: 0 (OK), 1 (WARN), 2 (FAIL).
-`);
+  return summary;
 };
 
-export const runCli = async (argv: string[]): Promise<void> => {
-  const args = parseCliArgs(argv);
+function resolveConformanceDir(argv: string[]): string | undefined {
+  const eq = argv.find((arg) => arg.startsWith('--dir='));
+  if (eq) return path.resolve(eq.slice('--dir='.length));
 
-  if (args.help) {
-    printHelp();
-    process.exitCode = 0;
-    return;
+  const idx = argv.indexOf('--dir');
+  if (idx === -1) return undefined;
+
+  const value = argv[idx + 1];
+  if (!value || value.startsWith('--')) {
+    throw new Error('Missing value for --dir. Usage: --dir <path> or --dir=<path>');
   }
+  return path.resolve(value);
+}
 
-  // (опционально) конформанс-директория нужна runVerify, если ты её используешь отдельно где-то ещё.
-  // Здесь основной “канонический” раннер — runLtpVerify(), он возвращает VerifyReport.
-  // Если тебе нужно пробросить conformanceDir внутрь runLtpVerify — добавь это в VerifyOptions и прокинь.
-  const report = await runLtpVerify({ verbose: args.verbose, outPath: args.outPath });
+export const getCurrentModuleHref = (): string | undefined => {
+  try {
+    // eslint-disable-next-line no-eval
+    return (0, eval)('import.meta.url') as string;
+  } catch {
+    return pathToFileURL(__filename).href;
+  }
+};
+
+export function isMainModule(
+  argvPath: string | undefined = process.argv[1],
+  currentHrefGetter: () => string | undefined = getCurrentModuleHref,
+): boolean {
+  if (!argvPath) return false;
+
+  const mainHref = pathToFileURL(argvPath).href;
+  const currentHref = currentHrefGetter();
+
+  if (!currentHref) return false;
+
+  return mainHref === currentHref;
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  const dirFromArg = resolveConformanceDir(argv);
+  const envDir = process.env.LTP_CONFORMANCE_DIR ? path.resolve(process.env.LTP_CONFORMANCE_DIR) : undefined;
+  const conformanceDir = dirFromArg ?? envDir ?? DEFAULT_CONFORMANCE_FIXTURES;
+
+  const summary = await runVerify(conformanceDir);
 
   if (process.env.LTP_VERIFY_JSON === '1') {
-    // eslint-disable-next-line no-console
-    console.log(`${JSON.stringify(report, null, 2)}\n`);
+    console.log(formatSummaryJson(summary));
   } else {
-    // eslint-disable-next-line no-console
-    console.log(formatSummary(report));
+    console.log(formatSummaryText(summary));
   }
 
-  switch (report.overall) {
-    case 'OK':
-      process.exitCode = 0;
-      break;
-    case 'WARN':
-      process.exitCode = 1;
-      break;
-    case 'FAIL':
-    default:
-      process.exitCode = 2;
-      break;
-  }
-};
+  process.exitCode = summary.overall === 'FAIL' ? 2 : 0;
+}
 
 // If executed directly: node scripts/verify/ltpVerify.ts ...
 if (isMainModule()) {
-  runCli(process.argv.slice(2)).catch((err) => {
-    // eslint-disable-next-line no-console
+  main().catch((err) => {
     console.error(err);
     process.exitCode = 1;
   });
