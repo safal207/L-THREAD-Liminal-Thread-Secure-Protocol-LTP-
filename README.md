@@ -27,6 +27,10 @@ v0.1 is frozen: no breaking changes; extensions only via RFC.
 - [Release checklist](./specs/LTP-v0.1-Release-Checklist.md)
 - Conformance v0.1: PASS ![Conformance v0.1 badge](https://img.shields.io/badge/LTP%20Conformance-v0.1%20PASS-brightgreen)
 
+## Governance & RFC
+
+LTP evolves through an open RFC process focused on stability, explainability, and backward compatibility. Governance clarifies who makes decisions, how consensus is reached, and when safeguards such as the Frozen Core apply. See [LTP Governance](./governance/LTP-Governance.md), [LTP RFC Process](./governance/LTP-RFC-Process.md), and [Maintainers](./governance/MAINTAINERS.md) for the current roles and decision model.
+
 ## Two-Layer Terminology
 
 - **Orientation** — current semantic state (aka Liminal Position)
@@ -165,7 +169,7 @@ LTP was created by Aleksey Safonov to keep routing deterministic and explainable
 - [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
 - [LTP Adoption & Certification Levels](./specs/LTP-ADOPTION-v0.1.md) - Defines adoption levels for the ecosystem.
 - [Status](./STATUS.md) - Protocol maturity and compatibility policy
-- [LTP Governance & RFC Process](./governance/LTP-Governance-and-RFC-v0.1.md) - How the protocol evolves.
+- [LTP Governance](./governance/LTP-Governance.md) and [RFC Process](./governance/LTP-RFC-Process.md) - How the protocol evolves.
 
 ### Governance Mapping (v0.1 Release Slice)
 
