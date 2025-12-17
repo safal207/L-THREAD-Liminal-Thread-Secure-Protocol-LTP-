@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LTP Conformance Report v0.1",
+  "description": "Canonical machine-readable contract for LTP conformance results.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "protocolVersion",
+    "toolingVersion",
+    "overall",
+    "determinismHash",
+    "summary",
+    "suites",
+    "timings",
+    "environment",
+    "artifacts"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "v0.1",
+      "description": "Schema version for the conformance report structure."
+    },
+    "protocolVersion": {
+      "const": "v0.1",
+      "description": "LTP protocol version under test."
+    },
+    "toolingVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "Semantic version of the verification tool producing the report."
+    },
+    "overall": {
+      "type": "string",
+      "enum": ["OK", "WARN", "FAIL"],
+      "description": "Aggregate conformance result across all suites."
+    },
+    "determinismHash": {
+      "type": "string",
+      "pattern": "^sha256:[A-Fa-f0-9]{64}$",
+      "description": "Stable fingerprint derived from protocol frames, canonical flow, and verified transitions."
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["passed", "warnings", "failed"],
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "description": "Totals aggregated across all suites."
+    },
+    "suites": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/suite"
+      },
+      "description": "Collection of logically grouped conformance checks."
+    },
+    "timings": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["startedAt", "finishedAt", "durationMs"],
+      "properties": {
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "finishedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "durationMs": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "description": "Wall-clock timing metadata; does not affect determinism."
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "runtime": {
+          "type": "string"
+        },
+        "os": {
+          "type": "string"
+        },
+        "ci": {
+          "type": "boolean"
+        }
+      },
+      "description": "Runtime metadata for reproducibility and audit trails."
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["reportPath", "logs"],
+      "properties": {
+        "reportPath": {
+          "type": "string"
+        },
+        "logs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "Pointers to persisted report artifacts and related logs."
+    }
+  },
+  "definitions": {
+    "suite": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "result", "checks"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "type": "string",
+          "enum": ["OK", "WARN", "FAIL"]
+        },
+        "checks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/check"
+          }
+        }
+      },
+      "description": "Stable grouping of checks for a specific conformance focus area."
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "result"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "type": "string",
+          "enum": ["OK", "WARN", "FAIL"]
+        },
+        "details": {
+          "type": "string"
+        }
+      },
+      "description": "Individual conformance check with deterministic identity."
+    }
+  }
+}
