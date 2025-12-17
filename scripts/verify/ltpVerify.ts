@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { renderCanonicalDemo } from '../../src/demos/canonicalFlowDemo.v0.1';
 import { verifyDirectoryReports } from '../../tools/conformance-kit/src/verify';
 import type { ConformanceReportBatch } from '../../tools/conformance-kit/src/types';
@@ -23,7 +24,14 @@ export interface VerifySummary {
 }
 
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
-const CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
+const DEFAULT_CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
+
+interface VerifyOptions {
+  conformanceDir?: string;
+}
+
+const resolveConformanceDir = (override?: string): string =>
+  override ?? process.env.LTP_CONFORMANCE_DIR ?? DEFAULT_CONFORMANCE_FIXTURES;
 
 const summarizeConformance = (batch: ConformanceReportBatch): ConformanceResult => {
   const { score, summary } = batch;
@@ -47,9 +55,9 @@ const runCanonicalFlow = (): CanonicalResult => {
   }
 };
 
-const runConformanceSuite = (): ConformanceResult => {
+const runConformanceSuite = (conformanceDir: string): ConformanceResult => {
   try {
-    const { batch } = verifyDirectoryReports(CONFORMANCE_FIXTURES);
+    const { batch } = verifyDirectoryReports(conformanceDir);
     return summarizeConformance(batch);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -81,9 +89,12 @@ export const formatSummary = (summary: VerifySummary): string => {
   return lines.join('\n');
 };
 
-export const runVerify = (): VerifySummary => {
+export const formatSummaryJson = (summary: VerifySummary): string => JSON.stringify(summary, null, 2);
+
+export const runVerify = (options: VerifyOptions = {}): VerifySummary => {
+  const conformanceDir = resolveConformanceDir(options.conformanceDir);
   const canonical = runCanonicalFlow();
-  const conformance = runConformanceSuite();
+  const conformance = runConformanceSuite(conformanceDir);
   const overall = deriveOverall(canonical.status, conformance.status);
 
   const summary: VerifySummary = {
@@ -92,15 +103,38 @@ export const runVerify = (): VerifySummary => {
     overall,
   };
 
-  const summaryText = formatSummary(summary);
-  // eslint-disable-next-line no-console
-  console.log(summaryText);
-
-  process.exitCode = overall === 'FAIL' ? 2 : 0;
-
   return summary;
 };
 
-if (require.main === module) {
-  runVerify();
+const parseDirArg = (argv: string[]): string | undefined => {
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (arg === '--dir') {
+      return argv[index + 1];
+    }
+    if (arg.startsWith('--dir=')) {
+      return arg.slice('--dir='.length);
+    }
+  }
+  return undefined;
+};
+
+const main = (): void => {
+  const cliDir = parseDirArg(process.argv.slice(2));
+  const conformanceDir = resolveConformanceDir(cliDir);
+  const summary = runVerify({ conformanceDir });
+  const summaryText = formatSummary(summary);
+  const jsonMode = process.env.LTP_VERIFY_JSON === '1';
+
+  // eslint-disable-next-line no-console
+  console.log(jsonMode ? formatSummaryJson(summary) : summaryText);
+
+  process.exitCode = summary.overall === 'FAIL' ? 2 : 0;
+};
+
+const mainArg = process.argv[1];
+const isMain = mainArg ? pathToFileURL(mainArg).href === import.meta.url : false;
+
+if (isMain) {
+  main();
 }
