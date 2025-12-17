@@ -1,9 +1,10 @@
 # LTP — Liminal Thread Protocol
 
-LTP is a deterministic, explainable routing protocol for stateful systems.
+LTP is a deterministic routing protocol for agent and stateful systems.
 
-It helps systems answer:
-“What are the plausible next paths, given where we are now — and why?”
+It answers a narrow engineering question: “What are the plausible next paths, given where we are now — and why?”
+
+**Standard-grade surface:** Frozen Core v0.1, Canonical Flow, Conformance Kit, RFC Process, minimal live Governance.
 
 LTP is NOT:
 - a recommendation engine
@@ -33,11 +34,11 @@ LTP evolves through an open RFC process focused on stability, explainability, an
 
 ## Two-Layer Terminology
 
-- **Orientation** — current semantic state (aka Liminal Position)
-- **Route Response** — multiple plausible paths (aka Meaning Branches)
+- **Orientation** — current semantic state
+- **Route Response** — multiple plausible paths
 - **Focus Snapshot** — state telemetry for diagnostics
 
-Use the primary terms in code and APIs; secondary names in parentheses are acceptable in docs.
+Use the primary terms in code and APIs; secondary names are optional in deeper docs.
 
 ## Where LTP Fits
 
@@ -57,13 +58,13 @@ LTP is infrastructure, not an application.
 
 LTP v0.1 core is frozen (frames, canonical routing order, conformance harness). HUDs, agent helpers, and LIMINAL-specific experiences are optional extensions that must not alter core semantics. See [docs/LTP-Core-vs-Extensions.md](./docs/LTP-Core-vs-Extensions.md) for details.
 
-## Design Principles (Optional)
+## Philosophy (optional)
 
-For the philosophical framing and design motivations, see [docs/LTP-PHILOSOPHY.md](./docs/LTP-PHILOSOPHY.md).
+Design motivations and the broader context live in [docs/LTP-PHILOSOPHY.md](./docs/LTP-PHILOSOPHY.md) and [specs/LTP-THINKS-v0.1.md](./specs/LTP-THINKS-v0.1.md). The core protocol is engineered and testable without them.
 
 ## What is LTP
 
-L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving context, intent, and inner state between LIMINAL nodes and clients. v0.1 is frozen as a small, deterministic frame surface so demos, SDKs, and conformance tools stay in lockstep.
+L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving context, intent, and orientation between nodes and clients. v0.1 is frozen as a small, deterministic frame surface so demos, SDKs, and conformance tools stay in lockstep.
 
 ## v0.1 protocol surface (frozen)
 
@@ -134,7 +135,7 @@ surface includes: hello, heartbeat, orientation, route_request, route_response, 
 
 ## Overview
 
-L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the LIMINAL ecosystem. It serves as a "liminal thread" - a protected communication channel between human devices and LIMINAL OS that preserves context, intent, and inner state throughout the interaction.
+L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the LIMINAL ecosystem, but it does not require LIMINAL OS or any specific AI stack. It is a protected communication channel that preserves context, intent, and orientation throughout an interaction.
 
 ### Ethos
 
