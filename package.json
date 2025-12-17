@@ -35,7 +35,8 @@
     "test:turtle": "vitest run src/turtle/__tests__",
     "conformance:report": "ts-node scripts/conformance/generateConformanceReport.ts",
     "ltp:conformance": "ts-node tools/conformance-kit/src/cli.ts",
-    "conformance:verify": "pnpm -w ltp:conformance verify"
+    "conformance:verify": "pnpm -w ltp:conformance verify",
+    "ltp:verify": "ts-node tools/verify/runVerify.ts"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
