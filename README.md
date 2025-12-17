@@ -95,6 +95,7 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving co
 - Actions: replays the frozen Canonical Flow v0.1 and verifies `fixtures/conformance/v0.1` via the conformance kit.
 - Output: compact summary showing canonical status, conformance status + score/errors, and overall status.
 - Exit codes: `OK`/`WARN` -> 0, `FAIL` -> 2 (suitable for CI pipelines).
+- Overrides: set `LTP_CONFORMANCE_DIR` or pass `--dir <path>` to point at custom fixture packages; set `LTP_VERIFY_JSON=1` to emit a JSON summary instead of text.
 
 ## Release v0.1 quickstart (always works)
 
