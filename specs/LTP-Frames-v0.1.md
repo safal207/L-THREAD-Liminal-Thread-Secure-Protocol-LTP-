@@ -1,4 +1,6 @@
-# LTP Frames v0.1 — Status: Draft (Frozen for v0.1)
+# LTP Frames v0.1 — Status: RC1 (additive-only)
+
+_Status: RC1. Change policy: **additive-only** until v0.1 tag. See `specs/LTP-v0.1-RC1.md` for the release gate and cross-SDK smoke entrypoint. Linked flow requirements live in `specs/LTP-Canonical-Flow-v0.1.md` and conformance in `specs/LTP-Conformance-v0.1.md`._
 
 ## Purpose
 Frames are the minimal, self-describing units of the Liminal Thread Protocol (LTP). Each frame expresses the state of a line at a moment in time and can be understood equally by Rust nodes, Node gateways, JS SDKs, and HUDs without depending on any specific storage layer. Frames are additive: new frame types may be introduced, but existing ones must not be broken.

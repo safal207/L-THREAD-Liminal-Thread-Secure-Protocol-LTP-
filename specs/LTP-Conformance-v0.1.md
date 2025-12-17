@@ -1,4 +1,6 @@
-# LTP Conformance v0.1 (Draft)
+# LTP Conformance v0.1 — Status: RC1 (additive-only)
+
+_Status: RC1. Change policy: **additive-only** until v0.1 tag. Canonical flow reference: `specs/LTP-Canonical-Flow-v0.1.md`; frame surface: `specs/LTP-Frames-v0.1.md`. Release gate and smoke instructions live in `specs/LTP-v0.1-RC1.md`._
 
 ## Purpose
 Defines the minimal, testable requirements an implementation MUST satisfy to be considered LTP-conformant.

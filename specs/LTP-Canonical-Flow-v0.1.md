@@ -1,7 +1,8 @@
-# LTP Canonical Flow v0.1 — Status: Draft (Normative intent, Frozen for v0.1)
+# LTP Canonical Flow v0.1 — Status: RC1 (additive-only)
 
-**Status:** Draft (Normative intent, frozen at v0.1 for shape compatibility)
-**Depends on:** `specs/LTP-Frames-v0.1.md`, `specs/LTP-Flow-v0.1.md`
+**Status:** RC1 (normative intent, frozen at v0.1 for shape compatibility)  
+**Change policy:** additive-only until v0.1 tag.  
+**Depends on:** `specs/LTP-Frames-v0.1.md`, `specs/LTP-Flow-v0.1.md`, `specs/LTP-Conformance-v0.1.md`. See `specs/LTP-v0.1-RC1.md` for the RC checklist and CI gate.
 
 ## Purpose
 This document defines the **canonical, deterministic reference flow** for LTP v0.1.
