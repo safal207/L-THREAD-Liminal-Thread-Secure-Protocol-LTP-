@@ -33,6 +33,11 @@ The following are frozen in v0.1:
 - Canonical flow
 - Conformance rules
 
+## Normative References
+- [LTP Frames v0.1](./LTP-Frames-v0.1.md)
+- [LTP Canonical Flow v0.1](./LTP-Canonical-Flow-v0.1.md)
+- [LTP Conformance v0.1](./LTP-Conformance-v0.1.md)
+
 ## Evolution Path
 - Extensions via RFC only
 - Backward compatibility preserved

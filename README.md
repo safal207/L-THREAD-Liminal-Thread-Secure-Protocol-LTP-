@@ -18,6 +18,14 @@ LTP is NOT:
 LTP v0.1 is officially released as a frozen core standard.
 The protocol is stable, governed, and safe for early production use
 in non-critical and experimental systems.
+v0.1 is frozen: no breaking changes; extensions only via RFC.
+
+**Support matrix (v0.1):** Transports — WS ✅, REST ✅. SDKs — JS ✅, Python ✅, Rust ✅.
+
+**v0.1 release package:**
+- [Release definition](./specs/LTP-v0.1-Release.md)
+- [Release checklist](./specs/LTP-v0.1-Release-Checklist.md)
+- Conformance v0.1: PASS ![Conformance v0.1 badge](https://img.shields.io/badge/LTP%20Conformance-v0.1%20PASS-brightgreen)
 
 ## Two-Layer Terminology
 
@@ -139,6 +147,8 @@ LTP was created by Aleksey Safonov to keep routing deterministic and explainable
 - [LTP Flow v0.1 (Draft)](./specs/LTP-Flow-v0.1.md) - Living, orientable motion of frames across time
 - [LTP Canonical Flow v0.1 (Draft/Frozen)](./specs/LTP-Canonical-Flow-v0.1.md) - Deterministic reference sequence for routing
 - [LTP v0.1 Release Slice](./specs/LTP-v0.1-Release-Slice.md) - One-page contract for artifacts, badges, and demo expectations
+- [LTP v0.1 Release](./specs/LTP-v0.1-Release.md) - Public release definition and usage guidance
+- [LTP v0.1 Release Checklist](./specs/LTP-v0.1-Release-Checklist.md) - Quick validation before tagging or marketing v0.1
 - [Project Map](./PROJECT_MAP.md) - Single entry point for specs, SDKs, nodes, and demos. **If you're new, start here.**
 - [Contributing Guide](./CONTRIBUTING.md) - How to contribute to LTP
 - [Changelog](./CHANGELOG.md) - Version history and changes
