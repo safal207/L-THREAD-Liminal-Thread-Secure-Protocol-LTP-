@@ -1,29 +1,75 @@
 # LTP — Liminal Thread Protocol
 
-LTP is a deterministic routing protocol for agent and stateful systems.
+**Deterministic routing protocol for context continuity, explainable transitions, and multi-path futures.**
 
-It answers a narrow engineering question: “What are the plausible next paths, given where we are now — and why?”
+LTP defines *how decisions, transitions, and agent handoffs are represented, verified, and replayed* — without black boxes, recommendations, or hidden state.
 
-**Standard-grade surface:** Frozen Core v0.1, Canonical Flow, Conformance Kit, RFC Process, minimal live Governance.
+---
 
-LTP is NOT:
-- a recommendation engine
-- an ML model
-- a black-box decision system
+### Versioning & Stability
 
-**Version:** 0.6.0-alpha.3
-**Status:** Production-Ready (Enterprise) | Security Hardened
+- **Protocol:** `v0.1` — **Frozen Core**  
+  Frames, Canonical Flow, Conformance, and Determinism rules are fixed and governed via RFC.
 
-## Quick Verify (30 seconds)
+- **Tooling / SDKs:** `0.x` — **Rapid Iteration**  
+  CLI, DevTools, SDKs, and integrations evolve independently of the protocol core.
 
-```
-pnpm install
+> Think: stable protocol, fast tooling.
+
+---
+
+### What LTP is (and is not)
+
+**LTP is:**
+- A protocol for deterministic decision routing
+- A standard you can verify, audit, and replay
+- A neutral layer for continuity across systems and agents
+
+**LTP is not:**
+- ❌ A recommendation system  
+- ❌ A machine learning model  
+- ❌ A black-box intelligence layer
+
+---
+
+## 🧭 Choose your path
+
+### ⚡ Try in 10 minutes (engineers)
+Verify the protocol core and see deterministic routing in action.
+
+```bash
 pnpm -w ltp:verify
 ```
 
-- JS SDK works
-- Canonical flow works
-- v0.1 conformance fixtures pass
+- Runs conformance checks
+- Produces a stable, machine-readable report
+- Confirms protocol compliance
+
+→ See: tools/conformance-kit/
+
+---
+
+### 🧩 Adopt in 30 minutes (platform teams)
+
+Embed LTP into an existing system or workflow.
+
+- Routing and decision flows
+- Deterministic replay
+- Explainable transitions
+
+→ Start here: adoption/ and docs/LTP-Adoption-Guide.md
+
+---
+
+### 📜 Spec & Governance (architects, standards)
+
+Understand the protocol rules and how changes are made.
+
+- Protocol specification
+- Conformance rules
+- RFC & governance process
+
+→ See: specs/ and governance/
 
 ## Protocol Status
 
@@ -161,35 +207,9 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer designed for the 
 LTP was created by Aleksey Safonov to keep routing deterministic and explainable. For the full philosophical context and design motivations, read [LTP Philosophy](./docs/LTP-PHILOSOPHY.md).
 
 📖 **Documentation:**
-- [Architecture Overview](./ARCHITECTURE.md) - Ecosystem architecture and SDK comparison
-- [Deployment Guide](./DEPLOYMENT.md) - Production deployment strategies
-- [API Reference](./API.md) - Complete API documentation for all SDKs
-- [Protocol Specifications](./specs/) - Detailed protocol specifications
-- [Two-Layer Terminology Glossary](./specs/GLOSSARY.md) - Primary naming for orientations, route responses, and focus snapshots
-- [Liminal Web Overview](./specs/LTP-Liminal-Web-Overview.md) - How thread, time, and consciousness layers fit together
-- [Consciousness Web & Orientation Shell](./specs/LTP-ConsciousnessWeb.md) - Semantic graph + focus layer built atop the Thread Life Model
-- [LTP Flow v0.1 (Draft)](./specs/LTP-Flow-v0.1.md) - Living, orientable motion of frames across time
-- [LTP Canonical Flow v0.1 (Draft/Frozen)](./specs/LTP-Canonical-Flow-v0.1.md) - Deterministic reference sequence for routing
-- [LTP v0.1 Release Slice](./specs/LTP-v0.1-Release-Slice.md) - One-page contract for artifacts, badges, and demo expectations
-- [LTP v0.1 Release](./specs/LTP-v0.1-Release.md) - Public release definition and usage guidance
-- [LTP v0.1 Release Checklist](./specs/LTP-v0.1-Release-Checklist.md) - Quick validation before tagging or marketing v0.1
-- [Project Map](./PROJECT_MAP.md) - Single entry point for specs, SDKs, nodes, and demos. **If you're new, start here.**
-- [Contributing Guide](./CONTRIBUTING.md) - How to contribute to LTP
-- [Changelog](./CHANGELOG.md) - Version history and changes
-- [Security Policy](./.github/SECURITY.md) - Security reporting and best practices
-- [LTP Adoption Playbook](./adoption/LTP-Adoption-Playbook-v0.1.md) - How to adopt LTP without replacing existing systems.
-- [LTP Adoption Guide](./docs/LTP-Adoption-Guide.md) - 30-minute evaluation flow (read → run → verify → decide)
-- [LTP THINKS](./specs/LTP-THINKS-v0.1.md) - The core philosophy and boundaries of the protocol. **Start here.**
-- [LTP vs Existing Paradigms](./positioning/LTP-vs-Existing-Paradigms-v0.1.md) - How LTP differs from ML, Web3, SaaS.
-- [LTP Positioning](./docs/vision/LTP-Positioning.md) - What LTP is and is not
-- [What LTP Is Not](./specs/LTP-What-It-Is-Not.md) - Negative contours and non-goals of the protocol.
-- [LTP Philosophy](./docs/LTP-PHILOSOPHY.md) - Optional design framing and ethos
-- [LTP Core vs Extensions](./docs/LTP-Core-vs-Extensions.md) - What is frozen v0.1 core vs optional layers
-- [LTP Economics & Market Roles](./economics/LTP-Economics-and-Market-Roles-v0.1.md) - How value is created around the protocol.
-- [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
-- [LTP Adoption & Certification Levels](./specs/LTP-ADOPTION-v0.1.md) - Defines adoption levels for the ecosystem.
-- [Status](./STATUS.md) - Protocol maturity and compatibility policy
-- [LTP Governance](./governance/LTP-Governance.md) and [RFC Process](./governance/LTP-RFC-Process.md) - How the protocol evolves.
+- Start with the curated [Docs Index](./docs/INDEX.md) to pick the right path.
+- See the [Project Map](./PROJECT_MAP.md) for a broader artifact directory.
+- Governance and RFC process: [LTP Governance](./governance/LTP-Governance.md) and [LTP RFC Process](./governance/LTP-RFC-Process.md).
 
 ### Governance Mapping (v0.1 Release Slice)
 
