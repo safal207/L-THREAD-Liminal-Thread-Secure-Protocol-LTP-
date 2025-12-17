@@ -31,7 +31,7 @@ export interface VerifyOptions {
 
 const VERSION = '0.1';
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
-const CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
+const DEFAULT_CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
 
 const CHECK_ORDER: VerifyCheckName[] = ['build', 'js-sdk-tests', 'conformance', 'cross-sdk-types', 'demos'];
 
@@ -144,7 +144,7 @@ const summarizeConformance = (batch: ConformanceReportBatch): VerifyCheck => {
 
 const runConformance = (): VerifyCheck => {
   try {
-    const { batch } = verifyDirectoryReports(CONFORMANCE_FIXTURES);
+    const { batch } = verifyDirectoryReports(conformanceDir);
     return summarizeConformance(batch);
   } catch (error) {
     return {
