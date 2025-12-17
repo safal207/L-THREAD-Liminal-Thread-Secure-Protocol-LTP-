@@ -13,6 +13,12 @@ LTP is NOT:
 **Version:** 0.6.0-alpha.3
 **Status:** Production-Ready (Enterprise) | Security Hardened
 
+## Protocol Status
+
+LTP v0.1 is officially released as a frozen core standard.
+The protocol is stable, governed, and safe for early production use
+in non-critical and experimental systems.
+
 ## Two-Layer Terminology
 
 - **Orientation** — current semantic state (aka Liminal Position)

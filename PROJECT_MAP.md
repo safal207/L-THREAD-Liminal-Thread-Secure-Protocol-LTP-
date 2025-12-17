@@ -36,6 +36,7 @@ scripts/
 - `specs/LTP-Flow-v0.1.md`: Flow v0.1 motion/ordering rules for frames across time (frozen for v0.1).
 - `specs/LTP-Canonical-Flow-v0.1.md`: Canonical Flow v0.1 deterministic hello→heartbeat→orientation→routing reference sequence for conformance (includes the Conformance v0.1 checklist).
 - `specs/LTP-Spec-v0.1.md`: consolidated spec entry point tying frames and flow together.
+- `specs/LTP-v0.1-Release.md`: official public release definition.
 - Frozen means no shape changes or new required fields until v0.2; compatibility and determinism have priority.
 
 ## 5. Reference implementations
