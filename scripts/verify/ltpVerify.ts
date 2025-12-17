@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { renderCanonicalDemo } from '../../src/demos/canonicalFlowDemo.v0.1';
 import { verifyDirectoryReports } from '../../tools/conformance-kit/src/verify';
 import type { ConformanceReportBatch } from '../../tools/conformance-kit/src/types';
@@ -22,8 +23,10 @@ export interface VerifySummary {
   overall: VerifyStatus;
 }
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '..', '..');
-const CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
+const DEFAULT_CONFORMANCE_FIXTURES = path.join(ROOT_DIR, 'fixtures', 'conformance', 'v0.1');
 
 const summarizeConformance = (batch: ConformanceReportBatch): ConformanceResult => {
   const { score, summary } = batch;
@@ -47,9 +50,9 @@ const runCanonicalFlow = (): CanonicalResult => {
   }
 };
 
-const runConformanceSuite = (): ConformanceResult => {
+const runConformanceSuite = (conformanceDir: string): ConformanceResult => {
   try {
-    const { batch } = verifyDirectoryReports(CONFORMANCE_FIXTURES);
+    const { batch } = verifyDirectoryReports(conformanceDir);
     return summarizeConformance(batch);
   } catch (error) {
     // eslint-disable-next-line no-console
@@ -68,7 +71,7 @@ const deriveOverall = (canonical: VerifyStatus, conformance: VerifyStatus): Veri
   return 'OK';
 };
 
-export const formatSummary = (summary: VerifySummary): string => {
+export const formatSummaryText = (summary: VerifySummary): string => {
   const lines = [
     'LTP v0.1 verify',
     '---------------',
@@ -81,9 +84,13 @@ export const formatSummary = (summary: VerifySummary): string => {
   return lines.join('\n');
 };
 
-export const runVerify = (): VerifySummary => {
+export const formatSummary = formatSummaryText;
+
+export const formatSummaryJson = (summary: VerifySummary): string => JSON.stringify(summary, null, 2);
+
+export const runVerify = async (conformanceDir: string): Promise<VerifySummary> => {
   const canonical = runCanonicalFlow();
-  const conformance = runConformanceSuite();
+  const conformance = runConformanceSuite(conformanceDir);
   const overall = deriveOverall(canonical.status, conformance.status);
 
   const summary: VerifySummary = {
@@ -92,15 +99,48 @@ export const runVerify = (): VerifySummary => {
     overall,
   };
 
-  const summaryText = formatSummary(summary);
-  // eslint-disable-next-line no-console
-  console.log(summaryText);
-
-  process.exitCode = overall === 'FAIL' ? 2 : 0;
-
   return summary;
 };
 
-if (require.main === module) {
-  runVerify();
+function resolveConformanceDir(argv: string[]): string | undefined {
+  const eq = argv.find((arg) => arg.startsWith('--dir='));
+  if (eq) return path.resolve(eq.slice('--dir='.length));
+
+  const idx = argv.indexOf('--dir');
+  if (idx === -1) return undefined;
+
+  const value = argv[idx + 1];
+  if (!value || value.startsWith('--')) {
+    throw new Error('Missing value for --dir. Usage: --dir <path> or --dir=<path>');
+  }
+  return path.resolve(value);
+}
+
+function isMainModule(): boolean {
+  // ESM-safe "am I the entrypoint?"
+  return import.meta.url === `file://${process.argv[1]}`;
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  const dirFromArg = resolveConformanceDir(argv);
+  const envDir = process.env.LTP_CONFORMANCE_DIR ? path.resolve(process.env.LTP_CONFORMANCE_DIR) : undefined;
+  const conformanceDir = dirFromArg ?? envDir ?? DEFAULT_CONFORMANCE_FIXTURES;
+
+  const summary = await runVerify(conformanceDir);
+
+  if (process.env.LTP_VERIFY_JSON === '1') {
+    console.log(formatSummaryJson(summary));
+  } else {
+    console.log(formatSummaryText(summary));
+  }
+
+  process.exitCode = summary.overall === 'FAIL' ? 2 : 0;
+}
+
+// If executed directly: node scripts/verify/ltpVerify.ts ...
+if (isMainModule()) {
+  main().catch((err) => {
+    console.error(err);
+    process.exitCode = 1;
+  });
 }
