@@ -89,6 +89,13 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving co
   - `pnpm -w ltp:conformance verify:dir fixtures/conformance/v0.1 --out reports/ci-report.json`
   - `pnpm -w ltp:conformance selftest --mode calm`
 
+## Quick verify (one command)
+
+- Run: `pnpm -w ltp:verify`
+- Actions: replays the frozen Canonical Flow v0.1 and verifies `fixtures/conformance/v0.1` via the conformance kit.
+- Output: compact summary showing canonical status, conformance status + score/errors, and overall status.
+- Exit codes: `OK`/`WARN` -> 0, `FAIL` -> 2 (suitable for CI pipelines).
+
 ## Release v0.1 quickstart (always works)
 
 1. Install dependencies: `pnpm -w install` (fallback: `npm install`).

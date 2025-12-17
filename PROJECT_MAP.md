@@ -62,6 +62,8 @@ scripts/
 - Demos are part of the protocol proof; keep them aligned with specs.
 
 ## 9. Quickstart
+Fast path CI check: `pnpm -w ltp:verify` (runs canonical flow + conformance fixtures; exits 0 on OK/WARN, 2 on FAIL).
+
 1) Install deps: `npm install` (root) and `cd sdk/js && npm install` for SDK workspace.
 2) Validate types/tests: `npm test` (root) or `npm run test:verify-types` for schema checks.
 3) Run canonical Rust node: `cd nodes/ltp-rust-node && LTP_NODE_ADDR=127.0.0.1:7070 cargo run -p ltp-rust-node`.
