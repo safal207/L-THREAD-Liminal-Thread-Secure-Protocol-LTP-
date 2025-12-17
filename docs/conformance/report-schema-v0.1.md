@@ -14,6 +14,8 @@ The report is the **authoritative artifact** produced by LTP verification tools 
 - **schemaVersion:** `v0.1`
 - Backward-incompatible changes require a new major schema version
 - Tooling MAY add extra fields, but MUST NOT alter or remove defined fields
+- **protocolVersion** is frozen at `v0.1` for this schema
+- **toolingVersion** follows `0.x.y` semver and may move faster than the protocol
 
 ---
 
@@ -35,7 +37,19 @@ The report is the **authoritative artifact** produced by LTP verification tools 
     "failed": 0
   },
 
-  "suites": [ /* see below */ ],
+  "suites": [
+    {
+      "id": "ltp-self-test",
+      "result": "OK",
+      "checks": [
+        {
+          "id": "ltp-node-self-test",
+          "result": "OK",
+          "details": "mode=calm level=LTP-Canonical"
+        }
+      ]
+    }
+  ],
 
   "timings": {
     "startedAt": "ISO-8601",
@@ -82,7 +96,7 @@ Exit codes MAY map to these values, but the report is the source of truth.
 - canonical flow
 - verified transitions
 
-It MUST remain identical across runs given identical inputs. This enables:
+It is formatted as `sha256:<64 hex>` and MUST remain identical across runs given identical inputs. This enables:
 
 - reproducibility checks
 - audit trails
