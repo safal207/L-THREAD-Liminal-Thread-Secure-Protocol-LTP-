@@ -128,6 +128,15 @@ class LtpClient:
         self.is_connected = False
         self.is_handshake_complete = False
 
+        # Ensure an event loop exists even when instantiated in non-async contexts
+        # (e.g., synchronous unit tests). Python 3.11+ no longer creates a default
+        # loop implicitly, so we create and set one if none is running.
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
         self.heartbeat_interval_ms = 15000
         self.heartbeat_task: Optional[asyncio.Task] = None
         self.receiver_task: Optional[asyncio.Task] = None
