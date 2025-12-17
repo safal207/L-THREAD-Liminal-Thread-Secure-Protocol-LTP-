@@ -35,6 +35,10 @@ Secondary:
 
 LTP is infrastructure, not an application.
 
+## Core vs Extensions
+
+LTP v0.1 core is frozen (frames, canonical routing order, conformance harness). HUDs, agent helpers, and LIMINAL-specific experiences are optional extensions that must not alter core semantics. See [docs/LTP-Core-vs-Extensions.md](./docs/LTP-Core-vs-Extensions.md) for details.
+
 ## Design Principles (Optional)
 
 For the philosophical framing and design motivations, see [docs/LTP-PHILOSOPHY.md](./docs/LTP-PHILOSOPHY.md).
@@ -140,6 +144,7 @@ LTP was created by Aleksey Safonov to keep routing deterministic and explainable
 - [LTP Positioning](./docs/vision/LTP-Positioning.md) - What LTP is and is not
 - [What LTP Is Not](./specs/LTP-What-It-Is-Not.md) - Negative contours and non-goals of the protocol.
 - [LTP Philosophy](./docs/LTP-PHILOSOPHY.md) - Optional design framing and ethos
+- [LTP Core vs Extensions](./docs/LTP-Core-vs-Extensions.md) - What is frozen v0.1 core vs optional layers
 - [LTP Economics & Market Roles](./economics/LTP-Economics-and-Market-Roles-v0.1.md) - How value is created around the protocol.
 - [LTP Services](./docs/LTP-Services.md) - Neutral list of services around LTP
 - [LTP Adoption & Certification Levels](./specs/LTP-ADOPTION-v0.1.md) - Defines adoption levels for the ecosystem.
