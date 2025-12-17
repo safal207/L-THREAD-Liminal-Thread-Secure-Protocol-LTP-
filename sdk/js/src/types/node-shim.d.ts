@@ -43,7 +43,11 @@ declare module 'node:child_process' {
     stderr: T;
   }
 
-  function spawnSync(command: string, args?: string[], options?: { encoding?: string }): SpawnSyncReturns<string>;
+  function spawnSync(
+    command: string,
+    args?: string[],
+    options?: { encoding?: string; stdio?: any },
+  ): SpawnSyncReturns<string>;
   export { spawnSync };
 }
 

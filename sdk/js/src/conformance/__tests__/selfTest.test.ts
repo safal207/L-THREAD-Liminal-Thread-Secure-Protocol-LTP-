@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { buildCanonicalSelfTestFrames, resolveSelfTestMode, runSelfTest } from '../selfTest';
 
@@ -81,13 +83,20 @@ runTest('modes produce deterministic but distinct reports', () => {
 
 runTest('cli self-test command emits canonical report', () => {
   const cliPath = path.resolve(__dirname, '../../cli.js');
-  const result = spawnSync('node', [cliPath], { encoding: 'utf-8' });
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-cli-selftest-'));
+  const outPath = path.join(tmpDir, 'stdout.json');
+  const outFile = fs.openSync(outPath, 'w');
+
+  const result = spawnSync('node', [cliPath], { stdio: ['ignore', outFile, 'inherit'] });
+  fs.closeSync(outFile);
 
   assert.equal(result.status, 0);
-  const output = JSON.parse(result.stdout);
+  const output = JSON.parse(fs.readFileSync(outPath, 'utf-8'));
   assert.equal(output.ok, true);
   assert.equal(output.level, 'LTP-Canonical');
   assert.equal(output.branches >= 2, true);
   assert.ok(typeof output.determinismHash === 'string');
   assert.equal(resolveSelfTestMode(output.mode), output.mode);
+
+  fs.rmSync(tmpDir, { recursive: true, force: true });
 });
