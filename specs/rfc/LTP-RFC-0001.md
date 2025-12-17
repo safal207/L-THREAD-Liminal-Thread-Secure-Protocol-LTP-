@@ -62,7 +62,7 @@ LTP complements REST by providing stateful, explainable routing semantics absent
 - Human-in-the-loop alignment: the protocol must allow inspection, intervention, and overrides without breaking flows.
 
 ## Future Work
-- Establishment of a governance process for maintaining and evolving RFCs.
+- Governance process and lifecycle rules are defined in [LTP-RFC-0000](./LTP-RFC-0000.md); future revisions should reference updates there.
 - Additional RFCs detailing canonical flow structures, frame semantics, and conformance criteria.
 - Formal definition of conformance levels and negotiated capabilities between participants.
 - Reference implementations and test suites across multiple languages and transports.

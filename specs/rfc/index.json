@@ -1,0 +1,14 @@
+[
+  {
+    "number": "LTP-RFC-0000",
+    "title": "Governance and RFC Process",
+    "status": "Active",
+    "link": "./LTP-RFC-0000.md"
+  },
+  {
+    "number": "LTP-RFC-0001",
+    "title": "Motivation, Scope, and Non-Goals",
+    "status": "Draft",
+    "link": "./LTP-RFC-0001.md"
+  }
+]
