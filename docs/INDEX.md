@@ -10,6 +10,7 @@
 - Frames & Determinism — `specs/LTP-Frames-v0.1.md`
 
 ## Conformance
+- Conformance Badge — `docs/conformance/badge.md`
 - Conformance Kit — `tools/conformance-kit/`
 - Reports & Badges — `specs/LTP-Conformance-Report-v0.1.md`
 - Report Schema v0.1 — `docs/conformance/report-schema-v0.1.md`
