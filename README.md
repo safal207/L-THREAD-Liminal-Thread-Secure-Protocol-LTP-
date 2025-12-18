@@ -137,6 +137,10 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving co
 4. `route_request`
 5. `route_response` with branches: `primary`, `recover`, `explore` (array or map accepted; normalized internally)
 
+## DevTools
+
+LTP includes thin inspection tools for tracing, replaying, and explaining orientation flows. These tools are intended for CI, audit, and debugging — not for automated decision making. The first utility, `ltp-inspect`, focuses on replayable summaries rather than optimization or normalization.
+
 ## Conformance kit (v0.1)
 
 - Expected-negative fixtures: `ok_*` must pass, `warn_*` should warn (but not fail), `fail_*` are expected failures.

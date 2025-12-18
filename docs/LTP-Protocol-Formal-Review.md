@@ -17,13 +17,13 @@
   - *Proposed:* Identify the authoritative compute locus for Orientation evaluation and routing decisions. Invariant: a frame sequence MUST identify the active focus node ID; only that node may emit `route_response` for the associated `route_request`.
 - **Primitive: Drift**
   - *Missing:* Quantification of divergence between intended Orientation and observed state.
-  - *Proposed:* Define drift as a scalar or structured metric attached to `focus_snapshot`, computed against a declared expected Orientation hash. Invariant: drift MUST be monotonic with respect to elapsed time within a canonical flow unless corrected by a new Orientation frame.
+  - *Proposed:* Define drift as a scalar or structured metric attached to `focus_snapshot`, computed against a declared expected Orientation hash. v0.1 treats drift as informational only—no monotonicity or cross-implementation invariant is required.
 - **Primitive: Future Branch**
   - *Missing:* Frame/field-level representation beyond `primary/recover/explore` labels.
-  - *Proposed:* Treat each branch as `{id, path, confidence, rationale, constraints}`. Invariant: at least one branch MUST be marked `primary`; confidence scores MUST sum to 1.0 ± ε.
+  - *Proposed:* Treat each branch as `{id, path, confidence?, rationale, constraints}`. Invariant: at least one branch MUST be marked `primary`; confidence values are OPTIONAL but if present MUST be within `[0.0, 1.0]`. Normalization is tooling-only, not a protocol requirement.
 - **Primitive: Continuity**
   - *Missing:* Persistence/chain rule tying frames across sessions.
-  - *Proposed:* Define continuity token carried in all frames after `hello`; token binds Orientation to Route Requests/Responses. Invariant: token MUST be stable across retries within a session and rotate only on explicit reset.
+  - *Proposed:* Define continuity token carried in all frames after `hello`; token binds Orientation to Route Requests/Responses. Invariant: token MUST be stable across retries within a session and rotation is FORBIDDEN mid-session in v0.1; rotation is allowed only at explicit session boundaries.
 - **Primitive: Orientation**
   - *Missing:* Serialization contract and mutability rules.
   - *Proposed:* Orientation payload MUST be JSON object with declared schema version; updates MUST be idempotent within a sequence number; hash of Orientation SHOULD be included in `route_request` for replay verification.
@@ -46,7 +46,7 @@
 7. **Invariants**
    - Required frame sequencing
    - Single authoritative focus node per continuity token
-   - Confidence-sum constraint on branches
+   - Optional confidence values on branches MUST respect `[0.0, 1.0]` when present; normalization is tooling-driven
 8. **Failure Semantics**
    - Handling of missing/unknown frame types (warn vs fail)
    - Timeout and heartbeat loss behavior
@@ -68,7 +68,7 @@
 - **Data Structures:**
   - `Frame` object with `id`, `ts`, `type`, `payload`, `continuity_token`, optional `seq`.
   - `Orientation` record (versioned schema) with hash for replay.
-  - `Branch` record `{id, class(primary|recover|explore), confidence, rationale, path}`.
+  - `Branch` record `{id, class(primary|recover|explore), confidence?, rationale, path}` where confidence values, if present, stay within `[0.0, 1.0]`.
   - `Snapshot` record capturing Orientation hash, drift metric, and heartbeat status.
 - **Interfaces:**
   - Input: subscribe to application events to emit frames; ingest incoming frames from transport.
@@ -84,5 +84,5 @@
 - **Hardest to Standardize:** Drift measurement and Future Branch confidence semantics—without strict definitions, scores and branch normalization will vary across stacks.
 - **Scope to Simplify for v0.1:**
   - Defer drift to an informational metric without cross-node invariants.
-  - Fix branch schema to `{id, class, path}` with optional confidence to reduce interoperability risk.
+  - Fix branch schema to `{id, class, path}` with optional confidence to reduce interoperability risk and keep values within `[0.0, 1.0]` when present.
   - Mandate a single continuity token per session and forbid mid-session rotation.
