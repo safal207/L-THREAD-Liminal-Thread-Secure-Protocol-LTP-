@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LTP DevTools — Conformance Landing</title>
+  <style>
+    :root {
+      --bg: #0b1021;
+      --card: #0f162e;
+      --text: #e8ecf5;
+      --muted: #b6bed5;
+      --accent: #7cf5ff;
+      --accent-strong: #42d3ff;
+      --border: #1e2544;
+      --badge: #18a999;
+      --warn: #ffb347;
+      --success: #64f4ac;
+      --shadow: 0 18px 60px rgba(0, 0, 0, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 24px 96px;
+    }
+
+    header {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      padding: 32px;
+      background: linear-gradient(140deg, rgba(24, 31, 64, 0.9), rgba(15, 22, 46, 0.95));
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(124, 245, 255, 0.14), transparent 45%),
+        radial-gradient(circle at 80% 10%, rgba(100, 244, 172, 0.16), transparent 40%),
+        radial-gradient(circle at 40% 80%, rgba(66, 211, 255, 0.12), transparent 38%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    header > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 2.4rem;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1.1rem;
+      max-width: 760px;
+    }
+
+    .bullets {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px 18px;
+      margin: 8px 0 4px;
+      padding: 0;
+      list-style: none;
+    }
+
+    .bullets li {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      color: var(--text);
+      font-weight: 600;
+      letter-spacing: -0.005em;
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .cta {
+      background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+      color: #041028;
+      border: none;
+      padding: 14px 22px;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 1rem;
+      letter-spacing: 0.01em;
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: 0 10px 36px rgba(66, 211, 255, 0.35);
+      transition: transform 0.08s ease, box-shadow 0.1s ease;
+    }
+
+    .cta:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 16px 40px rgba(66, 211, 255, 0.4);
+    }
+
+    .cta-note {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    section {
+      margin-top: 56px;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      background: var(--card);
+      box-shadow: 0 12px 50px rgba(0, 0, 0, 0.28);
+    }
+
+    section h2 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 1.6rem;
+      letter-spacing: -0.015em;
+    }
+
+    p {
+      margin: 12px 0;
+      color: var(--muted);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+
+    strong {
+      color: var(--text);
+    }
+
+    .grid-two {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 18px;
+    }
+
+    .tag-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 16px 0 8px;
+    }
+
+    .tag {
+      padding: 8px 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .proof-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin: 18px 0;
+    }
+
+    .proof-card {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .proof-card h3 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+
+    .muted-box {
+      border: 1px dashed var(--border);
+      padding: 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .highlight-box {
+      border: 1px solid var(--accent-strong);
+      border-radius: 14px;
+      padding: 18px;
+      background: rgba(66, 211, 255, 0.06);
+      color: var(--text);
+    }
+
+    .pricing {
+      display: grid;
+      gap: 12px;
+      margin: 16px 0;
+    }
+
+    .price-line {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.05rem;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .badge-preview {
+      margin-top: 8px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--badge);
+      background: rgba(24, 169, 153, 0.12);
+      color: var(--text);
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .steps {
+      list-style: decimal inside;
+      padding: 0;
+      margin: 12px 0 8px;
+      color: var(--muted);
+    }
+
+    .steps li {
+      margin: 8px 0;
+    }
+
+    .footer-note {
+      text-align: center;
+      color: var(--muted);
+      margin-top: 48px;
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 720px) {
+      header {
+        padding: 24px;
+      }
+      h1 {
+        font-size: 2rem;
+      }
+      section {
+        padding: 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Make complex decision systems verifiable, inspectable, and certifiable.</h1>
+        <p class="subtitle">LTP is a protocol-level DevTool for teams who must explain, audit, and trust their systems — without black boxes.</p>
+      </div>
+      <ul class="bullets">
+        <li>Deterministic verification</li>
+        <li>Read-only inspection</li>
+        <li>CI-ready conformance badges</li>
+        <li>No ML. No heuristics. No vendor lock-in.</li>
+      </ul>
+      <div class="cta-row">
+        <a class="cta" href="#offer">Get Conformance Badge</a>
+        <span class="cta-note">CI-ready · 5 minutes · No account required</span>
+      </div>
+    </header>
+
+    <section id="problem">
+      <h2>Modern systems make decisions engineers can’t explain.</h2>
+      <p>Today’s platforms rely on:</p>
+      <div class="grid-two">
+        <div>
+          <div class="tag">multi-step decision flows</div>
+          <div class="tag">agent handoffs</div>
+          <div class="tag">context-dependent routing</div>
+        </div>
+        <div>
+          <p>Yet teams are asked to:</p>
+          <div class="tag">debug outcomes they can’t replay</div>
+          <div class="tag">audit logic they can’t inspect</div>
+          <div class="tag">explain decisions made by opaque systems</div>
+        </div>
+      </div>
+      <div class="muted-box">This is not a tooling gap. It’s a protocol gap.</div>
+    </section>
+
+    <section id="mechanism">
+      <h2>LTP introduces a protocol for decision continuity.</h2>
+      <p>LTP does not optimize decisions. It defines how decisions move, branch, and complete — deterministically.</p>
+      <div class="grid-two">
+        <div class="highlight-box">
+          <strong>What this enables:</strong>
+          <ul>
+            <li>verification instead of guesswork</li>
+            <li>inspection instead of inference</li>
+            <li>certification instead of trust-by-assumption</li>
+          </ul>
+        </div>
+        <p class="muted-box">This is why LTP integrates around your system — not instead of it.</p>
+      </div>
+    </section>
+
+    <section id="proof">
+      <h2>Proof, not promises.</h2>
+      <div class="proof-cards">
+        <div class="proof-card">
+          <h3>✅ Conformance Report</h3>
+          <p class="muted">machine-verifiable</p>
+        </div>
+        <div class="proof-card">
+          <h3>🔍 Inspector</h3>
+          <p class="muted">human-readable</p>
+        </div>
+        <div class="proof-card">
+          <h3>🏷 Conformance Badge</h3>
+          <p class="muted">CI artifact</p>
+        </div>
+      </div>
+      <div class="badge-preview">Same report → same output. Always.</div>
+    </section>
+
+    <section id="authority">
+      <h2>Designed for engineers who carry responsibility.</h2>
+      <div class="grid-two">
+        <div>
+          <p>LTP is used by teams building:</p>
+          <ul>
+            <li>fintech &amp; trading infrastructure</li>
+            <li>risk and compliance systems</li>
+            <li>AI agent platforms with continuity requirements</li>
+          </ul>
+        </div>
+        <div class="muted-box">If you are responsible for auditability and trust, LTP is for you.</div>
+      </div>
+    </section>
+
+    <section id="fit">
+      <h2>LTP is not for everyone.</h2>
+      <p>LTP is not:</p>
+      <div class="tag-list">
+        <span class="tag">a recommendation engine</span>
+        <span class="tag">a prediction model</span>
+        <span class="tag">an orchestration framework</span>
+      </div>
+      <div class="muted-box">If you are looking for rankings, optimization, or growth hacks — this is not your tool.</div>
+    </section>
+
+    <section id="offer">
+      <h2>Get your LTP Conformance Badge</h2>
+      <div class="grid-two">
+        <div>
+          <p><strong>LTP Conformance (DevTools)</strong></p>
+          <ul>
+            <li>CI-ready badge</li>
+            <li>Deterministic verification</li>
+            <li>Inspector-readable report</li>
+            <li>Community support</li>
+          </ul>
+          <div class="pricing">
+            <div class="price-line">$99 / repo / month</div>
+            <div class="price-line">or $500 / year</div>
+          </div>
+          <div class="cta-row">
+            <a class="cta" href="#checkout">Get Certified</a>
+            <span class="cta-note">Enterprise — Contact us</span>
+          </div>
+        </div>
+        <div class="highlight-box">
+          <p><strong>After checkout:</strong></p>
+          <ol class="steps">
+            <li>Run LTP verify in CI</li>
+            <li>Generate conformance report</li>
+            <li>Receive badge artifact</li>
+            <li>Optional review if result ≠ OK</li>
+          </ol>
+          <p>No dashboards.<br />No lock-in.<br />Artifacts stay with you.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="value">
+      <h2>What this page gives you</h2>
+      <div class="grid-two">
+        <div class="highlight-box">
+          <p><strong>Dollars</strong></p>
+          <ul>
+            <li>первые повторяемые платежи</li>
+            <li>не фриланс, не консалтинг</li>
+            <li>спокойно масштабируется</li>
+          </ul>
+        </div>
+        <div class="highlight-box">
+          <p><strong>Influence</strong></p>
+          <ul>
+            <li>ты становишься точкой входа в стандарт</li>
+            <li>рынок начинает ориентироваться на badge</li>
+            <li>дальше → Fintech, Enterprise, Big Tech</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="calibration">
+      <h2>Калибровка по Ирану (теперь уже честно)</h2>
+      <ul>
+        <li>DevTools readiness: 100%</li>
+        <li>Landing + Offer: первые деньги</li>
+        <li>Следующий скачок влияния: Fintech / Risk</li>
+      </ul>
+    </section>
+
+    <section id="next">
+      <h2>Что предлагаю дальше (по шагам)</h2>
+      <ol class="steps">
+        <li>Сверстать эту страницу (минимум дизайна, максимум ясности)</li>
+        <li>Подключить Stripe / SamCart</li>
+        <li>Найти 2 design-partners</li>
+        <li>Зафиксировать кейсы → Фаза 2</li>
+      </ol>
+      <p>Если хочешь, следующим шагом я могу:</p>
+      <ul>
+        <li>✍️ переписать текст под твою личную интонацию</li>
+        <li>🎨 предложить конкретный layout (блоки + порядок)</li>
+        <li>🧾 сформировать SamCart checkout copy</li>
+      </ul>
+      <div class="cta-row">
+        <a class="cta" href="#offer">Launch with this copy</a>
+        <span class="cta-note">Без воды. Это уже продающий артефакт, а не концепт.</span>
+      </div>
+    </section>
+
+    <div class="footer-note">Protocol-level confidence for decision systems that must be explainable.</div>
+  </main>
+</body>
+</html>
