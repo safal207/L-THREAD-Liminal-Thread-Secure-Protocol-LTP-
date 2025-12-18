@@ -9,25 +9,52 @@ type Cli = {
   help?: boolean;
 };
 
-function parseArgs(argv: string[]): Cli {
+export function parseArgs(argv: string[]): Cli {
   const out: Cli = {};
   const args = [...argv];
+  let positional: string | undefined;
+  let afterDoubleDash = false;
 
   // positional: first non-flag is reportPath
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
 
+    if (a === '--') {
+      afterDoubleDash = true;
+      continue;
+    }
+
     if (a === '--help' || a === '-h') out.help = true;
 
-    if (a === '--schema') out.schemaPath = args[i + 1];
-    if (a.startsWith('--schema=')) out.schemaPath = a.slice('--schema='.length);
+    if (a === '--schema') {
+      out.schemaPath = args[i + 1];
+      i++;
+      continue;
+    }
 
-    if (a === '--report') out.reportPath = args[i + 1];
-    if (a.startsWith('--report=')) out.reportPath = a.slice('--report='.length);
+    if (a.startsWith('--schema=')) {
+      out.schemaPath = a.slice('--schema='.length);
+      continue;
+    }
+
+    if (a === '--report') {
+      out.reportPath = args[i + 1];
+      i++;
+      continue;
+    }
+
+    if (a.startsWith('--report=')) {
+      out.reportPath = a.slice('--report='.length);
+      continue;
+    }
+
+    if (!a.startsWith('-') && !out.reportPath) {
+      if (afterDoubleDash && !positional) positional = a;
+      else if (!afterDoubleDash && !positional) positional = a;
+    }
   }
 
   if (!out.reportPath) {
-    const positional = args.find((x) => x !== '--' && !x.startsWith('-'));
     if (positional) out.reportPath = positional;
   }
 
