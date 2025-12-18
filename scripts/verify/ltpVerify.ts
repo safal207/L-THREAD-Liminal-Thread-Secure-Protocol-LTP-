@@ -194,6 +194,7 @@ export const runLtpVerify = async (options: VerifyOptions = {}): Promise<VerifyR
     checks,
     overall: deriveOverall(checks),
   };
+};
 
   const summary = formatSummary(report);
   // eslint-disable-next-line no-console

@@ -6,32 +6,34 @@ import { generateConformanceReport, writeConformanceReport } from '../../scripts
 const fixedTimestamp = 1_730_000_000_000;
 
 describe('conformance report generator', () => {
-  it('produces deterministic schema with stable timestamp input', () => {
+  it('produces deterministic schema v0.1 with stable timestamp input', () => {
     const first = generateConformanceReport({ timestampMs: fixedTimestamp });
     const second = generateConformanceReport({ timestampMs: fixedTimestamp });
 
     expect(first).toEqual(second);
-    expect(first.ok).toBe(true);
-    expect(first.version).toBeTruthy();
-    expect(first.timestamp).toEqual({
-      epoch_ms: fixedTimestamp,
-      iso: new Date(fixedTimestamp).toISOString(),
-    });
+    expect(first.schemaVersion).toBe('v0.1');
+    expect(first.protocolVersion).toBe('v0.1');
+    expect(first.toolingVersion).toMatch(/^\d+\.\d+\.\d+$/);
 
-    expect(first.checks).toHaveLength(1);
-    const check = first.checks[0];
-    expect(check.name).toBe('ltp-node-self-test');
-    expect(check.ok).toBe(true);
-    expect(check.determinismHash).toBeTruthy();
-    expect(check.stats.received).toBeGreaterThan(0);
-    expect(check.stats.processed).toBeGreaterThan(0);
-    expect(check.errors).toEqual([]);
+    expect(first.timings.startedAt).toBe(new Date(fixedTimestamp).toISOString());
+    expect(first.timings.finishedAt).toBe(new Date(fixedTimestamp).toISOString());
+    expect(first.timings.durationMs).toBe(0);
 
+    expect(first.suites).toHaveLength(1);
+    const suite = first.suites[0];
+    expect(suite.id).toBe('ltp-self-test');
+    expect(suite.result).toBe('OK');
+    expect(suite.checks).toHaveLength(1);
+    const check = suite.checks[0];
+    expect(check.id).toBe('ltp-node-self-test');
+    expect(check.result).toBe('OK');
+    expect(check.details).toContain('mode=');
+
+    expect(first.determinismHash.startsWith('sha256:')).toBe(true);
     expect(first.summary).toEqual({
-      total: 1,
       passed: 1,
+      warnings: 0,
       failed: 0,
-      determinismHash: check.determinismHash,
     });
   });
 
@@ -47,7 +49,7 @@ describe('conformance report generator', () => {
     const parsed = JSON.parse(fs.readFileSync(targetPath, 'utf-8'));
 
     expect(parsed.summary).toEqual(report.summary);
-    expect(parsed.timestamp.iso).toBe(report.timestamp.iso);
+    expect(parsed.timings.startedAt).toBe(report.timings.startedAt);
 
     fs.unlinkSync(targetPath);
   });

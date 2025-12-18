@@ -111,6 +111,11 @@ jobs:
           set -euxo pipefail
           pnpm run conformance:report -- --mode calm
           cat artifacts/conformance-report.json
+      - name: Validate conformance report against schema
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pnpm -w ltp:report:validate -- artifacts/conformance-report.json
       - name: Upload conformance report
         uses: actions/upload-artifact@v4
         with:
