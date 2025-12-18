@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import Ajv, { type ErrorObject } from 'ajv';
+import Ajv, { type ErrorObject } from 'ajv/dist/2020';
 import addFormats from 'ajv-formats';
 import schema from '../../schemas/ltp-conformance-report.v0.1.json';
 
@@ -40,8 +40,7 @@ export const validateReport = (report: unknown): ValidationResult => ({
 
 const parseArgs = (argv: string[]): { reportPath: string; help: boolean } => {
   const help = argv.includes('--help') || argv.includes('-h');
-  const positional = argv.filter((arg) => !arg.startsWith('-'));
-  const reportPath = positional[0] ?? DEFAULT_REPORT_PATH;
+  const reportPath = argv.find((arg) => arg !== '--' && !arg.startsWith('-')) ?? DEFAULT_REPORT_PATH;
   return { reportPath, help };
 };
 
