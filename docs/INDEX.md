@@ -12,8 +12,9 @@
 ## Conformance
 - Conformance Kit — `tools/conformance-kit/`
 - Reports & Badges — `specs/LTP-Conformance-Report-v0.1.md`
-- Conformance Report Schema v0.1 — `docs/conformance/report-schema-v0.1.md`
-- JSON Schema (machine-readable) — `schemas/ltp-conformance-report.v0.1.json`
+- Report Schema v0.1 — `docs/conformance/report-schema-v0.1.md`
+- JSON Schema v0.1 — `schemas/ltp-conformance-report.v0.1.json`
+- CI: Consume Report — `docs/conformance/ci-consume-report.md`
 
 ## Governance
 - RFC Process — `governance/LTP-RFC-Process.md`
