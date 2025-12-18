@@ -110,7 +110,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   process.exitCode = 2;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (require.main === module) {
   main().catch((e) => {
     // eslint-disable-next-line no-console
     console.error(e);
