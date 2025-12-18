@@ -1,83 +1,119 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import Ajv, { type ErrorObject } from 'ajv';
+import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import schema from '../../schemas/ltp-conformance-report.v0.1.json';
 
-const DEFAULT_REPORT_PATH = path.resolve(process.cwd(), 'artifacts/conformance-report.json');
-const ajv = new Ajv({ allErrors: true, strict: false });
-addFormats(ajv);
-
-const validator = ajv.compile(schema);
-
-type ValidationResult = {
-  valid: boolean;
-  errors?: ErrorObject[] | null;
+type Cli = {
+  reportPath?: string;
+  schemaPath?: string;
+  help?: boolean;
 };
 
-const formatErrors = (errors: ErrorObject[] | null | undefined): string => {
-  if (!errors || errors.length === 0) return 'Unknown validation error';
-  return errors
-    .map((err) => {
-      const instancePath = err.instancePath || '/';
-      const message = err.message ?? 'invalid value';
-      const details = err.params ? JSON.stringify(err.params) : '';
-      return `${instancePath}: ${message}${details ? ` (${details})` : ''}`;
-    })
-    .join('\n');
-};
+function parseArgs(argv: string[]): Cli {
+  const out: Cli = {};
+  const args = [...argv];
 
-const readReport = (targetPath: string): unknown => {
-  const resolved = path.resolve(process.cwd(), targetPath);
-  const contents = fs.readFileSync(resolved, 'utf-8');
-  return JSON.parse(contents);
-};
+  // positional: first non-flag is reportPath
+  for (let i = 0; i < args.length; i++) {
+    const a = args[i];
 
-export const validateReport = (report: unknown): ValidationResult => ({
-  valid: Boolean(validator(report)),
-  errors: validator.errors,
-});
+    if (a === '--help' || a === '-h') out.help = true;
 
-const parseArgs = (argv: string[]): { reportPath: string; help: boolean } => {
-  const help = argv.includes('--help') || argv.includes('-h');
-  const positional = argv.filter((arg) => !arg.startsWith('-'));
-  const reportPath = positional[0] ?? DEFAULT_REPORT_PATH;
-  return { reportPath, help };
-};
+    if (a === '--schema') out.schemaPath = args[i + 1];
+    if (a.startsWith('--schema=')) out.schemaPath = a.slice('--schema='.length);
 
-export const main = (argv = process.argv.slice(2)): void => {
-  const { reportPath, help } = parseArgs(argv);
-
-  if (help) {
-    // eslint-disable-next-line no-console
-    console.log('Usage: pnpm -w ltp:report:validate -- <reportPath>');
-    process.exit(0);
+    if (a === '--report') out.reportPath = args[i + 1];
+    if (a.startsWith('--report=')) out.reportPath = a.slice('--report='.length);
   }
 
-  try {
-    const report = readReport(reportPath);
-    const result = validateReport(report);
+  if (!out.reportPath) {
+    const positional = args.find((x) => !x.startsWith('-'));
+    if (positional) out.reportPath = positional;
+  }
 
-    if (result.valid) {
-      // eslint-disable-next-line no-console
-      console.log(`✅ Conformance report is valid: ${reportPath}`);
-      return;
-    }
+  return out;
+}
 
+function printHelp(): void {
+  // eslint-disable-next-line no-console
+  console.log(`Usage:
+  pnpm -w ltp:report:validate -- <reportPath> [--schema <schemaPath>]
+
+Examples:
+  pnpm -w ltp:report:validate -- artifacts/conformance-report.json
+  pnpm -w ltp:report:validate -- artifacts/conformance-report.json --schema schemas/ltp-conformance-report.v0.1.json
+`);
+}
+
+function readJsonFile(filePath: string): unknown {
+  const raw = fs.readFileSync(filePath, 'utf-8');
+  return JSON.parse(raw);
+}
+
+export async function main(argv = process.argv.slice(2)): Promise<void> {
+  const args = parseArgs(argv);
+
+  if (args.help) {
+    printHelp();
+    process.exitCode = 0;
+    return;
+  }
+
+  const reportPath = args.reportPath ? path.resolve(args.reportPath) : undefined;
+
+  const schemaPath = path.resolve(args.schemaPath ?? 'schemas/ltp-conformance-report.v0.1.json');
+
+  if (!reportPath) {
     // eslint-disable-next-line no-console
-    console.error(`❌ Conformance report is invalid (${reportPath}):`);
-    // eslint-disable-next-line no-console
-    console.error(formatErrors(result.errors));
-    process.exitCode = 2;
-  } catch (error) {
-    // eslint-disable-next-line no-console
-    console.error(`Failed to validate conformance report at ${reportPath}`);
-    // eslint-disable-next-line no-console
-    console.error(error instanceof Error ? error.message : error);
+    console.error('Missing report path. Run with --help for usage.');
     process.exitCode = 1;
+    return;
   }
-};
 
-if (require.main === module) {
-  main();
+  if (!fs.existsSync(reportPath)) {
+    // eslint-disable-next-line no-console
+    console.error(`Report file not found: ${reportPath}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  if (!fs.existsSync(schemaPath)) {
+    // eslint-disable-next-line no-console
+    console.error(`Schema file not found: ${schemaPath}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const report = readJsonFile(reportPath);
+  const schema = readJsonFile(schemaPath);
+
+  const ajv = new Ajv({ allErrors: true, strict: false });
+  addFormats(ajv);
+
+  const validate = ajv.compile(schema as any);
+  const ok = validate(report);
+
+  if (ok) {
+    // eslint-disable-next-line no-console
+    console.log(`Conformance report is valid ✅ (${path.basename(schemaPath)})`);
+    process.exitCode = 0;
+    return;
+  }
+
+  // eslint-disable-next-line no-console
+  console.error(`Conformance report is INVALID ❌ (${path.basename(schemaPath)})`);
+  for (const err of validate.errors ?? []) {
+    // eslint-disable-next-line no-console
+    console.error(`- ${err.instancePath || '/'} ${err.message}`);
+  }
+
+  process.exitCode = 2;
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => {
+    // eslint-disable-next-line no-console
+    console.error(e);
+    process.exitCode = 1;
+  });
 }
