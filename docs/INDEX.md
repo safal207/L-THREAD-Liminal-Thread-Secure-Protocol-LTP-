@@ -20,5 +20,6 @@
 - RFC Process — `governance/LTP-RFC-Process.md`
 - Versioning Policy — `STATUS.md`
 
-## DevTools (early)
-- Inspector (WIP) — `tools/`
+## DevTools
+- LTP Inspector — `docs/devtools/inspector.md`
+- DevTools Manifesto — `docs/devtools/manifesto.md`
