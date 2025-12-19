@@ -139,9 +139,13 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving co
 
 ## DevTools
 
-LTP does not choose actions. It maintains orientation so actions remain coherent over time.
+`ltp:inspect` is a read-only inspector that emits deterministic orientation summaries for CI, audits, and debugging.
 
-LTP includes thin inspection tools for tracing, replaying, and explaining orientation flows. These tools are intended for CI, audit, and debugging — not for automated decision making. The first utility, `ltp-inspect`, focuses on replayable summaries rather than optimization or normalization. Inspector emits a versioned, deterministic state summary suitable for CI, audits, and replay; run via `pnpm -w ltp:inspect -- --help` for kubectl-style usage and examples.
+Not for automated recommendations or decision making.
+
+Run: `pnpm -w ltp:inspect -- --help` for kubectl-style usage and examples.
+
+Contract: [ltp-inspect contract v1](./docs/contracts/ltp-inspect.v1.md).
 
 ## Conformance kit (v0.1)
 

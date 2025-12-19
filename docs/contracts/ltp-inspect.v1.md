@@ -1,11 +1,22 @@
 # ltp:inspect contract v1.0
 
 - **Scope:** read-only orientation summaries; no decision making or normalization.
-- **Determinism:** field ordering is stable; branches are sorted by `id`; timestamps are ISO-8601.
+- **MUST:** stable field ordering, sorted `branches` by `id`, ISO-8601 timestamps.
+- **SHOULD:** include tool build metadata and input descriptors (path, count, format).
+- **MAY:** emit debug notes and vendor extensions (prefixed fields) without affecting stability.
 - **Top-level fields:** `contract`, `generated_at`, `tool`, `input`, `orientation`, `continuity`, `branches`, `notes`.
 - **Schema:** canonical JSON Schema lives at [`docs/contracts/ltp-inspect.v1.schema.json`](./ltp-inspect.v1.schema.json).
 - **Compatibility:** v1 fields are stable; additions will be backward-compatible via optional keys.
 - **Input surface:** accepts JSON arrays or JSONL streams of canonical LTP frames.
+
+## Field stability
+
+| Path | Type | Meaning | Stability |
+| --- | --- | --- | --- |
+| `orientation.stable` | boolean | Whether an `orientation` frame was observed | Stable |
+| `continuity.preserved` | boolean | Whether the continuity token remained consistent | Stable |
+| `branches[].confidence` | number 0..1 | Reported branch confidence score | Stable |
+| `notes[]` | string | Human-readable observations and warnings | Best-effort |
 
 Example (truncated):
 

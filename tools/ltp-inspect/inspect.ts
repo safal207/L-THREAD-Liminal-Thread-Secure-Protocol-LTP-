@@ -83,7 +83,7 @@ function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSumm
   }
 
   const raw = fs.readFileSync(resolved, 'utf-8').trim();
-  if (!raw) return { frames: [], format: 'jsonl' };
+  if (!raw) throw new CliError(`Frame log is empty: ${resolved}`, 2);
 
   if (raw.startsWith('[')) {
     try {
@@ -140,8 +140,8 @@ function detectContinuity(frames: LtpFrame[]): { preserved: boolean; notes: stri
   };
 }
 
-function normalizeBranches(raw: unknown): BranchInsight[] {
-  if (!raw) return [];
+function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: string[]; violations: string[] } {
+  if (!raw) return { branches: [], notes: [], violations: [] };
 
   const branchesArray = Array.isArray(raw)
     ? raw
@@ -150,6 +150,10 @@ function normalizeBranches(raw: unknown): BranchInsight[] {
       : [];
 
   const normalized: BranchInsight[] = [];
+  const notes: string[] = [];
+  const violations: string[] = [];
+
+  const idsInOrder: string[] = [];
 
   for (const entry of branchesArray as Array<Record<string, any>>) {
     const id = (entry.id ?? entry.name ?? 'unnamed') as string;
@@ -164,33 +168,39 @@ function normalizeBranches(raw: unknown): BranchInsight[] {
       class: entry.class as string | undefined,
     };
 
-    normalized.push(branch);
-  }
-
-  return normalized.sort((a, b) => a.id.localeCompare(b.id));
-}
-
-function collectNotes(branches: BranchInsight[], baseNotes: string[]): string[] {
-  const notes = [...baseNotes];
-
-  for (const branch of branches) {
-    if (branch.confidence === undefined) {
-      notes.push(`branch ${branch.id} missing confidence (tooling MAY normalize)`);
-    } else if (branch.confidence < 0 || branch.confidence > 1) {
-      notes.push(`branch ${branch.id} confidence out of range [0,1]`);
+    if (confidence === undefined) {
+      notes.push(`branch ${id} missing confidence (tooling MAY normalize)`);
+    } else if (confidence < 0 || confidence > 1) {
+      notes.push(`branch ${id} confidence out of range [0,1]`);
+      violations.push(`branch ${id} confidence outside 0..1`);
     }
+
+    normalized.push(branch);
+    idsInOrder.push(id);
   }
 
-  return notes;
+  const isSorted = idsInOrder.every((id, index) => index === 0 || idsInOrder[index - 1].localeCompare(id) <= 0);
+  if (!isSorted && idsInOrder.length > 0) {
+    violations.push('branches ordering violated (expected id-sorted ascending)');
+  }
+
+  const sorted = normalized.sort((a, b) => a.id.localeCompare(b.id));
+  return { branches: sorted, notes, violations };
 }
 
-function summarize(frames: LtpFrame[], inputPath: string, format: InspectSummary['input']['format']): InspectSummary {
+function summarize(
+  frames: LtpFrame[],
+  inputPath: string,
+  format: InspectSummary['input']['format'],
+): { summary: InspectSummary; violations: string[] } {
   const continuity = detectContinuity(frames);
   const driftLevel = driftLevelFromSnapshots(frames);
   const orientationStable = frames.some((f) => f.type === 'orientation');
 
   const lastRouteResponse = [...frames].reverse().find((f) => f.type === 'route_response');
-  const branches = normalizeBranches(lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload);
+  const { branches, notes: branchNotes, violations } = normalizeBranches(
+    lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload,
+  );
 
   const baseNotes = [
     ...(Array.isArray(lastRouteResponse?.payload?.notes) ? lastRouteResponse?.payload?.notes : []),
@@ -198,34 +208,37 @@ function summarize(frames: LtpFrame[], inputPath: string, format: InspectSummary
   if (!orientationStable) baseNotes.push('no orientation frame observed');
   if (!lastRouteResponse) baseNotes.push('no route_response frame observed');
 
-  const notes = collectNotes(branches, baseNotes);
+  const notes = [...baseNotes, ...branchNotes];
 
   return {
-    contract: {
-      name: CONTRACT.name,
-      version: CONTRACT.version,
-      schema: CONTRACT.schema,
+    summary: {
+      contract: {
+        name: CONTRACT.name,
+        version: CONTRACT.version,
+        schema: CONTRACT.schema,
+      },
+      generated_at: new Date().toISOString(),
+      tool: {
+        name: TOOL.name,
+        build: TOOL.build,
+      },
+      input: {
+        path: path.resolve(inputPath),
+        frames: frames.length,
+        format,
+      },
+      orientation: {
+        stable: orientationStable,
+        drift_level: driftLevel,
+      },
+      continuity: {
+        preserved: continuity.preserved,
+        notes: continuity.notes,
+      },
+      branches,
+      notes,
     },
-    generated_at: new Date().toISOString(),
-    tool: {
-      name: TOOL.name,
-      build: TOOL.build,
-    },
-    input: {
-      path: path.resolve(inputPath),
-      frames: frames.length,
-      format,
-    },
-    orientation: {
-      stable: orientationStable,
-      drift_level: driftLevel,
-    },
-    continuity: {
-      preserved: continuity.preserved,
-      notes: continuity.notes,
-    },
-    branches,
-    notes,
+    violations,
   };
 }
 
@@ -274,11 +287,12 @@ export function formatHuman(summary: InspectSummary): string {
 
 export function runInspect(file: string): InspectSummary {
   const { frames, format } = loadFrames(file);
-  return summarize(frames, file, format);
+  return summarize(frames, file, format).summary;
 }
 
 function handleTrace(file: string, format: OutputFormat, pretty: boolean, writer: Writer): void {
-  const summary = runInspect(file);
+  const { frames, format: inputFormat } = loadFrames(file);
+  const { summary, violations } = summarize(frames, file, inputFormat);
 
   if (format === 'json') printJson(summary, pretty, writer);
   else if (format === 'human') printHuman(summary, writer);
@@ -286,6 +300,10 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, writer
     printJson(summary, pretty, writer);
     writer('');
     printHuman(summary, writer);
+  }
+
+  if (violations.length) {
+    throw new CliError(`Contract violation: ${violations.join('; ')}`, 3);
   }
 }
 
@@ -303,7 +321,8 @@ function handleReplay(file: string, from: string | undefined, writer: Writer): v
 }
 
 function handleExplain(file: string, branchId: string | undefined, writer: Writer): void {
-  const summary = runInspect(file);
+  const { frames, format } = loadFrames(file);
+  const { summary, violations } = summarize(frames, file, format);
   const target = branchId ?? summary.branches[0]?.id;
 
   if (!target) {
@@ -330,6 +349,10 @@ function handleExplain(file: string, branchId: string | undefined, writer: Write
   if (summary.orientation.drift_level !== 'unknown') {
     writer(`Observed drift level: ${summary.orientation.drift_level}`);
   }
+
+  if (violations.length) {
+    throw new CliError(`Contract violation: ${violations.join('; ')}`, 3);
+  }
 }
 
 function printHelp(writer: Writer): void {
@@ -352,6 +375,7 @@ function printHelp(writer: Writer): void {
   writer('Exit codes:');
   writer('  0 OK — contract produced');
   writer('  2 invalid input — unreadable or missing frames');
+  writer('  3 contract violation — ordering or schema failure');
   writer('  4 runtime failure — unexpected error');
 }
 
