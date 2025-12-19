@@ -1,27 +1,134 @@
-# Who Is LTP For?
+# Who LTP Is For and How to Get Started
 
-LTP is a transport-agnostic protocol for orientation and routing. It keeps clients and services in sync on where they are, where they intend to go, and which branch to take next—even when the underlying transport or runtime shifts.
+## Who LTP Is For
 
-## Infrastructure / platform teams
+LTP is designed for engineers building systems where continuity, determinism, and auditability matter more than producing locally optimal answers.
 
-**Pain:** Fragmented service meshes and gateways make it hard to express intent, evaluate route quality, and prove compatibility across stacks.
+Typical users include:
 
-**What LTP gives:** A minimal frame vocabulary (hello, heartbeat, orientation, route_request/route_response) that keeps routing intent consistent across transports. Focus snapshots and heartbeats give live posture without custom glue code.
+Platform & DevTools engineers operating long-running or stateful AI systems
 
-**First step:** Run the canonical flow or the new scenario scripts with ts-node to see deterministic branches, then map the frame payloads onto your service boundary model.
+System architects designing workflows that must remain coherent across retries, restarts, or component changes
 
-## AI agent platforms
+Teams in regulated or safety-critical environments where behavior must be explainable and replayable
 
-**Pain:** Agents swap between tools and transports, but coordination often relies on ad-hoc JSON contracts and brittle sequencing.
 
-**What LTP gives:** A locked v0.1 frame ordering that keeps agent orientation explicit and routes measurable. Confidence-bearing route_response payloads support planning and failover without bespoke policy engines.
+LTP is not optimized for quick prototyping or ad-hoc experimentation.
+It is intended for systems that must remain interpretable over time.
 
-**First step:** Mirror the basic routing scenario, confirm ordering with the conformance kit, and plug the route_response into your planner’s branch selector.
 
-## High-risk decision systems
+---
 
-**Pain:** Systems that gate safety or money need deterministic audits of how routing choices were made and whether fallbacks were available.
+## The Problem LTP Solves
 
-**What LTP gives:** Canonical sequencing plus structured rationales per branch, making it clear why a route was chosen and how it degrades. Version locks prevent silent drift between components.
+Most AI systems fail not because they predict poorly,
+but because they lose orientation over time.
 
-**First step:** Run the degraded-load scenario, observe the confidence spread, and pin the same frames into your review pipeline for repeatability.
+This usually becomes visible after retries, restarts, reconnects, or model changes —
+when behavior suddenly stops making sense, even though individual components still function.
+
+LTP provides a continuity layer that preserves coherent behavior across time by making orientation explicit, inspectable, and reproducible.
+
+
+---
+
+## What Using LTP Looks Like
+
+Using LTP does not change how models generate outputs.
+It changes how systems reason about transitions between states.
+
+Instead of treating each inference as an isolated event, LTP records:
+
+the current orientation
+
+admissible future branches
+
+constraints under which transitions remain valid
+
+drift accumulated over time
+
+
+The result is not “better answers”, but traceable trajectories.
+
+
+---
+
+## Getting Started (15 Minutes)
+
+This path is intentionally minimal and non-opinionated.
+
+1. Install the SDK
+
+
+2. Run the canonical demo
+
+
+3. Inspect the resulting orientation trace
+
+
+4. Verify conformance against the protocol
+
+
+
+Example (JavaScript):
+
+```
+pnpm install
+pnpm demo:canonical-v0.1
+pnpm ltp inspect ./artifacts/trace.json
+pnpm ltp verify
+```
+
+This process does not require running or configuring a model.
+It inspects continuity behavior independently of inference.
+
+
+---
+
+## What to Expect Next
+
+After completing the canonical demo, the following parts of the repository should become easier to interpret:
+
+protocol frames and schemas
+
+conformance tests and verification logic
+
+governance and RFC process
+
+
+At this stage, LTP should feel less like a framework and more like a protocol surface.
+
+
+---
+
+## What LTP Is Not
+
+For clarity, LTP is intentionally not:
+
+a decision-making system
+
+a model, agent, or inference engine
+
+a memory store or vector database
+
+an orchestration or task-management framework
+
+
+LTP does not choose actions.
+It maintains orientation so actions remain coherent over time.
+
+
+---
+
+## Final Note
+
+LTP is designed to be adopted slowly and deliberately.
+
+If your system already works well without explicit continuity guarantees,
+you may not need it.
+
+If your system fails in subtle ways when time, retries, or changes accumulate,
+LTP exists to make those failures observable.
+
+
+---
