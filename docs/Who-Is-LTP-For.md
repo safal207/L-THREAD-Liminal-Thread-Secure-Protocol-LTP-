@@ -49,6 +49,7 @@ drift accumulated over time
 
 
 The result is not “better answers”, but traceable trajectories.
+These transitions can be replayed and compared across versions.
 
 
 ---
