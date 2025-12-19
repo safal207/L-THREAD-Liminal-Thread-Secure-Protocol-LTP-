@@ -196,6 +196,7 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
     }
 
     normalized.push(branch);
+    idsInOrder.push(id);
   }
 
   const sorted = normalized.sort((a, b) => {

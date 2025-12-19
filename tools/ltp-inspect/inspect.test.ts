@@ -78,4 +78,17 @@ describe('ltp-inspect golden summary', () => {
     expect(logs.join('\n').trim()).toEqual(fs.readFileSync(expectedHumanWarnPath, 'utf-8').trim());
     vi.useRealTimers();
   });
+
+  it('returns exit code 3 for contract violations (unsorted branches)', () => {
+    const fixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const exitCode = execute(['--input', fixture], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(3);
+    expect(errors.join('\n')).toContain('Contract violation');
+  });
 });
