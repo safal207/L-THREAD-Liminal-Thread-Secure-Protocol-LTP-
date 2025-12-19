@@ -10,15 +10,18 @@ Run from the repo root (JSON by default):
 
 ```bash
 pnpm -w ltp:inspect -- --input fixtures/minimal.frames.jsonl
-pnpm -w ltp:inspect -- --format human --input fixtures/minimal.frames.jsonl
+pnpm -w ltp:inspect -- --format json --input fixtures/minimal.frames.jsonl
 pnpm -w ltp:inspect -- replay --input fixtures/minimal.frames.jsonl --from t3
 pnpm -w ltp:inspect -- explain --input fixtures/minimal.frames.jsonl --branch A
 ```
 
 Flags:
-- `--format json|human` (default: `json`)
+- `--format json|human` (default: `human`)
 - `--pretty` for pretty-printed JSON
 - `--input <path>` to point at a JSON array or JSONL frame log
+- `--color auto|always|never` for human output (default: `auto`)
+- `--quiet` to emit only the final status line
+- `--output <file>` to write the formatted output to disk
 
 Frames may be a JSON array or JSONL with one frame per line. Existing conformance fixtures work as input.
 
@@ -44,8 +47,15 @@ Sections included: Usage, Examples, Output, Exit codes.
 Exit code | Meaning
 --------- | -------
 0 | OK — contract produced
-2 | invalid input — unreadable or missing frames
+2 | invalid input or contract violation
+3 | WARN — degraded orientation or continuity
 4 | runtime failure — unexpected error
+
+Failure modes:
+- Invalid JSON / JSONL input → exit 2 with `Invalid JSON*` message.
+- Empty or missing frames file → exit 2 with `Frame log not found` or empty-input notice.
+- Contract violation (e.g., out-of-range confidence, missing required field) → exit 2.
+- Unexpected runtime error → exit 4 with error text.
 
 ## Output contract v1 (deterministic ordering)
 

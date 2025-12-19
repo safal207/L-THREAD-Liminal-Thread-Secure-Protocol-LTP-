@@ -1,0 +1,22 @@
+LTP INSPECTOR  v1.0
+input: /workspace/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/tools/ltp-inspect/fixtures/continuity-rotated.json  time: 2024-01-01T00:00:00.000Z
+
+ORIENTATION
+identity: stable
+drift: medium
+continuity: rotated
+
+CONSTRAINTS
+continuity: WARN
+  note: continuity token rotation detected mid-session
+
+FUTURE BRANCHES (non-decisional)
+ID  score  cost  risk  explainable  status
+A   0.70   -     -     yes          admissible
+B   0.20   -     -     yes          degraded
+
+NOTES / WARNINGS
+- drift adjusted
+- continuity token rotation detected mid-session
+
+RESULT: WARN (degraded)  exit: 3
