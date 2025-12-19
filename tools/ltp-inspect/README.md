@@ -45,7 +45,14 @@ Exit code | Meaning
 --------- | -------
 0 | OK — contract produced
 2 | invalid input — unreadable or missing frames
+3 | contract violation — ordering, required fields, or schema mismatch
 4 | runtime failure — unexpected error
+
+Failure modes:
+- Invalid JSON / JSONL input → exit 2 with `Invalid JSON*` message.
+- Empty or missing frames file → exit 2 with `Frame log not found` or empty-input notice.
+- Contract violation (e.g., unsorted branches, missing required field) → exit 3.
+- Unexpected runtime error → exit 4 with error text.
 
 ## Output contract v1 (deterministic ordering)
 
