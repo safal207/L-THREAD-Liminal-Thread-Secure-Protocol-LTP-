@@ -28,7 +28,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   return {
     command: (command as ParsedArgs['command']) ?? 'help',
     file,
-    format: (options.format as OutputFormat) || 'both',
+    format: (options.format as OutputFormat) || 'json',
     from: options.from as string | undefined,
     branch: options.branch as string | undefined,
   };
@@ -53,7 +53,7 @@ function loadFrames(filePath: string): LtpFrame[] {
     .map((line) => JSON.parse(line));
 }
 
-function driftLevelFromSnapshots(frames: LtpFrame[]): InspectSummary['driftLevel'] {
+function driftLevelFromSnapshots(frames: LtpFrame[]): InspectSummary['orientation']['drift_level'] {
   const driftValues = frames
     .filter((f) => f.type === 'focus_snapshot')
     .map((f) => (f.payload?.drift ?? f.payload?.drift_level ?? f.payload?.driftLevel) as number | string | undefined)
@@ -64,7 +64,7 @@ function driftLevelFromSnapshots(frames: LtpFrame[]): InspectSummary['driftLevel
   const last = driftValues[driftValues.length - 1];
   if (typeof last === 'string') {
     const normalized = last.toLowerCase();
-    if (['low', 'medium', 'high'].includes(normalized)) return normalized as InspectSummary['driftLevel'];
+    if (['low', 'medium', 'high'].includes(normalized)) return normalized as InspectSummary['orientation']['drift_level'];
     return 'unknown';
   }
 
@@ -87,9 +87,8 @@ function detectContinuity(frames: LtpFrame[]): { preserved: boolean; notes: stri
   };
 }
 
-function normalizeBranches(raw: unknown): Record<string, BranchInsight> {
-  const result: Record<string, BranchInsight> = {};
-  if (!raw) return result;
+function normalizeBranches(raw: unknown): BranchInsight[] {
+  if (!raw) return [];
 
   const branchesArray = Array.isArray(raw)
     ? raw
@@ -97,30 +96,35 @@ function normalizeBranches(raw: unknown): Record<string, BranchInsight> {
       ? Object.entries(raw as Record<string, any>).map(([id, value]) => ({ id, ...(value as Record<string, unknown>) }))
       : [];
 
+  const normalized: BranchInsight[] = [];
+
   for (const entry of branchesArray as Array<Record<string, any>>) {
-    const id = entry.id ?? entry.name ?? 'unnamed';
+    const id = (entry.id ?? entry.name ?? 'unnamed') as string;
     const confidence = entry.confidence as number | undefined;
     const status = (entry.status as string | undefined) ?? (entry.class === 'primary' ? 'admissible' : 'degraded');
 
-    result[id] = {
+    const branch: BranchInsight = {
+      id,
       confidence,
       status,
       path: entry.path as string | undefined,
       class: entry.class as string | undefined,
     };
+
+    normalized.push(branch);
   }
 
-  return result;
+  return normalized.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-function collectNotes(summary: InspectSummary): string[] {
-  const notes = [...summary.notes];
+function collectNotes(branches: BranchInsight[], baseNotes: string[]): string[] {
+  const notes = [...baseNotes];
 
-  for (const [id, branch] of Object.entries(summary.branches)) {
+  for (const branch of branches) {
     if (branch.confidence === undefined) {
-      notes.push(`branch ${id} missing confidence (tooling MAY normalize)`);
+      notes.push(`branch ${branch.id} missing confidence (tooling MAY normalize)`);
     } else if (branch.confidence < 0 || branch.confidence > 1) {
-      notes.push(`branch ${id} confidence out of range [0,1]`);
+      notes.push(`branch ${branch.id} confidence out of range [0,1]`);
     }
   }
 
@@ -135,60 +139,51 @@ function summarize(frames: LtpFrame[]): InspectSummary {
   const lastRouteResponse = [...frames].reverse().find((f) => f.type === 'route_response');
   const branches = normalizeBranches(lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload);
 
-  const summary: InspectSummary = {
-    orientationStable,
-    driftLevel,
-    continuityPreserved: continuity.preserved,
-    continuityNotes: continuity.notes,
+  const baseNotes = [
+    ...(Array.isArray(lastRouteResponse?.payload?.notes) ? lastRouteResponse?.payload?.notes : []),
+  ];
+  if (!orientationStable) baseNotes.push('no orientation frame observed');
+  if (!lastRouteResponse) baseNotes.push('no route_response frame observed');
+
+  const notes = collectNotes(branches, baseNotes);
+
+  return {
+    version: '0.1',
+    orientation: {
+      stable: orientationStable,
+      drift_level: driftLevel,
+    },
+    continuity: {
+      preserved: continuity.preserved,
+      notes: continuity.notes,
+    },
     branches,
-    notes: [],
+    notes,
   };
-
-  if (!orientationStable) summary.notes.push('no orientation frame observed');
-  if (!lastRouteResponse) summary.notes.push('no route_response frame observed');
-
-  summary.notes = collectNotes(summary);
-
-  return summary;
 }
 
 function printJson(summary: InspectSummary): void {
-  const payload = {
-    orientation: {
-      stable: summary.orientationStable,
-    },
-    drift: {
-      level: summary.driftLevel,
-    },
-    continuity: {
-      preserved: summary.continuityPreserved,
-      notes: summary.continuityNotes,
-    },
-    branches: summary.branches,
-    notes: summary.notes,
-  };
-
-  console.log(JSON.stringify(payload, null, 2));
+  console.log(JSON.stringify(summary, null, 2));
 }
 
 function printHuman(summary: InspectSummary): void {
   console.log('LTP INSPECT SUMMARY');
   console.log('-------------------');
-  console.log(`Orientation: ${summary.orientationStable ? 'stable' : 'missing'}`);
-  console.log(`Drift: ${summary.driftLevel}`);
-  console.log(`Continuity: ${summary.continuityPreserved ? 'preserved' : 'rotated'}`);
-  if (summary.continuityNotes.length) {
-    for (const note of summary.continuityNotes) console.log(`  note: ${note}`);
+  console.log(`Version: ${summary.version}`);
+  console.log(`Orientation: ${summary.orientation.stable ? 'stable' : 'missing'}`);
+  console.log(`Drift: ${summary.orientation.drift_level}`);
+  console.log(`Continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}`);
+  if (summary.continuity.notes.length) {
+    for (const note of summary.continuity.notes) console.log(`  note: ${note}`);
   }
   console.log('');
   console.log('Branches:');
-  const branchEntries = Object.entries(summary.branches);
-  if (!branchEntries.length) {
+  if (!summary.branches.length) {
     console.log('- none observed');
   } else {
-    for (const [id, b] of branchEntries) {
+    for (const b of summary.branches) {
       const suffix = b.confidence !== undefined ? ` (${b.confidence})` : ' (no confidence)';
-      console.log(`- ${id}: ${b.status}${suffix}`);
+      console.log(`- ${b.id}: ${b.status}${suffix}`);
     }
   }
   if (summary.notes.length) {
@@ -198,9 +193,13 @@ function printHuman(summary: InspectSummary): void {
   }
 }
 
-function handleTrace(file: string, format: OutputFormat): void {
+export function runInspect(file: string): InspectSummary {
   const frames = loadFrames(file);
-  const summary = summarize(frames);
+  return summarize(frames);
+}
+
+function handleTrace(file: string, format: OutputFormat): void {
+  const summary = runInspect(file);
 
   if (format === 'json') printJson(summary);
   else if (format === 'text') printHuman(summary);
@@ -225,28 +224,32 @@ function handleReplay(file: string, from?: string): void {
 }
 
 function handleExplain(file: string, branchId?: string): void {
-  const frames = loadFrames(file);
-  const summary = summarize(frames);
-  const target = branchId ?? Object.keys(summary.branches)[0];
+  const summary = runInspect(file);
+  const target = branchId ?? summary.branches[0]?.id;
 
   if (!target) {
     console.log('No branches present to explain.');
     return;
   }
 
-  const branch = summary.branches[target];
+  const branch = summary.branches.find((b) => b.id === target);
+  if (!branch) {
+    console.log(`Branch ${target} not found.`);
+    return;
+  }
+
   console.log(`Branch: ${target}`);
   console.log(`Status: ${branch.status}`);
   if (branch.path) console.log(`Path: ${branch.path}`);
   if (branch.class) console.log(`Class: ${branch.class}`);
   if (branch.confidence !== undefined) console.log(`Confidence: ${branch.confidence}`);
   else console.log('Confidence: (not provided; tooling MAY normalize)');
-  if (summary.continuityNotes.length) {
+  if (summary.continuity.notes.length) {
     console.log('Continuity Notes:');
-    for (const n of summary.continuityNotes) console.log(`- ${n}`);
+    for (const n of summary.continuity.notes) console.log(`- ${n}`);
   }
-  if (summary.driftLevel !== 'unknown') {
-    console.log(`Observed drift level: ${summary.driftLevel}`);
+  if (summary.orientation.drift_level !== 'unknown') {
+    console.log(`Observed drift level: ${summary.orientation.drift_level}`);
   }
 }
 
@@ -255,6 +258,8 @@ function printHelp(): void {
   console.log('  trace <frames.jsonl> [--json|--text|--both]');
   console.log('  replay <frames.jsonl> [--from <frameId>]');
   console.log('  explain <frames.jsonl> [--branch <id>]');
+  console.log('');
+  console.log('Outputs JSON by default; add --text for a human-readable view.');
   console.log('');
   console.log('Frames may be JSON array or JSONL with one frame per line.');
   console.log('Confidence values are optional; if present they must be within [0.0, 1.0].');

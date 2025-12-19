@@ -9,6 +9,7 @@ export type LtpFrame = {
 };
 
 export type BranchInsight = {
+  id: string;
   confidence?: number;
   status: string;
   path?: string;
@@ -16,10 +17,15 @@ export type BranchInsight = {
 };
 
 export type InspectSummary = {
-  orientationStable: boolean;
-  driftLevel: 'low' | 'medium' | 'high' | 'unknown';
-  continuityPreserved: boolean;
-  continuityNotes: string[];
-  branches: Record<string, BranchInsight>;
+  version: string;
+  orientation: {
+    stable: boolean;
+    drift_level: 'low' | 'medium' | 'high' | 'unknown';
+  };
+  continuity: {
+    preserved: boolean;
+    notes: string[];
+  };
+  branches: BranchInsight[];
   notes: string[];
 };

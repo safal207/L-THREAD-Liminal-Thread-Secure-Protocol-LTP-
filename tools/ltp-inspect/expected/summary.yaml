@@ -1,0 +1,21 @@
+{
+  "version": "0.1",
+  "orientation": {
+    "stable": true,
+    "drift_level": "medium"
+  },
+  "continuity": {
+    "preserved": true,
+    "notes": []
+  },
+  "branches": [
+    {
+      "id": "A",
+      "confidence": 0.62,
+      "status": "admissible"
+    }
+  ],
+  "notes": [
+    "retry updated drift"
+  ]
+}
