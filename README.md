@@ -119,6 +119,8 @@ LTP v0.1 core is frozen (frames, canonical routing order, conformance harness). 
 
 Design motivations and the broader context live in [docs/LTP-PHILOSOPHY.md](./docs/LTP-PHILOSOPHY.md) and [specs/LTP-THINKS-v0.1.md](./specs/LTP-THINKS-v0.1.md). The core protocol is engineered and testable without them.
 
+See [Operational Notes on Continuity](./docs/notes/continuity.md) for background on continuity-oriented operations.
+
 ## What is LTP
 
 L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving context, intent, and orientation between nodes and clients. v0.1 is frozen as a small, deterministic frame surface so demos, SDKs, and conformance tools stay in lockstep.
