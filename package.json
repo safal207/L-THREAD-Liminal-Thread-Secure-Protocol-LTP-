@@ -39,7 +39,7 @@
     "ltp:verify": "ts-node --project scripts/tsconfig.verify.json scripts/verify/ltpVerify.ts --out artifacts/conformance-report.json",
     "ltp:badge": "ts-node scripts/conformance/ltpBadge.ts",
     "ltp:report:validate": "ts-node --project scripts/tsconfig.verify.json scripts/verify/validateConformanceReport.ts",
-    "ltp:inspect": "ts-node scripts/inspect/ltpInspect.ts"
+    "ltp:inspect": "ts-node tools/ltp-inspect/inspect.ts"
   },
   "devDependencies": {
     "@types/ws": "^8.18.1",
@@ -55,4 +55,3 @@
     "tools/conformance-kit"
   ]
 }
-

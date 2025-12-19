@@ -1,17 +1,14 @@
-# ltp-inspect (minimal)
+# ltp-inspect
 
 Thin inspector for canonical LTP frame logs. The goal is replayable observability, not decision making or ML-driven scoring.
 
-## Why
-- Separate protocol MUSTs from tooling-only SHOULDs
-- Surface continuity drift/rotation without enforcing math invariants
-- Provide a CI-friendly summary for SREs and a human-readable view for architects
-
-## Install / Run
-Use `ts-node` from the repo root:
+## One-command entrypoint
+Run from the repo root (JSON by default):
 
 ```bash
-npx ts-node tools/ltp-inspect/inspect.ts trace <frames.jsonl>
+pnpm -w ltp:inspect -- trace frames.jsonl
+pnpm -w ltp:inspect -- replay frames.jsonl --from t3
+pnpm -w ltp:inspect -- explain frames.jsonl --branch A
 ```
 
 Frames may be a JSON array or JSONL with one frame per line. Existing conformance fixtures work as input.
@@ -21,23 +18,40 @@ Frames may be a JSON array or JSONL with one frame per line. Existing conformanc
 - `replay <frames.jsonl> [--from <frameId>]` — print the frame sequence for deterministic playback
 - `explain <frames.jsonl> [--branch <id>]` — show branch-level details without normalizing confidence
 
-## Output
-The JSON summary keeps confidence optional while enforcing bounds when present:
+## CI semantics
 
-```json
-{
-  "orientation": { "stable": true },
-  "drift": { "level": "medium" },
-  "continuity": { "preserved": true, "notes": [] },
-  "branches": {
-    "A": { "confidence": 0.62, "status": "admissible" },
-    "B": { "confidence": 0.24, "status": "degraded" }
-  },
-  "notes": []
-}
+Condition | CI Result
+--------- | ---------
+confidence out of range | ❌ fail
+missing confidence | ⚠ warn
+continuity break | ❌ fail
+drift present | ℹ info
+
+## Stable output contract
+
+```
+version: 0.1
+orientation:
+  stable: true
+  drift_level: medium
+continuity:
+  preserved: true
+branches:
+  - id: A
+    confidence: 0.62
+    status: admissible
+notes:
+  - retry updated drift
 ```
 
-The human view mirrors the protocol language and flags continuity rotation as forbidden in v0.1.
+Output format is stable within minor versions.
+
+## Why DevOps use LTP Inspect
+
+- Deterministic replay of AI flows
+- CI-visible continuity violations
+- Audit-friendly orientation tracking
+- No hidden decision logic
 
 ## Boundaries
 - Does **not** normalize or sum confidence values (tooling-only concern)
