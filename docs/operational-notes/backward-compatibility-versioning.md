@@ -43,6 +43,7 @@ Stricter validation is compatible if previously valid states remain valid
 
 Extensions are compatible when defaults preserve prior behavior
 
+Compatibility is evaluated against historical traces, not intentions.
 
 Breaking changes occur when:
 
@@ -89,6 +90,7 @@ inspectable traces of behavior
 
 comparison of outcomes across versions
 
+For example, replay recorded trajectories across versions to compare structural outcomes, not just surface results.
 
 Black-box upgrades are the primary source of regressions in long-running systems.
 
