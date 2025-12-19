@@ -1,0 +1,32 @@
+[
+  {
+    "v": "0.1",
+    "id": "o1",
+    "ts": 1,
+    "type": "orientation",
+    "continuity_token": "c1",
+    "payload": { "origin": "test" }
+  },
+  {
+    "v": "0.1",
+    "id": "f1",
+    "ts": 2,
+    "type": "focus_snapshot",
+    "continuity_token": "c2",
+    "payload": { "drift": 0.4 }
+  },
+  {
+    "v": "0.1",
+    "id": "r1",
+    "ts": 3,
+    "type": "route_response",
+    "continuity_token": "c2",
+    "payload": {
+      "branches": [
+        { "id": "A", "confidence": 0.7, "status": "admissible" },
+        { "id": "B", "confidence": 0.2, "status": "degraded" }
+      ],
+      "notes": ["drift adjusted"]
+    }
+  }
+]

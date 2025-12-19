@@ -1,0 +1,21 @@
+[
+  {
+    "v": "0.1",
+    "id": "o1",
+    "ts": 1,
+    "type": "orientation",
+    "payload": { "origin": "test" }
+  },
+  {
+    "v": "0.1",
+    "id": "r1",
+    "ts": 2,
+    "type": "route_response",
+    "payload": {
+      "branches": [
+        { "id": "A", "confidence": 1.2, "status": "admissible" },
+        { "id": "B", "confidence": 0.5, "status": "degraded" }
+      ]
+    }
+  }
+]

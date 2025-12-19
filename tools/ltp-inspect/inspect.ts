@@ -13,7 +13,8 @@ const TOOL = {
   build: process.env.LTP_BUILD ?? 'dev',
 } as const;
 
-type OutputFormat = 'json' | 'human' | 'both';
+type OutputFormat = 'json' | 'human';
+type ColorMode = 'auto' | 'always' | 'never';
 type Writer = (message: string) => void;
 
 type ParsedArgs = {
@@ -23,6 +24,10 @@ type ParsedArgs = {
   pretty: boolean;
   from?: string;
   branch?: string;
+  color: ColorMode;
+  quiet: boolean;
+  verbose: boolean;
+  output?: string;
 };
 
 class CliError extends Error {
@@ -41,10 +46,14 @@ function parseArgs(argv: string[]): ParsedArgs {
   const options: ParsedArgs = {
     command: positionalCommand,
     input: undefined,
-    format: 'json',
+    format: 'human',
     pretty: false,
     from: undefined,
     branch: undefined,
+    color: 'auto',
+    quiet: false,
+    verbose: false,
+    output: undefined,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -55,19 +64,26 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.input = argv[++i];
     } else if (token === '--format') {
       const format = argv[++i] as OutputFormat;
-      options.format = format === 'human' || format === 'both' ? format : 'json';
+      options.format = format === 'human' || format === 'json' ? format : 'human';
     } else if (token === '--json') {
       options.format = 'json';
     } else if (token === '--text' || token === '--human') {
       options.format = 'human';
-    } else if (token === '--both') {
-      options.format = 'both';
     } else if (token === '--pretty') {
       options.pretty = true;
     } else if (token === '--from') {
       options.from = argv[++i];
     } else if (token === '--branch') {
       options.branch = argv[++i];
+    } else if (token === '--color') {
+      const mode = argv[++i] as ColorMode;
+      options.color = ['auto', 'always', 'never'].includes(mode) ? mode : 'auto';
+    } else if (token === '--quiet' || token === '-q') {
+      options.quiet = true;
+    } else if (token === '--verbose' || token === '-v') {
+      options.verbose = true;
+    } else if (token === '--output' || token === '-o') {
+      options.output = argv[++i];
     } else if (!options.input && !token.startsWith('-')) {
       options.input = token;
     }
@@ -76,20 +92,26 @@ function parseArgs(argv: string[]): ParsedArgs {
   return options;
 }
 
-function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSummary['input']['format'] } {
-  const resolved = path.resolve(filePath);
-  if (!fs.existsSync(resolved)) {
+function readStdin(): string {
+  return fs.readFileSync(0, 'utf-8');
+}
+
+function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSummary['input']['format']; inputPath: string } {
+  const isStdin = filePath === '-' || filePath === undefined;
+  const resolved = isStdin ? 'stdin' : path.resolve(filePath);
+
+  if (!isStdin && !fs.existsSync(resolved)) {
     throw new CliError(`Frame log not found: ${resolved}`, 2);
   }
 
-  const raw = fs.readFileSync(resolved, 'utf-8').trim();
+  const raw = (isStdin ? readStdin() : fs.readFileSync(resolved, 'utf-8')).trim();
   if (!raw) throw new CliError(`Frame log is empty: ${resolved}`, 2);
 
   if (raw.startsWith('[')) {
     try {
       const frames = JSON.parse(raw);
       if (!Array.isArray(frames)) throw new Error('Expected JSON array');
-      return { frames, format: 'json' };
+      return { frames, format: 'json', inputPath: resolved };
     } catch (err) {
       throw new CliError(`Invalid JSON array: ${(err as Error).message}`, 2);
     }
@@ -100,7 +122,7 @@ function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSumm
       .split(/\r?\n/)
       .filter((line) => line.trim().length > 0)
       .map((line) => JSON.parse(line));
-    return { frames, format: 'jsonl' };
+    return { frames, format: 'jsonl', inputPath: resolved };
   } catch (err) {
     throw new CliError(`Invalid JSONL: ${(err as Error).message}`, 2);
   }
@@ -153,8 +175,6 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
   const notes: string[] = [];
   const violations: string[] = [];
 
-  const idsInOrder: string[] = [];
-
   for (const entry of branchesArray as Array<Record<string, any>>) {
     const id = (entry.id ?? entry.name ?? 'unnamed') as string;
     const confidence = entry.confidence as number | undefined;
@@ -179,12 +199,13 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
     idsInOrder.push(id);
   }
 
-  const isSorted = idsInOrder.every((id, index) => index === 0 || idsInOrder[index - 1].localeCompare(id) <= 0);
-  if (!isSorted && idsInOrder.length > 0) {
-    violations.push('branches ordering violated (expected id-sorted ascending)');
-  }
+  const sorted = normalized.sort((a, b) => {
+    const scoreA = a.confidence ?? -Infinity;
+    const scoreB = b.confidence ?? -Infinity;
+    if (scoreA === scoreB) return a.id.localeCompare(b.id);
+    return scoreB - scoreA;
+  });
 
-  const sorted = normalized.sort((a, b) => a.id.localeCompare(b.id));
   return { branches: sorted, notes, violations };
 }
 
@@ -192,7 +213,7 @@ function summarize(
   frames: LtpFrame[],
   inputPath: string,
   format: InspectSummary['input']['format'],
-): { summary: InspectSummary; violations: string[] } {
+): { summary: InspectSummary; violations: string[]; warnings: string[] } {
   const continuity = detectContinuity(frames);
   const driftLevel = driftLevelFromSnapshots(frames);
   const orientationStable = frames.some((f) => f.type === 'orientation');
@@ -202,13 +223,15 @@ function summarize(
     lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload,
   );
 
-  const baseNotes = [
+  const warnings = [
     ...(Array.isArray(lastRouteResponse?.payload?.notes) ? lastRouteResponse?.payload?.notes : []),
+    ...branchNotes,
+    ...continuity.notes,
   ];
-  if (!orientationStable) baseNotes.push('no orientation frame observed');
-  if (!lastRouteResponse) baseNotes.push('no route_response frame observed');
+  if (!orientationStable) warnings.push('no orientation frame observed');
+  if (!lastRouteResponse) warnings.push('no route_response frame observed');
 
-  const notes = [...baseNotes, ...branchNotes];
+  const notes = [...warnings];
 
   return {
     summary: {
@@ -223,7 +246,7 @@ function summarize(
         build: TOOL.build,
       },
       input: {
-        path: path.resolve(inputPath),
+        path: inputPath === 'stdin' ? 'stdin' : path.resolve(inputPath),
         frames: frames.length,
         format,
       },
@@ -239,6 +262,7 @@ function summarize(
       notes,
     },
     violations,
+    warnings,
   };
 }
 
@@ -248,63 +272,71 @@ export function formatJson(summary: InspectSummary, pretty = false): string {
 
 export function formatHuman(summary: InspectSummary): string {
   const lines: string[] = [];
-  lines.push(`LTP INSPECT (v${summary.contract.version})`);
-  lines.push(`contract: ${summary.contract.name} (${summary.contract.schema})`);
-  lines.push(`input: ${summary.input.path}`);
-  lines.push(`frames: ${summary.input.frames} (${summary.input.format})`);
-  lines.push(`generated_at: ${summary.generated_at}`);
-  lines.push(`tool: ${summary.tool.name} build=${summary.tool.build}`);
+  lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
+  lines.push(`input: ${summary.input.path}  time: ${summary.generated_at}`);
   lines.push('');
-  lines.push('orientation:');
-  lines.push(`  stable: ${summary.orientation.stable ? 'yes' : 'no'}`);
-  lines.push(`  drift: ${summary.orientation.drift_level}`);
-  lines.push(`  continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}`);
-  if (summary.continuity.notes.length) {
-    for (const note of summary.continuity.notes) lines.push(`    note: ${note}`);
+  lines.push('ORIENTATION');
+  lines.push(`identity: ${summary.orientation.stable ? 'stable' : 'unknown'}`);
+  lines.push(`drift: ${summary.orientation.drift_level}`);
+  lines.push(`continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}`);
+  lines.push('');
+  lines.push('CONSTRAINTS');
+  if (!summary.continuity.preserved) {
+    lines.push('continuity: WARN');
+    summary.continuity.notes.forEach((note) => lines.push(`  note: ${note}`));
+  } else {
+    lines.push('continuity: OK');
   }
   lines.push('');
-  lines.push('future_branches:');
+  lines.push('FUTURE BRANCHES (non-decisional)');
   if (!summary.branches.length) {
-    lines.push('  - none observed');
+    lines.push('none observed');
   } else {
-    for (const branch of summary.branches) {
-      const attributes = [
-        `status=${branch.status}`,
-        branch.confidence !== undefined ? `score=${branch.confidence}` : 'score=NA',
-        branch.class ? `class=${branch.class}` : null,
-      ].filter(Boolean);
-      lines.push(`  - ${branch.id} ${attributes.join('  ')}`.replace(/\s+$/, ''));
-      if (branch.path) lines.push(`      path=${branch.path}`);
-    }
+    const headers = ['ID', 'score', 'cost', 'risk', 'explainable', 'status'];
+    const rows = summary.branches.map((branch) => [
+      branch.id,
+      branch.confidence !== undefined ? branch.confidence.toFixed(2) : 'NA',
+      branch.class ?? '-',
+      branch.path ?? '-',
+      branch.confidence !== undefined ? 'yes' : 'no',
+      branch.status ?? '-',
+    ]);
+    const widths = headers.map((header, idx) => Math.max(header.length, ...rows.map((row) => String(row[idx]).length)));
+    const formatRow = (row: string[]) =>
+      row
+        .map((cell, idx) => String(cell).padEnd(widths[idx], ' '))
+        .join('  ')
+        .trimEnd();
+    lines.push(formatRow(headers));
+    rows.forEach((row) => lines.push(formatRow(row as string[])));
   }
   if (summary.notes.length) {
     lines.push('');
-    lines.push('notes:');
-    for (const note of summary.notes) lines.push(`  - ${note}`);
+    lines.push('NOTES / WARNINGS');
+    for (const note of summary.notes) lines.push(`- ${note}`);
   }
   return lines.join('\n');
 }
 
 export function runInspect(file: string): InspectSummary {
-  const { frames, format } = loadFrames(file);
-  return summarize(frames, file, format).summary;
+  const { frames, format, inputPath } = loadFrames(file);
+  return summarize(frames, inputPath, format).summary;
 }
 
-function handleTrace(file: string, format: OutputFormat, pretty: boolean, writer: Writer): void {
-  const { frames, format: inputFormat } = loadFrames(file);
-  const { summary, violations } = summarize(frames, file, inputFormat);
+type InspectionResult = {
+  summary: InspectSummary;
+  warnings: string[];
+  violations: string[];
+};
+
+function handleTrace(file: string, format: OutputFormat, pretty: boolean, writer: Writer): InspectionResult {
+  const { frames, format: inputFormat, inputPath } = loadFrames(file);
+  const { summary, violations, warnings } = summarize(frames, inputPath, inputFormat);
 
   if (format === 'json') printJson(summary, pretty, writer);
-  else if (format === 'human') printHuman(summary, writer);
-  else {
-    printJson(summary, pretty, writer);
-    writer('');
-    printHuman(summary, writer);
-  }
+  else printHuman(summary, writer);
 
-  if (violations.length) {
-    throw new CliError(`Contract violation: ${violations.join('; ')}`, 3);
-  }
+  return { summary, violations, warnings };
 }
 
 function handleReplay(file: string, from: string | undefined, writer: Writer): void {
@@ -320,20 +352,20 @@ function handleReplay(file: string, from: string | undefined, writer: Writer): v
   }
 }
 
-function handleExplain(file: string, branchId: string | undefined, writer: Writer): void {
-  const { frames, format } = loadFrames(file);
-  const { summary, violations } = summarize(frames, file, format);
+function handleExplain(file: string, branchId: string | undefined, writer: Writer): { violations: string[] } {
+  const { frames, format, inputPath } = loadFrames(file);
+  const { summary, violations } = summarize(frames, inputPath, format);
   const target = branchId ?? summary.branches[0]?.id;
 
   if (!target) {
     writer('No branches present to explain.');
-    return;
+    return { violations };
   }
 
   const branch = summary.branches.find((b) => b.id === target);
   if (!branch) {
     writer(`Branch ${target} not found.`);
-    return;
+    return { violations };
   }
 
   writer(`Branch: ${target}`);
@@ -350,32 +382,30 @@ function handleExplain(file: string, branchId: string | undefined, writer: Write
     writer(`Observed drift level: ${summary.orientation.drift_level}`);
   }
 
-  if (violations.length) {
-    throw new CliError(`Contract violation: ${violations.join('; ')}`, 3);
-  }
+  return { violations };
 }
 
 function printHelp(writer: Writer): void {
   writer('ltp:inspect — orientation inspector (no decisions made).');
   writer('');
   writer('Usage:');
-  writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--format json|human] [--pretty]');
+  writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>]');
   writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
   writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--branch <id>]');
   writer('');
   writer('Examples:');
-  writer('  pnpm -w ltp:inspect -- --input fixtures/ltp/demo.frames.jsonl');
-  writer('  pnpm -w ltp:inspect -- --format human --input fixtures/ltp/demo.frames.jsonl');
-  writer('  pnpm -w ltp:inspect -- replay --input fixtures/ltp/demo.frames.jsonl --from t3');
+  writer('  pnpm -w ltp:inspect -- --input fixtures/ltp/demo.frames.jsonl --format=human');
+  writer('  pnpm -w ltp:inspect -- --input fixtures/ltp/demo.frames.jsonl --format=json');
+  writer('  pnpm -w ltp:inspect -- --format=json --quiet --input fixtures/ltp/demo.frames.jsonl | jq .orientation');
   writer('');
   writer('Output:');
-  writer('  JSON (default) includes contract metadata, deterministic ordering, and orientation fields.');
-  writer('  Human format mirrors kubectl describe: continuity, drift, and branches.');
+  writer('  JSON (v1 contract) with deterministic ordering for CI.');
+  writer('  Human format (kubectl describe style) with Orientation, Constraints, Branches, and warnings.');
   writer('');
   writer('Exit codes:');
   writer('  0 OK — contract produced');
-  writer('  2 invalid input — unreadable or missing frames');
-  writer('  3 contract violation — ordering or schema failure');
+  writer('  2 invalid input or contract violation');
+  writer('  3 WARN — degraded orientation or continuity');
   writer('  4 runtime failure — unexpected error');
 }
 
@@ -388,7 +418,8 @@ function printHuman(summary: InspectSummary, writer: Writer): void {
 }
 
 export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> = console): number {
-  const writer = (message: string) => logger.log(message);
+  const buffer: string[] = [];
+  const writer = (message: string) => buffer.push(message);
   const errorWriter = (message: string) => logger.error(message);
   const args = parseArgs(argv);
 
@@ -398,23 +429,68 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
       throw new CliError('Missing --input <frames.jsonl>', 2);
     }
 
+    const colorEnabled =
+      args.color === 'always' || (args.color === 'auto' && Boolean(process.stdout.isTTY) && args.format === 'human');
+    const applyColor = (code: string, text: string) => (colorEnabled ? `${code}${text}\u001b[0m` : text);
+    const green = (text: string) => applyColor('\u001b[32m', text);
+    const yellow = (text: string) => applyColor('\u001b[33m', text);
+    const red = (text: string) => applyColor('\u001b[31m', text);
+
     switch (args.command) {
       case 'trace':
-        handleTrace(args.input as string, args.format, args.pretty, writer);
-        break;
+        {
+          const { violations, warnings } = handleTrace(args.input as string, args.format, args.pretty, writer);
+          const status = violations.length ? 'error' : warnings.length ? 'warn' : 'ok';
+          const exitCode = status === 'error' ? 2 : status === 'warn' ? 3 : 0;
+          const statusText =
+            status === 'ok' ? green('OK') : status === 'warn' ? yellow('WARN (degraded)') : red('FAIL (contract)');
+          if (violations.length) {
+            errorWriter(`ERROR: Contract violation: ${violations.join('; ')}`);
+            errorWriter('hint: re-run with --format=json and --pretty for contract view');
+          }
+          if (args.format === 'human') {
+            writer('');
+            writer(`RESULT: ${statusText}  exit: ${exitCode}`);
+          }
+
+          if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
+          if (!args.quiet) {
+            buffer.forEach((line) => logger.log(line));
+          } else {
+            logger.log(`RESULT: ${statusText}  exit: ${exitCode}`);
+          }
+          return exitCode;
+        }
       case 'replay':
         handleReplay(args.input as string, args.from, writer);
+        if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
+        if (!args.quiet) buffer.forEach((line) => logger.log(line));
         break;
       case 'explain':
-        handleExplain(args.input as string, args.branch, writer);
+        {
+          const { violations } = handleExplain(args.input as string, args.branch, writer);
+          if (violations.length) {
+            throw new CliError(`Contract violation: ${violations.join('; ')}`, 2);
+          }
+          if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
+          if (!args.quiet) buffer.forEach((line) => logger.log(line));
+        }
         break;
       default:
         printHelp(writer);
+        if (!args.quiet) buffer.forEach((line) => logger.log(line));
     }
     return 0;
   } catch (err) {
     if (err instanceof CliError) {
-      errorWriter(err.message);
+      const hint =
+        err.exitCode === 2
+          ? 'hint: pass a JSON file or pipe JSON/JSONL via stdin (use - for stdin)'
+          : 'hint: re-run with --format=json to inspect the contract payload';
+      const example = 'example: pnpm -w ltp:inspect --format=json --input fixtures/minimal.frames.jsonl';
+      errorWriter(`ERROR: ${err.message}`);
+      errorWriter(hint);
+      errorWriter(example);
       return err.exitCode;
     }
     errorWriter(`Runtime failure: ${(err as Error).message}`);

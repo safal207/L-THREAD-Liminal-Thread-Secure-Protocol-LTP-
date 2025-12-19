@@ -1,0 +1,17 @@
+LTP INSPECTOR  v1.0
+input: /workspace/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/tools/ltp-inspect/fixtures/minimal.frames.jsonl  time: 2024-01-01T00:00:00.000Z
+
+ORIENTATION
+identity: stable
+drift: medium
+continuity: preserved
+
+CONSTRAINTS
+continuity: OK
+
+FUTURE BRANCHES (non-decisional)
+ID  score  cost  risk  explainable  status
+A   0.62   -     -     yes          admissible
+
+NOTES / WARNINGS
+- retry updated drift

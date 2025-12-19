@@ -1,0 +1,20 @@
+LTP INSPECTOR  v1.0
+input: /workspace/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/tools/ltp-inspect/fixtures/invalid-confidence.json  time: 2024-01-01T00:00:00.000Z
+
+ORIENTATION
+identity: stable
+drift: unknown
+continuity: preserved
+
+CONSTRAINTS
+continuity: OK
+
+FUTURE BRANCHES (non-decisional)
+ID  score  cost  risk  explainable  status
+A   1.20   -     -     yes          admissible
+B   0.50   -     -     yes          degraded
+
+NOTES / WARNINGS
+- branch A confidence out of range [0,1]
+
+RESULT: FAIL (contract)  exit: 2

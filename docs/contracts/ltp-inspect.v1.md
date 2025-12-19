@@ -1,7 +1,7 @@
 # ltp:inspect contract v1.0
 
 - **Scope:** read-only orientation summaries; no decision making or normalization.
-- **MUST:** stable field ordering, sorted `branches` by `id`, ISO-8601 timestamps.
+- **MUST:** stable field ordering, `branches` sorted by descending `confidence` then `id`, ISO-8601 timestamps.
 - **SHOULD:** include tool build metadata and input descriptors (path, count, format).
 - **MAY:** emit debug notes and vendor extensions (prefixed fields) without affecting stability.
 - **Top-level fields:** `contract`, `generated_at`, `tool`, `input`, `orientation`, `continuity`, `branches`, `notes`.
