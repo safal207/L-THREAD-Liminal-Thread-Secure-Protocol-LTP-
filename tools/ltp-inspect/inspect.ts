@@ -2,55 +2,108 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { BranchInsight, InspectSummary, LtpFrame } from './types';
 
-type OutputFormat = 'text' | 'json' | 'both';
+const CONTRACT = {
+  name: 'ltp-inspect',
+  version: '1.0',
+  schema: 'docs/contracts/ltp-inspect.v1.schema.json',
+} as const;
+
+const TOOL = {
+  name: 'ltp:inspect',
+  build: process.env.LTP_BUILD ?? 'dev',
+} as const;
+
+type OutputFormat = 'json' | 'human' | 'both';
+type Writer = (message: string) => void;
 
 type ParsedArgs = {
   command: 'trace' | 'replay' | 'explain' | 'help';
-  file?: string;
+  input?: string;
   format: OutputFormat;
+  pretty: boolean;
   from?: string;
   branch?: string;
 };
 
-function parseArgs(argv: string[]): ParsedArgs {
-  const [command = 'help', file, ...rest] = argv;
-  const options: Record<string, string | boolean> = {};
+class CliError extends Error {
+  exitCode: number;
 
-  for (let i = 0; i < rest.length; i += 1) {
-    const token = rest[i];
-    if (token === '--json') options.format = 'json';
-    else if (token === '--text') options.format = 'text';
-    else if (token === '--both') options.format = 'both';
-    else if (token === '--from') options.from = rest[++i];
-    else if (token === '--branch') options.branch = rest[++i];
+  constructor(message: string, exitCode: number) {
+    super(message);
+    this.exitCode = exitCode;
   }
-
-  return {
-    command: (command as ParsedArgs['command']) ?? 'help',
-    file,
-    format: (options.format as OutputFormat) || 'json',
-    from: options.from as string | undefined,
-    branch: options.branch as string | undefined,
-  };
 }
 
-function loadFrames(filePath: string): LtpFrame[] {
+function parseArgs(argv: string[]): ParsedArgs {
+  const commands: ParsedArgs['command'][] = ['trace', 'replay', 'explain', 'help'];
+  const positionalCommand = commands.includes(argv[0] as ParsedArgs['command']) ? (argv.shift() as ParsedArgs['command']) : 'trace';
+
+  const options: ParsedArgs = {
+    command: positionalCommand,
+    input: undefined,
+    format: 'json',
+    pretty: false,
+    from: undefined,
+    branch: undefined,
+  };
+
+  for (let i = 0; i < argv.length; i += 1) {
+    const token = argv[i];
+    if (token === '--help' || token === '-h') {
+      options.command = 'help';
+    } else if (token === '--input' || token === '-i') {
+      options.input = argv[++i];
+    } else if (token === '--format') {
+      const format = argv[++i] as OutputFormat;
+      options.format = format === 'human' || format === 'both' ? format : 'json';
+    } else if (token === '--json') {
+      options.format = 'json';
+    } else if (token === '--text' || token === '--human') {
+      options.format = 'human';
+    } else if (token === '--both') {
+      options.format = 'both';
+    } else if (token === '--pretty') {
+      options.pretty = true;
+    } else if (token === '--from') {
+      options.from = argv[++i];
+    } else if (token === '--branch') {
+      options.branch = argv[++i];
+    } else if (!options.input && !token.startsWith('-')) {
+      options.input = token;
+    }
+  }
+
+  return options;
+}
+
+function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSummary['input']['format'] } {
   const resolved = path.resolve(filePath);
   if (!fs.existsSync(resolved)) {
-    throw new Error(`Frame log not found: ${resolved}`);
+    throw new CliError(`Frame log not found: ${resolved}`, 2);
   }
 
   const raw = fs.readFileSync(resolved, 'utf-8').trim();
-  if (!raw) return [];
+  if (!raw) return { frames: [], format: 'jsonl' };
 
   if (raw.startsWith('[')) {
-    return JSON.parse(raw);
+    try {
+      const frames = JSON.parse(raw);
+      if (!Array.isArray(frames)) throw new Error('Expected JSON array');
+      return { frames, format: 'json' };
+    } catch (err) {
+      throw new CliError(`Invalid JSON array: ${(err as Error).message}`, 2);
+    }
   }
 
-  return raw
-    .split(/\r?\n/)
-    .filter((line) => line.trim().length > 0)
-    .map((line) => JSON.parse(line));
+  try {
+    const frames = raw
+      .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0)
+      .map((line) => JSON.parse(line));
+    return { frames, format: 'jsonl' };
+  } catch (err) {
+    throw new CliError(`Invalid JSONL: ${(err as Error).message}`, 2);
+  }
 }
 
 function driftLevelFromSnapshots(frames: LtpFrame[]): InspectSummary['orientation']['drift_level'] {
@@ -131,7 +184,7 @@ function collectNotes(branches: BranchInsight[], baseNotes: string[]): string[] 
   return notes;
 }
 
-function summarize(frames: LtpFrame[]): InspectSummary {
+function summarize(frames: LtpFrame[], inputPath: string, format: InspectSummary['input']['format']): InspectSummary {
   const continuity = detectContinuity(frames);
   const driftLevel = driftLevelFromSnapshots(frames);
   const orientationStable = frames.some((f) => f.type === 'orientation');
@@ -148,7 +201,21 @@ function summarize(frames: LtpFrame[]): InspectSummary {
   const notes = collectNotes(branches, baseNotes);
 
   return {
-    version: '0.1',
+    contract: {
+      name: CONTRACT.name,
+      version: CONTRACT.version,
+      schema: CONTRACT.schema,
+    },
+    generated_at: new Date().toISOString(),
+    tool: {
+      name: TOOL.name,
+      build: TOOL.build,
+    },
+    input: {
+      path: path.resolve(inputPath),
+      frames: frames.length,
+      format,
+    },
     orientation: {
       stable: orientationStable,
       drift_level: driftLevel,
@@ -162,136 +229,178 @@ function summarize(frames: LtpFrame[]): InspectSummary {
   };
 }
 
-function printJson(summary: InspectSummary): void {
-  console.log(JSON.stringify(summary, null, 2));
+export function formatJson(summary: InspectSummary, pretty = false): string {
+  return JSON.stringify(summary, null, pretty ? 2 : 0);
 }
 
-function printHuman(summary: InspectSummary): void {
-  console.log('LTP INSPECT SUMMARY');
-  console.log('-------------------');
-  console.log(`Version: ${summary.version}`);
-  console.log(`Orientation: ${summary.orientation.stable ? 'stable' : 'missing'}`);
-  console.log(`Drift: ${summary.orientation.drift_level}`);
-  console.log(`Continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}`);
+export function formatHuman(summary: InspectSummary): string {
+  const lines: string[] = [];
+  lines.push(`LTP INSPECT (v${summary.contract.version})`);
+  lines.push(`contract: ${summary.contract.name} (${summary.contract.schema})`);
+  lines.push(`input: ${summary.input.path}`);
+  lines.push(`frames: ${summary.input.frames} (${summary.input.format})`);
+  lines.push(`generated_at: ${summary.generated_at}`);
+  lines.push(`tool: ${summary.tool.name} build=${summary.tool.build}`);
+  lines.push('');
+  lines.push('orientation:');
+  lines.push(`  stable: ${summary.orientation.stable ? 'yes' : 'no'}`);
+  lines.push(`  drift: ${summary.orientation.drift_level}`);
+  lines.push(`  continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}`);
   if (summary.continuity.notes.length) {
-    for (const note of summary.continuity.notes) console.log(`  note: ${note}`);
+    for (const note of summary.continuity.notes) lines.push(`    note: ${note}`);
   }
-  console.log('');
-  console.log('Branches:');
+  lines.push('');
+  lines.push('future_branches:');
   if (!summary.branches.length) {
-    console.log('- none observed');
+    lines.push('  - none observed');
   } else {
-    for (const b of summary.branches) {
-      const suffix = b.confidence !== undefined ? ` (${b.confidence})` : ' (no confidence)';
-      console.log(`- ${b.id}: ${b.status}${suffix}`);
+    for (const branch of summary.branches) {
+      const attributes = [
+        `status=${branch.status}`,
+        branch.confidence !== undefined ? `score=${branch.confidence}` : 'score=NA',
+        branch.class ? `class=${branch.class}` : null,
+      ].filter(Boolean);
+      lines.push(`  - ${branch.id} ${attributes.join('  ')}`.replace(/\s+$/, ''));
+      if (branch.path) lines.push(`      path=${branch.path}`);
     }
   }
   if (summary.notes.length) {
-    console.log('');
-    console.log('Notes:');
-    for (const n of summary.notes) console.log(`- ${n}`);
+    lines.push('');
+    lines.push('notes:');
+    for (const note of summary.notes) lines.push(`  - ${note}`);
   }
+  return lines.join('\n');
 }
 
 export function runInspect(file: string): InspectSummary {
-  const frames = loadFrames(file);
-  return summarize(frames);
+  const { frames, format } = loadFrames(file);
+  return summarize(frames, file, format);
 }
 
-function handleTrace(file: string, format: OutputFormat): void {
+function handleTrace(file: string, format: OutputFormat, pretty: boolean, writer: Writer): void {
   const summary = runInspect(file);
 
-  if (format === 'json') printJson(summary);
-  else if (format === 'text') printHuman(summary);
+  if (format === 'json') printJson(summary, pretty, writer);
+  else if (format === 'human') printHuman(summary, writer);
   else {
-    printJson(summary);
-    console.log('');
-    printHuman(summary);
+    printJson(summary, pretty, writer);
+    writer('');
+    printHuman(summary, writer);
   }
 }
 
-function handleReplay(file: string, from?: string): void {
-  const frames = loadFrames(file);
+function handleReplay(file: string, from: string | undefined, writer: Writer): void {
+  const { frames } = loadFrames(file);
   const startIndex = from ? frames.findIndex((f) => f.id === from || f.ts === from) : 0;
   const replayFrames = startIndex >= 0 ? frames.slice(startIndex) : frames;
 
-  console.log(`Replaying ${replayFrames.length} frames${from ? ` from ${from}` : ''}...`);
+  writer(`Replaying ${replayFrames.length} frames${from ? ` from ${from}` : ''}...`);
   for (const frame of replayFrames) {
     const label = `${frame.type}${frame.id ? `#${frame.id}` : ''}`;
     const continuity = frame.continuity_token ? ` ct=${frame.continuity_token}` : '';
-    console.log(`- ${label}${continuity}`);
+    writer(`- ${label}${continuity}`);
   }
 }
 
-function handleExplain(file: string, branchId?: string): void {
+function handleExplain(file: string, branchId: string | undefined, writer: Writer): void {
   const summary = runInspect(file);
   const target = branchId ?? summary.branches[0]?.id;
 
   if (!target) {
-    console.log('No branches present to explain.');
+    writer('No branches present to explain.');
     return;
   }
 
   const branch = summary.branches.find((b) => b.id === target);
   if (!branch) {
-    console.log(`Branch ${target} not found.`);
+    writer(`Branch ${target} not found.`);
     return;
   }
 
-  console.log(`Branch: ${target}`);
-  console.log(`Status: ${branch.status}`);
-  if (branch.path) console.log(`Path: ${branch.path}`);
-  if (branch.class) console.log(`Class: ${branch.class}`);
-  if (branch.confidence !== undefined) console.log(`Confidence: ${branch.confidence}`);
-  else console.log('Confidence: (not provided; tooling MAY normalize)');
+  writer(`Branch: ${target}`);
+  writer(`Status: ${branch.status}`);
+  if (branch.path) writer(`Path: ${branch.path}`);
+  if (branch.class) writer(`Class: ${branch.class}`);
+  if (branch.confidence !== undefined) writer(`Confidence: ${branch.confidence}`);
+  else writer('Confidence: (not provided; tooling MAY normalize)');
   if (summary.continuity.notes.length) {
-    console.log('Continuity Notes:');
-    for (const n of summary.continuity.notes) console.log(`- ${n}`);
+    writer('Continuity Notes:');
+    for (const n of summary.continuity.notes) writer(`- ${n}`);
   }
   if (summary.orientation.drift_level !== 'unknown') {
-    console.log(`Observed drift level: ${summary.orientation.drift_level}`);
+    writer(`Observed drift level: ${summary.orientation.drift_level}`);
   }
 }
 
-function printHelp(): void {
-  console.log('ltp-inspect commands:');
-  console.log('  trace <frames.jsonl> [--json|--text|--both]');
-  console.log('  replay <frames.jsonl> [--from <frameId>]');
-  console.log('  explain <frames.jsonl> [--branch <id>]');
-  console.log('');
-  console.log('Outputs JSON by default; add --text for a human-readable view.');
-  console.log('');
-  console.log('Frames may be JSON array or JSONL with one frame per line.');
-  console.log('Confidence values are optional; if present they must be within [0.0, 1.0].');
-  console.log('Continuity tokens MUST remain stable within a session; rotations are flagged.');
+function printHelp(writer: Writer): void {
+  writer('ltp:inspect — orientation inspector (no decisions made).');
+  writer('');
+  writer('Usage:');
+  writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--format json|human] [--pretty]');
+  writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
+  writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--branch <id>]');
+  writer('');
+  writer('Examples:');
+  writer('  pnpm -w ltp:inspect -- --input fixtures/ltp/demo.frames.jsonl');
+  writer('  pnpm -w ltp:inspect -- --format human --input fixtures/ltp/demo.frames.jsonl');
+  writer('  pnpm -w ltp:inspect -- replay --input fixtures/ltp/demo.frames.jsonl --from t3');
+  writer('');
+  writer('Output:');
+  writer('  JSON (default) includes contract metadata, deterministic ordering, and orientation fields.');
+  writer('  Human format mirrors kubectl describe: continuity, drift, and branches.');
+  writer('');
+  writer('Exit codes:');
+  writer('  0 OK — contract produced');
+  writer('  2 invalid input — unreadable or missing frames');
+  writer('  4 runtime failure — unexpected error');
 }
 
-function main(): void {
-  const args = parseArgs(process.argv.slice(2));
+function printJson(summary: InspectSummary, pretty = false, writer: Writer): void {
+  writer(formatJson(summary, pretty));
+}
+
+function printHuman(summary: InspectSummary, writer: Writer): void {
+  writer(formatHuman(summary));
+}
+
+export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> = console): number {
+  const writer = (message: string) => logger.log(message);
+  const errorWriter = (message: string) => logger.error(message);
+  const args = parseArgs(argv);
 
   try {
-    if (!args.file && args.command !== 'help') {
-      printHelp();
-      return;
+    if (!args.input && args.command !== 'help') {
+      printHelp(writer);
+      throw new CliError('Missing --input <frames.jsonl>', 2);
     }
 
     switch (args.command) {
       case 'trace':
-        handleTrace(args.file as string, args.format);
+        handleTrace(args.input as string, args.format, args.pretty, writer);
         break;
       case 'replay':
-        handleReplay(args.file as string, args.from);
+        handleReplay(args.input as string, args.from, writer);
         break;
       case 'explain':
-        handleExplain(args.file as string, args.branch);
+        handleExplain(args.input as string, args.branch, writer);
         break;
       default:
-        printHelp();
+        printHelp(writer);
     }
+    return 0;
   } catch (err) {
-    console.error((err as Error).message);
-    process.exit(1);
+    if (err instanceof CliError) {
+      errorWriter(err.message);
+      return err.exitCode;
+    }
+    errorWriter(`Runtime failure: ${(err as Error).message}`);
+    return 4;
   }
+}
+
+export function main(argv = process.argv.slice(2)): void {
+  const exitCode = execute(argv, console);
+  process.exit(exitCode);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -1,5 +1,19 @@
 {
-  "version": "0.1",
+  "contract": {
+    "name": "ltp-inspect",
+    "version": "1.0",
+    "schema": "docs/contracts/ltp-inspect.v1.schema.json"
+  },
+  "generated_at": "2024-01-01T00:00:00.000Z",
+  "tool": {
+    "name": "ltp:inspect",
+    "build": "dev"
+  },
+  "input": {
+    "path": "/workspace/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/tools/ltp-inspect/fixtures/minimal.frames.jsonl",
+    "frames": 3,
+    "format": "jsonl"
+  },
   "orientation": {
     "stable": true,
     "drift_level": "medium"

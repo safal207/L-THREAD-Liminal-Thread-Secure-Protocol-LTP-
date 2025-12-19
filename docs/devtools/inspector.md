@@ -1,4 +1,6 @@
-# LTP Inspector (v0)
+# LTP Inspector (v1)
+
+LTP does not choose actions. It maintains orientation so actions remain coherent over time. Inspector emits a versioned, deterministic state summary suitable for CI, audits, and replay.
 
 The LTP Inspector is a **read-only DevTool** for understanding canonical frame logs with deterministic, CI-friendly output.
 
@@ -6,6 +8,7 @@ The LTP Inspector is a **read-only DevTool** for understanding canonical frame l
 - Reads canonical LTP frame logs (JSON array or JSONL)
 - Presents a deterministic JSON summary and matching human view
 - Explains outcomes and deviations without mutating the log
+- Emits contract metadata: `contract`, `generated_at`, `tool`, and `input`
 
 ## What it does NOT do
 - No UI or dashboards
@@ -16,9 +19,10 @@ The LTP Inspector is a **read-only DevTool** for understanding canonical frame l
 ## Usage
 
 ```bash
-pnpm -w ltp:inspect -- trace frames.jsonl        # JSON summary by default
-pnpm -w ltp:inspect -- replay frames.jsonl --from t3
-pnpm -w ltp:inspect -- explain frames.jsonl --branch A
+pnpm -w ltp:inspect -- --input frames.jsonl                     # JSON summary by default
+pnpm -w ltp:inspect -- --format human --input frames.jsonl      # Human-readable summary
+pnpm -w ltp:inspect -- replay --input frames.jsonl --from t3
+pnpm -w ltp:inspect -- explain --input frames.jsonl --branch A
 ```
 
 Output is stable within minor versions and follows CI semantics: drift is informational, continuity breaks fail, confidence gaps warn, and out-of-range confidence fails.

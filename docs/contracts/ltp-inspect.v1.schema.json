@@ -1,0 +1,135 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ltp-inspect contract v1.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "contract",
+    "generated_at",
+    "tool",
+    "input",
+    "orientation",
+    "continuity",
+    "branches",
+    "notes"
+  ],
+  "properties": {
+    "contract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "version", "schema"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "const": "ltp-inspect"
+        },
+        "version": {
+          "type": "string",
+          "const": "1.0"
+        },
+        "schema": {
+          "type": "string",
+          "const": "docs/contracts/ltp-inspect.v1.schema.json"
+        }
+      }
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "build"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "const": "ltp:inspect"
+        },
+        "build": {
+          "type": "string"
+        }
+      }
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "frames", "format"],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frames": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "format": {
+          "type": "string",
+          "enum": ["jsonl", "json"]
+        }
+      }
+    },
+    "orientation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stable", "drift_level"],
+      "properties": {
+        "stable": {
+          "type": "boolean"
+        },
+        "drift_level": {
+          "type": "string",
+          "enum": ["low", "medium", "high", "unknown"]
+        }
+      }
+    },
+    "continuity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preserved", "notes"],
+      "properties": {
+        "preserved": {
+          "type": "boolean"
+        },
+        "notes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "branches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status"],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "confidence": {
+            "type": "number"
+          },
+          "path": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

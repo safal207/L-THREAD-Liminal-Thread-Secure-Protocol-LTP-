@@ -17,7 +17,21 @@ export type BranchInsight = {
 };
 
 export type InspectSummary = {
-  version: string;
+  contract: {
+    name: string;
+    version: string;
+    schema: string;
+  };
+  generated_at: string;
+  tool: {
+    name: string;
+    build: string;
+  };
+  input: {
+    path: string;
+    frames: number;
+    format: 'jsonl' | 'json';
+  };
   orientation: {
     stable: boolean;
     drift_level: 'low' | 'medium' | 'high' | 'unknown';
