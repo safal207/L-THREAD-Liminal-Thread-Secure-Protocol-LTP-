@@ -1,0 +1,17 @@
+LTP INSPECT (v1.0)
+contract: ltp-inspect (docs/contracts/ltp-inspect.v1.schema.json)
+input: /workspace/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/tools/ltp-inspect/fixtures/minimal.frames.jsonl
+frames: 3 (jsonl)
+generated_at: 2024-01-01T00:00:00.000Z
+tool: ltp:inspect build=dev
+
+orientation:
+  stable: yes
+  drift: medium
+  continuity: preserved
+
+future_branches:
+  - A status=admissible  score=0.62
+
+notes:
+  - retry updated drift

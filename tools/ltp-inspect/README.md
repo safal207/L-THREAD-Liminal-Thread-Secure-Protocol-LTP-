@@ -1,50 +1,77 @@
 # ltp-inspect
 
-Thin inspector for canonical LTP frame logs. The goal is replayable observability, not decision making or ML-driven scoring.
+LTP does not choose actions. It maintains orientation so actions remain coherent over time. The inspector is a read-only DevOps tool for deterministic visibility — no recommendations, no automated decisions.
+
+Inspector emits a versioned, deterministic state summary suitable for CI, audits, and replay.
 
 ## One-command entrypoint
+
 Run from the repo root (JSON by default):
 
 ```bash
-pnpm -w ltp:inspect -- trace frames.jsonl
-pnpm -w ltp:inspect -- replay frames.jsonl --from t3
-pnpm -w ltp:inspect -- explain frames.jsonl --branch A
+pnpm -w ltp:inspect -- --input fixtures/minimal.frames.jsonl
+pnpm -w ltp:inspect -- --format human --input fixtures/minimal.frames.jsonl
+pnpm -w ltp:inspect -- replay --input fixtures/minimal.frames.jsonl --from t3
+pnpm -w ltp:inspect -- explain --input fixtures/minimal.frames.jsonl --branch A
 ```
+
+Flags:
+- `--format json|human` (default: `json`)
+- `--pretty` for pretty-printed JSON
+- `--input <path>` to point at a JSON array or JSONL frame log
 
 Frames may be a JSON array or JSONL with one frame per line. Existing conformance fixtures work as input.
 
-## Commands
-- `trace <frames.jsonl> [--json|--text|--both]` — emit a CI-oriented JSON summary and/or human-readable recap
-- `replay <frames.jsonl> [--from <frameId>]` — print the frame sequence for deterministic playback
-- `explain <frames.jsonl> [--branch <id>]` — show branch-level details without normalizing confidence
+## What it is / What it is NOT
 
-## CI semantics
+Ordinary AI | LTP Inspector
+----------- | -------------
+Stateless call | Stateful continuity
+Retry = repeat | Retry = drift update
+Failure = reset | Failure = trajectory update
+Logs | Trajectories
 
-Condition | CI Result
---------- | ---------
-confidence out of range | ❌ fail
-missing confidence | ⚠ warn
-continuity break | ❌ fail
-drift present | ℹ info
+## CLI help (kubectl-style)
 
-## Stable output contract
+```bash
+pnpm -w ltp:inspect -- --help
+```
+
+Sections included: Usage, Examples, Output, Exit codes.
+
+## CI usage
+
+Exit code | Meaning
+--------- | -------
+0 | OK — contract produced
+2 | invalid input — unreadable or missing frames
+4 | runtime failure — unexpected error
+
+## Output contract v1 (deterministic ordering)
+
+Top-level metadata is always emitted:
+
+```json
+{
+  "contract": { "name": "ltp-inspect", "version": "1.0", "schema": "docs/contracts/ltp-inspect.v1.schema.json" },
+  "generated_at": "2024-01-01T00:00:00.000Z",
+  "tool": { "name": "ltp:inspect", "build": "dev" },
+  "input": { "path": "...", "frames": 3, "format": "jsonl" }
+}
+```
+
+See [`docs/contracts/ltp-inspect.v1.schema.json`](../../docs/contracts/ltp-inspect.v1.schema.json) for the full contract. Field ordering is deterministic in v1.
+
+## Human format (kubectl describe vibes)
 
 ```
-version: 0.1
-orientation:
-  stable: true
-  drift_level: medium
-continuity:
-  preserved: true
-branches:
-  - id: A
-    confidence: 0.62
-    status: admissible
+LTP INSPECT (v1.0)
+orientation: stable, drift=medium, continuity=preserved
+future_branches:
+  - A status=admissible score=0.62
 notes:
   - retry updated drift
 ```
-
-Output format is stable within minor versions.
 
 ## Why DevOps use LTP Inspect
 
@@ -55,5 +82,5 @@ Output format is stable within minor versions.
 
 ## Boundaries
 - Does **not** normalize or sum confidence values (tooling-only concern)
-- Treats drift as informational; no monotonicity rules in v0.1
+- Treats drift as informational; no monotonicity rules in v1.0
 - Flags mid-session continuity token changes as violations
