@@ -1,5 +1,7 @@
 # DevTools exit codes (`ltp:inspect`)
 
+Canonical source of truth for Inspector exit codes across docs, README guidance, and CI checks.
+
 | Code | Meaning | When it triggers |
 | --- | --- | --- |
 | 0 | OK | Contract satisfied with no warnings. |

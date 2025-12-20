@@ -50,18 +50,14 @@ Sections included: Usage, Examples, Output, Exit codes.
 
 ## CI usage
 
+> Exit codes are canonical — see [`docs/devtools/exit-codes.md`](../../docs/devtools/exit-codes.md).
+
 Exit code | Meaning
 --------- | -------
 0 | OK — contract produced
 1 | warnings only (normalized output or degraded signals)
 2 | contract violation (invalid input, unsupported/mixed versions, or non-canonical in `--strict`)
 3 | runtime failure — unexpected error
-
-Failure modes:
-- Invalid JSON / JSONL input → exit 2 with `Invalid JSON*` message.
-- Empty or missing frames file → exit 2 with `Frame log not found` or empty-input notice.
-- Contract violation (e.g., out-of-range confidence, missing required field, canonicalization required in `--strict`) → exit 2.
-- Unexpected runtime error → exit 3 with error text.
 
 Suggested workflow integration:
 - Pull requests: run `pnpm -w ltp:inspect -- --input <trace>` (non-strict) to surface warnings without blocking.
