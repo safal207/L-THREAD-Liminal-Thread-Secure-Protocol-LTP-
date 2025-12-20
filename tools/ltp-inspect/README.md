@@ -25,6 +25,7 @@ Flags:
 - `--pretty` for pretty-printed JSON
 - `--input <path>` to point at a JSON array or JSONL frame log
 - `--color auto|always|never` for human output (default: `auto`)
+- `--strict` to treat canonicalization needs as contract violations (exit 2)
 - `--quiet` to emit only the final status line
 - `--output <file>` to write the formatted output to disk
 
@@ -52,15 +53,19 @@ Sections included: Usage, Examples, Output, Exit codes.
 Exit code | Meaning
 --------- | -------
 0 | OK — contract produced
-2 | invalid input or contract violation
-3 | WARN — degraded orientation or continuity
-4 | runtime failure — unexpected error
+1 | warnings only (normalized output or degraded signals)
+2 | contract violation (invalid input, unsupported/mixed versions, or non-canonical in `--strict`)
+3 | runtime failure — unexpected error
 
 Failure modes:
 - Invalid JSON / JSONL input → exit 2 with `Invalid JSON*` message.
 - Empty or missing frames file → exit 2 with `Frame log not found` or empty-input notice.
-- Contract violation (e.g., out-of-range confidence, missing required field) → exit 2.
-- Unexpected runtime error → exit 4 with error text.
+- Contract violation (e.g., out-of-range confidence, missing required field, canonicalization required in `--strict`) → exit 2.
+- Unexpected runtime error → exit 3 with error text.
+
+Suggested workflow integration:
+- Pull requests: run `pnpm -w ltp:inspect -- --input <trace>` (non-strict) to surface warnings without blocking.
+- Protected branches/conformance folders: run `pnpm -w ltp:inspect -- --strict --input <trace>` to gate on canonical traces (exit 2 on normalization).
 
 ## Output contract v1 (deterministic ordering)
 

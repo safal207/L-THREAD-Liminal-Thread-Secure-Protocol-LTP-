@@ -34,3 +34,22 @@ pnpm -w ltp:inspect -- explain --input examples/traces/constraint-blocked.json -
 Output is stable within minor versions and follows CI semantics: drift is informational, continuity breaks fail, confidence gaps warn, and out-of-range confidence fails.
 
 The Inspector is the foundation for future DevTools and enterprise integrations.
+
+## Modes
+
+- **Default (non-strict):** emits canonicalized output when needed and surfaces it as a warning (`exit 1`). Core contract violations still fail with `exit 2`.
+- **Strict:** any need for normalization (e.g., branch order) is treated as a contract violation (`exit 2`), suitable for conformance gates.
+
+## Exit codes
+
+See [`docs/devtools/exit-codes.md`](./exit-codes.md) for the canonical table. Summary:
+
+- `0` — valid, no warnings
+- `1` — warnings only (normalized output or degraded signals)
+- `2` — contract violations (missing/unsupported versions, invalid payloads, or non-canonical input in `--strict`)
+- `3` — runtime/IO errors
+
+## CI usage
+
+- Pull requests: run `pnpm -w ltp:inspect -- --input <trace>` (non-strict) to surface warnings without blocking contributions.
+- Protected branches or conformance folders: run `pnpm -w ltp:inspect -- --strict --input <trace>` to gate on canonical traces.

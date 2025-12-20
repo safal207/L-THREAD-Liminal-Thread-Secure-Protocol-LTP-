@@ -11,6 +11,9 @@ const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt
 const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.json');
 const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.json');
 const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.json');
+const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.json');
+const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.json');
+const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
 
 describe('ltp-inspect golden summary', () => {
   it('emits stable, ordered output', () => {
@@ -64,7 +67,7 @@ describe('ltp-inspect golden summary', () => {
     vi.useRealTimers();
   });
 
-  it('returns exit code 3 for degraded continuity', () => {
+  it('returns exit code 1 for degraded continuity', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
     const logs: string[] = [];
@@ -74,23 +77,22 @@ describe('ltp-inspect golden summary', () => {
       error: (message) => errors.push(message),
     });
 
-    expect(exitCode).toBe(3);
+    expect(exitCode).toBe(1);
     expect(errors.length).toBe(0);
     expect(logs.join('\n').trim()).toEqual(fs.readFileSync(expectedHumanWarnPath, 'utf-8').trim());
     vi.useRealTimers();
   });
 
-  it('returns exit code 3 for contract violations (unsorted branches)', () => {
-    const fixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
+  it('returns exit code 1 for normalized output in non-strict mode', () => {
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', fixture], {
+    const exitCode = execute(['--input', unsortedBranchesFixture], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    expect(exitCode).toBe(2);
-    expect(errors.join('\n')).toContain('Contract violation');
+    expect(exitCode).toBe(1);
+    expect(errors.join('\n')).toContain('normalized output (non-canonical input)');
   });
 
   it('fails loudly when trace version is missing', () => {
@@ -103,5 +105,41 @@ describe('ltp-inspect golden summary', () => {
 
     expect(exitCode).toBe(2);
     expect(errors.join('\n')).toContain('missing trace version');
+  });
+
+  it('fails loudly for mixed trace versions', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const exitCode = execute(['--input', mixedVersionsFixture, '--format=human', '--color=never'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('mixed trace versions detected');
+  });
+
+  it('fails loudly for unsupported versions', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const exitCode = execute(['--input', unsupportedVersionFixture, '--format=human', '--color=never'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('unsupported trace version');
+  });
+
+  it('treats canonical gaps as contract violations in strict mode', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const exitCode = execute(['--input', unsortedBranchesFixture, '--strict'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('non-canonical input');
   });
 });

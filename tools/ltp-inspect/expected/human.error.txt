@@ -21,4 +21,4 @@ NOTES / WARNINGS
 - branch A confidence out of range [0,1]
 - no drift snapshots observed (focus_snapshot missing)
 
-RESULT: FAIL (contract)  exit: 2
+RESULT: ERROR (contract)  exit: 2
