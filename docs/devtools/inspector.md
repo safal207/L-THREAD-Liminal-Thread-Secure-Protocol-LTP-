@@ -42,12 +42,14 @@ The Inspector is the foundation for future DevTools and enterprise integrations.
 
 ## Exit codes
 
-See [`docs/devtools/exit-codes.md`](./exit-codes.md) for the canonical table. Summary:
+Inspector follows the canonical exit codes (see [`docs/devtools/exit-codes.md`](./exit-codes.md)):
 
-- `0` — valid, no warnings
-- `1` — warnings only (normalized output or degraded signals)
-- `2` — contract violations (missing/unsupported versions, invalid payloads, or non-canonical input in `--strict`)
-- `3` — runtime/IO errors
+| Code | Meaning |
+| --- | --- |
+| 0 | Valid, no warnings. |
+| 1 | Warnings only (normalized output or degraded signals). |
+| 2 | Contract violations (missing/unsupported versions, invalid payloads, or non-canonical input in `--strict`). |
+| 3 | Runtime or IO errors. |
 
 ## CI usage
 
