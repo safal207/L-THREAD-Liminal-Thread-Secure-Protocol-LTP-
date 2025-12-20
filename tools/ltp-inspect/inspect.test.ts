@@ -10,6 +10,7 @@ const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt')
 const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt');
 const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.json');
 const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.json');
+const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.json');
 
 describe('ltp-inspect golden summary', () => {
   it('emits stable, ordered output', () => {
@@ -88,7 +89,19 @@ describe('ltp-inspect golden summary', () => {
       error: (message) => errors.push(message),
     });
 
-    expect(exitCode).toBe(3);
+    expect(exitCode).toBe(2);
     expect(errors.join('\n')).toContain('Contract violation');
+  });
+
+  it('fails loudly when trace version is missing', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const exitCode = execute(['--input', missingVersionFixture, '--format=human', '--color=never'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('missing trace version');
   });
 });

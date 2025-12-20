@@ -13,6 +13,8 @@ const TOOL = {
   build: process.env.LTP_BUILD ?? 'dev',
 } as const;
 
+const SUPPORTED_TRACE_VERSIONS = ['0.1'] as const;
+
 type OutputFormat = 'json' | 'human';
 type ColorMode = 'auto' | 'always' | 'never';
 type Writer = (message: string) => void;
@@ -162,6 +164,79 @@ function detectContinuity(frames: LtpFrame[]): { preserved: boolean; notes: stri
   };
 }
 
+function extractTraceVersion(frame: Record<string, unknown>): string | undefined {
+  const version = (frame.v ?? frame.version) as string | number | undefined;
+  if (typeof version === 'number') return version.toFixed(1);
+  if (typeof version === 'string') return version;
+  return undefined;
+}
+
+function validateTraceFrames(frames: LtpFrame[]): { warnings: string[]; violations: string[] } {
+  const warnings: string[] = [];
+  const violations: string[] = [];
+  const versions = new Set<string>();
+
+  frames.forEach((frame, idx) => {
+    const label = `frame#${idx}`;
+    if (!frame || typeof frame !== 'object' || Array.isArray(frame)) {
+      violations.push(`${label} is not an object`);
+      return;
+    }
+
+    const traceVersion = extractTraceVersion(frame as Record<string, unknown>);
+    if (!traceVersion) {
+      violations.push(`${label} missing trace version (v|version)`);
+    } else {
+      versions.add(traceVersion);
+      if (!SUPPORTED_TRACE_VERSIONS.includes(traceVersion as (typeof SUPPORTED_TRACE_VERSIONS)[number])) {
+        violations.push(`${label} uses unsupported trace version ${traceVersion}`);
+      }
+    }
+
+    if (typeof frame.type !== 'string' || frame.type.trim().length === 0) {
+      violations.push(`${label} missing required type`);
+    }
+
+    if (
+      'payload' in frame &&
+      frame.payload !== undefined &&
+      (typeof frame.payload !== 'object' || frame.payload === null || Array.isArray(frame.payload))
+    ) {
+      violations.push(`${label} payload must be an object when provided`);
+    }
+
+    const identity = (frame as any).identity ?? (frame as any).payload?.identity;
+    if (identity !== undefined && (typeof identity !== 'object' || identity === null || Array.isArray(identity))) {
+      violations.push(`${label} identity must be an object if provided`);
+    }
+
+    const constraints = (frame as any).constraints ?? (frame as any).payload?.constraints;
+    if (constraints !== undefined && (typeof constraints !== 'object' || constraints === null || Array.isArray(constraints))) {
+      violations.push(`${label} constraints must be an object if provided`);
+    }
+
+    const focusMomentum =
+      (frame as any).payload?.focus_momentum ?? (frame as any).payload?.focusMomentum ?? (frame as any).payload?.focus;
+    if (focusMomentum !== undefined && typeof focusMomentum !== 'number') {
+      violations.push(`${label} focus_momentum must be numeric when provided`);
+    }
+
+    const drift =
+      (frame as any).payload?.drift ??
+      (frame as any).payload?.drift_level ??
+      (frame as any).payload?.driftLevel;
+    if (drift !== undefined && typeof drift !== 'number' && typeof drift !== 'string') {
+      violations.push(`${label} drift must be numeric or string when provided`);
+    }
+  });
+
+  if (versions.size > 1) {
+    violations.push(`mixed trace versions detected: ${Array.from(versions).join(', ')}`);
+  }
+
+  return { warnings, violations };
+}
+
 function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: string[]; violations: string[] } {
   if (!raw) return { branches: [], notes: [], violations: [] };
 
@@ -174,6 +249,8 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
   const normalized: BranchInsight[] = [];
   const notes: string[] = [];
   const violations: string[] = [];
+  const seenIds = new Set<string>();
+  const originalOrder: string[] = [];
 
   for (const entry of branchesArray as Array<Record<string, any>>) {
     const id = (entry.id ?? entry.name ?? 'unnamed') as string;
@@ -188,6 +265,13 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
       class: entry.class as string | undefined,
     };
 
+    if (seenIds.has(id)) {
+      violations.push(`duplicate branch id ${id}`);
+      continue;
+    }
+    seenIds.add(id);
+    originalOrder.push(id);
+
     if (confidence === undefined) {
       notes.push(`branch ${id} missing confidence (tooling MAY normalize)`);
     } else if (confidence < 0 || confidence > 1) {
@@ -196,15 +280,22 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
     }
 
     normalized.push(branch);
-    idsInOrder.push(id);
   }
 
-  const sorted = normalized.sort((a, b) => {
+  const sorted = [...normalized].sort((a, b) => {
     const scoreA = a.confidence ?? -Infinity;
     const scoreB = b.confidence ?? -Infinity;
     if (scoreA === scoreB) return a.id.localeCompare(b.id);
     return scoreB - scoreA;
   });
+
+  const reordered =
+    sorted.length === originalOrder.length &&
+    sorted.some((branch, idx) => branch.id !== originalOrder[idx]);
+  if (reordered) {
+    notes.push('branches reordered to deterministic confidence order');
+    violations.push('branches not pre-sorted by confidence');
+  }
 
   return { branches: sorted, notes, violations };
 }
@@ -214,6 +305,7 @@ function summarize(
   inputPath: string,
   format: InspectSummary['input']['format'],
 ): { summary: InspectSummary; violations: string[]; warnings: string[] } {
+  const validation = validateTraceFrames(frames);
   const continuity = detectContinuity(frames);
   const driftLevel = driftLevelFromSnapshots(frames);
   const orientationStable = frames.some((f) => f.type === 'orientation');
@@ -224,6 +316,7 @@ function summarize(
   );
 
   const warnings = [
+    ...validation.warnings,
     ...(Array.isArray(lastRouteResponse?.payload?.notes) ? lastRouteResponse?.payload?.notes : []),
     ...branchNotes,
     ...continuity.notes,
@@ -261,7 +354,7 @@ function summarize(
       branches,
       notes,
     },
-    violations,
+    violations: [...validation.violations, ...violations],
     warnings,
   };
 }
