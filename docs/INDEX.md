@@ -13,6 +13,7 @@
 - Orientation (Canonical) — `docs/canon/ORIENTATION.md`
 - Limits of LTP (Non-Goals & Boundaries) — `docs/canon/LTP-Limits-of-LTP.md`
 - How to Build Products on LTP Without Violating the Core — `docs/canon/LTP-Products-on-LTP-Without-Violating-Core.md`
+- Misuse Patterns: How LTP Is Commonly Broken (And Why This Is Not Allowed) — `docs/canon/LTP-Misuse-Patterns.md`
 
 ## Conformance
 - Conformance Badge — `docs/conformance/badge.md`
