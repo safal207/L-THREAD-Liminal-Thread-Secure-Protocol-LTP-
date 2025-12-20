@@ -9,6 +9,10 @@
 - Canonical Flow — `specs/LTP-Canonical-Flow-v0.1.md`
 - Frames & Determinism — `specs/LTP-Frames-v0.1.md`
 
+## Canon
+- Orientation (Canonical) — `docs/canon/ORIENTATION.md`
+- Limits of LTP (Non-Goals & Boundaries) — `docs/canon/LTP-Limits-of-LTP.md`
+
 ## Conformance
 - Conformance Badge — `docs/conformance/badge.md`
 - Conformance Kit — `tools/conformance-kit/`
