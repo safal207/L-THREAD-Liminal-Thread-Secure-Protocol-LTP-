@@ -31,6 +31,12 @@ Flags:
 
 Frames may be a JSON array or JSONL with one frame per line. Existing conformance fixtures work as input.
 
+## Deterministic snapshots
+
+- Input paths are normalized relative to the current workspace to keep reruns diffable.
+- Set `LTP_INSPECT_FROZEN_TIME=2024-01-01T00:00:00.000Z` (or any ISO timestamp) to pin `generated_at` for snapshotting; this is how `docs/devtools/inspect-output.txt` is produced.
+- Flags accept `--flag value` or `--flag=value`; use `--color=never` to strip ANSI codes in CI.
+
 ## What it is / What it is NOT
 
 Ordinary AI | LTP Inspector

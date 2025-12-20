@@ -33,6 +33,11 @@ pnpm -w ltp:inspect -- explain --input examples/traces/constraint-blocked.json -
 
 Output is stable within minor versions and follows CI semantics: drift is informational, continuity breaks fail, confidence gaps warn, and out-of-range confidence fails.
 
+Deterministic snapshotting:
+- Output paths are normalized relative to the working directory to keep diffs clean.
+- Set `LTP_INSPECT_FROZEN_TIME=2024-01-01T00:00:00.000Z` (or another ISO timestamp) to pin `generated_at` when generating review artifacts like [`docs/devtools/inspect-output.txt`](./inspect-output.txt).
+- CLI flags accept both `--flag value` and `--flag=value`; `--color=never` removes ANSI codes for snapshotting and CI logs.
+
 The Inspector is the foundation for future DevTools and enterprise integrations.
 
 ## Modes

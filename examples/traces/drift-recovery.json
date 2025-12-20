@@ -1,5 +1,6 @@
 [
   {
+    "v": "0.1",
     "id": "step-1",
     "ts": 1700001000000,
     "type": "orientation",
@@ -12,6 +13,7 @@
     }
   },
   {
+    "v": "0.1",
     "id": "step-2",
     "ts": 1700001000500,
     "type": "focus_snapshot",
@@ -22,6 +24,7 @@
     }
   },
   {
+    "v": "0.1",
     "id": "step-3",
     "ts": 1700001001000,
     "type": "route_response",
@@ -47,6 +50,7 @@
     }
   },
   {
+    "v": "0.1",
     "id": "step-4",
     "ts": 1700001001500,
     "type": "focus_snapshot",
