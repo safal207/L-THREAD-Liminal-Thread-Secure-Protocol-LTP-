@@ -1,4 +1,4 @@
-# PR 200 — Non-Goals as Design Constraints: Why LTP Cannot (and Should Not) Be Extended
+# LTP — Non-Goals as Design Constraints (Canonical)
 
 > This document defines non-goals of LTP as first-class design constraints.
 > These constraints are not limitations of the protocol,
@@ -18,7 +18,9 @@ They are framed as design constraints, not as expressions of scarcity or lack.
 > LTP is intentionally minimal.
 >
 > Any feature that requires interpretation, optimization, or goal synthesis
-> must exist above the protocol layer, not within it.
+> MUST be implemented above the protocol layer, not within it.
+
+Core state MUST remain deterministic and replayable across implementations and over time.
 
 This principle is the shield that keeps LTP stable when products evolve.
 
@@ -48,6 +50,26 @@ LTP does not encode affect, emotion, intention, or mental states.
 Such concepts may be layered above LTP,
 but are explicitly out of scope for the protocol.
 
+### 3.5 LTP does not provide observability storage
+
+LTP describes how traces are structured and replays remain coherent.
+It does not dictate storage backends (e.g., Loki, S3, OpenTelemetry, ClickHouse).
+
+### 3.6 LTP does not define transport security
+
+LTP is agnostic to TLS, mTLS, WSS, QUIC, or other transport security choices.
+Crypto policy, ciphers, and key management live below or beside the protocol, not inside it.
+
+### 3.7 LTP does not orchestrate agents
+
+LTP is not a scheduler, workflow engine, or queue manager.
+Agent coordination, retries, and backpressure belong to orchestration layers above LTP.
+
+**Operational Rule of Thumb**
+- LTP defines trace shape, not trace storage.
+- LTP is transport-agnostic, not crypto policy.
+- LTP is continuity substrate, not agent runtime.
+
 ---
 
 ## 4. Why Extension Would Break LTP
@@ -67,6 +89,9 @@ This would:
 Systems requiring semantics, optimization, or agency must implement such capabilities above LTP, using LTP only as a continuity and orientation substrate.
 The protocol remains neutral; the product layer remains free to innovate.
 
+Use LTP to record: present → focus_node → admissible_branches (deterministic, replayable).
+Implement in your product: scoring, selection, learning, UX, policy, and transport choices.
+
 ---
 
 ## 6. Final Formula
@@ -80,6 +105,12 @@ The protocol remains neutral; the product layer remains free to innovate.
 
 - PR 195 defined explicit limits and boundaries for LTP.
 - PR 199 documented common misuse patterns and how they violate the core.
-- PR 200 explains why the boundaries cannot be relaxed without dissolving the protocol.
+- The companion document explains why the boundaries cannot be relaxed without dissolving the protocol.
 
 Together they keep LTP closed under extension and open under composition.
+
+See also:
+
+- `docs/canon/LTP-Limits-of-LTP.md`
+- `docs/canon/LTP-Products-on-LTP-Without-Violating-Core.md`
+- `docs/canon/LTP-Misuse-Patterns.md`
