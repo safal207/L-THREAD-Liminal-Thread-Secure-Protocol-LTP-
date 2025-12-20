@@ -1,0 +1,20 @@
+[
+  {
+    "v": "0.2",
+    "id": "u1",
+    "ts": 1,
+    "type": "orientation",
+    "payload": {
+      "origin": "test"
+    }
+  },
+  {
+    "v": "0.2",
+    "id": "u2",
+    "ts": 2,
+    "type": "route_response",
+    "payload": {
+      "branches": [{ "id": "A", "confidence": 0.5, "status": "admissible" }]
+    }
+  }
+]

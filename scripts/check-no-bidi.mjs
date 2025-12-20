@@ -5,8 +5,9 @@ import path from 'path';
 import process from 'process';
 
 const BIDI_REGEX = /[\u202A-\u202E\u2066-\u2069\u200B]/;
-const DIRS_TO_SCAN = ['docs', 'specs', 'governance', 'positioning', 'adoption'];
-const EXTENSIONS_TO_SCAN = ['.md'];
+const DIRS_TO_SCAN = ['docs', 'specs', 'governance', 'positioning', 'adoption', 'tools', 'fixtures', 'examples', 'src', '.github'];
+const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'artifacts', 'reports', 'coverage']);
+const EXTENSIONS_TO_SCAN = ['.md', '.json', '.jsonl', '.ts', '.js', '.yaml', '.yml'];
 
 let filesWithBidi = [];
 
@@ -16,6 +17,7 @@ function scanDir(dir) {
     const filePath = path.join(dir, file);
     const stat = fs.statSync(filePath);
     if (stat.isDirectory()) {
+      if (SKIP_DIRS.has(file)) continue;
       scanDir(filePath);
     } else if (EXTENSIONS_TO_SCAN.includes(path.extname(filePath))) {
       const content = fs.readFileSync(filePath, 'utf8');
