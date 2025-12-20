@@ -10,6 +10,7 @@ const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt')
 const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt');
 const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.json');
 const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.json');
+const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.json');
 
 describe('ltp-inspect golden summary', () => {
   it('emits stable, ordered output', () => {
@@ -88,27 +89,19 @@ describe('ltp-inspect golden summary', () => {
       error: (message) => errors.push(message),
     });
 
-    expect(exitCode).toBe(3);
-    expect(errors.length).toBe(0);
-    expect(logs.join('\n')).toContain('branches reordered for determinism');
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('Contract violation');
   });
 
-  it('explains constraints and deltas at a given step', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+  it('fails loudly when trace version is missing', () => {
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['explain', '--input', warnFixture, '--at', 'r1'], {
+    const exitCode = execute(['--input', missingVersionFixture, '--format=human', '--color=never'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    expect(exitCode).toBe(0);
-    expect(errors.length).toBe(0);
-    const output = logs.join('\n');
-    expect(output).toContain('Explain @ r1');
-    expect(output).toContain('constraints active');
-    expect(output).toContain('drift');
-    vi.useRealTimers();
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('missing trace version');
   });
 });

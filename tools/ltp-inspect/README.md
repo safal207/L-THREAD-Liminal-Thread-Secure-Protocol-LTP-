@@ -4,6 +4,11 @@ LTP does not choose actions. It maintains orientation so actions remain coherent
 
 Inspector emits a versioned, deterministic state summary suitable for CI, audits, replay, and explainability.
 
+## Constraint alignment
+- Inspector is justified by LTP core constraints (see [`docs/canon/LTP-Non-Goals-as-Design-Constraints.md`](../../docs/canon/LTP-Non-Goals-as-Design-Constraints.md)): it never executes models, chooses branches, or adapts heuristically.
+- Input traces must be immutable, deterministic orientation logs. Frames lacking `v`/`version`, non-object payloads, duplicate branch ids, or non-numeric drift/focus values are rejected as contract violations.
+- The CLI is read-only; it consumes schema-defined fields (`identity`, `focus_momentum`, `drift`, `constraints`) and emits summaries. Any requirement for inference or normalization lives outside Inspector.
+
 ## One-command entrypoint
 
 Run from the repo root (JSON by default):

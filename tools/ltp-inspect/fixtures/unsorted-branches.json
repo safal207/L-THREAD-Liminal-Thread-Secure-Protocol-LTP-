@@ -15,8 +15,8 @@
     "type": "route_response",
     "payload": {
       "branches": [
-        { "id": "A", "confidence": 0.2, "status": "admissible" },
-        { "id": "B", "confidence": 0.7, "status": "admissible" }
+        { "id": "B", "confidence": 0.2, "status": "admissible" },
+        { "id": "A", "confidence": 0.7, "status": "admissible" }
       ]
     }
   }
