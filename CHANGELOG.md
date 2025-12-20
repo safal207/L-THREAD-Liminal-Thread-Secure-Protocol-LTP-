@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added canonical orientation explanation and onboarding materials (media assets referenced externally; binaries not stored in repo).
+- No protocol or contract changes.
+
 ### Planned
 - Complete v0.6.0 production security (see roadmap below)
 - LRI integration examples
@@ -1002,4 +1006,3 @@ No breaking changes. All security enhancements are backward compatible.
 [0.3.0]: https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/releases/tag/v0.1.0
-
