@@ -1,5 +1,7 @@
 # PR 196 — How to Build Products on LTP Without Violating the Core
 
+**Any product built on LTP may add behavior, but MUST preserve the continuity guarantees of the protocol unchanged.**
+
 Purpose: explain how to design systems, products, and services on top of LTP while preserving the invariants defined in the LTP Core and in **Limits of LTP (PR 195)**. It exists to enable innovation without erosion.
 
 ## 1. The Core Rule
@@ -68,6 +70,8 @@ Products **MUST NOT**:
 
 If orientation changes, it must happen via canonical LTP transitions only.
 
+Example of violation: rewriting drift history to “clean up” agent behavior after a failure.
+
 ### ❌ Do NOT overload LTP with intent
 
 LTP **MUST NOT** be used as:
@@ -99,6 +103,8 @@ Discontinuity is a signal, not a bug.
 But neither may redefine the thread itself.
 
 ## 5. Canonical Product Patterns
+
+These patterns are illustrative, not exhaustive.
 
 ### Pattern 1 — Orientation-aware Agent
 
