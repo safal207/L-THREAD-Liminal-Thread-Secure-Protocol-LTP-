@@ -1,10 +1,11 @@
 use crate::protocol::{
-    LtpOutgoingMessage, RouteDebugInfo, TimeOrientationBoostPayload, TimeOrientationDirectionPayload,
+    LtpOutgoingMessage, RouteDebugInfo, TimeOrientationBoostPayload,
+    TimeOrientationDirectionPayload,
 };
 use crate::state::LtpNodeState;
 
-pub fn build_route_suggestion(state: &LtpNodeState, client_id: &str) -> LtpOutgoingMessage {
-    let client_state = state.get_client_state(client_id);
+pub async fn build_route_suggestion(state: &LtpNodeState, client_id: &str) -> LtpOutgoingMessage {
+    let client_state = state.snapshot(client_id).await;
 
     let mut suggested_sector = "neutral".to_string();
     let mut reason = String::from("default");

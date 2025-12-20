@@ -98,9 +98,9 @@ Implement in your product: scoring, selection, learning, UX, policy, and transpo
 
 ## 7. Relation to Prior PRs
 
-- PR 195 defined explicit limits and boundaries for LTP.
-- PR 199 documented common misuse patterns and how they violate the core.
-- PR 200 explains why the boundaries cannot be relaxed without dissolving the protocol.
+- “Limits of LTP (Non-Goals & Boundaries)” defines explicit limits and boundaries for LTP.
+- “Misuse Patterns: How LTP Is Commonly Broken (And Why This Is Not Allowed)” documents common misuse patterns and how they violate the core.
+- The companion document explains why the boundaries cannot be relaxed without dissolving the protocol.
 
 Together they keep LTP closed under extension and open under composition.
 
