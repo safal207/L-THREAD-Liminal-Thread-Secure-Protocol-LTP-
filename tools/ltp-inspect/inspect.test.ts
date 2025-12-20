@@ -89,6 +89,26 @@ describe('ltp-inspect golden summary', () => {
     });
 
     expect(exitCode).toBe(3);
-    expect(errors.join('\n')).toContain('Contract violation');
+    expect(errors.length).toBe(0);
+    expect(logs.join('\n')).toContain('branches reordered for determinism');
+  });
+
+  it('explains constraints and deltas at a given step', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+    const logs: string[] = [];
+    const errors: string[] = [];
+    const exitCode = execute(['explain', '--input', warnFixture, '--at', 'r1'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(errors.length).toBe(0);
+    const output = logs.join('\n');
+    expect(output).toContain('Explain @ r1');
+    expect(output).toContain('constraints active');
+    expect(output).toContain('drift');
+    vi.useRealTimers();
   });
 });

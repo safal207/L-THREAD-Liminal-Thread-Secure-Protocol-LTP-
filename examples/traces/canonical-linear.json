@@ -1,0 +1,60 @@
+[
+  {
+    "id": "step-1",
+    "ts": 1700000000000,
+    "type": "orientation",
+    "continuity_token": "ct-linear",
+    "payload": {
+      "origin": "demo.client",
+      "focus_momentum": 0.48,
+      "constraints": ["stay canonical", "no shortcuts"]
+    }
+  },
+  {
+    "id": "step-2",
+    "ts": 1700000000500,
+    "type": "route_request",
+    "continuity_token": "ct-linear",
+    "payload": {
+      "goal": "ship linear demo",
+      "context": ["hello", "heartbeat", "orientation"],
+      "constraints": ["preserve ordering"]
+    }
+  },
+  {
+    "id": "step-3",
+    "ts": 1700000001000,
+    "type": "route_response",
+    "continuity_token": "ct-linear",
+    "payload": {
+      "branches": [
+        {
+          "id": "A",
+          "status": "admissible",
+          "confidence": 0.64,
+          "rationale": "primary path",
+          "path": "stabilize -> deliver",
+          "constraints": ["preserve ordering"]
+        },
+        {
+          "id": "B",
+          "status": "degraded",
+          "confidence": 0.21,
+          "rationale": "fallback path",
+          "path": "recover -> deliver"
+        }
+      ],
+      "notes": ["canonical linear demo"]
+    }
+  },
+  {
+    "id": "step-4",
+    "ts": 1700000001500,
+    "type": "focus_snapshot",
+    "continuity_token": "ct-linear",
+    "payload": {
+      "drift": 0.22,
+      "rationale": "aligned after routing"
+    }
+  }
+]
