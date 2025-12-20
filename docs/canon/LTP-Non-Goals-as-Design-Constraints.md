@@ -65,11 +65,6 @@ Crypto policy, ciphers, and key management live below or beside the protocol, no
 LTP is not a scheduler, workflow engine, or queue manager.
 Agent coordination, retries, and backpressure belong to orchestration layers above LTP.
 
-**Operational Rule of Thumb**
-- LTP defines trace shape, not trace storage.
-- LTP is transport-agnostic, not crypto policy.
-- LTP is continuity substrate, not agent runtime.
-
 ---
 
 ## 4. Why Extension Would Break LTP
@@ -103,8 +98,8 @@ Implement in your product: scoring, selection, learning, UX, policy, and transpo
 
 ## 7. Relation to Prior PRs
 
-- PR 195 defined explicit limits and boundaries for LTP.
-- PR 199 documented common misuse patterns and how they violate the core.
+- “Limits of LTP (Non-Goals & Boundaries)” defines explicit limits and boundaries for LTP.
+- “Misuse Patterns: How LTP Is Commonly Broken (And Why This Is Not Allowed)” documents common misuse patterns and how they violate the core.
 - The companion document explains why the boundaries cannot be relaxed without dissolving the protocol.
 
 Together they keep LTP closed under extension and open under composition.
@@ -114,3 +109,19 @@ See also:
 - `docs/canon/LTP-Limits-of-LTP.md`
 - `docs/canon/LTP-Products-on-LTP-Without-Violating-Core.md`
 - `docs/canon/LTP-Misuse-Patterns.md`
+
+---
+
+## Operational Rule of Thumb
+
+- LTP defines **trace shape**, not **trace storage**.
+- LTP is **transport-agnostic**, not a **security policy**.
+- LTP provides **continuity guarantees**, not **agent orchestration**.
+- LTP governs **orientation over time**, not **decision correctness**.
+
+If a proposed extension violates any of the above, it does not belong in the LTP core.
+
+---
+
+This document is canonical.
+Implementation details may evolve; these constraints must not.
