@@ -1,5 +1,10 @@
 # LTP — Liminal Thread Protocol
 
+LTP preserves orientation over time.
+It does not predict, decide, or optimize outcomes.
+
+→ New here? Start with: docs/readme/WHY_ORIENTATION.md
+
 **Deterministic routing protocol for context continuity, explainable transitions, and multi-path futures.**
 
 LTP defines *how decisions, transitions, and agent handoffs are represented, verified, and replayed* — without black boxes, recommendations, or hidden state.
