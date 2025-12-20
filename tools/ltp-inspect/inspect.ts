@@ -68,8 +68,13 @@ function parseArgs(argv: string[]): ParsedArgs {
     const token = argv[i];
     if (token === '--help' || token === '-h') {
       options.command = 'help';
+    } else if (token.startsWith('--input=')) {
+      options.input = token.split('=').slice(1).join('=');
     } else if (token === '--input' || token === '-i') {
       options.input = argv[++i];
+    } else if (token.startsWith('--format=')) {
+      const format = token.split('=').slice(1).join('=') as OutputFormat;
+      options.format = format === 'human' || format === 'json' ? format : 'human';
     } else if (token === '--format') {
       const format = argv[++i] as OutputFormat;
       options.format = format === 'human' || format === 'json' ? format : 'human';
@@ -79,14 +84,23 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.format = 'human';
     } else if (token === '--pretty') {
       options.pretty = true;
+    } else if (token.startsWith('--from=')) {
+      options.from = token.split('=').slice(1).join('=');
     } else if (token === '--from') {
       options.from = argv[++i];
+    } else if (token.startsWith('--branch=')) {
+      options.branch = token.split('=').slice(1).join('=');
     } else if (token === '--branch') {
       options.branch = argv[++i];
     } else if (token === '--strict') {
       options.strict = true;
+    } else if (token.startsWith('--at=')) {
+      options.at = token.split('=').slice(1).join('=');
     } else if (token === '--at') {
       options.at = argv[++i];
+    } else if (token.startsWith('--color=')) {
+      const mode = token.split('=').slice(1).join('=') as ColorMode;
+      options.color = ['auto', 'always', 'never'].includes(mode) ? mode : 'auto';
     } else if (token === '--color') {
       const mode = argv[++i] as ColorMode;
       options.color = ['auto', 'always', 'never'].includes(mode) ? mode : 'auto';
@@ -94,6 +108,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.quiet = true;
     } else if (token === '--verbose' || token === '-v') {
       options.verbose = true;
+    } else if (token.startsWith('--output=')) {
+      options.output = token.split('=').slice(1).join('=');
     } else if (token === '--output' || token === '-o') {
       options.output = argv[++i];
     } else if (!options.input && !token.startsWith('-')) {
@@ -106,6 +122,21 @@ function parseArgs(argv: string[]): ParsedArgs {
 
 function readStdin(): string {
   return fs.readFileSync(0, 'utf-8');
+}
+
+function stableGeneratedAt(): string {
+  const frozen = process.env.LTP_INSPECT_FROZEN_TIME;
+  if (frozen) {
+    const parsed = new Date(frozen);
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function normalizeInputPathForOutput(resolved: string): string {
+  const relative = path.relative(process.cwd(), resolved);
+  const candidate = relative && !relative.startsWith('..') ? relative : resolved;
+  return candidate.split(path.sep).join('/');
 }
 
 function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSummary['input']['format']; inputPath: string } {
@@ -123,7 +154,7 @@ function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSumm
     try {
       const frames = JSON.parse(raw);
       if (!Array.isArray(frames)) throw new Error('Expected JSON array');
-      return { frames, format: 'json', inputPath: resolved };
+      return { frames, format: 'json', inputPath: isStdin ? 'stdin' : normalizeInputPathForOutput(resolved) };
     } catch (err) {
       throw new CliError(`Invalid JSON array: ${(err as Error).message}`, 2);
     }
@@ -134,7 +165,7 @@ function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSumm
       .split(/\r?\n/)
       .filter((line) => line.trim().length > 0)
       .map((line) => JSON.parse(line));
-    return { frames, format: 'jsonl', inputPath: resolved };
+    return { frames, format: 'jsonl', inputPath: isStdin ? 'stdin' : normalizeInputPathForOutput(resolved) };
   } catch (err) {
     throw new CliError(`Invalid JSONL: ${(err as Error).message}`, 2);
   }
@@ -233,8 +264,14 @@ function validateTraceFrames(frames: LtpFrame[]): { warnings: string[]; violatio
     }
 
     const constraints = (frame as any).constraints ?? (frame as any).payload?.constraints;
-    if (constraints !== undefined && (typeof constraints !== 'object' || constraints === null || Array.isArray(constraints))) {
-      violations.push(`${label} constraints must be an object if provided`);
+    if (
+      constraints !== undefined &&
+      constraints !== null &&
+      typeof constraints !== 'string' &&
+      !Array.isArray(constraints) &&
+      typeof constraints !== 'object'
+    ) {
+      violations.push(`${label} constraints must be a string, array, or object when provided`);
     }
 
     const focusMomentum =
@@ -451,13 +488,13 @@ function summarize(
         version: CONTRACT.version,
         schema: CONTRACT.schema,
       },
-      generated_at: new Date().toISOString(),
+      generated_at: stableGeneratedAt(),
       tool: {
         name: TOOL.name,
         build: TOOL.build,
       },
       input: {
-        path: inputPath === 'stdin' ? 'stdin' : path.resolve(inputPath),
+        path: inputPath,
         frames: frames.length,
         format,
       },
@@ -785,6 +822,6 @@ export function main(argv = process.argv.slice(2)): void {
   process.exit(exitCode);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (require.main === module) {
   main();
 }

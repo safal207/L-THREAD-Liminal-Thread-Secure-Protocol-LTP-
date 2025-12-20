@@ -1,19 +1,23 @@
 LTP INSPECTOR  v1.0
-input: tools/ltp-inspect/fixtures/minimal.frames.jsonl  time: 2024-01-01T00:00:00.000Z
+input: examples/traces/canonical-linear.json  time: 2024-01-01T00:00:00.000Z
 
 IDENTITY
-identity: ct-1
-continuity: preserved (ct-1)
+identity: demo.client
+continuity: preserved (ct-linear)
 
 ORIENTATION
 stable: yes
-focus_momentum: unknown
-drift: medium
-drift_history: t1:0.55
+focus_momentum: 0.48
+drift: low
+drift_history: step-4:0.22 (aligned after routing)
 
 FUTURES (admissible / degraded / blocked)
 admissible:
-- A score=0.62 status=admissible
+- A score=0.64 status=admissible reason=primary path path=stabilize -> deliver constraints=preserve ordering
+degraded:
+- B score=0.21 status=degraded reason=fallback path path=recover -> deliver
 
 NOTES / WARNINGS
-- retry updated drift
+- canonical linear demo
+
+RESULT: WARN  exit: 1

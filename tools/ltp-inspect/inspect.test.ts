@@ -9,6 +9,8 @@ const expectedHumanOkPath = path.join(__dirname, 'expected', 'human.ok.txt');
 const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt');
 const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt');
 const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.json');
+const canonicalFixture = path.join(__dirname, '..', '..', 'examples', 'traces', 'canonical-linear.json');
+const canonicalHumanSnapshot = path.join(__dirname, '..', '..', 'docs', 'devtools', 'inspect-output.txt');
 const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.json');
 const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.json');
 const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.json');
@@ -36,6 +38,24 @@ describe('ltp-inspect golden summary', () => {
 
     expect(human.trim()).toEqual(expectedHuman);
     vi.useRealTimers();
+  });
+
+  it('matches the canonical human snapshot output', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.stubEnv('LTP_INSPECT_FROZEN_TIME', '2024-01-01T00:00:00.000Z');
+    try {
+      const exitCode = execute(['--input', canonicalFixture, '--format=human', '--color=never'], {
+        log: (message) => logs.push(message),
+        error: (message) => errors.push(message),
+      });
+
+      expect(exitCode).toBe(1);
+      expect(errors.length).toBe(0);
+      expect(logs.join('\n').trim()).toEqual(fs.readFileSync(canonicalHumanSnapshot, 'utf-8').trim());
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('returns exit code 2 for missing input', () => {

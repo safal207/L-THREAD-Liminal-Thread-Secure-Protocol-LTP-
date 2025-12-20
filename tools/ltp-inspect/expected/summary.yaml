@@ -10,7 +10,7 @@
     "build": "dev"
   },
   "input": {
-    "path": "/workspace/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/tools/ltp-inspect/fixtures/minimal.frames.jsonl",
+    "path": "tools/ltp-inspect/fixtures/minimal.frames.jsonl",
     "frames": 3,
     "format": "jsonl"
   },

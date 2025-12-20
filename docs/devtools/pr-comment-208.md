@@ -36,7 +36,7 @@ What is intentionally not included
 Testing / Verification
 - Inspector output format and semantics validated against the canonical trace source (`examples/traces/canonical-linear.json` → `inspect-output.txt`).
 - Output is deterministic and suitable for snapshot comparison.
-- CLI wiring currently fails under `ts-node` due to missing helper functions in `tools/ltp-inspect/inspect.ts`; wiring is tracked separately and will be addressed in follow-up.
+- CLI wiring fixed in PR #212: `pnpm -w ltp:inspect` runs via `ts-node` without manual helper patches; use `LTP_INSPECT_FROZEN_TIME` to pin snapshot timestamps.
 
 Status
 - DevTools readiness: ~85–90%
