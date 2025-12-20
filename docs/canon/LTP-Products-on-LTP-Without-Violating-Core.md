@@ -2,6 +2,8 @@
 
 **Any product built on LTP may add behavior, but MUST preserve the continuity guarantees of the protocol unchanged.**
 
+This document clarifies how responsibility is distributed between the LTP protocol and systems built on top of it. It exists to prevent ambiguity, not to restrict design freedom.
+
 Purpose: explain how to design systems, products, and services on top of LTP while preserving the invariants defined in the LTP Core and in **Limits of LTP (PR 195)**. It exists to enable innovation without erosion.
 
 ## 1. The Core Rule
@@ -71,6 +73,8 @@ Products **MUST NOT**:
 If orientation changes, it must happen via canonical LTP transitions only.
 
 Example of violation: rewriting drift history to “clean up” agent behavior after a failure.
+
+Anti-pattern: treating LTP continuity guarantees as a substitute for product-level correctness or ethics.
 
 ### ❌ Do NOT overload LTP with intent
 
