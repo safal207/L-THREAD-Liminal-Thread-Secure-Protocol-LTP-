@@ -1,0 +1,48 @@
+{
+  "protocol": "LTP",
+  "version": "0.1",
+  "thread_id": "ltp-thread-0001",
+  "identity": {
+    "id": "canonical-agent",
+    "stability": 1.0
+  },
+  "timeline": [
+    {
+      "t": 0,
+      "event": "init",
+      "orientation": {
+        "focus_momentum": 0.72,
+        "drift": 0.0
+      }
+    },
+    {
+      "t": 1,
+      "event": "transition",
+      "orientation": {
+        "focus_momentum": 0.68,
+        "drift": 0.04
+      }
+    }
+  ],
+  "futures": [
+    {
+      "id": "A",
+      "confidence": 0.62,
+      "admissible": true
+    },
+    {
+      "id": "B",
+      "confidence": 0.24,
+      "admissible": true
+    },
+    {
+      "id": "C",
+      "confidence": 0.14,
+      "admissible": false
+    }
+  ],
+  "constraints": {
+    "safety": true,
+    "resources": "ok"
+  }
+}
