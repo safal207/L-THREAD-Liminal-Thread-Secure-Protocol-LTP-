@@ -125,3 +125,15 @@ If a proposed extension violates any of the above, it does not belong in the LTP
 
 This document is canonical.
 Implementation details may evolve; these constraints must not.
+
+---
+
+## Design Invariant
+
+If a system:
+- hides orientation transitions,
+- merges prediction with routing,
+- makes continuity implicit,
+
+it is not an LTP-compatible system,
+even if it uses LTP terminology.
