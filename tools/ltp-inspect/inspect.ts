@@ -24,6 +24,7 @@ type Command = 'trace' | 'replay' | 'explain' | 'help';
 type ParsedArgs = {
   command: Command;
   input?: string;
+  strict: boolean;
   format: OutputFormat;
   pretty: boolean;
   from?: string;
@@ -51,6 +52,7 @@ function parseArgs(argv: string[]): ParsedArgs {
   const options: ParsedArgs = {
     command: positionalCommand,
     input: undefined,
+    strict: false,
     format: 'human',
     pretty: false,
     from: undefined,
@@ -81,6 +83,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.from = argv[++i];
     } else if (token === '--branch') {
       options.branch = argv[++i];
+    } else if (token === '--strict') {
+      options.strict = true;
     } else if (token === '--at') {
       options.at = argv[++i];
     } else if (token === '--color') {
@@ -255,8 +259,8 @@ function validateTraceFrames(frames: LtpFrame[]): { warnings: string[]; violatio
   return { warnings, violations };
 }
 
-function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: string[]; violations: string[] } {
-  if (!raw) return { branches: [], notes: [], violations: [] };
+function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: string[]; violations: string[]; normalizations: string[] } {
+  if (!raw) return { branches: [], notes: [], violations: [], normalizations: [] };
 
   const branchesArray = Array.isArray(raw)
     ? raw
@@ -267,8 +271,11 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
   const normalized: BranchInsight[] = [];
   const notes: string[] = [];
   const violations: string[] = [];
+  const normalizations: string[] = [];
   const seenIds = new Set<string>();
   const originalOrder: string[] = [];
+  let sawUnsorted = false;
+  let lastConfidence: number | undefined;
 
   for (const entry of branchesArray as Array<Record<string, any>>) {
     const id = (entry.id ?? entry.name ?? 'unnamed') as string;
@@ -327,11 +334,64 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
     sorted.length === originalOrder.length &&
     sorted.some((branch, idx) => branch.id !== originalOrder[idx]);
   if (reordered) {
-    notes.push('branches reordered to deterministic confidence order');
-    violations.push('branches not pre-sorted by confidence');
+    const message = 'branches reordered to deterministic confidence order';
+    notes.push(message);
+    normalizations.push('branches not pre-sorted by confidence (normalized order applied)');
   }
 
-  return { branches: sorted, notes, violations };
+  if (sawUnsorted && !reordered) {
+    normalizations.push('branch confidences not in canonical order (normalization available)');
+  }
+
+  return { branches: sorted, notes, violations, normalizations };
+}
+
+function constraintListFrom(raw: unknown): string[] {
+  if (!raw) return [];
+  if (typeof raw === 'string') return [raw];
+  if (Array.isArray(raw)) return raw.flatMap((item) => constraintListFrom(item));
+  if (typeof raw === 'object') {
+    return Object.entries(raw as Record<string, unknown>).map(([key, value]) =>
+      value === undefined || value === null ? String(key) : `${key}:${value}`,
+    );
+  }
+  return [];
+}
+
+function extractIdentity(frames: LtpFrame[]): string {
+  for (let i = frames.length - 1; i >= 0; i -= 1) {
+    const frame = frames[i] as Record<string, unknown>;
+    const payload = (frame.payload ?? {}) as Record<string, unknown>;
+    const directIdentity = payload.identity ?? (frame as any).identity ?? payload.origin ?? payload.id;
+    if (typeof directIdentity === 'string' && directIdentity.trim().length) return directIdentity;
+    if (directIdentity && typeof directIdentity === 'object' && 'id' in (directIdentity as Record<string, unknown>)) {
+      const embedded = (directIdentity as Record<string, unknown>).id;
+      if (typeof embedded === 'string' && embedded.trim().length) return embedded;
+    }
+  }
+
+  const continuity = frames.map((f) => f.continuity_token).filter((token): token is string => Boolean(token));
+  return continuity.at(-1) ?? 'unknown';
+}
+
+function extractFocusMomentum(frames: LtpFrame[]): number | undefined {
+  for (let i = frames.length - 1; i >= 0; i -= 1) {
+    const payload = (frames[i] as any).payload ?? {};
+    const value = payload.focus_momentum ?? payload.focusMomentum ?? payload.focus;
+    if (typeof value === 'number') return value;
+  }
+  return undefined;
+}
+
+function collectConstraints(frames: LtpFrame[]): string[] {
+  const collected: string[] = [];
+  for (const frame of frames) {
+    const rawConstraints = (frame as any).payload?.constraints ?? (frame as any).constraints;
+    for (const constraint of constraintListFrom(rawConstraints)) {
+      if (!collected.includes(constraint)) collected.push(constraint);
+    }
+  }
+  return collected;
 }
 
 function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
@@ -357,7 +417,7 @@ function summarize(
   frames: LtpFrame[],
   inputPath: string,
   format: InspectSummary['input']['format'],
-): { summary: InspectSummary; violations: string[]; warnings: string[] } {
+): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
   const validation = validateTraceFrames(frames);
   const continuity = detectContinuity(frames);
   const driftHistory = collectDriftHistory(frames);
@@ -367,7 +427,7 @@ function summarize(
   const orientationStable = frames.some((f) => f.type === 'orientation');
 
   const lastRouteResponse = [...frames].reverse().find((f) => f.type === 'route_response');
-  const { branches, notes: branchNotes, violations } = normalizeBranches(
+  const { branches, notes: branchNotes, violations, normalizations } = normalizeBranches(
     lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload,
   );
 
@@ -419,6 +479,7 @@ function summarize(
     },
     violations: [...validation.violations, ...violations],
     warnings,
+    normalizations,
   };
 }
 
@@ -501,16 +562,17 @@ type InspectionResult = {
   summary: InspectSummary;
   warnings: string[];
   violations: string[];
+  normalizations: string[];
 };
 
 function handleTrace(file: string, format: OutputFormat, pretty: boolean, writer: Writer): InspectionResult {
   const { frames, format: inputFormat, inputPath } = loadFrames(file);
-  const { summary, violations, warnings } = summarize(frames, inputPath, inputFormat);
+  const { summary, violations, warnings, normalizations } = summarize(frames, inputPath, inputFormat);
 
   if (format === 'json') printJson(summary, pretty, writer);
   else printHuman(summary, writer);
 
-  return { summary, violations, warnings };
+  return { summary, violations, warnings, normalizations };
 }
 
 function handleReplay(file: string, from: string | undefined, writer: Writer): void {
@@ -587,7 +649,7 @@ function printHelp(writer: Writer): void {
   writer('ltp:inspect — orientation inspector (no decisions, no model execution).');
   writer('');
   writer('Usage:');
-  writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>]');
+  writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>]');
   writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
   writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
@@ -600,12 +662,13 @@ function printHelp(writer: Writer): void {
   writer('Output:');
   writer('  JSON (v1 contract) with deterministic ordering for CI. Additional fields remain optional.');
   writer('  Human format shows identity, focus momentum, drift history, continuity, and future branches with rationale.');
+  writer('  --strict treats canonicalization needs as contract violations (exit 2).');
   writer('');
   writer('Exit codes:');
   writer('  0 OK — contract produced');
-  writer('  2 invalid input or contract violation');
-  writer('  3 WARN — degraded orientation or continuity');
-  writer('  4 runtime failure — unexpected error');
+  writer('  1 warnings only (normalized output or degraded signals)');
+  writer('  2 contract violation (invalid input or non-canonical in --strict)');
+  writer('  3 runtime failure — unexpected error');
 }
 
 function printJson(summary: InspectSummary, pretty = false, writer: Writer): void {
@@ -638,14 +701,32 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
     switch (args.command) {
       case 'trace':
         {
-          const { violations, warnings } = handleTrace(args.input as string, args.format, args.pretty, writer);
-          const status = violations.length ? 'error' : warnings.length ? 'warn' : 'ok';
-          const exitCode = status === 'error' ? 2 : status === 'warn' ? 3 : 0;
+          const { violations, warnings, normalizations } = handleTrace(args.input as string, args.format, args.pretty, writer);
+          const contractBreaches = [...violations];
+          const hasCanonicalGaps = normalizations.length > 0;
+          const hasWarnings = warnings.length > 0 || normalizations.length > 0;
+
+          if (args.strict && hasCanonicalGaps) {
+            contractBreaches.push(
+              ...normalizations.map((note) => `non-canonical input (normalization would be required): ${note}`),
+            );
+          }
+
+          const status = contractBreaches.length ? 'error' : hasWarnings ? 'warn' : 'ok';
+          const exitCode = contractBreaches.length ? 2 : hasWarnings ? 1 : 0;
+          process.exitCode = exitCode;
+
           const statusText =
-            status === 'ok' ? green('OK') : status === 'warn' ? yellow('WARN (degraded)') : red('FAIL (contract)');
-          if (violations.length) {
-            errorWriter(`ERROR: Contract violation: ${violations.join('; ')}`);
+            status === 'ok'
+              ? green('OK')
+              : status === 'warn'
+                ? yellow('WARN')
+                : red('ERROR (contract)');
+          if (contractBreaches.length) {
+            errorWriter(`ERROR: Contract violation: ${contractBreaches.join('; ')}`);
             errorWriter('hint: re-run with --format=json and --pretty for contract view');
+          } else if (hasCanonicalGaps) {
+            errorWriter(`WARN: normalized output (non-canonical input): ${normalizations.join('; ')}`);
           }
           if (args.format === 'human') {
             writer('');
@@ -690,10 +771,12 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
       errorWriter(`ERROR: ${err.message}`);
       errorWriter(hint);
       errorWriter(example);
+      process.exitCode = err.exitCode;
       return err.exitCode;
     }
     errorWriter(`Runtime failure: ${(err as Error).message}`);
-    return 4;
+    process.exitCode = 3;
+    return 3;
   }
 }
 

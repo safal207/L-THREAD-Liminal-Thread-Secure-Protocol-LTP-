@@ -21,4 +21,4 @@ NOTES / WARNINGS
 - drift adjusted
 - continuity token rotation detected mid-session
 
-RESULT: WARN (degraded)  exit: 3
+RESULT: WARN  exit: 1

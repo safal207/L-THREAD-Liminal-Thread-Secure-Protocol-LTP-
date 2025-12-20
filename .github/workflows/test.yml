@@ -19,6 +19,37 @@ jobs:
         run: |
           ./scripts/check-no-bidi.mjs
 
+  ltp-inspect:
+    name: Inspector contract check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Enable Corepack + pnpm
+        shell: bash
+        run: |
+          set -euxo pipefail
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+          pnpm -v
+      - name: Install inspector dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pnpm fetch || echo "pnpm fetch skipped (offline)"
+          pnpm -w install --prefer-offline --no-frozen-lockfile
+      - name: Inspect trace (non-strict, PR visibility)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/unsorted-branches.json --format=human --color=never --quiet
+      - name: Inspect trace (strict gate)
+        if: github.event_name != 'pull_request'
+        run: |
+          pnpm -w ltp:inspect -- --strict --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --quiet
+
   verify-types:
     name: Verify Cross-SDK Type Consistency
     runs-on: ubuntu-latest
@@ -261,4 +292,3 @@ jobs:
         run: |
           set -euxo pipefail
           ./scripts/ci/rc1-smoke.sh
-
