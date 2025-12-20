@@ -8,12 +8,21 @@ export type LtpFrame = {
   [key: string]: unknown;
 };
 
+export type DriftSnapshot = {
+  id?: string;
+  ts?: string | number;
+  value: number | string;
+  note?: string;
+};
+
 export type BranchInsight = {
   id: string;
   confidence?: number;
   status: string;
   path?: string;
   class?: string;
+  reason?: string;
+  constraints?: string[];
 };
 
 export type InspectSummary = {
@@ -33,13 +42,22 @@ export type InspectSummary = {
     format: 'jsonl' | 'json';
   };
   orientation: {
+    identity: string;
     stable: boolean;
     drift_level: 'low' | 'medium' | 'high' | 'unknown';
+    focus_momentum?: number;
+    drift_history: DriftSnapshot[];
   };
   continuity: {
     preserved: boolean;
     notes: string[];
+    token?: string;
   };
   branches: BranchInsight[];
+  futures: {
+    admissible: BranchInsight[];
+    degraded: BranchInsight[];
+    blocked: BranchInsight[];
+  };
   notes: string[];
 };

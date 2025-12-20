@@ -15,12 +15,20 @@
     "format": "jsonl"
   },
   "orientation": {
+    "identity": "ct-1",
     "stable": true,
-    "drift_level": "medium"
+    "drift_level": "medium",
+    "drift_history": [
+      {
+        "id": "t1",
+        "value": 0.55
+      }
+    ]
   },
   "continuity": {
     "preserved": true,
-    "notes": []
+    "notes": [],
+    "token": "ct-1"
   },
   "branches": [
     {
@@ -29,6 +37,17 @@
       "status": "admissible"
     }
   ],
+  "futures": {
+    "admissible": [
+      {
+        "id": "A",
+        "confidence": 0.62,
+        "status": "admissible"
+      }
+    ],
+    "degraded": [],
+    "blocked": []
+  },
   "notes": [
     "retry updated drift"
   ]

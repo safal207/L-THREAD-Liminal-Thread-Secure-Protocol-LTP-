@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { BranchInsight, InspectSummary, LtpFrame } from './types';
+import { BranchInsight, DriftSnapshot, InspectSummary, LtpFrame } from './types';
 
 const CONTRACT = {
   name: 'ltp-inspect',
@@ -17,13 +17,16 @@ type OutputFormat = 'json' | 'human';
 type ColorMode = 'auto' | 'always' | 'never';
 type Writer = (message: string) => void;
 
+type Command = 'trace' | 'replay' | 'explain' | 'help';
+
 type ParsedArgs = {
-  command: 'trace' | 'replay' | 'explain' | 'help';
+  command: Command;
   input?: string;
   format: OutputFormat;
   pretty: boolean;
   from?: string;
   branch?: string;
+  at?: string;
   color: ColorMode;
   quiet: boolean;
   verbose: boolean;
@@ -40,8 +43,8 @@ class CliError extends Error {
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
-  const commands: ParsedArgs['command'][] = ['trace', 'replay', 'explain', 'help'];
-  const positionalCommand = commands.includes(argv[0] as ParsedArgs['command']) ? (argv.shift() as ParsedArgs['command']) : 'trace';
+  const commands: Command[] = ['trace', 'replay', 'explain', 'help'];
+  const positionalCommand = commands.includes(argv[0] as Command) ? (argv.shift() as Command) : 'trace';
 
   const options: ParsedArgs = {
     command: positionalCommand,
@@ -50,6 +53,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     pretty: false,
     from: undefined,
     branch: undefined,
+    at: undefined,
     color: 'auto',
     quiet: false,
     verbose: false,
@@ -75,6 +79,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.from = argv[++i];
     } else if (token === '--branch') {
       options.branch = argv[++i];
+    } else if (token === '--at') {
+      options.at = argv[++i];
     } else if (token === '--color') {
       const mode = argv[++i] as ColorMode;
       options.color = ['auto', 'always', 'never'].includes(mode) ? mode : 'auto';
@@ -128,15 +134,25 @@ function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSumm
   }
 }
 
-function driftLevelFromSnapshots(frames: LtpFrame[]): InspectSummary['orientation']['drift_level'] {
-  const driftValues = frames
-    .filter((f) => f.type === 'focus_snapshot')
-    .map((f) => (f.payload?.drift ?? f.payload?.drift_level ?? f.payload?.driftLevel) as number | string | undefined)
-    .filter((v): v is number | string => v !== undefined);
+function collectDriftHistory(frames: LtpFrame[]): DriftSnapshot[] {
+  const driftFrames = frames.filter((f) => f.type === 'focus_snapshot');
+  const history: DriftSnapshot[] = [];
 
-  if (!driftValues.length) return 'unknown';
+  for (const frame of driftFrames) {
+    const payload = frame.payload ?? {};
+    const rawDrift =
+      payload.drift ?? payload.drift_level ?? payload.driftLevel ?? payload.drift_score ?? payload.signal;
+    if (rawDrift === undefined || (typeof rawDrift !== 'number' && typeof rawDrift !== 'string')) continue;
+    const note = payload.rationale ?? payload.reason ?? payload.note ?? payload.notes?.[0];
+    history.push({ id: frame.id, ts: frame.ts, value: rawDrift, note });
+  }
 
-  const last = driftValues[driftValues.length - 1];
+  return history.filter((entry, idx, arr) => idx === 0 || arr[idx - 1].value !== entry.value);
+}
+
+function driftLevelFromHistory(history: DriftSnapshot[]): InspectSummary['orientation']['drift_level'] {
+  if (!history.length) return 'unknown';
+  const last = history[history.length - 1].value;
   if (typeof last === 'string') {
     const normalized = last.toLowerCase();
     if (['low', 'medium', 'high'].includes(normalized)) return normalized as InspectSummary['orientation']['drift_level'];
@@ -148,18 +164,85 @@ function driftLevelFromSnapshots(frames: LtpFrame[]): InspectSummary['orientatio
   return 'high';
 }
 
-function detectContinuity(frames: LtpFrame[]): { preserved: boolean; notes: string[] } {
+function detectContinuity(frames: LtpFrame[]): { preserved: boolean; notes: string[]; token?: string } {
   const tokens = frames
     .map((f) => f.continuity_token)
     .filter((token): token is string => typeof token === 'string' && token.length > 0);
 
+  const token = tokens.length ? tokens[tokens.length - 1] : undefined;
   const unique = new Set(tokens);
-  if (unique.size <= 1) return { preserved: true, notes: [] };
+  if (unique.size <= 1) return { preserved: true, notes: [], token };
 
   return {
     preserved: false,
+    token,
     notes: ['continuity token rotation detected mid-session'],
   };
+}
+
+function extractIdentity(frames: LtpFrame[]): string {
+  const orientationFrame = frames.find((f) => f.type === 'orientation');
+  const payload = orientationFrame?.payload ?? {};
+  const candidates = [
+    payload.identity,
+    payload.thread_id,
+    payload.thread,
+    payload.origin,
+    payload.client_id,
+    payload.clientId,
+    payload.session_id,
+    payload.sessionId,
+    orientationFrame?.continuity_token,
+    frames[0]?.continuity_token,
+    orientationFrame?.id,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate) return String(candidate);
+  }
+
+  return 'unknown';
+}
+
+function extractFocusMomentum(frames: LtpFrame[]): number | undefined {
+  const payloads = frames.map((f) => f.payload ?? {});
+  const candidates = payloads
+    .map((p) => p.focus_momentum ?? p.focusMomentum ?? p.focus?.momentum ?? p.debug?.focus_momentum)
+    .filter((value) => typeof value === 'number');
+
+  if (!candidates.length) return undefined;
+  return candidates[candidates.length - 1];
+}
+
+function constraintListFrom(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value.map(String).filter((v) => v.length > 0);
+  if (typeof value === 'string') return [value];
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([name, reason]) => (reason ? `${name}: ${String(reason)}` : name))
+      .filter((v) => v.length > 0);
+  }
+  return [];
+}
+
+function collectConstraints(frames: LtpFrame[]): string[] {
+  const constraintHints = frames.flatMap((frame) => {
+    const payload = frame.payload ?? {};
+    return [payload.constraints, payload.guardrails, payload.limits, payload.non_goals]
+      .flatMap((value) => constraintListFrom(value))
+      .map((text) => ({ text, ts: frame.ts ?? 0 }));
+  });
+
+  const seen = new Set<string>();
+  return constraintHints
+    .sort((a, b) => (a.ts as number) - (b.ts as number))
+    .map((entry) => entry.text)
+    .filter((text) => {
+      if (seen.has(text)) return false;
+      seen.add(text);
+      return true;
+    });
 }
 
 function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: string[]; violations: string[] } {
@@ -174,18 +257,29 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
   const normalized: BranchInsight[] = [];
   const notes: string[] = [];
   const violations: string[] = [];
+  let lastConfidence: number | undefined;
+  let sawUnsorted = false;
 
   for (const entry of branchesArray as Array<Record<string, any>>) {
     const id = (entry.id ?? entry.name ?? 'unnamed') as string;
-    const confidence = entry.confidence as number | undefined;
+    const confidence = typeof entry.confidence === 'number' ? entry.confidence : undefined;
     const status = (entry.status as string | undefined) ?? (entry.class === 'primary' ? 'admissible' : 'degraded');
+    const reason =
+      (entry.rationale as string | undefined) ??
+      (entry.reason as string | undefined) ??
+      (entry.why as string | undefined) ??
+      (entry.note as string | undefined) ??
+      (entry.explainer as string | undefined);
+    const constraints = constraintListFrom(entry.constraints ?? entry.guardrails ?? entry.limits);
 
     const branch: BranchInsight = {
       id,
       confidence,
       status,
-      path: entry.path as string | undefined,
+      path: (entry.path as string | undefined) ?? (entry.route as string | undefined),
       class: entry.class as string | undefined,
+      reason,
+      constraints: constraints.length ? constraints : undefined,
     };
 
     if (confidence === undefined) {
@@ -195,8 +289,14 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
       violations.push(`branch ${id} confidence outside 0..1`);
     }
 
+    if (confidence !== undefined) {
+      if (lastConfidence !== undefined && confidence > lastConfidence) {
+        sawUnsorted = true;
+      }
+      lastConfidence = confidence;
+    }
+
     normalized.push(branch);
-    idsInOrder.push(id);
   }
 
   const sorted = normalized.sort((a, b) => {
@@ -206,7 +306,30 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
     return scoreB - scoreA;
   });
 
+  if (sawUnsorted) {
+    notes.push('branches reordered for determinism');
+  }
+
   return { branches: sorted, notes, violations };
+}
+
+function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
+  const admissible: BranchInsight[] = [];
+  const degraded: BranchInsight[] = [];
+  const blocked: BranchInsight[] = [];
+
+  for (const branch of branches) {
+    const status = (branch.status ?? '').toLowerCase();
+    if (status.includes('blocked') || status.includes('rejected') || status.includes('inadmissible')) {
+      blocked.push(branch);
+    } else if (status.includes('degraded') || status.includes('fallback')) {
+      degraded.push(branch);
+    } else {
+      admissible.push(branch);
+    }
+  }
+
+  return { admissible, degraded, blocked };
 }
 
 function summarize(
@@ -215,7 +338,10 @@ function summarize(
   format: InspectSummary['input']['format'],
 ): { summary: InspectSummary; violations: string[]; warnings: string[] } {
   const continuity = detectContinuity(frames);
-  const driftLevel = driftLevelFromSnapshots(frames);
+  const driftHistory = collectDriftHistory(frames);
+  const driftLevel = driftLevelFromHistory(driftHistory);
+  const focusMomentum = extractFocusMomentum(frames);
+  const identity = extractIdentity(frames);
   const orientationStable = frames.some((f) => f.type === 'orientation');
 
   const lastRouteResponse = [...frames].reverse().find((f) => f.type === 'route_response');
@@ -228,7 +354,9 @@ function summarize(
     ...branchNotes,
     ...continuity.notes,
   ];
+
   if (!orientationStable) warnings.push('no orientation frame observed');
+  if (!driftHistory.length) warnings.push('no drift snapshots observed (focus_snapshot missing)');
   if (!lastRouteResponse) warnings.push('no route_response frame observed');
 
   const notes = [...warnings];
@@ -251,14 +379,19 @@ function summarize(
         format,
       },
       orientation: {
+        identity,
         stable: orientationStable,
         drift_level: driftLevel,
+        drift_history: driftHistory,
+        ...(focusMomentum !== undefined ? { focus_momentum: focusMomentum } : {}),
       },
       continuity: {
         preserved: continuity.preserved,
         notes: continuity.notes,
+        ...(continuity.token ? { token: continuity.token } : {}),
       },
       branches,
+      futures: groupFutures(branches),
       notes,
     },
     violations,
@@ -270,46 +403,64 @@ export function formatJson(summary: InspectSummary, pretty = false): string {
   return JSON.stringify(summary, null, pretty ? 2 : 0);
 }
 
+function formatDriftHistory(history: DriftSnapshot[]): string {
+  if (!history.length) return '(none)';
+  return history
+    .map((entry) => {
+      const value = typeof entry.value === 'number' ? entry.value.toFixed(2) : String(entry.value);
+      const step = entry.id ?? entry.ts ?? 'frame';
+      const note = entry.note ? ` (${entry.note})` : '';
+      return `${step}:${value}${note}`;
+    })
+    .join(' -> ');
+}
+
 export function formatHuman(summary: InspectSummary): string {
   const lines: string[] = [];
   lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
   lines.push(`input: ${summary.input.path}  time: ${summary.generated_at}`);
   lines.push('');
+  lines.push('IDENTITY');
+  lines.push(`identity: ${summary.orientation.identity}`);
+  lines.push(`continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}${summary.continuity.token ? ` (${summary.continuity.token})` : ''}`);
+  lines.push('');
   lines.push('ORIENTATION');
-  lines.push(`identity: ${summary.orientation.stable ? 'stable' : 'unknown'}`);
+  lines.push(`stable: ${summary.orientation.stable ? 'yes' : 'unknown'}`);
+  lines.push(`focus_momentum: ${summary.orientation.focus_momentum ?? 'unknown'}`);
   lines.push(`drift: ${summary.orientation.drift_level}`);
-  lines.push(`continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}`);
+  lines.push(`drift_history: ${formatDriftHistory(summary.orientation.drift_history)}`);
   lines.push('');
-  lines.push('CONSTRAINTS');
-  if (!summary.continuity.preserved) {
-    lines.push('continuity: WARN');
-    summary.continuity.notes.forEach((note) => lines.push(`  note: ${note}`));
-  } else {
-    lines.push('continuity: OK');
-  }
-  lines.push('');
-  lines.push('FUTURE BRANCHES (non-decisional)');
-  if (!summary.branches.length) {
+  lines.push('FUTURES (admissible / degraded / blocked)');
+  const formatBranch = (branch: BranchInsight) => {
+    const score = branch.confidence !== undefined ? branch.confidence.toFixed(2) : 'NA';
+    const pieces = [`${branch.id}`, `score=${score}`, `status=${branch.status}`];
+    if (branch.reason) pieces.push(`reason=${branch.reason}`);
+    if (branch.path) pieces.push(`path=${branch.path}`);
+    if (branch.constraints?.length) pieces.push(`constraints=${branch.constraints.join('|')}`);
+    return `- ${pieces.join(' ')}`;
+  };
+
+  if (
+    !summary.futures.admissible.length &&
+    !summary.futures.degraded.length &&
+    !summary.futures.blocked.length
+  ) {
     lines.push('none observed');
   } else {
-    const headers = ['ID', 'score', 'cost', 'risk', 'explainable', 'status'];
-    const rows = summary.branches.map((branch) => [
-      branch.id,
-      branch.confidence !== undefined ? branch.confidence.toFixed(2) : 'NA',
-      branch.class ?? '-',
-      branch.path ?? '-',
-      branch.confidence !== undefined ? 'yes' : 'no',
-      branch.status ?? '-',
-    ]);
-    const widths = headers.map((header, idx) => Math.max(header.length, ...rows.map((row) => String(row[idx]).length)));
-    const formatRow = (row: string[]) =>
-      row
-        .map((cell, idx) => String(cell).padEnd(widths[idx], ' '))
-        .join('  ')
-        .trimEnd();
-    lines.push(formatRow(headers));
-    rows.forEach((row) => lines.push(formatRow(row as string[])));
+    if (summary.futures.admissible.length) {
+      lines.push('admissible:');
+      summary.futures.admissible.forEach((branch) => lines.push(formatBranch(branch)));
+    }
+    if (summary.futures.degraded.length) {
+      lines.push('degraded:');
+      summary.futures.degraded.forEach((branch) => lines.push(formatBranch(branch)));
+    }
+    if (summary.futures.blocked.length) {
+      lines.push('blocked:');
+      summary.futures.blocked.forEach((branch) => lines.push(formatBranch(branch)));
+    }
   }
+
   if (summary.notes.length) {
     lines.push('');
     lines.push('NOTES / WARNINGS');
@@ -348,59 +499,84 @@ function handleReplay(file: string, from: string | undefined, writer: Writer): v
   for (const frame of replayFrames) {
     const label = `${frame.type}${frame.id ? `#${frame.id}` : ''}`;
     const continuity = frame.continuity_token ? ` ct=${frame.continuity_token}` : '';
-    writer(`- ${label}${continuity}`);
+    const drift = frame.type === 'focus_snapshot' && frame.payload?.drift !== undefined ? ` drift=${frame.payload.drift}` : '';
+    writer(`- ${label}${continuity}${drift}`);
   }
 }
 
-function handleExplain(file: string, branchId: string | undefined, writer: Writer): { violations: string[] } {
+function handleExplain(file: string, at: string | undefined, branchId: string | undefined, writer: Writer): { violations: string[] } {
   const { frames, format, inputPath } = loadFrames(file);
-  const { summary, violations } = summarize(frames, inputPath, format);
-  const target = branchId ?? summary.branches[0]?.id;
+  const targetIndex = at
+    ? frames.findIndex((f) => f.id === at || String(f.ts) === at || `step-${f.id}` === at)
+    : frames.length - 1;
+  const boundedIndex = targetIndex >= 0 ? targetIndex : frames.length - 1;
+  const window = frames.slice(0, boundedIndex + 1);
+  const prior = frames.slice(0, boundedIndex);
+  const { summary, violations } = summarize(window, inputPath, format);
+  const previous = prior.length ? summarize(prior, inputPath, format).summary : undefined;
 
-  if (!target) {
-    writer('No branches present to explain.');
-    return { violations };
+  const targetBranch = branchId ?? summary.branches[0]?.id;
+  const branch = targetBranch ? summary.branches.find((b) => b.id === targetBranch) : undefined;
+
+  writer(`Explain @ ${at ?? 'last'} (${window[window.length - 1]?.type ?? 'unknown'})`);
+  writer(`identity: ${summary.orientation.identity}`);
+  writer(`continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}${summary.continuity.token ? ` (${summary.continuity.token})` : ''}`);
+  writer('constraints active:');
+  const constraints = collectConstraints(window);
+  if (constraints.length) constraints.forEach((c) => writer(`- ${c}`));
+  else writer('- none observed');
+
+  writer('futures:');
+  if (branch) {
+    writer(`- branch ${branch.id}: status=${branch.status} score=${branch.confidence ?? 'NA'} reason=${branch.reason ?? 'n/a'}`);
+    if (branch.constraints?.length) writer(`  constraints: ${branch.constraints.join(' | ')}`);
+  } else {
+    writer('- none observed');
   }
 
-  const branch = summary.branches.find((b) => b.id === target);
-  if (!branch) {
-    writer(`Branch ${target} not found.`);
-    return { violations };
-  }
+  writer('changes since previous step:');
+  if (!previous) {
+    writer('- initial frame (no prior context)');
+  } else {
+    const previousDrift = previous.orientation.drift_history.at(-1)?.value;
+    const currentDrift = summary.orientation.drift_history.at(-1)?.value;
+    if (previousDrift !== currentDrift) {
+      writer(`- drift ${previousDrift ?? 'n/a'} -> ${currentDrift ?? 'n/a'}`);
+    } else {
+      writer(`- drift steady at ${currentDrift ?? 'n/a'}`);
+    }
 
-  writer(`Branch: ${target}`);
-  writer(`Status: ${branch.status}`);
-  if (branch.path) writer(`Path: ${branch.path}`);
-  if (branch.class) writer(`Class: ${branch.class}`);
-  if (branch.confidence !== undefined) writer(`Confidence: ${branch.confidence}`);
-  else writer('Confidence: (not provided; tooling MAY normalize)');
-  if (summary.continuity.notes.length) {
-    writer('Continuity Notes:');
-    for (const n of summary.continuity.notes) writer(`- ${n}`);
-  }
-  if (summary.orientation.drift_level !== 'unknown') {
-    writer(`Observed drift level: ${summary.orientation.drift_level}`);
+    if (previous.orientation.focus_momentum !== summary.orientation.focus_momentum) {
+      writer(
+        `- focus_momentum ${previous.orientation.focus_momentum ?? 'n/a'} -> ${summary.orientation.focus_momentum ?? 'n/a'}`,
+      );
+    }
+
+    if (previous.continuity.preserved !== summary.continuity.preserved) {
+      writer(`- continuity updated: ${previous.continuity.preserved ? 'preserved' : 'rotated'} -> ${summary.continuity.preserved ? 'preserved' : 'rotated'}`);
+    }
   }
 
   return { violations };
 }
 
 function printHelp(writer: Writer): void {
-  writer('ltp:inspect — orientation inspector (no decisions made).');
+  writer('ltp:inspect — orientation inspector (no decisions, no model execution).');
   writer('');
   writer('Usage:');
   writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>]');
   writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
-  writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--branch <id>]');
+  writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
   writer('Examples:');
-  writer('  pnpm -w ltp:inspect -- --input fixtures/ltp/demo.frames.jsonl --format=human');
-  writer('  pnpm -w ltp:inspect -- --input fixtures/ltp/demo.frames.jsonl --format=json');
-  writer('  pnpm -w ltp:inspect -- --format=json --quiet --input fixtures/ltp/demo.frames.jsonl | jq .orientation');
+  writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=human');
+  writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=json');
+  writer('  pnpm -w ltp:inspect -- --format=json --quiet --input examples/traces/drift-recovery.json | jq .orientation');
+  writer('  pnpm -w ltp:inspect -- explain --input examples/traces/drift-recovery.json --at step-3');
   writer('');
   writer('Output:');
-  writer('  JSON (v1 contract) with deterministic ordering for CI.');
-  writer('  Human format (kubectl describe style) with Orientation, Constraints, Branches, and warnings.');
+  writer('  JSON (v1 contract) with deterministic ordering for CI. Additional fields remain optional.');
+  writer('  Human format shows identity, focus momentum, drift history, continuity, and future branches with rationale.');
   writer('');
   writer('Exit codes:');
   writer('  0 OK — contract produced');
@@ -468,7 +644,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
         break;
       case 'explain':
         {
-          const { violations } = handleExplain(args.input as string, args.branch, writer);
+          const { violations } = handleExplain(args.input as string, args.at, args.branch, writer);
           if (violations.length) {
             throw new CliError(`Contract violation: ${violations.join('; ')}`, 2);
           }
@@ -487,7 +663,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
         err.exitCode === 2
           ? 'hint: pass a JSON file or pipe JSON/JSONL via stdin (use - for stdin)'
           : 'hint: re-run with --format=json to inspect the contract payload';
-      const example = 'example: pnpm -w ltp:inspect --format=json --input fixtures/minimal.frames.jsonl';
+      const example = 'example: pnpm -w ltp:inspect --format=json --input tools/ltp-inspect/fixtures/minimal.frames.jsonl';
       errorWriter(`ERROR: ${err.message}`);
       errorWriter(hint);
       errorWriter(example);
