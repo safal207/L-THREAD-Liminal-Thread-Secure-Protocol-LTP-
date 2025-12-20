@@ -1,8 +1,8 @@
 # ltp-inspect
 
-LTP does not choose actions. It maintains orientation so actions remain coherent over time. The inspector is a read-only DevOps tool for deterministic visibility — no recommendations, no automated decisions.
+LTP does not choose actions. It maintains orientation so actions remain coherent over time. The inspector is a read-only DevOps tool for deterministic visibility — **no recommendations, no automated decisions, no model calls.**
 
-Inspector emits a versioned, deterministic state summary suitable for CI, audits, and replay.
+Inspector emits a versioned, deterministic state summary suitable for CI, audits, replay, and explainability.
 
 ## Constraint alignment
 - Inspector is justified by LTP core constraints (see [`docs/canon/LTP-Non-Goals-as-Design-Constraints.md`](../../docs/canon/LTP-Non-Goals-as-Design-Constraints.md)): it never executes models, chooses branches, or adapts heuristically.
@@ -14,10 +14,10 @@ Inspector emits a versioned, deterministic state summary suitable for CI, audits
 Run from the repo root (JSON by default):
 
 ```bash
-pnpm -w ltp:inspect -- --input fixtures/minimal.frames.jsonl
-pnpm -w ltp:inspect -- --format json --input fixtures/minimal.frames.jsonl
-pnpm -w ltp:inspect -- replay --input fixtures/minimal.frames.jsonl --from t3
-pnpm -w ltp:inspect -- explain --input fixtures/minimal.frames.jsonl --branch A
+pnpm -w ltp:inspect -- --input examples/traces/canonical-linear.json
+pnpm -w ltp:inspect -- --format human --input examples/traces/drift-recovery.json
+pnpm -w ltp:inspect -- replay --input examples/traces/canonical-linear.json --from step-2
+pnpm -w ltp:inspect -- explain --input examples/traces/constraint-blocked.json --at step-3
 ```
 
 Flags:
@@ -81,9 +81,13 @@ See [`docs/contracts/ltp-inspect.v1.schema.json`](../../docs/contracts/ltp-inspe
 
 ```
 LTP INSPECT (v1.0)
-orientation: stable, drift=medium, continuity=preserved
-future_branches:
-  - A status=admissible score=0.62
+identity: ct-1
+focus_momentum: unknown
+drift_history: t1:0.55
+continuity: preserved
+futures:
+  admissible:
+    - A status=admissible score=0.62
 notes:
   - retry updated drift
 ```
