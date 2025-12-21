@@ -10,6 +10,8 @@ It does not predict, decide, or optimize outcomes.
 These artifacts describe the control plane of AI systems —
 coherence over time, not model outputs.
 
+LTP is defined by a small set of orientation invariants. See: [docs/orientation-invariants.md](docs/orientation-invariants.md)
+
 ### DevTools & CI artifacts
 
 LTP provides reproducible CI artifacts for inspecting orientation and drift
