@@ -22,9 +22,6 @@ jobs:
       - name: Check for hidden Unicode characters
         run: |
           ./scripts/check-no-bidi.mjs
-      - name: Check hidden/bidi Unicode (DevTools docs)
-        run: |
-          node scripts/check-no-bidi.mjs .github/workflows/test.yml docs/devtools/exit-codes.md docs/devtools/inspector.md
 
   ltp-inspect:
     name: Inspector contract check
