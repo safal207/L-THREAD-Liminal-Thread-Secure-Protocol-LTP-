@@ -3,6 +3,10 @@
 LTP preserves orientation over time.
 It does not predict, decide, or optimize outcomes.
 
+## Start here → Canonical Index
+
+[Canonical LTP Index](canonical/README.md)
+
 > Every pull request produces reproducible DevTools artifacts
 > (Inspector output and golden traces) that make orientation,
 > drift, and continuity auditable in CI.
