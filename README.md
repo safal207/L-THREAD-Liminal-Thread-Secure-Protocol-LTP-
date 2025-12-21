@@ -11,6 +11,19 @@ LTP defines *how decisions, transitions, and agent handoffs are represented, ver
 
 ---
 
+## DevTools & Verification
+
+LTP ships with built-in tooling for deterministic inspection and regression verification.
+
+- 🔍 Inspector & CI artifacts — inspect orientation, drift, and admissible futures
+- 🧪 Golden traces — canonical baselines for regression testing
+- 🔁 One-click reproducibility — replay CI runs locally
+
+See:
+- docs/devtools/ci-artifacts.md
+
+---
+
 ### Versioning & Stability
 
 - **Protocol:** `v0.1` — **Frozen Core**  
