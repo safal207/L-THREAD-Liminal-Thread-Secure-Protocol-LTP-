@@ -1,0 +1,119 @@
+# CI Artifacts: Inspector Outputs & Golden Traces
+
+This repo publishes reproducible DevTools artifacts on every CI run.
+They are intended for platform teams to validate **orientation continuity**
+without rerunning models or rehydrating ad-hoc context.
+
+## What CI produces
+
+Each CI run uploads artifacts that you can download from the GitHub Actions UI:
+
+- **Inspector output** (`inspect-output.txt` or `.json`)
+  - A canonical, deterministic view of:
+    - orientation frames
+    - drift / constraints
+    - admissible futures (if present in trace)
+- **Golden traces**
+  - Known-good traces used as fixtures for conformance / inspector stability
+  - Useful for regression checks and debugging
+
+> These artifacts are "control-plane" signals.
+> They describe **coherence over time**, not model quality.
+
+---
+
+## Where to find artifacts
+
+1. Open the PR
+2. Go to **Checks**
+3. Open the CI run
+4. Scroll to the **Artifacts** section
+5. Download:
+   - `canonical-inspector-output`
+   - `golden-traces` (if present)
+
+---
+
+## How to read Inspector output
+
+Inspector output is meant to be stable and CI-friendly.
+Typical fields you should expect to see:
+
+- `identity` — stable continuity handle (not user identity)
+- `focus_momentum` — continuity weight over time (control-plane)
+- `drift_history` — tracked deviation signals
+- `constraints` — policy/resources/safety gates
+- `admissible_futures` — future branches that remain coherent
+
+If the output changes unexpectedly between PRs, it usually means:
+- a schema/format regression
+- a fixture was modified
+- an inspector rule changed (should be versioned)
+
+---
+
+## Local reproduction
+
+To reproduce CI artifacts locally:
+
+### 1) Install workspace deps
+```bash
+pnpm -w install
+```
+
+### 2) Run inspector on canonical fixture
+```bash
+pnpm -w ltp:inspect -- \
+  --strict \
+  --input tools/ltp-inspect/fixtures/canonical-clean.json \
+  --format=json
+```
+
+### 3) Validate a conformance report (if generated)
+```bash
+pnpm -w ltp:report:validate -- artifacts/conformance-report.json
+```
+
+---
+
+## What CI artifacts are not
+
+- Not a recommendation output
+- Not model evaluation
+- Not a memory store dump
+- Not orchestration logs
+
+CI artifacts exist to answer one question:
+
+> Did the system preserve a coherent orientation trajectory across changes, retries, and tooling updates?
+
+---
+
+## Common failure modes
+
+### Missing artifacts
+
+- Inspector step did not run
+- The output file path changed
+- PR comment missing
+- PR comes from a fork (commenting is disabled for security)
+
+### Output changed unexpectedly
+
+- Fixture changed (golden trace drift)
+- Inspector rules updated without bumping a version tag
+
+---
+
+## Suggested workflow for reviewers
+
+When reviewing DevTools changes:
+
+1. Download canonical-inspector-output
+2. Compare to previous PR output
+3. Confirm changes are:
+   - intentional
+   - documented
+   - compatible (or versioned)
+
+This keeps DevTools stable while SDK/tooling can iterate quickly.
