@@ -42,7 +42,10 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
-artifacts/
+artifacts/*
+!artifacts/traces/
+artifacts/traces/*
+!artifacts/traces/sample.trace.json
 
 # Misc
 .cache/

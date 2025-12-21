@@ -3,6 +3,27 @@
 LTP preserves orientation over time.
 It does not predict, decide, or optimize outcomes.
 
+## Try it in 60 seconds
+
+```bash
+pnpm i -g @ltp/inspect
+ltp inspect artifacts/traces/sample.trace.json
+```
+
+No model. No agent framework. Just orientation, drift, and replay.
+
+```text
+Identity: stable (id=abc123)
+Transitions: 5
+Drift: +0.18 (accumulated)
+Branches:
+  - A (admissible)
+  - B (admissible)
+  - C (blocked: constraint)
+Violations: none
+Replay: deterministic
+```
+
 ## Start here → Canonical Index
 
 [Canonical LTP Index](canonical/README.md)

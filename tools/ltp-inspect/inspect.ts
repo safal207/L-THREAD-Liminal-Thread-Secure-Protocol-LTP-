@@ -674,6 +674,10 @@ type InspectionResult = {
   normalizations: string[];
 };
 
+function canonicalizeSummary(summary: InspectSummary): InspectSummary {
+  return JSON.parse(JSON.stringify(summary)) as InspectSummary;
+}
+
 function handleTrace(file: string, format: OutputFormat, pretty: boolean, writer: Writer): InspectionResult {
   const { frames, format: inputFormat, inputPath, inputSource } = loadFrames(file);
   const { summary, violations, warnings, normalizations } = summarize(frames, { path: inputPath, source: inputSource }, inputFormat);
@@ -895,15 +899,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
 }
 
 function isDirectRun(): boolean {
-  if (typeof require !== 'undefined' && typeof module !== 'undefined') {
-    if (require.main === module) return true;
-  }
-
-  if (typeof import.meta !== 'undefined') {
-    return import.meta.url === `file://${process.argv[1]}`;
-  }
-
-  return false;
+  return typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module;
 }
 
 if (isDirectRun()) {
