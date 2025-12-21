@@ -11,6 +11,8 @@ pnpm i -g @ltp/inspect
 
 ## Run
 ltp inspect artifacts/traces/sample.trace.json
+> If your shell cannot find `ltp`, restart the session or ensure the PNPM global bin directory is on your `PATH`.
+> Prefer a workspace-local run? Use: `pnpm -w ltp:inspect -- --input artifacts/traces/sample.trace.json`.
 
 ## What you’ll see
 - Stable identity across transitions
@@ -25,6 +27,10 @@ This command does NOT:
 
 It only inspects orientation.
 
+## Where does the trace come from?
+- Any JSON array of LTP frames at protocol version `v0.1` works.
+- Each frame should include an `id`, `ts`, `type`, and `payload`; optional metadata such as `source`, `node_id`, or `session_id` help anchor the trace to real systems.
+
 ## Sample inspector output (no execution needed)
 
 ```text
@@ -38,3 +44,5 @@ Branches:
 Violations: none
 Replay: deterministic
 ```
+
+All quickstart assets are sanitized to avoid hidden or bidirectional Unicode characters.

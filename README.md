@@ -10,6 +10,9 @@ pnpm i -g @ltp/inspect
 ltp inspect artifacts/traces/sample.trace.json
 ```
 
+If your shell cannot find the `ltp` command, restart the session or ensure the PNPM global bin directory is on your `PATH`.  
+Prefer a workspace local run? Use: `pnpm -w ltp:inspect -- --input artifacts/traces/sample.trace.json`.
+
 No model. No agent framework. Just orientation, drift, and replay.
 
 ```text
@@ -23,6 +26,8 @@ Branches:
 Violations: none
 Replay: deterministic
 ```
+
+Repository content is sanitized to avoid hidden or bidirectional Unicode characters for supply-chain hygiene.
 
 ## Start here → Canonical Index
 

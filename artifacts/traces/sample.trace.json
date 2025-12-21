@@ -4,6 +4,9 @@
     "id": "dev-0",
     "ts": 0,
     "type": "orientation",
+    "source": "prod-edge-observer",
+    "node_id": "edge-01",
+    "session_id": "session-prod-142",
     "payload": {
       "identity": {
         "id": "abc123",
@@ -19,6 +22,9 @@
     "id": "dev-1",
     "ts": 1,
     "type": "focus_snapshot",
+    "source": "prod-edge-observer",
+    "node_id": "edge-01",
+    "session_id": "session-prod-142",
     "payload": {
       "drift": 0.03,
       "note": "transition"
@@ -30,6 +36,9 @@
     "id": "dev-2",
     "ts": 2,
     "type": "focus_snapshot",
+    "source": "prod-edge-observer",
+    "node_id": "edge-01",
+    "session_id": "session-prod-142",
     "payload": {
       "drift": 0.18,
       "note": "retry after microfault"
@@ -41,6 +50,9 @@
     "id": "dev-3",
     "ts": 3,
     "type": "route_response",
+    "source": "prod-edge-observer",
+    "node_id": "edge-01",
+    "session_id": "session-prod-142",
     "payload": {
       "branches": [
         {
@@ -73,6 +85,9 @@
     "id": "dev-4",
     "ts": 4,
     "type": "focus_snapshot",
+    "source": "prod-edge-observer",
+    "node_id": "edge-01",
+    "session_id": "session-prod-142",
     "payload": {
       "drift": 0.18,
       "note": "branch committed"
