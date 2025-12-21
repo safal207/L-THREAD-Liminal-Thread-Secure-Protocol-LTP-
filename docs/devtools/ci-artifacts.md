@@ -4,6 +4,13 @@ This repo publishes reproducible DevTools artifacts on every CI run.
 They are intended for platform teams to validate **orientation continuity**
 without rerunning models or rehydrating ad-hoc context.
 
+## Quick verification flow
+
+1. Open the CI run → download inspector + golden trace artifacts
+2. Compare inspector output to golden trace (schema + transitions)
+3. Reproduce locally using the same trace
+4. If golden changes — it is a protocol change, not an accident
+
 ## What CI produces
 
 Each CI run uploads artifacts that you can download from the GitHub Actions UI:
@@ -91,17 +98,14 @@ CI artifacts exist to answer one question:
 
 ## Common failure modes
 
-### Missing artifacts
+1. Non-deterministic ordering  
+   → check normalization and sorting rules
 
-- Inspector step did not run
-- The output file path changed
-- PR comment missing
-- PR comes from a fork (commenting is disabled for security)
+2. Schema drift  
+   → inspector updated without corresponding golden trace change
 
-### Output changed unexpectedly
-
-- Fixture changed (golden trace drift)
-- Inspector rules updated without bumping a version tag
+3. Time-dependent fields  
+   → timestamps or IDs not normalized before comparison
 
 ---
 
@@ -117,3 +121,15 @@ When reviewing DevTools changes:
    - compatible (or versioned)
 
 This keeps DevTools stable while SDK/tooling can iterate quickly.
+
+## Source of truth
+
+- Golden traces are the canonical source of truth for protocol behavior.
+- Inspector output is a projection for observability and debugging.
+- Inspector may evolve; golden traces define correctness.
+
+## Reviewer checklist
+
+- [ ] Does inspector output match golden trace?
+- [ ] If golden changed — is this an intentional protocol change?
+- [ ] Can the behavior be reproduced locally?
