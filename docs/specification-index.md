@@ -11,6 +11,19 @@ The key words “MUST”, “MUST NOT”, and “SHOULD” in this document are 
 
 ---
 
+## Scope Clarification
+
+This document does NOT modify the LTP Frozen Core v0.1.
+
+It defines:
+- clarifications
+- usage constraints
+- extension guidelines
+
+All Frozen Core invariants remain unchanged.
+
+---
+
 ## Normative Documents
 
 ### 1. Protocol Limits
@@ -45,6 +58,26 @@ Violating any invariant renders an implementation non-compliant.
 
 Failure is acceptable as long as orientation continuity is preserved.
 Silent loss of orientation is forbidden.
+
+---
+
+## Normative Rules
+
+- Orientation MUST only change via explicit transition events. Implicit inference, heuristic adjustment, or silent correction of Orientation state is NOT permitted by the protocol.
+- Orientation Event, Transition, and Update are distinct terms. Use “Orientation Event” when describing inputs to the transition log; “Transition” when referring to state changes; and avoid using “Update” as a synonym for “Transition.”
+- “Frozen Core” is a proper noun and MUST appear capitalized in normative text.
+
+These rules constrain extensions so they do not dilute the Frozen Core.
+
+---
+
+## Non-Normative Guidance
+
+The following items are provided as best practices (non-normative):
+
+- Keep advisory logic (heuristics, scoring, routing shortcuts) in clearly labeled extensions rather than in the Frozen Core surface.
+- If a document contains examples or patterns, label them as guidance to avoid conflating them with MUST/MUST NOT requirements.
+- Consider placing experimental orientation strategies in an `extensions/` subtree (e.g., `extensions/orientation-strategies.md`) to make boundaries explicit.
 
 ---
 
