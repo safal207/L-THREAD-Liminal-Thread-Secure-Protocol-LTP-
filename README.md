@@ -25,6 +25,30 @@ LTP defines *how decisions, transitions, and agent handoffs are represented, ver
 
 ---
 
+## Protocol Core Status
+
+**Status:** Frozen  
+**Since:** 2025-XX-XX
+
+The LTP Protocol Core is considered **stable and frozen**.
+
+This means:
+- Core concepts, terms, and guarantees are fixed
+- No semantic changes are allowed without an RFC
+- Implementations may evolve, but must preserve core invariants
+
+Further development happens through:
+- RFC proposals
+- Non-normative extensions
+- Tooling, SDKs, and visualizations
+
+Canonical reference:
+- `docs/canonical/INDEX.md`
+
+The canonical index defines the authoritative description of the LTP Core.
+
+---
+
 ## DevTools & Verification
 
 LTP ships with built-in tooling for deterministic inspection and regression verification.
@@ -121,6 +145,8 @@ v0.1 is frozen: no breaking changes; extensions only via RFC.
 ## Governance & RFC
 
 LTP evolves through an open RFC process focused on stability, explainability, and backward compatibility. Governance clarifies who makes decisions, how consensus is reached, and when safeguards such as the Frozen Core apply. See [LTP Governance](./governance/LTP-Governance.md), [LTP RFC Process](./governance/LTP-RFC-Process.md), and [Maintainers](./governance/MAINTAINERS.md) for the current roles and decision model.
+
+Any change affecting the meaning of **orientation**, **trajectory**, **admissibility**, **drift**, or **continuity guarantees** MUST go through the RFC process. This is the legal seal of the protocol.
 
 ## Two-Layer Terminology
 
