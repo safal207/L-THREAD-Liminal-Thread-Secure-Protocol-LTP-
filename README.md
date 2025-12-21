@@ -3,6 +3,15 @@
 LTP preserves orientation over time.
 It does not predict, decide, or optimize outcomes.
 
+> Every pull request produces reproducible DevTools artifacts
+> (Inspector output and golden traces) that make orientation,
+> drift, and continuity auditable in CI.
+
+These artifacts describe the control plane of AI systems —
+coherence over time, not model outputs.
+
+See: [CI Artifacts & Inspector Outputs](docs/devtools/ci-artifacts.md)
+
 → New here? Start with: docs/readme/WHY_ORIENTATION.md
 
 **Deterministic routing protocol for context continuity, explainable transitions, and multi-path futures.**
