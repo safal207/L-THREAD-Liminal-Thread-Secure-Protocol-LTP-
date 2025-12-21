@@ -1,62 +1,66 @@
 # LTP Specification Index (Frozen Core v0.1)
+Status: **NON-NORMATIVE (index only)**
 
-## Status (Non-Normative Index)
+This index lists the canonical **Frozen Core v0.1** documents and summarizes their status labels.  
+It **does not introduce new requirements** or define protocol behavior; it only points to the sources of truth.
 
-This document is **NON-NORMATIVE**.  
-It does **not** define protocol behavior by itself. It is an index that **points to** the normative documents that define **Frozen Core v0.1** and its conformance expectations.
-
-## Scope Clarification
+## Scope
 
 This index applies only to **Frozen Core v0.1** and the documents explicitly labeled **Normative** below.  
-Tooling, SDKs, DevTools, and examples may evolve independently without changing Frozen Core.
+Tooling, SDKs, DevTools, and examples may evolve independently without changing Frozen Core semantics.
 
----
+## How to use this index
 
-## Canonical Status
+- **Implement LTP:** read the **Normative** list first; those files are the contract.  
+- **Build tooling / SDKs:** follow the **Conformance** and **Schemas** entries to align reports and validators.  
+- **Write docs or guidance:** do not restate or modify requirements—link to the normative files instead.
 
-The **Frozen Core v0.1 normative surface** is defined by the documents labeled **Normative** below.  
-All other documents are **Informative** or **Guidance**: they may explain, illustrate, or operationalize LTP, but they do not change Frozen Core semantics.
-
----
-
-## Documents
+## Canonical document status
 
 ### Normative (Frozen Core v0.1)
 
-- `specs/LTP-core.md` — **Normative**
-- `specs/LTP-Frames-v0.1.md` — **Normative**
-- `specs/LTP-Canonical-Flow-v0.1.md` — **Normative**
-- `specs/LTP-Conformance-v0.1.md` — **Normative**
-- `schemas/ltp-conformance-report.v0.1.json` — **Normative**
+- `./specs/LTP-core.md` — protocol principles and primitives
+- `./specs/LTP-Frames-v0.1.md` — frame structure and encoding
+- `./specs/LTP-Canonical-Flow-v0.1.md` — canonical event/transition flow
+- `./specs/LTP-Conformance-v0.1.md` — conformance obligations and levels
+- `./schemas/ltp-conformance-report.v0.1.json` — conformance report schema
 
 ### Informative / Guidance
 
-- `specs/LTP-THINKS-v0.1.md` — **Informative**
-- `docs/` — **Guidance**
-- `tools/` — **Guidance**
-- `adoption/` — **Guidance**
-- `positioning/` — **Informative**
-- `governance/` — **Informative** (process), not protocol semantics
-- `protocol-limits/` — **Guidance** (operational limits), not Frozen Core
+- `./specs/LTP-THINKS-v0.1.md`
+- `./docs/` — tutorials, playbooks, and supporting notes
+- `./tools/` — dev tooling and utilities
+- `./adoption/` — adoption patterns and checklists
+- `./positioning/` — market and messaging context
+- `./governance/` — process documents; not protocol semantics
+- `./protocol-limits/` — operational limits; not part of Frozen Core
+
+### Recommended reading order (normative set)
+
+1. `./specs/LTP-core.md` — start here for the vocabulary and primitives.  
+2. `./specs/LTP-Frames-v0.1.md` — understand how Frames carry state.  
+3. `./specs/LTP-Canonical-Flow-v0.1.md` — follow the event/transition lifecycle.  
+4. `./specs/LTP-Conformance-v0.1.md` — see how implementations prove correctness.  
+5. `./schemas/ltp-conformance-report.v0.1.json` — produce interoperable conformance artifacts.
 
 ---
 
-## Normative Rules (Index-Level)
+## Terminology guardrails (index reminders — non-normative)
 
-The rules below are **Normative only for interpretation of Frozen Core**.  
-They do not introduce new semantics beyond the Normative documents listed above.
+These reminders keep terminology consistent when reading or editing the normative set. They do **not** add requirements.
 
-### 1) No Silent Mutation of Orientation
+### No silent mutation of orientation
 
-Orientation MUST NOT be changed without an explicit event in the canonical flow.
-If something changes, it MUST appear as a Transition/Event with a traceable cause.
+Orientation MUST NOT change without an explicit event in the canonical flow. Any change MUST appear as a Transition/Event with a traceable cause.
 
-### 2) No “Update” Without Transition Semantics
+### Avoid “update” without transition semantics
 
-Avoid ambiguous terminology like “update orientation” in normative text.
-Use explicit protocol terms: **Event**, **Transition**, **Frame**, **Replay**, **Conformance**.
+Prefer explicit protocol terms: **Event**, **Transition**, **Frame**, **Replay**, **Conformance**.
 
-### 3) Keep Metaphors Out of the Contract
+### Keep metaphors out of the contract
 
-Metaphors are allowed in **Informative/Guidance** docs.
-The Frozen Core contract MUST remain testable, deterministic, and implementation-neutral.
+Metaphors belong in **Informative/Guidance** docs. The Frozen Core contract MUST remain testable, deterministic, and implementation-neutral.
+
+## Hygiene
+
+This index is covered by the docs hygiene check (`scripts/check-no-bidi.mjs` in CI) that rejects hidden or bidirectional Unicode characters.
