@@ -76,10 +76,23 @@ If emitted, it MUST include:
 - optional extended metrics (e.g. `volatility`, `depth`, `tenderness`)
 
 ## Conformance v0.1 checklist — Status: Draft (stabilizing for v0.1 freeze)
-An implementation is canonical-flow compliant if it can:
-- complete Steps 1–5 successfully
-- produce stable branch ordering for the same input
-- keep frame shapes compatible with v0.1
+**Applies to:** Frozen Core v0.1  
+**Scope:** Protocol compliance (canonical flow + frame semantics), not product correctness or UX.
+
+**Compliance levels**
+- **MUST** — required for LTP protocol compliance  
+- **MAY** — optional; must not alter core semantics  
+Violation of any **MUST** condition is **non-compliant** (fail fast).
+
+**Checklist**
+- MUST: Complete Steps 1–5 successfully (`hello` → `route_response`).  
+  → Defined in: `specs/LTP-Flow-v0.1.md` and `specs/LTP-Frames-v0.1.md`
+- MUST: Preserve stable branch ordering for identical inputs.  
+  → Defined in: `specs/LTP-Canonical-Flow-v0.1.md`
+- MUST: Keep frame shapes compatible with v0.1 (`hello`, `heartbeat`, `orientation`, `route_request`, `route_response`).  
+  → Defined in: `specs/LTP-Frames-v0.1.md`
+- MAY: Emit `focus_snapshot` with required fields when present.  
+  → Defined in: `specs/LTP-Frames-v0.1.md`
 
 ## Non-goals
 - No ML requirement
