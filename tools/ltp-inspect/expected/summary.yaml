@@ -10,6 +10,7 @@
     "build": "dev"
   },
   "input": {
+    "source": "file",
     "path": "tools/ltp-inspect/fixtures/minimal.frames.jsonl",
     "frames": 3,
     "format": "jsonl"

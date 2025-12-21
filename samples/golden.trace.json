@@ -1,0 +1,35 @@
+[
+  {
+    "v": "0.1",
+    "type": "orientation",
+    "id": "g0",
+    "continuity_token": "ct-sample"
+  },
+  {
+    "v": "0.1",
+    "type": "focus_snapshot",
+    "id": "g1",
+    "payload": {
+      "drift": "low"
+    },
+    "continuity_token": "ct-sample"
+  },
+  {
+    "v": "0.1",
+    "type": "route_response",
+    "id": "g2",
+    "payload": {
+      "branches": [
+        {
+          "id": "main",
+          "confidence": 0.7,
+          "status": "admissible",
+          "constraints": {
+            "policy": "on-call"
+          }
+        }
+      ]
+    },
+    "continuity_token": "ct-sample"
+  }
+]

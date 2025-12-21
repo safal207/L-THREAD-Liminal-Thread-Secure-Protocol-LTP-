@@ -9,7 +9,9 @@
       "origin": "demo.client",
       "thread": "constraint-blocked",
       "focus_momentum": 0.55,
-      "constraints": ["no external writes"],
+      "constraints": {
+        "no external writes": null
+      },
       "guardrails": { "mutations": "forbidden" }
     }
   },
@@ -21,7 +23,9 @@
     "continuity_token": "ct-guard",
     "payload": {
       "goal": "apply patch",
-      "constraints": ["must stay read-only"],
+      "constraints": {
+        "must stay read-only": null
+      },
       "non_goals": ["do not mutate production"]
     }
   },
@@ -38,7 +42,10 @@
           "status": "blocked",
           "confidence": 0.31,
           "rationale": "read-only constraint",
-          "constraints": ["mutations: forbidden", "must stay read-only"]
+          "constraints": {
+            "mutations: forbidden": null,
+            "must stay read-only": null
+          }
         },
         {
           "id": "B",

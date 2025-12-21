@@ -8,7 +8,9 @@
     "payload": {
       "origin": "demo.client",
       "focus_momentum": 0.72,
-      "constraints": ["stay on rails"],
+      "constraints": {
+        "stay on rails": null
+      },
       "non_goals": ["no silent resets"]
     }
   },
@@ -36,14 +38,18 @@
           "status": "admissible",
           "confidence": 0.58,
           "rationale": "pull back toward origin",
-          "constraints": ["stay on rails"]
+          "constraints": {
+            "stay on rails": null
+          }
         },
         {
           "id": "explore",
           "status": "blocked",
           "confidence": 0.12,
           "rationale": "blocked by drift",
-          "constraints": ["no silent resets"]
+          "constraints": {
+            "no silent resets": null
+          }
         }
       ],
       "notes": ["drift acknowledged before recovery"]
