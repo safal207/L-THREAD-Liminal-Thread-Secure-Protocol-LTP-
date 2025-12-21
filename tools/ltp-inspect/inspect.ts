@@ -36,6 +36,8 @@ type ParsedArgs = {
   output?: string;
 };
 
+const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
+
 class CliError extends Error {
   exitCode: number;
 
@@ -130,6 +132,10 @@ function stableGeneratedAt(): string {
     const parsed = new Date(frozen);
     if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
   }
+  const freezeClock =
+    process.env.LTP_INSPECT_FREEZE_CLOCK === '1' ||
+    process.env.LTP_INSPECT_FREEZE_CLOCK?.toLowerCase() === 'true';
+  if (freezeClock) return DETERMINISTIC_TIMESTAMP;
   return new Date().toISOString();
 }
 
@@ -137,6 +143,69 @@ function normalizeInputPathForOutput(resolved: string): string {
   const relative = path.relative(process.cwd(), resolved);
   const candidate = relative && !relative.startsWith('..') ? relative : resolved;
   return candidate.split(path.sep).join('/');
+}
+
+function orderByPriority<T extends Record<string, unknown>>(value: T, priority: readonly string[]): T {
+  const ordered: Record<string, unknown> = {};
+
+  for (const key of priority) {
+    if (key in value && value[key] !== undefined) ordered[key] = value[key];
+  }
+
+  const remaining = Object.keys(value)
+    .filter((key) => !priority.includes(key))
+    .sort();
+  for (const key of remaining) ordered[key] = value[key];
+
+  return ordered as T;
+}
+
+function canonicalizeSummary(summary: InspectSummary): InspectSummary {
+  const order = {
+    root: ['contract', 'generated_at', 'tool', 'input', 'orientation', 'continuity', 'branches', 'futures', 'notes'],
+    contract: ['name', 'version', 'schema'],
+    tool: ['name', 'build'],
+    input: ['path', 'frames', 'format'],
+    orientation: ['identity', 'stable', 'drift_level', 'drift_history', 'focus_momentum'],
+    continuity: ['preserved', 'notes', 'token'],
+    branch: ['id', 'confidence', 'status', 'reason', 'path', 'constraints', 'class'],
+    drift: ['id', 'ts', 'value', 'note'],
+    futures: ['admissible', 'degraded', 'blocked'],
+  } as const;
+
+  const orderBranch = (branch: BranchInsight) =>
+    orderByPriority(
+      {
+        ...branch,
+        ...(branch.constraints?.length ? { constraints: [...branch.constraints].sort() } : {}),
+        ...(branch.class ? { class: branch.class } : {}),
+      },
+      order.branch,
+    );
+
+  const canonicalBranches = summary.branches.map(orderBranch);
+  const canonicalDriftHistory = summary.orientation.drift_history.map((drift) => orderByPriority(drift, order.drift));
+
+  const canonicalSummary: InspectSummary = {
+    contract: orderByPriority(summary.contract, order.contract),
+    generated_at: summary.generated_at,
+    tool: orderByPriority(summary.tool, order.tool),
+    input: orderByPriority(summary.input, order.input),
+    orientation: orderByPriority(
+      { ...summary.orientation, drift_history: canonicalDriftHistory },
+      order.orientation,
+    ),
+    continuity: orderByPriority(summary.continuity, order.continuity),
+    branches: canonicalBranches,
+    futures: {
+      admissible: (summary.futures.admissible ?? []).map(orderBranch),
+      degraded: (summary.futures.degraded ?? []).map(orderBranch),
+      blocked: (summary.futures.blocked ?? []).map(orderBranch),
+    },
+    notes: [...summary.notes],
+  };
+
+  return orderByPriority(canonicalSummary as Record<string, unknown>, order.root) as InspectSummary;
 }
 
 function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSummary['input']['format']; inputPath: string } {
@@ -481,39 +550,41 @@ function summarize(
 
   const notes = [...warnings];
 
-  return {
-    summary: {
-      contract: {
-        name: CONTRACT.name,
-        version: CONTRACT.version,
-        schema: CONTRACT.schema,
-      },
-      generated_at: stableGeneratedAt(),
-      tool: {
-        name: TOOL.name,
-        build: TOOL.build,
-      },
-      input: {
-        path: inputPath,
-        frames: frames.length,
-        format,
-      },
-      orientation: {
-        identity,
-        stable: orientationStable,
-        drift_level: driftLevel,
-        drift_history: driftHistory,
-        ...(focusMomentum !== undefined ? { focus_momentum: focusMomentum } : {}),
-      },
-      continuity: {
-        preserved: continuity.preserved,
-        notes: continuity.notes,
-        ...(continuity.token ? { token: continuity.token } : {}),
-      },
-      branches,
-      futures: groupFutures(branches),
-      notes,
+  const summary = canonicalizeSummary({
+    contract: {
+      name: CONTRACT.name,
+      version: CONTRACT.version,
+      schema: CONTRACT.schema,
     },
+    generated_at: stableGeneratedAt(),
+    tool: {
+      name: TOOL.name,
+      build: TOOL.build,
+    },
+    input: {
+      path: inputPath,
+      frames: frames.length,
+      format,
+    },
+    orientation: {
+      identity,
+      stable: orientationStable,
+      drift_level: driftLevel,
+      drift_history: driftHistory,
+      ...(focusMomentum !== undefined ? { focus_momentum: focusMomentum } : {}),
+    },
+    continuity: {
+      preserved: continuity.preserved,
+      notes: continuity.notes,
+      ...(continuity.token ? { token: continuity.token } : {}),
+    },
+    branches,
+    futures: groupFutures(branches),
+    notes,
+  });
+
+  return {
+    summary,
     violations: [...validation.violations, ...violations],
     warnings,
     normalizations,
@@ -521,7 +592,7 @@ function summarize(
 }
 
 export function formatJson(summary: InspectSummary, pretty = false): string {
-  return JSON.stringify(summary, null, pretty ? 2 : 0);
+  return JSON.stringify(canonicalizeSummary(summary), null, pretty ? 2 : 0);
 }
 
 function formatDriftHistory(history: DriftSnapshot[]): string {

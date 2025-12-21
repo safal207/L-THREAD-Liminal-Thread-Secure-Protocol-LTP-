@@ -1,3 +1,4 @@
 packages:
   - sdk/js
   - tools/conformance-kit
+  - packages/inspect
