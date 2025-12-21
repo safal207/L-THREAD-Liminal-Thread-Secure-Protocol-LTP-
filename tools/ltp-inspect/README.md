@@ -52,12 +52,9 @@ Sections included: Usage, Examples, Output, Exit codes.
 
 > Exit codes are canonical — see [`docs/devtools/exit-codes.md`](../../docs/devtools/exit-codes.md).
 
-Exit code | Meaning
---------- | -------
-0 | OK — contract produced
-1 | warnings only (normalized output or degraded signals)
-2 | contract violation (invalid input, unsupported/mixed versions, or non-canonical in `--strict`)
-3 | runtime failure — unexpected error
+This README defers to the canonical table to avoid drift. Practical shorthand:
+- `0` when the contract is satisfied without warnings.
+- `2` when the contract is violated (`--strict` escalates normalization to `2`).
 
 Suggested workflow integration:
 - Pull requests: run `pnpm -w ltp:inspect -- --input <trace>` (non-strict) to surface warnings without blocking.
