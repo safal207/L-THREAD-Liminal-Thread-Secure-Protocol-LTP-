@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "../../dist",
+    "rootDir": ".",
+    "noEmit": false
+  },
+  "include": ["./inspect.ts", "./types.ts"]
+}

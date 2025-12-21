@@ -2,44 +2,34 @@
   {
     "v": "0.1",
     "type": "orientation",
-    "id": "step-1",
-    "continuity_token": "ct-golden",
-    "payload": {
-      "identity": { "id": "demo.client" },
-      "focus_momentum": 0.48
-    }
+    "id": "g0",
+    "continuity_token": "ct-sample"
   },
   {
     "v": "0.1",
     "type": "focus_snapshot",
-    "id": "step-2",
-    "continuity_token": "ct-golden",
+    "id": "g1",
     "payload": {
-      "drift": 0.22,
-      "note": "aligned after routing"
-    }
+      "drift": "low"
+    },
+    "continuity_token": "ct-sample"
   },
   {
     "v": "0.1",
     "type": "route_response",
-    "id": "step-3",
-    "continuity_token": "ct-golden",
+    "id": "g2",
     "payload": {
-      "branches": {
-        "A": {
-          "confidence": 0.64,
+      "branches": [
+        {
+          "id": "main",
+          "confidence": 0.7,
           "status": "admissible",
-          "reason": "primary path",
-          "path": "stabilize -> deliver",
-          "constraints": ["preserve ordering"]
-        },
-        "B": {
-          "confidence": 0.21,
-          "status": "degraded",
-          "reason": "fallback path",
-          "path": "recover -> deliver"
+          "constraints": {
+            "policy": "on-call"
+          }
         }
-      }
-    }
+      ]
+    },
+    "continuity_token": "ct-sample"
   }
 ]

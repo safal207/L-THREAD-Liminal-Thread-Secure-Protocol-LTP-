@@ -8,7 +8,10 @@
     "payload": {
       "origin": "demo.client",
       "focus_momentum": 0.48,
-      "constraints": ["stay canonical", "no shortcuts"]
+      "constraints": {
+        "stay canonical": null,
+        "no shortcuts": null
+      }
     }
   },
   {
@@ -20,7 +23,9 @@
     "payload": {
       "goal": "ship linear demo",
       "context": ["hello", "heartbeat", "orientation"],
-      "constraints": ["preserve ordering"]
+      "constraints": {
+        "preserve ordering": null
+      }
     }
   },
   {
@@ -37,7 +42,9 @@
           "confidence": 0.64,
           "rationale": "primary path",
           "path": "stabilize -> deliver",
-          "constraints": ["preserve ordering"]
+          "constraints": {
+            "preserve ordering": null
+          }
         },
         {
           "id": "B",

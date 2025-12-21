@@ -5,6 +5,7 @@ export type LtpFrame = {
   payload?: any;
   continuity_token?: string;
   branches?: Record<string, unknown> | Array<Record<string, unknown>>;
+  constraints?: Record<string, unknown>;
   [key: string]: unknown;
 };
 
@@ -37,7 +38,8 @@ export type InspectSummary = {
     build: string;
   };
   input: {
-    path: string;
+    source: 'stdin' | 'file';
+    path?: string;
     frames: number;
     format: 'jsonl' | 'json';
   };

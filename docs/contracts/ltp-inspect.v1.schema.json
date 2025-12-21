@@ -55,8 +55,12 @@
     "input": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "frames", "format"],
+      "required": ["source", "frames", "format"],
       "properties": {
+        "source": {
+          "type": "string",
+          "enum": ["stdin", "file"]
+        },
         "path": {
           "type": "string",
           "minLength": 1

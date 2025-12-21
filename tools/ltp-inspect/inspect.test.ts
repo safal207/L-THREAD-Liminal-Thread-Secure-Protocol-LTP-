@@ -1,6 +1,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn, type SpawnOptions } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
+import ts from 'typescript';
 import { execute, formatHuman, formatJson, runInspect } from './inspect';
 
 const fixturePath = path.join(__dirname, 'fixtures', 'minimal.frames.jsonl');
@@ -16,6 +18,54 @@ const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.
 const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.json');
 const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.json');
 const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
+const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
+let builtCliPath: string | undefined;
+
+async function runCommand(command: string, args: string[], options: SpawnOptions = {}) {
+  return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolve, reject) => {
+    const child = spawn(command, args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout?.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr?.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on('error', reject);
+    child.on('close', (code) => {
+      resolve({ exitCode: code ?? 0, stdout, stderr });
+    });
+  });
+}
+
+function transpileToDist(sourcePath: string, outPath: string): void {
+  const source = fs.readFileSync(sourcePath, 'utf-8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2020,
+      module: ts.ModuleKind.ES2020,
+      moduleResolution: ts.ModuleResolutionKind.Node10,
+      esModuleInterop: true,
+    },
+    fileName: sourcePath,
+  });
+  fs.writeFileSync(outPath, output.outputText, 'utf-8');
+}
+
+async function buildInspectCli(): Promise<string> {
+  if (builtCliPath) return builtCliPath;
+  const distDir = path.join(__dirname, '..', '..', 'dist');
+  fs.mkdirSync(distDir, { recursive: true });
+  fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify({ type: 'module' }), 'utf-8');
+  transpileToDist(path.join(__dirname, 'inspect.ts'), path.join(distDir, 'inspect.js'));
+  transpileToDist(path.join(__dirname, 'types.ts'), path.join(distDir, 'types.js'));
+  builtCliPath = path.join(distDir, 'inspect.js');
+  return builtCliPath;
+}
 
 describe('ltp-inspect golden summary', () => {
   it('emits stable, ordered output', () => {
@@ -161,5 +211,17 @@ describe('ltp-inspect golden summary', () => {
 
     expect(exitCode).toBe(2);
     expect(errors.join('\n')).toContain('non-canonical input');
+  });
+});
+
+describe('ltp inspect cli', () => {
+  it('boots without crashing', async () => {
+    const distPath = await buildInspectCli();
+    const result = await runCommand('node', [distPath, sampleTrace], {
+      env: { ...process.env, LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z' },
+    });
+
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toLowerCase()).toContain('orientation');
   });
 });

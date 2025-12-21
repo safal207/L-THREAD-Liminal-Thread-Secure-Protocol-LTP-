@@ -145,70 +145,70 @@ function normalizeInputPathForOutput(resolved: string): string {
   return candidate.split(path.sep).join('/');
 }
 
-function orderByPriority<T extends Record<string, unknown>>(value: T, priority: readonly string[]): T {
-  const ordered: Record<string, unknown> = {};
-
-  for (const key of priority) {
-    if (key in value && value[key] !== undefined) ordered[key] = value[key];
+function normalizeConstraintsValue(
+  raw: unknown,
+): { value?: Record<string, unknown>; normalized: boolean; invalid: boolean } {
+  if (raw === undefined) return { normalized: false, invalid: false };
+  if (raw === null) return { normalized: false, invalid: true };
+  if (typeof raw === 'object' && !Array.isArray(raw)) {
+    return { value: raw as Record<string, unknown>, normalized: false, invalid: false };
   }
-
-  const remaining = Object.keys(value)
-    .filter((key) => !priority.includes(key))
-    .sort();
-  for (const key of remaining) ordered[key] = value[key];
-
-  return ordered as T;
+  if (typeof raw === 'string') return { value: { [raw]: undefined }, normalized: true, invalid: false };
+  if (Array.isArray(raw)) {
+    const mapped: Record<string, unknown> = {};
+    (raw as unknown[]).forEach((entry, idx) => {
+      const key = typeof entry === 'string' ? entry : `item_${idx}`;
+      mapped[key] = entry ?? undefined;
+    });
+    return { value: mapped, normalized: true, invalid: false };
+  }
+  return { normalized: false, invalid: true };
 }
 
-function canonicalizeSummary(summary: InspectSummary): InspectSummary {
-  const order = {
-    root: ['contract', 'generated_at', 'tool', 'input', 'orientation', 'continuity', 'branches', 'futures', 'notes'],
-    contract: ['name', 'version', 'schema'],
-    tool: ['name', 'build'],
-    input: ['path', 'frames', 'format'],
-    orientation: ['identity', 'stable', 'drift_level', 'drift_history', 'focus_momentum'],
-    continuity: ['preserved', 'notes', 'token'],
-    branch: ['id', 'confidence', 'status', 'reason', 'path', 'constraints', 'class'],
-    drift: ['id', 'ts', 'value', 'note'],
-    futures: ['admissible', 'degraded', 'blocked'],
-  } as const;
+function normalizeFrameConstraints(frames: LtpFrame[]): {
+  frames: LtpFrame[];
+  normalizations: string[];
+  violations: string[];
+} {
+  const normalizations: string[] = [];
+  const violations: string[] = [];
+  const normalizedFrames = frames.map((frame, idx) => {
+    const label = `frame#${idx}`;
+    const next: LtpFrame = { ...frame };
+    const payloadObject =
+      frame.payload && typeof frame.payload === 'object' && !Array.isArray(frame.payload)
+        ? { ...(frame.payload as Record<string, unknown>) }
+        : undefined;
 
-  const orderBranch = (branch: BranchInsight) =>
-    orderByPriority(
-      {
-        ...branch,
-        ...(branch.constraints?.length ? { constraints: [...branch.constraints].sort() } : {}),
-        ...(branch.class ? { class: branch.class } : {}),
-      },
-      order.branch,
-    );
+    const directConstraints = normalizeConstraintsValue((frame as any).constraints);
+    if (directConstraints.invalid) {
+      violations.push(`${label} constraints must be an object when provided`);
+    } else if (directConstraints.value) {
+      next.constraints = directConstraints.value;
+      if (directConstraints.normalized) normalizations.push(`${label} constraints normalized to object map`);
+    }
 
-  const canonicalBranches = summary.branches.map(orderBranch);
-  const canonicalDriftHistory = summary.orientation.drift_history.map((drift) => orderByPriority(drift, order.drift));
+    const payloadConstraints = normalizeConstraintsValue((frame as any).payload?.constraints);
+    if (payloadConstraints.invalid) {
+      violations.push(`${label} constraints must be an object when provided`);
+    } else if (payloadConstraints.value) {
+      const updatedPayload = payloadObject ?? {};
+      updatedPayload.constraints = payloadConstraints.value;
+      next.payload = updatedPayload;
+      if (payloadConstraints.normalized) normalizations.push(`${label} payload constraints normalized to object map`);
+    } else if (payloadObject) {
+      next.payload = payloadObject;
+    }
 
-  const canonicalSummary: InspectSummary = {
-    contract: orderByPriority(summary.contract, order.contract),
-    generated_at: summary.generated_at,
-    tool: orderByPriority(summary.tool, order.tool),
-    input: orderByPriority(summary.input, order.input),
-    orientation: orderByPriority(
-      { ...summary.orientation, drift_history: canonicalDriftHistory },
-      order.orientation,
-    ),
-    continuity: orderByPriority(summary.continuity, order.continuity),
-    branches: canonicalBranches,
-    futures: {
-      admissible: (summary.futures.admissible ?? []).map(orderBranch),
-      degraded: (summary.futures.degraded ?? []).map(orderBranch),
-      blocked: (summary.futures.blocked ?? []).map(orderBranch),
-    },
-    notes: [...summary.notes],
-  };
+    return next;
+  });
 
-  return orderByPriority(canonicalSummary as Record<string, unknown>, order.root) as InspectSummary;
+  return { frames: normalizedFrames, normalizations, violations };
 }
 
-function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSummary['input']['format']; inputPath: string } {
+function loadFrames(
+  filePath: string,
+): { frames: LtpFrame[]; format: InspectSummary['input']['format']; inputPath?: string; inputSource: InspectSummary['input']['source'] } {
   const isStdin = filePath === '-' || filePath === undefined;
   const resolved = isStdin ? 'stdin' : path.resolve(filePath);
 
@@ -223,7 +223,12 @@ function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSumm
     try {
       const frames = JSON.parse(raw);
       if (!Array.isArray(frames)) throw new Error('Expected JSON array');
-      return { frames, format: 'json', inputPath: isStdin ? 'stdin' : normalizeInputPathForOutput(resolved) };
+      return {
+        frames,
+        format: 'json',
+        inputSource: isStdin ? 'stdin' : 'file',
+        inputPath: isStdin ? undefined : normalizeInputPathForOutput(resolved),
+      };
     } catch (err) {
       throw new CliError(`Invalid JSON array: ${(err as Error).message}`, 2);
     }
@@ -234,7 +239,12 @@ function loadFrames(filePath: string): { frames: LtpFrame[]; format: InspectSumm
       .split(/\r?\n/)
       .filter((line) => line.trim().length > 0)
       .map((line) => JSON.parse(line));
-    return { frames, format: 'jsonl', inputPath: isStdin ? 'stdin' : normalizeInputPathForOutput(resolved) };
+    return {
+      frames,
+      format: 'jsonl',
+      inputSource: isStdin ? 'stdin' : 'file',
+      inputPath: isStdin ? undefined : normalizeInputPathForOutput(resolved),
+    };
   } catch (err) {
     throw new CliError(`Invalid JSONL: ${(err as Error).message}`, 2);
   }
@@ -333,14 +343,8 @@ function validateTraceFrames(frames: LtpFrame[]): { warnings: string[]; violatio
     }
 
     const constraints = (frame as any).constraints ?? (frame as any).payload?.constraints;
-    if (
-      constraints !== undefined &&
-      constraints !== null &&
-      typeof constraints !== 'string' &&
-      !Array.isArray(constraints) &&
-      typeof constraints !== 'object'
-    ) {
-      violations.push(`${label} constraints must be a string, array, or object when provided`);
+    if (constraints !== undefined && (typeof constraints !== 'object' || constraints === null || Array.isArray(constraints))) {
+      violations.push(`${label} constraints must be an object when provided`);
     }
 
     const focusMomentum =
@@ -453,15 +457,10 @@ function normalizeBranches(raw: unknown): { branches: BranchInsight[]; notes: st
 }
 
 function constraintListFrom(raw: unknown): string[] {
-  if (!raw) return [];
-  if (typeof raw === 'string') return [raw];
-  if (Array.isArray(raw)) return raw.flatMap((item) => constraintListFrom(item));
-  if (typeof raw === 'object') {
-    return Object.entries(raw as Record<string, unknown>).map(([key, value]) =>
-      value === undefined || value === null ? String(key) : `${key}:${value}`,
-    );
-  }
-  return [];
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+  return Object.entries(raw as Record<string, unknown>).map(([key, value]) =>
+    value === undefined || value === null ? String(key) : `${key}:${value}`,
+  );
 }
 
 function extractIdentity(frames: LtpFrame[]): string {
@@ -521,18 +520,20 @@ function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
 
 function summarize(
   frames: LtpFrame[],
-  inputPath: string,
+  input: { path?: string; source: InspectSummary['input']['source'] },
   format: InspectSummary['input']['format'],
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
-  const validation = validateTraceFrames(frames);
-  const continuity = detectContinuity(frames);
-  const driftHistory = collectDriftHistory(frames);
+  const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
+    normalizeFrameConstraints(frames);
+  const validation = validateTraceFrames(normalizedFrames);
+  const continuity = detectContinuity(normalizedFrames);
+  const driftHistory = collectDriftHistory(normalizedFrames);
   const driftLevel = driftLevelFromHistory(driftHistory);
-  const focusMomentum = extractFocusMomentum(frames);
-  const identity = extractIdentity(frames);
-  const orientationStable = frames.some((f) => f.type === 'orientation');
+  const focusMomentum = extractFocusMomentum(normalizedFrames);
+  const identity = extractIdentity(normalizedFrames);
+  const orientationStable = normalizedFrames.some((f) => f.type === 'orientation');
 
-  const lastRouteResponse = [...frames].reverse().find((f) => f.type === 'route_response');
+  const lastRouteResponse = [...normalizedFrames].reverse().find((f) => f.type === 'route_response');
   const { branches, notes: branchNotes, violations, normalizations } = normalizeBranches(
     lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload,
   );
@@ -550,44 +551,43 @@ function summarize(
 
   const notes = [...warnings];
 
-  const summary = canonicalizeSummary({
-    contract: {
-      name: CONTRACT.name,
-      version: CONTRACT.version,
-      schema: CONTRACT.schema,
-    },
-    generated_at: stableGeneratedAt(),
-    tool: {
-      name: TOOL.name,
-      build: TOOL.build,
-    },
-    input: {
-      path: inputPath,
-      frames: frames.length,
-      format,
-    },
-    orientation: {
-      identity,
-      stable: orientationStable,
-      drift_level: driftLevel,
-      drift_history: driftHistory,
-      ...(focusMomentum !== undefined ? { focus_momentum: focusMomentum } : {}),
-    },
-    continuity: {
-      preserved: continuity.preserved,
-      notes: continuity.notes,
-      ...(continuity.token ? { token: continuity.token } : {}),
-    },
-    branches,
-    futures: groupFutures(branches),
-    notes,
-  });
-
   return {
-    summary,
-    violations: [...validation.violations, ...violations],
+    summary: {
+      contract: {
+        name: CONTRACT.name,
+        version: CONTRACT.version,
+        schema: CONTRACT.schema,
+      },
+      generated_at: stableGeneratedAt(),
+      tool: {
+        name: TOOL.name,
+        build: TOOL.build,
+      },
+      input: {
+        source: input.source,
+        ...(input.path ? { path: input.path } : {}),
+        frames: normalizedFrames.length,
+        format,
+      },
+      orientation: {
+        identity,
+        stable: orientationStable,
+        drift_level: driftLevel,
+        drift_history: driftHistory,
+        ...(focusMomentum !== undefined ? { focus_momentum: focusMomentum } : {}),
+      },
+      continuity: {
+        preserved: continuity.preserved,
+        notes: continuity.notes,
+        ...(continuity.token ? { token: continuity.token } : {}),
+      },
+      branches,
+      futures: groupFutures(branches),
+      notes,
+    },
+    violations: [...constraintViolations, ...validation.violations, ...violations],
     warnings,
-    normalizations,
+    normalizations: [...constraintNormalizations, ...normalizations],
   };
 }
 
@@ -610,7 +610,8 @@ function formatDriftHistory(history: DriftSnapshot[]): string {
 export function formatHuman(summary: InspectSummary): string {
   const lines: string[] = [];
   lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
-  lines.push(`input: ${summary.input.path}  time: ${summary.generated_at}`);
+  const inputLabel = summary.input.path ?? summary.input.source;
+  lines.push(`input: ${inputLabel}  time: ${summary.generated_at}`);
   lines.push('');
   lines.push('IDENTITY');
   lines.push(`identity: ${summary.orientation.identity}`);
@@ -662,8 +663,8 @@ export function formatHuman(summary: InspectSummary): string {
 }
 
 export function runInspect(file: string): InspectSummary {
-  const { frames, format, inputPath } = loadFrames(file);
-  return summarize(frames, inputPath, format).summary;
+  const { frames, format, inputPath, inputSource } = loadFrames(file);
+  return summarize(frames, { path: inputPath, source: inputSource }, format).summary;
 }
 
 type InspectionResult = {
@@ -674,8 +675,8 @@ type InspectionResult = {
 };
 
 function handleTrace(file: string, format: OutputFormat, pretty: boolean, writer: Writer): InspectionResult {
-  const { frames, format: inputFormat, inputPath } = loadFrames(file);
-  const { summary, violations, warnings, normalizations } = summarize(frames, inputPath, inputFormat);
+  const { frames, format: inputFormat, inputPath, inputSource } = loadFrames(file);
+  const { summary, violations, warnings, normalizations } = summarize(frames, { path: inputPath, source: inputSource }, inputFormat);
 
   if (format === 'json') printJson(summary, pretty, writer);
   else printHuman(summary, writer);
@@ -698,15 +699,15 @@ function handleReplay(file: string, from: string | undefined, writer: Writer): v
 }
 
 function handleExplain(file: string, at: string | undefined, branchId: string | undefined, writer: Writer): { violations: string[] } {
-  const { frames, format, inputPath } = loadFrames(file);
+  const { frames, format, inputPath, inputSource } = loadFrames(file);
   const targetIndex = at
     ? frames.findIndex((f) => f.id === at || String(f.ts) === at || `step-${f.id}` === at)
     : frames.length - 1;
   const boundedIndex = targetIndex >= 0 ? targetIndex : frames.length - 1;
   const window = frames.slice(0, boundedIndex + 1);
   const prior = frames.slice(0, boundedIndex);
-  const { summary, violations } = summarize(window, inputPath, format);
-  const previous = prior.length ? summarize(prior, inputPath, format).summary : undefined;
+  const { summary, violations } = summarize(window, { path: inputPath, source: inputSource }, format);
+  const previous = prior.length ? summarize(prior, { path: inputPath, source: inputSource }, format).summary : undefined;
 
   const targetBranch = branchId ?? summary.branches[0]?.id;
   const branch = targetBranch ? summary.branches.find((b) => b.id === targetBranch) : undefined;
@@ -888,11 +889,26 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
   }
 }
 
-export function main(argv = process.argv.slice(2)): void {
+export async function main(argv = process.argv.slice(2)): Promise<void> {
   const exitCode = execute(argv, console);
   process.exit(exitCode);
 }
 
-if (require.main === module) {
-  main();
+function isDirectRun(): boolean {
+  if (typeof require !== 'undefined' && typeof module !== 'undefined') {
+    if (require.main === module) return true;
+  }
+
+  if (typeof import.meta !== 'undefined') {
+    return import.meta.url === `file://${process.argv[1]}`;
+  }
+
+  return false;
+}
+
+if (isDirectRun()) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 }
