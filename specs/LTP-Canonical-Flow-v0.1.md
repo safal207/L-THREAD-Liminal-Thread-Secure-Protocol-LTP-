@@ -4,6 +4,15 @@
 **Change policy:** additive-only until v0.1 tag.  
 **Depends on:** `specs/LTP-Frames-v0.1.md`, `specs/LTP-Flow-v0.1.md`, `specs/LTP-Conformance-v0.1.md`. See `specs/LTP-v0.1-RC1.md` for the RC checklist and CI gate.
 
+## Status
+
+This document is **NORMATIVE** for LTP Frozen Core v0.1.
+
+All statements using RFC 2119 keywords (MUST, MUST NOT, SHOULD, MAY)
+define compliance requirements.
+
+Examples and diagrams are **INFORMATIVE** unless explicitly stated otherwise.
+
 ## Purpose
 This document defines the **canonical, deterministic reference flow** for LTP v0.1.
 Any compliant implementation (Rust node, Node gateway, JS SDK, HUD) **SHOULD**
@@ -13,6 +22,17 @@ Canonical flow is used for:
 - cross-language conformance (Rust/Node/JS)
 - stable demos and docs
 - deterministic CI checks
+
+## Frozen Core scope
+Frozen Core v0.1 defines:
+- orientation primitives
+- transition semantics
+- continuity invariants
+
+It does NOT define:
+- routing strategies
+- scoring algorithms
+- UI, visualization, or SDK behavior
 
 ## Normative rules
 1. **Frame compatibility:** implementations MUST NOT break existing frame types.
@@ -33,6 +53,18 @@ Canonical flow is used for:
 - **Reconnect + duplicates:** if a client reconnects with a **new id**, the node MAY replay the last known `orientation` or
   `focus_snapshot` for continuity but MUST NOT re-emit `route_response` without a fresh `route_request`. Duplicate frame ids
   MUST be ignored while keeping the underlying session open.
+
+## Continuity and orientation invariants
+A compliant LTP implementation **MUST NOT** silently lose orientation state.
+Silent orientation loss is considered a protocol violation, even if downstream behavior appears correct.
+
+Orientation Loss:
+A condition where identity, focus, or drift history is dropped, reset, or overwritten without an explicit transition event.
+
+Example:
+An LTP node MUST preserve orientation across retries.
+An LTP node MAY update focus momentum during a transition.
+An LTP node MUST NOT rewrite drift history retroactively.
 
 ## Canonical sequence (v0.1)
 A canonical session is a sequence of frames exchanged between:
@@ -93,6 +125,12 @@ Violation of any **MUST** condition is **non-compliant** (fail fast).
   → Defined in: `specs/LTP-Frames-v0.1.md`
 - MAY: Emit `focus_snapshot` with required fields when present.  
   → Defined in: `specs/LTP-Frames-v0.1.md`
+
+## Compliance verification
+Implementations SHOULD provide a reproducible trace of orientation transitions.
+
+Reference conformance tests are provided in `/conformance`.
+A compliant implementation SHOULD pass all Frozen Core v0.1 checks.
 
 ## Non-goals
 - No ML requirement
