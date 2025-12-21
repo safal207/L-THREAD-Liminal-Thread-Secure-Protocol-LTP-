@@ -53,6 +53,12 @@ Canonical reference:
 
 The canonical index defines the authoritative description of the LTP Core.
 
+See also:
+- [docs/glossary.md](docs/glossary.md)
+- [docs/invariants.md](docs/invariants.md)
+
+These documents define the canonical language of LTP.
+
 ---
 
 ## DevTools & Verification
