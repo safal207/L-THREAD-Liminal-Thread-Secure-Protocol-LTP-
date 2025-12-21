@@ -48,11 +48,15 @@ jobs:
         if: github.event_name == 'pull_request'
         continue-on-error: true
         run: |
-          pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/unsorted-branches.json --format=human --color=never --quiet
+          set -euxo pipefail
+          mkdir -p docs/devtools
+          pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/unsorted-branches.json --format=human --color=never --quiet > docs/devtools/inspect-output.txt
       - name: Inspect trace (strict gate)
         if: github.event_name != 'pull_request'
         run: |
-          pnpm -w ltp:inspect -- --strict --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --quiet
+          set -euxo pipefail
+          mkdir -p docs/devtools
+          pnpm -w ltp:inspect -- --strict --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --quiet > docs/devtools/inspect-output.txt
       - name: Upload golden traces
         if: always()
         uses: actions/upload-artifact@v4
@@ -68,7 +72,7 @@ jobs:
           name: inspect-output
           path: docs/devtools/inspect-output.txt
       - name: Post artifact links to PR
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false
         uses: actions/github-script@v7
         with:
           script: |
