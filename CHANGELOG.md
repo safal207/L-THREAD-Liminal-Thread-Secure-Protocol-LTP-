@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added canonical orientation explanation and onboarding materials (media assets referenced externally; binaries not stored in repo).
 - No protocol or contract changes.
+- Published `@ltp/inspect@0.1.1` CLI shim for `ltp inspect` entrypoint with deterministic inspector outputs (stable field ordering, gated timestamps, and golden trace quickstart).
 
 ### Planned
 - Complete v0.6.0 production security (see roadmap below)

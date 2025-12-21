@@ -157,6 +157,14 @@ It inspects continuity.
 pnpm -w ltp:inspect -- --input examples/traces/drift-recovery.json
 ```
 
+Quickstart:
+
+```
+pnpm i @ltp/inspect
+ltp inspect ./samples/golden.trace.json
+> Does not run a model. Inspects orientation continuity.
+```
+
 Одна команда → одно понимание. Всё.
 
 Contract: [ltp-inspect contract v1](./docs/contracts/ltp-inspect.v1.md).

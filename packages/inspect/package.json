@@ -1,0 +1,16 @@
+{
+  "name": "@ltp/inspect",
+  "version": "0.1.1",
+  "private": false,
+  "type": "commonjs",
+  "bin": {
+    "ltp": "./bin/ltp.js"
+  },
+  "files": [
+    "bin"
+  ],
+  "dependencies": {
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}
