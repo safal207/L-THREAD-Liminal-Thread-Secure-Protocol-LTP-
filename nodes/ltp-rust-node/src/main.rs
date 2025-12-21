@@ -17,7 +17,10 @@ use tokio::net::TcpListener;
 use tokio::time::timeout;
 use tokio_tungstenite::{
     accept_async,
-    tungstenite::{protocol::frame::coding::CloseCode, CloseFrame, Message, Result as WsResult},
+    tungstenite::{
+        protocol::{frame::coding::CloseCode, CloseFrame},
+        Message, Result as WsResult,
+    },
 };
 use tracing::{error, info, warn};
 use uuid::Uuid;
@@ -173,11 +176,21 @@ async fn main() -> anyhow::Result<()> {
         }),
     );
 
+    let metrics_config = config.clone();
     tokio::spawn(async move {
-        if let Err(err) = axum::Server::bind(&config.metrics_addr.parse().unwrap())
-            .serve(metrics_app.into_make_service())
-            .await
-        {
+        let listener = match TcpListener::bind(&metrics_config.metrics_addr).await {
+            Ok(listener) => listener,
+            Err(err) => {
+                error!(
+                    error = ?err,
+                    addr = %metrics_config.metrics_addr,
+                    "failed to bind metrics listener"
+                );
+                return;
+            }
+        };
+
+        if let Err(err) = axum::serve(listener, metrics_app.into_make_service()).await {
             error!(error = ?err, "failed to start metrics server");
         }
     });
@@ -454,7 +467,7 @@ fn spawn_janitor(ctx: AppContext) {
             tokio::time::sleep(interval).await;
             let removed = ctx.state.expire_idle(idle_ttl);
             if removed > 0 {
-                ctx.metrics.sessions.dec_by(removed as i64);
+                ctx.metrics.sessions.sub(removed as i64);
                 ctx.metrics
                     .sessions_expired
                     .with_label_values(&["ttl"])
