@@ -2,6 +2,12 @@
 
 Thank you for your interest in contributing to LTP! This document provides guidelines and instructions for contributing.
 
+## Governance quickstart
+- Read and follow [GOVERNANCE.md](./GOVERNANCE.md); it defines roles, permissions, and core change rules.
+- Contributors may work on SDKs, tooling (inspectors, visualizers), demos, docs, and tests.
+- Only Core Maintainers may approve changes that alter protocol semantics, orientation invariants, or golden traces.
+- Any proposal that touches `core/`, `protocol/`, or golden traces requires an RFC plus updated traces showing deterministic behavior.
+
 ## Code of Conduct
 
 - Be respectful and inclusive
@@ -49,6 +55,7 @@ git checkout -b fix/your-bug-fix
 - Write clear, self-documenting code
 - Add comments for complex logic
 - Update documentation as needed
+- Stay within the contributor scope unless a Core Maintainer sponsors the change and an RFC is in flight
 
 ### 3. Write Tests
 
@@ -150,12 +157,13 @@ cd sdk/rust/ltp-client && cargo test
 
 ## Protocol Changes
 
-If proposing protocol changes:
+If proposing protocol changes (Core Maintainer approval required):
 
-1. **Update specifications** in `specs/`
-2. **Update all SDKs** to maintain compatibility
-3. **Add migration guide** if breaking changes
-4. **Update version numbers** appropriately
+1. **Open an RFC** documenting the change and why determinism/orientation are preserved.
+2. **Update specifications** in `specs/` and any relevant docs.
+3. **Update golden traces** and conformance fixtures to demonstrate the new behavior.
+4. **Update SDKs** to maintain compatibility where applicable.
+5. **Add migration guide** if breaking changes and update version numbers appropriately.
 
 ## Pull Request Process
 
@@ -197,4 +205,3 @@ For feature requests:
 By contributing, you agree that your contributions will be licensed under the same license as the project (see LICENSE file).
 
 Thank you for contributing to LTP! 🚀
-
