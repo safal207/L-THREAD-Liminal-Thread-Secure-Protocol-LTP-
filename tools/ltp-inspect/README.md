@@ -35,6 +35,7 @@ Frames may be a JSON array or JSONL with one frame per line. Existing conformanc
 
 - Input paths are normalized relative to the current workspace to keep reruns diffable.
 - Set `LTP_INSPECT_FROZEN_TIME=2024-01-01T00:00:00.000Z` (or any ISO timestamp) to pin `generated_at` for snapshotting; this is how `docs/devtools/inspect-output.txt` is produced.
+- Without `LTP_INSPECT_FROZEN_TIME`, timestamps follow the current clock (or Vitest fake timers). Set `LTP_INSPECT_FREEZE_CLOCK=1` to force a deterministic epoch (`1970-01-01T00:00:00.000Z`) for CI diffs.
 - Flags accept `--flag value` or `--flag=value`; use `--color=never` to strip ANSI codes in CI.
 
 ## What it is / What it is NOT
@@ -58,12 +59,9 @@ Sections included: Usage, Examples, Output, Exit codes.
 
 > Exit codes are canonical — see [`docs/devtools/exit-codes.md`](../../docs/devtools/exit-codes.md).
 
-Exit code | Meaning
---------- | -------
-0 | OK — contract produced
-1 | warnings only (normalized output or degraded signals)
-2 | contract violation (invalid input, unsupported/mixed versions, or non-canonical in `--strict`)
-3 | runtime failure — unexpected error
+This README defers to the canonical table to avoid drift. Practical shorthand:
+- `0` when the contract is satisfied without warnings.
+- `2` when the contract is violated (`--strict` escalates normalization to `2`).
 
 Suggested workflow integration:
 - Pull requests: run `pnpm -w ltp:inspect -- --input <trace>` (non-strict) to surface warnings without blocking.

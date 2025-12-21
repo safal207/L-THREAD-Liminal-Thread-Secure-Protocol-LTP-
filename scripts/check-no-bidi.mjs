@@ -12,6 +12,32 @@ const EXTENSIONS_TO_SCAN = ['.md', '.json', '.jsonl', '.ts', '.js', '.yaml', '.y
 let filesWithBidi = [];
 let missingFiles = [];
 
+function runProvidedScan(targets) {
+  console.log('Scanning provided files for hidden Unicode characters...');
+  for (const target of targets) {
+    if (!fs.existsSync(target)) {
+      missingFiles.push(target);
+      continue;
+    }
+
+    const stat = fs.statSync(target);
+    if (stat.isDirectory()) {
+      scanDir(target);
+    } else {
+      scanFile(target, false);
+    }
+  }
+}
+
+function runDefaultScan() {
+  console.log(`Scanning for hidden Unicode characters in ${DIRS_TO_SCAN.join(', ')}...`);
+  for (const dir of DIRS_TO_SCAN) {
+    if (fs.existsSync(dir)) {
+      scanDir(dir);
+    }
+  }
+}
+
 function scanFile(filePath, enforceExtensionFilter = true) {
   if (enforceExtensionFilter && !EXTENSIONS_TO_SCAN.includes(path.extname(filePath))) {
     return;
@@ -40,27 +66,9 @@ function scanDir(dir) {
 const providedPaths = process.argv.slice(2);
 
 if (providedPaths.length > 0) {
-  console.log('Scanning provided files for hidden Unicode characters...');
-  for (const target of providedPaths) {
-    if (!fs.existsSync(target)) {
-      missingFiles.push(target);
-      continue;
-    }
-
-    const stat = fs.statSync(target);
-    if (stat.isDirectory()) {
-      scanDir(target);
-    } else {
-      scanFile(target, false);
-    }
-  }
+  runProvidedScan(providedPaths);
 } else {
-  console.log(`Scanning for hidden Unicode characters in ${DIRS_TO_SCAN.join(', ')}...`);
-  for (const dir of DIRS_TO_SCAN) {
-    if (fs.existsSync(dir)) {
-      scanDir(dir);
-    }
-  }
+  runDefaultScan();
 }
 
 if (missingFiles.length > 0) {

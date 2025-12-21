@@ -36,6 +36,8 @@ type ParsedArgs = {
   output?: string;
 };
 
+const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
+
 class CliError extends Error {
   exitCode: number;
 
@@ -130,6 +132,10 @@ function stableGeneratedAt(): string {
     const parsed = new Date(frozen);
     if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
   }
+  const freezeClock =
+    process.env.LTP_INSPECT_FREEZE_CLOCK === '1' ||
+    process.env.LTP_INSPECT_FREEZE_CLOCK?.toLowerCase() === 'true';
+  if (freezeClock) return DETERMINISTIC_TIMESTAMP;
   return new Date().toISOString();
 }
 
@@ -586,7 +592,7 @@ function summarize(
 }
 
 export function formatJson(summary: InspectSummary, pretty = false): string {
-  return JSON.stringify(summary, null, pretty ? 2 : 0);
+  return JSON.stringify(canonicalizeSummary(summary), null, pretty ? 2 : 0);
 }
 
 function formatDriftHistory(history: DriftSnapshot[]): string {

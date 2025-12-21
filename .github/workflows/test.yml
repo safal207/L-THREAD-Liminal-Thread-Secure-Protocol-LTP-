@@ -1,5 +1,9 @@
 name: Test LTP SDKs
 
+permissions:
+  contents: read
+  pull-requests: write
+
 on:
   push:
     branches: [ main, develop ]
@@ -18,9 +22,6 @@ jobs:
       - name: Check for hidden Unicode characters
         run: |
           ./scripts/check-no-bidi.mjs
-      - name: Check hidden/bidi Unicode (DevTools docs)
-        run: |
-          node scripts/check-no-bidi.mjs .github/workflows/test.yml docs/devtools/exit-codes.md docs/devtools/inspector.md
 
   ltp-inspect:
     name: Inspector contract check
@@ -52,6 +53,39 @@ jobs:
         if: github.event_name != 'pull_request'
         run: |
           pnpm -w ltp:inspect -- --strict --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --quiet
+      - name: Upload golden traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-traces
+          path: |
+            examples/traces/*.json
+            specs/flow/golden-transcript.v0.1.jsonl
+      - name: Upload canonical inspect output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inspect-output
+          path: docs/devtools/inspect-output.txt
+      - name: Post artifact links to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const artifactsUrl = `${runUrl}#artifacts`;
+            const body = [
+              '🔗 DevTools artifacts are available for this run:',
+              `- [Golden traces](${artifactsUrl})`,
+              `- [Canonical inspector output](${artifactsUrl})`,
+              '',
+              'Artifacts are stored with the workflow run for reproducibility.'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body,
+            });
 
   verify-types:
     name: Verify Cross-SDK Type Consistency
