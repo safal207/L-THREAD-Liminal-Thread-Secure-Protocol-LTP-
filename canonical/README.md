@@ -15,3 +15,7 @@ This trace:
 
 If your implementation cannot ingest, validate, and replay this trace,
 it is not LTP-compliant.
+
+## Compliance references
+
+- [Frozen Core Compliance Checklist](./compliance-checklist.md)
