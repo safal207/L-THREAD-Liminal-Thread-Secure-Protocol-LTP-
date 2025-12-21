@@ -27,9 +27,10 @@ LTP ships with built-in tooling for deterministic inspection and regression veri
 - 🔍 Inspector & CI artifacts — inspect orientation, drift, and admissible futures
 - 🧪 Golden traces — canonical baselines for regression testing
 - 🔁 One-click reproducibility — replay CI runs locally
+  - One-click reproducibility = CI publishes the exact traces and inspector outputs needed to reproduce locally without model execution.
 
 See:
-- docs/devtools/ci-artifacts.md
+- CI artifacts & reproducibility: [docs/devtools/ci-artifacts.md](docs/devtools/ci-artifacts.md) — download artifacts → inspect → compare to golden traces
 
 ---
 
