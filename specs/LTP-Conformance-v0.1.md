@@ -44,7 +44,7 @@ Implementations MUST accept and emit the following frames:
 
 Implementations MAY support:
 - `focus_snapshot`
-- Future extensions (MAY be ignored if unknown).
+- Future extensions (MUST accept unknown fields in known frames and MUST ignore unknown frame types while keeping the connection/session alive; logging is allowed but not required).
 
 ---
 
@@ -54,7 +54,8 @@ An implementation MUST:
 - Tolerate missing optional frames without breaking the flow.
 - Preserve frame ordering per connection/session.
 - Treat silence as a signal (no forced responses for absence).
-- Ignore unknown frame types (forward-compatible), MAY log.
+- Accept unknown fields in known frames without rejecting the frame.
+- Ignore unknown frame types while keeping the connection/session alive (forward-compatible), MAY log.
 - Validate protocol version `v: "0.1"` (or compatible); otherwise reject or ignore.
 - Treat `id` as unique per sender scope to avoid duplicate side effects on retries.
 
@@ -64,6 +65,17 @@ Silent orientation loss is considered a protocol violation, even if downstream b
 
 Orientation Loss:
 A condition where identity, focus, or drift history is dropped, reset, or overwritten without an explicit transition event.
+
+Explicit rules:
+**Forbidden (MUST NOT):**
+- Reset identity without an explicit `transition` frame.
+- Rewrite past `drift_history` entries.
+- Silently drop `focus_momentum` updates.
+
+**Allowed (MAY/SHOULD):**
+- Append `drift_history` entries only in `transition` frames.
+- Degrade branch confidence with recorded reasons when supported by the payload schema (SHOULD document the reason).
+- Mark discontinuity explicitly with a violation or error frame when discontinuity is detected.
 
 ---
 
@@ -76,7 +88,9 @@ An implementation MUST:
 ---
 
 ## Determinism & Explainability
-- Same inputs SHOULD yield the same outputs within implementation tolerance.
+- “Same input” means the same ordered sequence of frames (byte-stable for binary payloads or canonical JSON for structured payloads), the same protocol version, and the same node configuration (including constraint sets and policy flags).
+- Same inputs SHOULD yield the same outputs within implementation tolerance for all deterministic fields that drive routing, orientation, and branch ordering.
+- Timestamps, nonces, and transport-level identifiers MAY vary, but MUST NOT affect deterministic fields or reorder stable outputs.
 - Routing decisions MUST be explainable (traceable factors, not opaque randomness).
 
 ---
@@ -104,6 +118,14 @@ Implementations SHOULD provide a reproducible trace of orientation transitions.
 
 Reference conformance tests are provided in `/conformance`.
 A compliant implementation SHOULD pass all Frozen Core v0.1 checks.
+
+## Conformance report minimum contract
+Automated conformance output MUST include:
+- `protocol_version`
+- `implementation_id`
+- A pass/fail summary
+- An artifact link or trace reference (file path or URL)
+- Failing invariant name and failing frame identifier when a check fails
 
 ---
 
