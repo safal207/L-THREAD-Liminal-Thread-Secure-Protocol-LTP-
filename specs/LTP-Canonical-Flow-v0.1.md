@@ -35,13 +35,17 @@ It does NOT define:
 - UI, visualization, or SDK behavior
 
 ## Normative rules
-1. **Frame compatibility:** implementations MUST NOT break existing frame types.
+1. **Frame compatibility:** implementations MUST NOT break existing frame types. Implementations MUST accept unknown fields in known frames without rejecting the frame, and MUST ignore unknown frame types while keeping the session alive (logging is allowed but not required).
 2. **Determinism:** given the same input, output frames MUST be stable in:
    - `type`
    - required payload fields
    - ordering
 3. **Transport-agnostic:** this flow MUST be representable over WebSocket and REST.
 4. **Storage-agnostic:** no database is required to execute the flow.
+
+## Determinism scope
+- “Same input” means the same ordered sequence of frames (byte-stable for binary payloads or canonical JSON for structured payloads), the same protocol version, and the same node configuration (including constraint sets and policy flags).
+- Timestamps, nonces, and transport-level identifiers MAY vary, but implementations MUST ensure deterministic values for stable fields that drive routing, orientation, and branch ordering.
 
 ## Session semantics
 - **REST session:** the lifetime of a canonical session is the full HTTP request chain identified by a stable `Correlation-Id`
@@ -61,10 +65,16 @@ Silent orientation loss is considered a protocol violation, even if downstream b
 Orientation Loss:
 A condition where identity, focus, or drift history is dropped, reset, or overwritten without an explicit transition event.
 
-Example:
-An LTP node MUST preserve orientation across retries.
-An LTP node MAY update focus momentum during a transition.
-An LTP node MUST NOT rewrite drift history retroactively.
+Explicit rules:
+**Forbidden (MUST NOT):**
+- Reset identity without an explicit `transition` frame.
+- Rewrite past `drift_history` entries.
+- Silently drop `focus_momentum` updates.
+
+**Allowed (MAY/SHOULD):**
+- Append `drift_history` entries only in `transition` frames.
+- Degrade branch confidence with recorded reasons when supported by the payload schema (SHOULD document the reason).
+- Mark discontinuity explicitly with a violation or error frame when discontinuity is detected.
 
 ## Canonical sequence (v0.1)
 A canonical session is a sequence of frames exchanged between:
