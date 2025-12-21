@@ -5,6 +5,11 @@ Defines the minimum, testable criteria required for any implementation to claim 
 
 ---
 
+## Version Scope
+Applies to **Frozen Core v0.1**. Future changes follow the RFC process and are not retroactive without an explicit version bump.
+
+---
+
 ## 1. Core Orientation Invariants (REQUIRED)
 An implementation MUST:
 
@@ -63,6 +68,7 @@ An implementation MUST:
 - Produce identical orientation transitions given identical inputs.
 - Support replay/audit of transitions independent of runtime conditions.
 - Avoid hidden randomness at the protocol level.
+- Re-running conformance on the same trace MUST produce identical orientation outcomes.
 
 Non-conformance example: reliance on wall-clock time or global mutable state.
 
@@ -92,6 +98,24 @@ Misuse of the term “conformant” is considered a specification violation.
 
 ## 8. Evolution Rule
 Any change affecting the meaning of items in sections 1–5 MUST go through the RFC process defined in this repository.
+
+---
+
+## 9. Success Criteria
+A conformance run is **successful** when all MUST-level checks pass without violations. SHOULD/MAY checks MAY be reported for diagnostics but do not block success.
+
+---
+
+## 10. Interpreting Failures
+- **Protocol non-compliance**: the implementation violates a MUST-level requirement in this checklist.
+- **Reference implementation gaps**: failures arising from incomplete or non-representative reference code (should be labeled as such).
+
+Disambiguating these modes is required for fair evaluation and remediation.
+
+---
+
+## 11. Explicit Non-Goal
+Conformance does **not** evaluate decision quality, model accuracy, or task success; it is a protocol-layer verification only.
 
 ---
 
