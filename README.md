@@ -10,7 +10,12 @@ It does not predict, decide, or optimize outcomes.
 These artifacts describe the control plane of AI systems —
 coherence over time, not model outputs.
 
-See: [CI Artifacts & Inspector Outputs](docs/devtools/ci-artifacts.md)
+### DevTools & CI artifacts
+
+LTP provides reproducible CI artifacts for inspecting orientation and drift
+without running a model.
+
+→ [docs/devtools/ci-artifacts.md](docs/devtools/ci-artifacts.md)
 
 → New here? Start with: docs/readme/WHY_ORIENTATION.md
 
@@ -30,7 +35,7 @@ LTP ships with built-in tooling for deterministic inspection and regression veri
   - One-click reproducibility = CI publishes the exact traces and inspector outputs needed to reproduce locally without model execution.
 
 See:
-- CI artifacts & reproducibility: [docs/devtools/ci-artifacts.md](docs/devtools/ci-artifacts.md) — download artifacts → inspect → compare to golden traces
+- DevTools & CI artifacts: [docs/devtools/ci-artifacts.md](docs/devtools/ci-artifacts.md) — download artifacts → inspect → compare to golden traces
 
 ---
 

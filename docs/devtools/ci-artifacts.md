@@ -29,9 +29,7 @@ Each CI run uploads artifacts that you can download from the GitHub Actions UI:
 > These artifacts are "control-plane" signals.
 > They describe **coherence over time**, not model quality.
 
----
-
-## Artifacts (minimum set) & where to find them
+## CI Artifacts: Canonical Set & Location
 
 Minimum set to download from a CI run:
 
@@ -41,11 +39,19 @@ Minimum set to download from a CI run:
 
 Where to find them in GitHub Actions:
 
-1. Open the PR
-2. Go to **Checks**
-3. Open the CI run (Inspector / Conformance jobs)
-4. Scroll to the **Artifacts** section of the job
-5. Download the minimum set above
+- GitHub Actions run → **Artifacts** section
+- Job name: Inspector / Conformance
+- Bundle name: `ltp-ci-artifacts` (or equivalent)
+
+---
+
+## How to retrieve CI artifacts
+
+1. Open the GitHub Actions run for the commit.
+2. Navigate to the "Artifacts" section.
+3. Download the artifact bundle (e.g. `ltp-ci-artifacts.zip`).
+4. Extract locally.
+5. Inspect artifacts using LTP DevTools.
 
 ---
 
@@ -106,19 +112,57 @@ CI artifacts exist to answer one question:
 
 ## Common failure modes
 
-### Missing artifacts
-- Inspector step did not run
-- Output path changed
-- PR is from fork (comments disabled)
+### 1. Missing artifacts
+**Symptom:**  
+Expected CI artifacts are not available in the workflow run.
 
-### Non-deterministic output
-- Check normalization and sorting rules
+**Likely cause:**  
+Artifact upload step failed or was skipped.
 
-### Schema drift
-- Inspector updated without corresponding golden trace change
+**Next check:**  
+Verify `actions/upload-artifact` step in the workflow.
 
-### Time-dependent fields
-- Normalize timestamps/IDs before comparison
+---
+
+### 2. Non-deterministic output
+**Symptom:**  
+Inspector output differs between identical runs.
+
+**Likely cause:**  
+Unstable ordering or non-deterministic branch evaluation.
+
+**Next check:**  
+Ensure deterministic sorting and fixed seeds in test data.
+
+---
+
+### 3. Schema drift
+**Symptom:**  
+Inspector fails to parse artifact files.
+
+**Likely cause:**  
+Artifact schema version mismatch.
+
+**Next check:**  
+Confirm artifact schema matches the inspector version.
+
+---
+
+## Example artifact output
+
+```json
+{
+  "orientation_id": "8f3c…",
+  "focus_momentum": 0.71,
+  "drift": "aligned",
+  "admissible_futures": [
+    { "id": "A", "confidence": 0.62 },
+    { "id": "B", "confidence": 0.24 }
+  ]
+}
+```
+
+This output represents orientation state at a specific transition point. It can be replayed and compared without running a model.
 
 ---
 
