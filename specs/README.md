@@ -8,6 +8,7 @@ This directory contains the normative and non-normative specifications for the L
 - [**Frames v0.1**](./LTP-Frames-v0.1.md) - Definition of frame types and structures.
 - [**Canonical Flow v0.1**](./LTP-Canonical-Flow-v0.1.md) - The standard lifecycle of a thread interaction.
 - [**Conformance v0.1**](./LTP-Conformance-v0.1.md) - Requirements for compliance and testing.
+- [**Core Conformance Checklist (PR #230)**](./LTP-Core-Conformance-Checklist.md) - Minimal, testable criteria for claiming LTP Core conformance.
 
 ## Boundaries & Philosophy
 
