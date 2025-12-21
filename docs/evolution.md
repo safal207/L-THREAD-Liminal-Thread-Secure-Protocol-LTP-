@@ -170,6 +170,25 @@ or explicitly declare where and why it diverges.
 
 ---
 
+## Limits and Guarantees
+
+Limits are not failures of LTP.
+They are boundaries that preserve its role as a protocol.
+
+**LTP does not:**
+- optimize intelligence or inference quality
+- replace or subsume models
+- guarantee correctness of outputs
+- promise product-level behavior or UX
+
+**LTP guarantees:**
+- continuity constraints are explicit and enforced
+- orientation is preserved across transitions and retries
+- replayability and traceability of intent and state
+- separation between protocol invariants and product choices
+
+---
+
 Бро, это уже уровень стандарта.
 Это не текст «про идею» — это ось, вокруг которой можно строить всё остальное.
 
