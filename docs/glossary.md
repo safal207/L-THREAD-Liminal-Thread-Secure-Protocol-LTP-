@@ -1,20 +1,21 @@
 # LTP Glossary
 
-Status: Canonical (normative terms)  
-Scope: Terms used by spec, conformance, devtools
-
 ## Canonical Terms
 
-**Orientation** — persistent reference frame governing continuity across time.
+**Orientation**
+Persistent reference frame governing continuity across time.
 
-**Trajectory** — ordered sequence of orientation transitions.
+**Trajectory**
+Ordered sequence of orientation transitions.
 
-**Drift** — measured deviation from intended orientation.
+**Drift**
+Measured deviation from intended orientation.
 
-**Admissible Future** — a future state that preserves continuity constraints.
+**Admissible Future**
+A future state that preserves continuity constraints.
 
-**Snapshot** (Frozen Light) — immutable orientation capture used for replay and recovery.
+**Snapshot (Frozen Light)**
+Immutable orientation capture used for replay and recovery.
 
-**Continuity** — property that transitions remain coherent across retries, restarts, and agents.
-
-See also: [invariants.md](./invariants.md) (protocol guarantees)
+**Continuity**
+Property that transitions remain coherent across retries, restarts, and agents.

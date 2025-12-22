@@ -11,7 +11,7 @@
 
 ## Canon
 - Orientation (Canonical) — `docs/canon/ORIENTATION.md`
-- LTP Scope Boundaries (Non-Goals & Limits) — `docs/canon/LTP-Scope-Boundaries.md`
+- Limits of LTP (Non-Goals & Boundaries) — `docs/canon/LTP-Limits-of-LTP.md`
 - LTP — Non-Goals as Design Constraints (Canonical) — `docs/canon/LTP-Non-Goals-as-Design-Constraints.md`
 - How to Build Products on LTP Without Violating the Core — `docs/canon/LTP-Products-on-LTP-Without-Violating-Core.md`
 - Misuse Patterns: How LTP Is Commonly Broken (And Why This Is Not Allowed) — `docs/canon/LTP-Misuse-Patterns.md`
