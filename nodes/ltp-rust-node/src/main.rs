@@ -6,14 +6,17 @@ mod tests;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use axum::{http::StatusCode, routing::get, Router};
 use futures_util::{SinkExt, StreamExt};
-use prometheus::{Encoder, IntCounterVec, IntGauge, Registry, TextEncoder};
+use prometheus::{Encoder, Histogram, IntCounter, IntCounterVec, IntGauge, Registry, TextEncoder};
 use protocol::{LtpIncomingMessage, LtpOutgoingMessage};
+use rand::{rngs::StdRng, Rng, SeedableRng};
 use tokio::net::TcpListener;
+use tokio::signal;
+use tokio::sync::watch;
 use tokio::time::timeout;
 use tokio_tungstenite::{
     accept_async,
@@ -26,10 +29,10 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::node::build_route_suggestion;
-use crate::state::LtpNodeState;
+use crate::state::{ExpireStats, LtpNodeState};
 
 const DEFAULT_ADDR: &str = "127.0.0.1:7070";
-const DEFAULT_METRICS_ADDR: &str = "0.0.0.0:9090";
+const DEFAULT_METRICS_ADDR: &str = "127.0.0.1:9090";
 
 #[derive(Clone, Debug)]
 struct Config {
@@ -93,6 +96,10 @@ struct Metrics {
     sessions_expired: IntCounterVec,
     messages_total: IntCounterVec,
     messages_rejected: IntCounterVec,
+    janitor_sweep_duration: Histogram,
+    janitor_skipped_lock: IntCounter,
+    janitor_expired_last_sweep: IntGauge,
+    capacity_rejections: IntCounter,
 }
 
 impl Metrics {
@@ -115,12 +122,32 @@ impl Metrics {
             prometheus::Opts::new("ltp_msg_rejected_total", "Rejected inbound messages"),
             &["reason"],
         )?;
+        let janitor_sweep_duration = Histogram::with_opts(prometheus::HistogramOpts::new(
+            "ltp_janitor_sweep_duration_seconds",
+            "Duration of janitor sweeps",
+        ))?;
+        let janitor_skipped_lock = IntCounter::new(
+            "ltp_janitor_skipped_lock_total",
+            "Sessions skipped during GC because locks were contended",
+        )?;
+        let janitor_expired_last_sweep = IntGauge::new(
+            "ltp_janitor_expired_last_sweep",
+            "Sessions expired in the most recent GC sweep",
+        )?;
+        let capacity_rejections = IntCounter::new(
+            "ltp_capacity_rejections_total",
+            "Sessions rejected due to capacity limits",
+        )?;
 
         registry.register(Box::new(connections.clone()))?;
         registry.register(Box::new(sessions.clone()))?;
         registry.register(Box::new(sessions_expired.clone()))?;
         registry.register(Box::new(messages_total.clone()))?;
         registry.register(Box::new(messages_rejected.clone()))?;
+        registry.register(Box::new(janitor_sweep_duration.clone()))?;
+        registry.register(Box::new(janitor_skipped_lock.clone()))?;
+        registry.register(Box::new(janitor_expired_last_sweep.clone()))?;
+        registry.register(Box::new(capacity_rejections.clone()))?;
 
         Ok(Self {
             registry,
@@ -129,6 +156,10 @@ impl Metrics {
             sessions_expired,
             messages_total,
             messages_rejected,
+            janitor_sweep_duration,
+            janitor_skipped_lock,
+            janitor_expired_last_sweep,
+            capacity_rejections,
         })
     }
 
@@ -155,6 +186,7 @@ async fn main() -> anyhow::Result<()> {
     let config = Arc::new(Config::from_env());
     let metrics = Arc::new(Metrics::new()?);
     let state = Arc::new(LtpNodeState::new());
+    let (shutdown_tx, shutdown_rx) = watch::channel(false);
     let ctx = AppContext {
         config: config.clone(),
         state: state.clone(),
@@ -177,7 +209,8 @@ async fn main() -> anyhow::Result<()> {
     );
 
     let metrics_config = config.clone();
-    tokio::spawn(async move {
+    let mut metrics_shutdown = shutdown_rx.clone();
+    let metrics_handle = tokio::spawn(async move {
         let listener = match TcpListener::bind(&metrics_config.metrics_addr).await {
             Ok(listener) => listener,
             Err(err) => {
@@ -190,9 +223,18 @@ async fn main() -> anyhow::Result<()> {
             }
         };
 
-        if let Err(err) = axum::serve(listener, metrics_app.into_make_service()).await {
+        info!(addr = %metrics_config.metrics_addr, "metrics server listening");
+
+        if let Err(err) = axum::serve(listener, metrics_app.into_make_service())
+            .with_graceful_shutdown(async move {
+                let _ = metrics_shutdown.changed().await;
+            })
+            .await
+        {
             error!(error = ?err, "failed to start metrics server");
         }
+
+        info!("metrics server shutdown complete");
     });
 
     let listener = TcpListener::bind(&config.addr)
@@ -206,27 +248,45 @@ async fn main() -> anyhow::Result<()> {
         "ltp-rust-node listening"
     );
 
-    spawn_janitor(ctx.clone());
+    let janitor_handle = spawn_janitor(ctx.clone(), shutdown_rx.clone());
 
     loop {
-        let (stream, peer) = listener.accept().await?;
-
-        if ctx.metrics.connections.get() as usize >= ctx.config.max_connections {
-            warn!(
-                remote_addr = %peer,
-                max_connections = ctx.config.max_connections,
-                "rejecting connection: connection limit reached"
-            );
-            continue;
-        }
-
-        let ctx_clone = ctx.clone();
-        tokio::spawn(async move {
-            if let Err(err) = handle_connection(stream, peer, ctx_clone.clone()).await {
-                error!(remote_addr = %peer, error = ?err, "connection handler error");
+        tokio::select! {
+            biased;
+            _ = signal::ctrl_c() => {
+                info!("shutdown signal received, stopping accept loop");
+                let _ = shutdown_tx.send(true);
+                break;
             }
-        });
+            accept_result = listener.accept() => {
+                let (stream, peer) = accept_result?;
+
+                if ctx.metrics.connections.get() as usize >= ctx.config.max_connections {
+                    warn!(
+                        remote_addr = %peer,
+                        max_connections = ctx.config.max_connections,
+                        "rejecting connection: connection limit reached"
+                    );
+                    ctx.metrics.capacity_rejections.inc();
+                    continue;
+                }
+
+                let ctx_clone = ctx.clone();
+                tokio::spawn(async move {
+                    if let Err(err) = handle_connection(stream, peer, ctx_clone.clone()).await {
+                        error!(remote_addr = %peer, error = ?err, "connection handler error");
+                    }
+                });
+            }
+        }
     }
+
+    info!("waiting for background tasks to finish");
+    let _ = shutdown_tx.send(true);
+    let _ = janitor_handle.await;
+    let _ = metrics_handle.await;
+    info!("shutdown complete");
+    Ok(())
 }
 
 fn init_tracing() {
@@ -459,23 +519,65 @@ async fn send_json(
     write.send(Message::Text(payload)).await
 }
 
-fn spawn_janitor(ctx: AppContext) {
+fn spawn_janitor(
+    ctx: AppContext,
+    mut shutdown: watch::Receiver<bool>,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
+        info!("janitor task started");
         let idle_ttl = Duration::from_millis(ctx.config.idle_ttl_ms);
-        let interval = Duration::from_millis(ctx.config.gc_interval_ms);
+        let base_interval = Duration::from_millis(ctx.config.gc_interval_ms);
+        let mut rng = StdRng::from_entropy();
         loop {
-            tokio::time::sleep(interval).await;
-            let removed = ctx.state.expire_idle(idle_ttl);
-            if removed > 0 {
-                ctx.metrics.sessions.sub(removed as i64);
+            let jitter_factor: f64 = rng.gen_range(0.9..=1.1);
+            let sleep_millis = (base_interval.as_millis() as f64 * jitter_factor) as u64;
+            let sleep_duration = Duration::from_millis(sleep_millis.max(1));
+            tokio::select! {
+                result = shutdown.changed() => {
+                    if result.is_err() || *shutdown.borrow() {
+                        info!("janitor task received shutdown signal");
+                        break;
+                    }
+                }
+                _ = tokio::time::sleep(sleep_duration) => {}
+            }
+
+            if *shutdown.borrow() {
+                info!("janitor task received shutdown signal");
+                break;
+            }
+
+            let sweep_start = Instant::now();
+            let stats = ctx.state.expire_idle(idle_ttl);
+            let elapsed = sweep_start.elapsed();
+            ctx.metrics
+                .janitor_sweep_duration
+                .observe(elapsed.as_secs_f64());
+            ctx.metrics
+                .janitor_skipped_lock
+                .inc_by(stats.skipped_locks as u64);
+            ctx.metrics
+                .janitor_expired_last_sweep
+                .set(stats.expired as i64);
+
+            if stats.expired > 0 {
+                ctx.metrics.sessions.sub(stats.expired as i64);
                 ctx.metrics
                     .sessions_expired
                     .with_label_values(&["ttl"])
-                    .inc_by(removed as u64);
-                info!(removed, reason = "ttl", "expired idle sessions");
+                    .inc_by(stats.expired as u64);
             }
+
+            info!(
+                expired = stats.expired,
+                scanned = stats.scanned,
+                skipped_locks = stats.skipped_locks,
+                duration_ms = elapsed.as_millis(),
+                "janitor sweep completed"
+            );
         }
-    });
+        info!("janitor task stopped");
+    })
 }
 
 fn reject_when_over_capacity(ctx: &AppContext, client_id: &str) -> bool {
@@ -486,6 +588,7 @@ fn reject_when_over_capacity(ctx: &AppContext, client_id: &str) -> bool {
             max_sessions = ctx.config.max_sessions_total,
             "rejecting session: session limit reached"
         );
+        ctx.metrics.capacity_rejections.inc();
         ctx.metrics
             .messages_rejected
             .with_label_values(&["rate_limit"])
