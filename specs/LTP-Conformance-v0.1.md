@@ -95,6 +95,63 @@ An implementation MUST:
 
 ---
 
+## Allowed Extension
+
+An **Allowed Extension** operates on LTP artifacts without redefining their semantics.
+
+An extension MAY:
+- read LTP traces, frames, or orientation snapshots
+- visualize, index, or analyze protocol outputs
+- attach external metadata without affecting replayability
+
+An extension MUST NOT:
+- mutate Focus Node semantics
+- alter admissibility rules
+- inject heuristic or learned scores into protocol state
+
+Allowed extensions may claim compatibility only if they preserve full determinism and replayability.
+
+---
+
+## Derived System
+
+A **Derived System** builds on LTP concepts or data, but reinterprets or enriches their semantics.
+
+A derived system MAY:
+- apply additional scoring, learning, or heuristics
+- reinterpret orientation signals
+- combine LTP data with proprietary logic
+
+A derived system MUST NOT:
+- claim LTP protocol compliance
+- use LTP naming for modified semantics
+- represent itself as a conforming implementation
+
+Derived systems are valid, but exist outside the LTP protocol boundary.
+
+---
+
+## Compatibility Invariant
+
+If a system alters any of the following properties, it is no longer LTP-compliant:
+
+- deterministic replay of orientation
+- admissibility semantics of future branches
+- identity continuity across transitions
+- protocol-defined focus evolution
+
+Compliance is binary. There is no partial or “mostly” LTP compliance.
+
+---
+
+## Example
+
+A visualization tool that reads orientation traces and renders future branches is an Allowed Extension.
+
+A system that injects learned confidence scores directly into the Focus Node is a Derived System and MUST NOT claim LTP compliance.
+
+---
+
 ## Non-Goals
 - No requirement for ML or LLM usage.
 - No requirement for persistence or global state.
@@ -131,3 +188,7 @@ Automated conformance output MUST include:
 
 ## Declaration Phrase
 An implementation MAY claim: **"This implementation is LTP-conformant (v0.1)."**
+
+---
+
+LTP defines protocol invariants. Everything else is implementation choice.
