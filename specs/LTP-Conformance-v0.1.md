@@ -14,6 +14,8 @@ Examples and diagrams are **INFORMATIVE** unless explicitly stated otherwise.
 ## Purpose
 Defines the minimal, testable requirements an implementation MUST satisfy to be considered LTP-conformant.
 
+This document assumes the hardened core boundaries formalized in PR #263 (glossary + invariants canon) and explains how to build freely without violating them.
+
 This document keeps the protocol stable across languages (JS / Rust / HUD / Agent) and transports by pinning a small, interoperable core.
 
 This document does not define:
@@ -124,6 +126,8 @@ Allowed extensions may claim compatibility only if they preserve full determinis
 ## Derived System
 
 A **Derived System** builds on LTP concepts or data, but reinterprets or enriches their semantics.
+
+“Outside the protocol” means outside its state, outside its invariants, and outside its authority to adjudicate continuity.
 
 A derived system MAY:
 - apply additional scoring, learning, or heuristics
