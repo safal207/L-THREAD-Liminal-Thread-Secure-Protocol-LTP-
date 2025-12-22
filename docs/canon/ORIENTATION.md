@@ -29,4 +29,4 @@ Loss of orientation is not.
 LTP preserves the path through change.
 Nothing more. Nothing less.
 
-> 🔒 Правило: этот файл меняется только через RFC.
+> 🔒 Rule: this file is changed only via RFC.
