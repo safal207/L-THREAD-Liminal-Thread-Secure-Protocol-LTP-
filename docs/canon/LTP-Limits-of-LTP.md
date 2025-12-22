@@ -1,4 +1,4 @@
-# Limits & Non-Goals of LTP (Refined)
+# PR 252 — Limits and Non-Goals of LTP
 
 ## Why this document exists
 
@@ -13,8 +13,9 @@ They protect the core invariants of the protocol.
 
 ## 1. Hard Limits (By Design)
 
-These are fundamental limits.
-LTP cannot perform these functions even in theory, without violating its core guarantees.
+## 2. Hard Limits (By Design)
+
+These constraints are rooted in the orientation invariant and cannot be relaxed without breaking LTP.
 
 ### 1.1 LTP does not make decisions
 
@@ -41,7 +42,10 @@ LTP does not:
 
 All inference happens outside the protocol.
 
-LTP only records and constrains how inference results may be used over time.
+If you need LTP to make decisions, you are building the wrong layer.
+
+Errors are allowed.
+Loss of orientation is not.
 
 ---
 
@@ -110,22 +114,17 @@ The following uses are explicitly incorrect:
 
 If your design requires any of the above, LTP is the wrong abstraction.
 
----
+### 2.6 On physical, quantum, and metaphorical interpretations
 
 ## 4. Relation to Core Invariants
 
 These limits exist to protect LTP’s core invariants:
 
-- Orientation continuity
-- Deterministic replay
-- Model-agnostic neutrality
-- Explainable state transitions
-
-Violating the limits inevitably breaks at least one invariant.
+Any such interpretations are optional, external, and strictly out of scope.
 
 ---
 
-## 5. Canonical Boundary Statement
+## 3. Orientation Invariant (Clarification)
 
 > LTP defines where you are — not what you should do.
 
@@ -135,16 +134,27 @@ If a system needs LTP to “decide”, it is built at the wrong layer.
 
 ## 6. Architectural Guidance
 
-Correct usage pattern:
+## 4. Explicit Non-Goals
 
-```
-[ Models / Agents / Policies ]
-            ↑
-     (decisions & actions)
-            ↑
-        [ LTP Core ]
-   (orientation & continuity)
-```
+These are deliberate exclusions: areas where LTP could be extended by other layers but must not be conflated with the protocol itself.
+
+- Providing governance for autonomous agents.
+- Dictating safety policies or norms for decisioning systems.
+- Acting as a product framework for UX, memory strategies, or RL pipelines.
+- Serving as an “AI platform” or “agent OS”.
+- Replacing storage, orchestration, or model selection systems.
+
+LTP defines where you are — not what you should do.
+
+## 5. Anti-Patterns (Negative Examples)
+
+The following misuses violate the design intent and should be rejected at review time:
+
+- ❌ Using LTP to select actions directly.
+- ❌ Using LTP as a memory database.
+- ❌ Treating orientation as model attention or prompt-weaving logic.
+
+## 6. Why These Limits Matter
 
 Innovation lives above the protocol, not inside it.
 
@@ -157,7 +167,13 @@ Innovation lives above the protocol, not inside it.
 - Long-term protocol stability
 - Reduced governance and review friction
 
----
+These limits exist to protect LTP core invariants:
+
+- Orientation continuity,
+- Deterministic replay,
+- Model-agnostic neutrality.
+
+## 7. Summary
 
 ## End note
 
@@ -172,13 +188,9 @@ but from what it refuses to do.
 
 После этого PR логично сделать один из двух:
 
-1. PR: “How to Build Products on LTP Without Violating the Core”
-
-2. PR: “Reference Architectures (Allowed Extensions)”
-
-Оба будут читаться уже очень легко, потому что границы зафиксированы.
-
----
+- PR 194 introduces the orientation invariant.
+- PR 252 codifies what the invariant is *not*, keeping the standard narrowly scoped.
+- Together they mirror patterns like TCP + what TCP does not guarantee, POSIX + undefined behavior, and RFC + security considerations.
 
 Бро, если хочешь — в следующем шаге могу:
 
