@@ -1,50 +1,26 @@
-# LTP Core Invariants (Normative)
+# LTP Invariants
 
-The key words MUST, MUST NOT, SHOULD, and MAY
-are to be interpreted as described in RFC 2119.
+These invariants define what “LTP-compatible” means.
 
-For the purposes of this document, **core** refers strictly to the protocol specification,
-its invariants, and conformance requirements.
-This document finalizes the boundary definitions introduced in PR #263 and the product guidance in PR #264.
-This document concludes a series defining the boundaries, safe usage, and long-term stability guarantees of LTP.
+## I1 — No outcomes
+LTP must never decide outcomes.
+It may only validate transition admissibility.
 
-1. Orientation MUST be explicit.
-2. Continuity MUST be preserved across transitions.
-3. Transitions MUST be deterministic and replayable.
-4. Admissible futures MUST respect protocol constraints.
-5. Identity continuity MUST NOT be implicit or inferred.
+## I2 — Separation of planes
+Orientation and constraints (control plane) are separate from inference/execution (data plane).
 
-## 1. Explicit Orientation
-- **Statement (MUST):** Orientation state MUST be explicit and monotonic with respect to the canonical transition index (or equivalent sequence/clock used for ordering).
-- **Rationale:** Prevents hidden state and ensures continuity is reproducible and auditable.
-- **Testability:** Conformance asserts presence of explicit orientation fields and verifies monotonic advance of the transition index across traces.
+## I3 — Replayability
+Orientation transitions must be replayable and verifiable from a trace.
 
-## 2. Replayable Transitions
-- **Statement (MUST):** Transitions MUST be replayable deterministically from canonical inputs, excluding non-deterministic fields (e.g., wall-clock time, ephemeral IDs).
-- **Rationale:** Ensures identical orientation evolution under controlled inputs and isolates non-determinism.
-- **Testability:** Devtools replay transitions from canonical inputs and compare resulting orientation traces byte-for-byte, tolerating normalized non-deterministic fields.
+## I4 — Local failure
+Errors are local.
+Failures must not silently corrupt global continuity.
 
-## 3. Observable Drift
-- **Statement (MUST):** Drift MUST be observable as a measurable delta from intended orientation at each transition.
-- **Rationale:** Makes deviation detectable and attributable during audits.
-- **Testability:** Conformance checks require drift metrics to be present, well-formed, and monotonically accumulated according to declared drift rules.
+## I5 — Model-agnostic continuity
+Models may change without breaking orientation, as long as transitions remain admissible.
 
-## 4. Constrained Futures
-- **Statement (MUST):** Futures MUST be admissible only if they satisfy declared continuity constraints.
-- **Rationale:** Prevents invalid branches and enforces consistency of future choices.
-- **Testability:** Devtools validate admissibility decisions against declared constraints and flag any branch admitted in violation of constraints.
+## I6 — Explicit constraints
+Constraints must be explicit and testable (not hidden inside ad-hoc logic).
 
-## 5. Replaceable Models, Persistent Continuity
-- **Statement (MUST):** Models MAY change; continuity guarantees MUST persist independent of model implementation.
-- **Rationale:** Decouples protocol continuity from specific model behavior.
-- **Testability:** Conformance swaps model components (or simulates absence) while requiring identical orientation continuity and replay outcomes.
-
-## Related documents
-- [docs/glossary.md](./glossary.md)
-
-LTP defines protocol invariants.
-Everything else is implementation choice.
-LTP explicitly prioritizes stability over adoption velocity.
-Any behavior that shifts LTP from admissibility checking to outcome influence is a boundary violation.
-Violating core boundaries does not create innovation.
-It creates irrecoverable ambiguity.
+## I7 — No silent scope creep
+If LTP begins to absorb decision logic, ranking, or goals — the protocol is violated.
