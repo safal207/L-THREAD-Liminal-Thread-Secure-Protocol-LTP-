@@ -6,18 +6,20 @@ mod tests;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use anyhow::Context;
 use axum::{http::StatusCode, routing::get, Router};
 use futures_util::{SinkExt, StreamExt};
-use prometheus::{Encoder, IntCounterVec, IntGauge, Registry, TextEncoder};
+use prometheus::{Encoder, IntCounter, IntCounterVec, IntGauge, Registry, TextEncoder};
 use protocol::{LtpIncomingMessage, LtpOutgoingMessage};
 use tokio::net::TcpListener;
 use tokio::time::timeout;
 use tokio_tungstenite::{
-    accept_async,
+    accept_hdr_async,
     tungstenite::{
+        handshake::server::{ErrorResponse, Request, Response},
         protocol::{frame::coding::CloseCode, CloseFrame},
         Message, Result as WsResult,
     },
@@ -42,6 +44,9 @@ struct Config {
     handshake_timeout_ms: u64,
     idle_ttl_ms: u64,
     gc_interval_ms: u64,
+    rate_limit_rps: f64,
+    rate_limit_burst: f64,
+    auth: AuthConfig,
 }
 
 impl Config {
@@ -57,6 +62,9 @@ impl Config {
         let handshake_timeout_ms = read_env_u64("LTP_NODE_HANDSHAKE_TIMEOUT_MS", 5_000);
         let idle_ttl_ms = read_env_u64("LTP_NODE_IDLE_TTL_MS", 60_000);
         let gc_interval_ms = read_env_u64("LTP_NODE_GC_INTERVAL_MS", 10_000);
+        let rate_limit_rps = read_env_f64("RATE_LIMIT_RPS", 10.0);
+        let rate_limit_burst = read_env_f64("RATE_LIMIT_BURST", 20.0);
+        let auth = AuthConfig::from_env();
 
         Self {
             addr,
@@ -68,6 +76,9 @@ impl Config {
             handshake_timeout_ms,
             idle_ttl_ms,
             gc_interval_ms,
+            rate_limit_rps,
+            rate_limit_burst,
+            auth,
         }
     }
 }
@@ -86,6 +97,161 @@ fn read_env_u64(key: &str, default: u64) -> u64 {
         .unwrap_or(default)
 }
 
+fn read_env_f64(key: &str, default: f64) -> f64 {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .unwrap_or(default)
+}
+
+#[derive(Clone, Debug)]
+enum AuthMode {
+    None,
+    ApiKey,
+    Jwt,
+}
+
+#[derive(Clone, Debug)]
+struct AuthConfig {
+    mode: AuthMode,
+    api_keys: std::collections::HashMap<String, String>,
+    jwt_secret: Option<String>,
+}
+
+impl AuthConfig {
+    fn from_env() -> Self {
+        let mode = match std::env::var("AUTH_MODE")
+            .unwrap_or_else(|_| "none".to_string())
+            .to_lowercase()
+            .as_str()
+        {
+            "api_key" => AuthMode::ApiKey,
+            "jwt" => AuthMode::Jwt,
+            _ => AuthMode::None,
+        };
+
+        let mut api_keys = std::collections::HashMap::new();
+        if let Ok(raw_keys) = std::env::var("AUTH_KEYS") {
+            api_keys.extend(parse_keys(&raw_keys));
+        }
+
+        if let Ok(path) = std::env::var("AUTH_KEYS_FILE") {
+            if let Ok(content) = std::fs::read_to_string(&path) {
+                if let Ok(map) =
+                    serde_json::from_str::<std::collections::HashMap<String, String>>(&content)
+                {
+                    api_keys.extend(map);
+                } else {
+                    warn!(file = %path, "failed to parse AUTH_KEYS_FILE; ignoring");
+                }
+            }
+        }
+
+        let jwt_secret = std::env::var("AUTH_JWT_SECRET").ok();
+
+        if matches!(mode, AuthMode::Jwt) {
+            warn!("AUTH_MODE=jwt is configured but JWT verification is not implemented; connections will be rejected");
+        }
+
+        Self {
+            mode,
+            api_keys,
+            jwt_secret,
+        }
+    }
+
+    fn auth_enabled(&self) -> bool {
+        !matches!(self.mode, AuthMode::None)
+    }
+
+    fn authenticate_header(&self, req: &Request) -> Result<Option<String>, ErrorResponse> {
+        match self.mode {
+            AuthMode::None => Ok(None),
+            AuthMode::ApiKey => {
+                let token = extract_api_key(req.headers()).ok_or_else(|| {
+                    build_error_response(
+                        http::StatusCode::UNAUTHORIZED,
+                        "missing api key".to_string(),
+                    )
+                })?;
+                self.validate_api_key(&token)
+            }
+            AuthMode::Jwt => {
+                let _ = &self.jwt_secret;
+                Err(build_error_response(
+                    http::StatusCode::UNAUTHORIZED,
+                    "jwt mode is not yet supported".to_string(),
+                ))
+            }
+        }
+    }
+
+    fn validate_api_key(&self, token: &str) -> Result<Option<String>, ErrorResponse> {
+        let identity =
+            self.api_keys
+                .iter()
+                .find_map(|(id, key)| if key == token { Some(id.clone()) } else { None });
+
+        if let Some(id) = identity {
+            Ok(Some(id))
+        } else {
+            Err(build_error_response(
+                http::StatusCode::UNAUTHORIZED,
+                "invalid api key".to_string(),
+            ))
+        }
+    }
+}
+
+fn parse_keys(raw: &str) -> std::collections::HashMap<String, String> {
+    raw.split(',')
+        .filter_map(|pair| {
+            let mut iter = pair.split(':');
+            let id = iter.next()?.trim();
+            let key = iter.next()?.trim();
+            if id.is_empty() || key.is_empty() {
+                None
+            } else {
+                Some((id.to_string(), key.to_string()))
+            }
+        })
+        .collect()
+}
+
+fn extract_api_key(headers: &http::HeaderMap) -> Option<String> {
+    if let Some(value) = headers.get("x-api-key") {
+        if let Ok(val) = value.to_str() {
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        }
+    }
+
+    if let Some(value) = headers.get(http::header::AUTHORIZATION) {
+        if let Ok(val) = value.to_str() {
+            if let Some(rest) = val.strip_prefix("Bearer ") {
+                return Some(rest.trim().to_string());
+            } else if let Some(rest) = val.strip_prefix("ApiKey ") {
+                return Some(rest.trim().to_string());
+            }
+        }
+    }
+
+    None
+}
+
+fn build_error_response(status: StatusCode, message: String) -> ErrorResponse {
+    Response::builder()
+        .status(status)
+        .body(Some(message))
+        .unwrap_or_else(|_| {
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(None)
+                .unwrap()
+        })
+}
+
 struct Metrics {
     registry: Registry,
     connections: IntGauge,
@@ -93,6 +259,10 @@ struct Metrics {
     sessions_expired: IntCounterVec,
     messages_total: IntCounterVec,
     messages_rejected: IntCounterVec,
+    invalid_json_total: IntCounter,
+    invalid_json_suppressed_total: IntCounter,
+    rate_limit_violations_total: IntCounter,
+    auth_failures_total: IntCounter,
 }
 
 impl Metrics {
@@ -115,12 +285,26 @@ impl Metrics {
             prometheus::Opts::new("ltp_msg_rejected_total", "Rejected inbound messages"),
             &["reason"],
         )?;
+        let invalid_json_total =
+            IntCounter::new("ws_invalid_json_total", "Invalid websocket JSON messages")?;
+        let invalid_json_suppressed_total = IntCounter::new(
+            "ws_invalid_json_suppressed_total",
+            "Suppressed invalid JSON logs",
+        )?;
+        let rate_limit_violations_total =
+            IntCounter::new("rate_limit_violations_total", "Rate limit violations total")?;
+        let auth_failures_total =
+            IntCounter::new("auth_failures_total", "Failed websocket authentications")?;
 
         registry.register(Box::new(connections.clone()))?;
         registry.register(Box::new(sessions.clone()))?;
         registry.register(Box::new(sessions_expired.clone()))?;
         registry.register(Box::new(messages_total.clone()))?;
         registry.register(Box::new(messages_rejected.clone()))?;
+        registry.register(Box::new(invalid_json_total.clone()))?;
+        registry.register(Box::new(invalid_json_suppressed_total.clone()))?;
+        registry.register(Box::new(rate_limit_violations_total.clone()))?;
+        registry.register(Box::new(auth_failures_total.clone()))?;
 
         Ok(Self {
             registry,
@@ -129,6 +313,10 @@ impl Metrics {
             sessions_expired,
             messages_total,
             messages_rejected,
+            invalid_json_total,
+            invalid_json_suppressed_total,
+            rate_limit_violations_total,
+            auth_failures_total,
         })
     }
 
@@ -146,6 +334,41 @@ struct AppContext {
     config: Arc<Config>,
     state: Arc<LtpNodeState>,
     metrics: Arc<Metrics>,
+}
+
+#[derive(Debug)]
+struct RateLimiter {
+    tokens: f64,
+    last_refill: Instant,
+    rate_per_sec: f64,
+    burst: f64,
+}
+
+impl RateLimiter {
+    fn new(rate_per_sec: f64, burst: f64) -> Self {
+        Self {
+            tokens: burst,
+            last_refill: Instant::now(),
+            rate_per_sec,
+            burst,
+        }
+    }
+
+    fn allow(&mut self) -> bool {
+        let now = Instant::now();
+        let elapsed = now
+            .checked_duration_since(self.last_refill)
+            .unwrap_or_default()
+            .as_secs_f64();
+        self.last_refill = now;
+        self.tokens = (self.tokens + elapsed * self.rate_per_sec).min(self.burst);
+        if self.tokens >= 1.0 {
+            self.tokens -= 1.0;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[tokio::main]
@@ -240,9 +463,33 @@ async fn handle_connection(
     peer: SocketAddr,
     ctx: AppContext,
 ) -> anyhow::Result<()> {
+    let auth_identity: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    let metrics_for_handshake = ctx.metrics.clone();
+    let auth_config = ctx.config.auth.clone();
+    let auth_identity_for_cb = auth_identity.clone();
+
     let ws_stream = match timeout(
         Duration::from_millis(ctx.config.handshake_timeout_ms),
-        accept_async(stream),
+        accept_hdr_async(stream, move |req: &Request, response: Response| {
+            if !auth_config.auth_enabled() {
+                return Ok(response);
+            }
+
+            match auth_config.authenticate_header(req) {
+                Ok(identity) => {
+                    if let Some(id) = identity {
+                        if let Ok(mut guard) = auth_identity_for_cb.lock() {
+                            *guard = Some(id);
+                        }
+                    }
+                    Ok(response)
+                }
+                Err(err) => {
+                    metrics_for_handshake.auth_failures_total.inc();
+                    Err(err)
+                }
+            }
+        }),
     )
     .await
     {
@@ -261,7 +508,10 @@ async fn handle_connection(
     info!(remote_addr = %peer, "websocket connection established");
 
     let (mut write, mut read) = ws_stream.split();
+    let enforced_client_id = auth_identity.lock().ok().and_then(|id| id.clone());
     let mut active_session: Option<String> = None;
+    let mut rate_limiter = RateLimiter::new(ctx.config.rate_limit_rps, ctx.config.rate_limit_burst);
+    let mut last_invalid_json_log: Option<Instant> = None;
 
     while let Some(msg) = read.next().await {
         let msg = match msg {
@@ -274,6 +524,25 @@ async fn handle_connection(
 
         match msg {
             Message::Text(text) => {
+                if !rate_limiter.allow() {
+                    warn!(
+                        remote_addr = %peer,
+                        "closing connection due to rate limit exceeded"
+                    );
+                    ctx.metrics.rate_limit_violations_total.inc();
+                    ctx.metrics
+                        .messages_rejected
+                        .with_label_values(&["rate_limit"])
+                        .inc();
+                    let _ = write
+                        .send(Message::Close(Some(CloseFrame {
+                            code: CloseCode::Policy,
+                            reason: "rate limit exceeded".into(),
+                        })))
+                        .await;
+                    break;
+                }
+
                 if text.as_bytes().len() > ctx.config.max_message_bytes {
                     warn!(
                         remote_addr = %peer,
@@ -296,6 +565,8 @@ async fn handle_connection(
 
                 match serde_json::from_str::<LtpIncomingMessage>(&text) {
                     Ok(incoming) => {
+                        let incoming =
+                            enforce_client_identity(incoming, enforced_client_id.as_deref());
                         if let Some(client_id) = extract_client_id(&incoming) {
                             active_session.get_or_insert_with(|| client_id.clone());
                         }
@@ -321,7 +592,17 @@ async fn handle_connection(
                         }
                     }
                     Err(err) => {
-                        warn!(remote_addr = %peer, error = ?err, "invalid JSON payload");
+                        let now = Instant::now();
+                        let should_log = last_invalid_json_log
+                            .map(|prev| now.duration_since(prev) >= Duration::from_secs(1))
+                            .unwrap_or(true);
+                        if should_log {
+                            warn!(remote_addr = %peer, error = ?err, "invalid JSON payload");
+                            last_invalid_json_log = Some(now);
+                        } else {
+                            ctx.metrics.invalid_json_suppressed_total.inc();
+                        }
+                        ctx.metrics.invalid_json_total.inc();
                         ctx.metrics
                             .messages_rejected
                             .with_label_values(&["invalid_json"])
@@ -337,6 +618,17 @@ async fn handle_connection(
                 }
             }
             Message::Binary(_) => {
+                let now = Instant::now();
+                let should_log = last_invalid_json_log
+                    .map(|prev| now.duration_since(prev) >= Duration::from_secs(1))
+                    .unwrap_or(true);
+                if should_log {
+                    warn!(remote_addr = %peer, "binary payloads are not supported");
+                    last_invalid_json_log = Some(now);
+                } else {
+                    ctx.metrics.invalid_json_suppressed_total.inc();
+                }
+                ctx.metrics.invalid_json_total.inc();
                 ctx.metrics
                     .messages_rejected
                     .with_label_values(&["invalid_json"])
@@ -388,6 +680,41 @@ fn incoming_type(msg: &LtpIncomingMessage) -> &'static str {
         LtpIncomingMessage::Heartbeat { .. } => "heartbeat",
         LtpIncomingMessage::Orientation { .. } => "orientation",
         LtpIncomingMessage::RouteRequest { .. } => "route_request",
+    }
+}
+
+fn enforce_client_identity(msg: LtpIncomingMessage, enforced: Option<&str>) -> LtpIncomingMessage {
+    let Some(enforced_id) = enforced else {
+        return msg;
+    };
+
+    match msg {
+        LtpIncomingMessage::Hello {
+            session_tag,
+            auth_token,
+            ..
+        } => LtpIncomingMessage::Hello {
+            client_id: enforced_id.to_string(),
+            session_tag,
+            auth_token,
+        },
+        LtpIncomingMessage::Heartbeat { timestamp_ms, .. } => LtpIncomingMessage::Heartbeat {
+            client_id: enforced_id.to_string(),
+            timestamp_ms,
+        },
+        LtpIncomingMessage::Orientation {
+            focus_momentum,
+            time_orientation,
+            ..
+        } => LtpIncomingMessage::Orientation {
+            client_id: enforced_id.to_string(),
+            focus_momentum,
+            time_orientation,
+        },
+        LtpIncomingMessage::RouteRequest { hint_sector, .. } => LtpIncomingMessage::RouteRequest {
+            client_id: enforced_id.to_string(),
+            hint_sector,
+        },
     }
 }
 

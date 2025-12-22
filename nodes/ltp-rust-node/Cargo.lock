@@ -604,6 +604,7 @@ dependencies = [
  "axum",
  "dashmap",
  "futures-util",
+ "http",
  "prometheus",
  "serde",
  "serde_json",
