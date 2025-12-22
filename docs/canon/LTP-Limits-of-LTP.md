@@ -1,98 +1,188 @@
-# Limits of LTP
+# Limits & Non-Goals of LTP (Refined)
 
-## Why this page exists
-LTP is often misunderstood when approached as a framework, model, or decision system.
-This page clarifies what LTP intentionally does **not** attempt to solve.
+## Why this document exists
 
-Defining limits is not a weakness.
-For protocols, it is a form of strength and long-term stability.
+LTP is a protocol, not a platform.
 
-## Core principle
-LTP defines **orientation**, not outcomes.
-It does not decide what should happen.
-It ensures that whatever happens remains coherent over time.
+This document exists to prevent category errors — attempts to use LTP for problems it was not designed to solve.
+These limits are not temporary gaps; they are intentional design constraints.
 
-## What LTP is not
+They protect the core invariants of the protocol.
 
-### 1) Not a decision-making system
-LTP never chooses actions, answers, or policies.
-It does not:
-- rank options
-- select a “best” response
-- optimize for reward, accuracy, or utility
+---
 
-All decisions happen outside the protocol.
+## 1. Hard Limits (By Design)
 
-### 2) Not a model or inference engine
-LTP does not:
-- generate tokens
-- run neural networks
-- perform attention or prediction
+These are fundamental limits.
+LTP cannot perform these functions even in theory, without violating its core guarantees.
 
-It is model-agnostic by design.
-Different models may enter and exit the same continuity thread without breaking orientation.
+### 1.1 LTP does not make decisions
 
-### 3) Not memory in the traditional sense
-LTP does not store knowledge, facts, or embeddings.
-Instead, it preserves:
-- trajectory
-- constraints
-- admissible transitions
+LTP never selects an action, outcome, or “best” future.
 
-Memory answers *what is known*.  
-Orientation answers *where we are*.
+It only defines:
+
+- admissible trajectories
+- orientation constraints
+- continuity across transitions
+
+If you need a system to choose — you are operating above LTP.
+
+---
+
+### 1.2 LTP does not perform inference
 
 ### 4) Not an orchestration framework
 LTP does not:
-- manage workflows
-- schedule tasks
-- coordinate services
 
-It can be used alongside orchestration systems, but never replaces them.
+- generate tokens
+- rank model outputs
+- evaluate semantic correctness
 
-### 5) Not an optimization layer
-LTP does not aim to:
-- reduce latency
-- minimize tokens
-- maximize throughput
+All inference happens outside the protocol.
 
-Those concerns belong to execution layers.
-LTP operates **before execution**, at the level of permission and readiness.
+LTP only records and constrains how inference results may be used over time.
 
-## Why these limits matter
-Most system failures come from scope creep, not lack of features.
-By refusing to:
-- decide
-- predict
-- optimize
-- orchestrate
+---
 
-LTP remains:
-- auditable
-- explainable
-- reusable across domains
-- stable across decades, not versions
+### 1.3 LTP is not a memory database
 
-## Relationship to other layers
+LTP does not store:
 
-| Layer | Responsibility |
-|------|----------------|
-| Models | Prediction & generation |
-| Agents | Decision logic |
-| Orchestration | Execution & scheduling |
-| LTP | Continuity & orientation |
+- embeddings
+- knowledge graphs
+- long-term semantic memory
 
-LTP does not compete with these layers. It aligns them.
+It stores orientation state, not content.
 
-## Final note
-If you are looking for:
-- smarter decisions → use better models
-- faster execution → optimize infrastructure
-- richer memory → build knowledge systems
+Using LTP as a memory layer breaks determinism and replayability.
 
-If you are losing:
-- context after retries
-- meaning across restarts
-- coherence across models
+---
 
-Then LTP is the missing layer.
+## 2. Explicit Non-Goals
+
+These are things LTP deliberately does not try to solve, even though they may appear adjacent.
+
+### 2.1 LTP is not an agent framework
+
+LTP does not manage:
+
+- task scheduling
+- tool calling
+- retries or planning loops
+
+It can support agent systems, but it never replaces them.
+
+---
+
+### 2.2 LTP is not an orchestration layer
+
+LTP does not:
+
+- route network traffic
+- balance workloads
+- manage distributed execution
+
+It operates at the orientation layer, not the execution layer.
+
+---
+
+### 2.3 LTP is not a safety or alignment system
+
+LTP does not define:
+
+- ethical rules
+- alignment objectives
+- value systems
+
+It only ensures that whatever rules exist are applied consistently over time.
+
+---
+
+## 3. Anti-Patterns
+
+The following uses are explicitly incorrect:
+
+❌ Using LTP to select or rank actions
+❌ Treating orientation as model attention
+❌ Using LTP as a persistence layer for content
+❌ Encoding business logic directly into the protocol
+
+If your design requires any of the above, LTP is the wrong abstraction.
+
+---
+
+## 4. Relation to Core Invariants
+
+These limits exist to protect LTP’s core invariants:
+
+- Orientation continuity
+- Deterministic replay
+- Model-agnostic neutrality
+- Explainable state transitions
+
+Violating the limits inevitably breaks at least one invariant.
+
+---
+
+## 5. Canonical Boundary Statement
+
+> LTP defines where you are — not what you should do.
+
+If a system needs LTP to “decide”, it is built at the wrong layer.
+
+---
+
+## 6. Architectural Guidance
+
+Correct usage pattern:
+
+```
+[ Models / Agents / Policies ]
+            ↑
+     (decisions & actions)
+            ↑
+        [ LTP Core ]
+   (orientation & continuity)
+```
+
+Innovation lives above the protocol, not inside it.
+
+---
+
+## What this gives the project
+
+- Protection against misuse
+- Clear mental model for contributors
+- Long-term protocol stability
+- Reduced governance and review friction
+
+---
+
+## End note
+
+LTP remains intentionally small.
+
+Its power comes not from what it does —
+but from what it refuses to do.
+
+---
+
+## Что дальше (рекомендую)
+
+После этого PR логично сделать один из двух:
+
+1. PR: “How to Build Products on LTP Without Violating the Core”
+
+2. PR: “Reference Architectures (Allowed Extensions)”
+
+Оба будут читаться уже очень легко, потому что границы зафиксированы.
+
+---
+
+Бро, если хочешь — в следующем шаге могу:
+
+- привести это в IETF/RFC-тон (ещё суше),
+- или наоборот — сделать короткую версию для README.
+
+Скажи формат — и идём дальше.
