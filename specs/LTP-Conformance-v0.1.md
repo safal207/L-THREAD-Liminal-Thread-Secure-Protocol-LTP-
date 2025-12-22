@@ -16,6 +16,14 @@ Defines the minimal, testable requirements an implementation MUST satisfy to be 
 
 This document keeps the protocol stable across languages (JS / Rust / HUD / Agent) and transports by pinning a small, interoperable core.
 
+This document does not define:
+- recommended architectures
+- preferred agent designs
+- optimal strategies
+- best practices
+
+It defines boundaries, not patterns.
+
 ## Scope
 - Applies to Nodes, Clients, Agents, and HUDs.
 - Transport-agnostic (WS / REST / others).
@@ -133,6 +141,8 @@ Derived systems are valid, but exist outside the LTP protocol boundary.
 
 ## Compatibility Invariant
 
+A valid experiment on LTP MUST be removable without affecting the continuity guarantees of the system.
+
 If a system alters any of the following properties, it is no longer LTP-compliant:
 
 - deterministic replay of orientation
@@ -149,6 +159,8 @@ Compliance is binary. There is no partial or “mostly” LTP compliance.
 A visualization tool that reads orientation traces and renders future branches is an Allowed Extension.
 
 A system that injects learned confidence scores directly into the Focus Node is a Derived System and MUST NOT claim LTP compliance.
+
+Experimental layers should be treated as disposable. If an experiment becomes critical infrastructure, it must be redesigned outside the protocol boundary.
 
 ---
 
@@ -191,4 +203,4 @@ An implementation MAY claim: **"This implementation is LTP-conformant (v0.1)."**
 
 ---
 
-LTP defines protocol invariants. Everything else is implementation choice.
+If an experiment requires modifying the core, it is no longer an experiment.
