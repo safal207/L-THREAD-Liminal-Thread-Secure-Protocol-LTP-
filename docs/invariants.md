@@ -3,6 +3,9 @@
 The key words MUST, MUST NOT, SHOULD, and MAY
 are to be interpreted as described in RFC 2119.
 
+For the purposes of this document, **core** refers strictly to the protocol specification,
+its invariants, and conformance requirements.
+
 1. Orientation MUST be explicit.
 2. Continuity MUST be preserved across transitions.
 3. Transitions MUST be deterministic and replayable.
@@ -39,3 +42,5 @@ are to be interpreted as described in RFC 2119.
 
 LTP defines protocol invariants.
 Everything else is implementation choice.
+Violating core boundaries does not create innovation.
+It creates irrecoverable ambiguity.
