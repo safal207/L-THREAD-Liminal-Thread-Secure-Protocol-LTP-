@@ -15,9 +15,10 @@ or maximize conversion metrics.
 
 It does not rank content by popularity, similarity, or historical behavior.
 
-Orientation is not recommendation.
-Branches are not suggestions.
-Confidence is not probability.
+**Hard Limit:**
+- Orientation is not recommendation.
+- Branches are not suggestions.
+- Confidence is not probability.
 
 ---
 
@@ -76,6 +77,7 @@ Graceful degradation is preferred over optimal performance.
 
 ## LTP is NOT an Autonomous Decision Maker
 
+**Decision-Layer Warning:**
 LTP does not make decisions.
 It does not act on behalf of users or agents.
 
@@ -94,14 +96,31 @@ Its purpose is to *make uncertainty navigable*, not disappear.
 
 ---
 
-## Design Principle
+## Anti-Patterns & Canonical Guidance
 
-If an implementation claims LTP but:
-- enforces outcomes,
-- hides uncertainty,
-- collapses plurality into a single answer,
+The following patterns are considered violations of the protocol's spirit and design goals.
 
-it is likely violating the spirit of the protocol.
+### Enforcing Outcomes
+LTP provides a map of possible futures (branches), but does not mandate which path must be taken.
+*Anti-Pattern:* Blocking a thread until a specific "correct" response is received.
+
+### Hiding Uncertainty
+LTP thrives on exposing ambiguity and multiple possibilities.
+*Anti-Pattern:* Artificially inflating confidence scores or removing low-probability branches to present a clean but false certainty.
+
+### Collapsing Plurality
+LTP supports divergent paths and "plural" states.
+*Anti-Pattern:* Reducing a complex set of branches into a single "best answer" summary without preserving the option to explore alternatives.
+
+---
+
+## Core Invariants
+
+These limits are necessary to preserve the foundational principle of LTP:
+
+**Orientation over Answers.**
+
+By restricting the protocol's scope (no decisions, no optimization, no storage), we ensure it remains a neutral, lightweight layer for context and orientation.
 
 ---
 
