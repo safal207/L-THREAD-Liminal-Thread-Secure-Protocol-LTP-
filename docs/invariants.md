@@ -6,6 +6,7 @@ are to be interpreted as described in RFC 2119.
 For the purposes of this document, **core** refers strictly to the protocol specification,
 its invariants, and conformance requirements.
 This document finalizes the boundary definitions introduced in PR #263 and the product guidance in PR #264.
+This document concludes a series defining the boundaries, safe usage, and long-term stability guarantees of LTP.
 
 1. Orientation MUST be explicit.
 2. Continuity MUST be preserved across transitions.
@@ -43,6 +44,7 @@ This document finalizes the boundary definitions introduced in PR #263 and the p
 
 LTP defines protocol invariants.
 Everything else is implementation choice.
+LTP explicitly prioritizes stability over adoption velocity.
 Any behavior that shifts LTP from admissibility checking to outcome influence is a boundary violation.
 Violating core boundaries does not create innovation.
 It creates irrecoverable ambiguity.
