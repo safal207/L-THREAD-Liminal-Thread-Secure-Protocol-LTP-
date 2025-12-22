@@ -605,6 +605,7 @@ dependencies = [
  "dashmap",
  "futures-util",
  "prometheus",
+ "rand",
  "serde",
  "serde_json",
  "tokio",

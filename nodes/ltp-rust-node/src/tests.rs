@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use crate::node::build_route_suggestion;
 use crate::protocol::{
     LtpOutgoingMessage, TimeOrientationBoostPayload, TimeOrientationDirectionPayload,
@@ -73,8 +75,63 @@ async fn builds_default_route_when_no_state() {
 async fn expires_idle_sessions() {
     let state = LtpNodeState::new();
     state.touch_heartbeat("stale-client").await;
-    let removed = state.expire_idle(std::time::Duration::from_millis(0));
-    assert_eq!(removed, 1);
+    let removed = state.expire_idle(Duration::from_millis(0));
+    assert_eq!(removed.expired, 1);
+}
+
+#[tokio::test]
+async fn expire_idle_removes_old_sessions_and_updates_stats() {
+    let state = LtpNodeState::new();
+    let ttl = Duration::from_millis(50);
+
+    state.touch_heartbeat("old-1").await;
+    state.touch_heartbeat("old-2").await;
+    state.touch_heartbeat("fresh").await;
+
+    state
+        .set_last_seen_for_test("old-1", Instant::now() - ttl * 2)
+        .await;
+    state
+        .set_last_seen_for_test("old-2", Instant::now() - ttl * 3)
+        .await;
+    state
+        .set_last_seen_for_test("fresh", Instant::now() - ttl / 4)
+        .await;
+
+    let stats = state.expire_idle(ttl);
+    assert_eq!(stats.expired, 2);
+    assert_eq!(state.len(), 1);
+    assert!(stats.scanned >= 3);
+}
+
+#[tokio::test]
+async fn expire_idle_keeps_recent_sessions() {
+    let state = LtpNodeState::new();
+    let ttl = Duration::from_secs(1);
+
+    state.touch_heartbeat("recent").await;
+    state
+        .set_last_seen_for_test("recent", Instant::now() - ttl / 2)
+        .await;
+
+    let stats = state.expire_idle(ttl);
+    assert_eq!(stats.expired, 0);
+    assert_eq!(state.len(), 1);
+}
+
+#[tokio::test]
+async fn expire_idle_handles_future_last_seen_without_panic() {
+    let state = LtpNodeState::new();
+    let ttl = Duration::from_millis(10);
+
+    state.touch_heartbeat("future").await;
+    state
+        .set_last_seen_for_test("future", Instant::now() + ttl)
+        .await;
+
+    let stats = state.expire_idle(ttl);
+    assert_eq!(stats.expired, 0);
+    assert_eq!(state.len(), 1);
 }
 
 #[tokio::test]

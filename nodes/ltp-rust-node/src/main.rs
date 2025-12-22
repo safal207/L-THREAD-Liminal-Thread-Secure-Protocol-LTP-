@@ -6,7 +6,7 @@ mod tests;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::Context;
 use axum::{http::StatusCode, routing::get, Router};
@@ -29,7 +29,7 @@ use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::node::build_route_suggestion;
-use crate::state::{ExpireStats, LtpNodeState};
+use crate::state::LtpNodeState;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:7070";
 const DEFAULT_METRICS_ADDR: &str = "127.0.0.1:9090";
@@ -547,12 +547,12 @@ fn spawn_janitor(
                 break;
             }
 
-            let sweep_start = Instant::now();
             let stats = ctx.state.expire_idle(idle_ttl);
-            let elapsed = sweep_start.elapsed();
+            let sweep_duration =
+                Duration::from_millis(stats.sweep_ms.min(u128::from(u64::MAX)) as u64);
             ctx.metrics
                 .janitor_sweep_duration
-                .observe(elapsed.as_secs_f64());
+                .observe(sweep_duration.as_secs_f64());
             ctx.metrics
                 .janitor_skipped_lock
                 .inc_by(stats.skipped_locks as u64);
@@ -572,7 +572,7 @@ fn spawn_janitor(
                 expired = stats.expired,
                 scanned = stats.scanned,
                 skipped_locks = stats.skipped_locks,
-                duration_ms = elapsed.as_millis(),
+                duration_ms = stats.sweep_ms,
                 "janitor sweep completed"
             );
         }
