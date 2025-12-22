@@ -15,6 +15,7 @@ Examples and diagrams are **INFORMATIVE** unless explicitly stated otherwise.
 Defines the minimal, testable requirements an implementation MUST satisfy to be considered LTP-conformant.
 
 This document assumes the hardened core boundaries formalized in PR #263 (glossary + invariants canon) and explains how to build freely without violating them.
+It complements PR #265 by focusing not on limits but on safe patterns of usage and extension.
 
 This document keeps the protocol stable across languages (JS / Rust / HUD / Agent) and transports by pinning a small, interoperable core.
 
@@ -102,6 +103,13 @@ An implementation MUST:
 - Same inputs SHOULD yield the same outputs within implementation tolerance for all deterministic fields that drive routing, orientation, and branch ordering.
 - Timestamps, nonces, and transport-level identifiers MAY vary, but MUST NOT affect deterministic fields or reorder stable outputs.
 - Routing decisions MUST be explainable (traceable factors, not opaque randomness).
+
+---
+
+## Indifference guarantee
+We refer to this property as the **indifference guarantee**: the protocol core MUST remain indifferent to outcomes, goals, and success metrics, even when implemented in systems that optimize for them.
+Protocol decisions, admissibility checks, and orientation continuity MUST depend only on protocol-defined inputs and invariants, not on external evaluation or target achievement.
+Extensions MAY observe, score, or label outcomes, but those artifacts MUST stay outside protocol state and replay semantics.
 
 ---
 
