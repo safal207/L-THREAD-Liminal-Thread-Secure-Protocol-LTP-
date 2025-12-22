@@ -8,7 +8,7 @@ All values are read from the environment (defaults in parentheses):
 | --- | --- |
 | `LTP_NODE_ADDR` (`127.0.0.1:7070`) | WebSocket bind address |
 | `LTP_NODE_ID` (random UUID) | Node identity advertised in `hello_ack` |
-| `LTP_NODE_METRICS_ADDR` (`0.0.0.0:9090`) | Prometheus `/metrics` listener |
+| `LTP_NODE_METRICS_ADDR` (`127.0.0.1:9090`) | Prometheus `/metrics` listener (bind to loopback by default; expose via a reverse proxy with TLS/origin/rate limiting) |
 | `LTP_NODE_MAX_CONNECTIONS` (`10000`) | Concurrent TCP/WS connection cap |
 | `LTP_NODE_MAX_MESSAGE_BYTES` (`131072`) | Incoming message size limit (hard drop) |
 | `LTP_NODE_MAX_SESSIONS` (`50000`) | Total tracked sessions cap |

@@ -32,6 +32,13 @@ pub struct LtpNodeState {
     sessions: DashMap<String, Arc<Mutex<SessionState>>>,
 }
 
+#[derive(Debug, Default)]
+pub struct ExpireStats {
+    pub expired: usize,
+    pub skipped_locks: usize,
+    pub scanned: usize,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct SessionSnapshot {
     pub last_seen: Instant,
@@ -105,31 +112,49 @@ impl LtpNodeState {
         self.sessions.remove(client_id).is_some()
     }
 
-    pub fn expire_idle(&self, idle_ttl: Duration) -> usize {
-        let now = Instant::now();
-        let mut removed = 0;
+    pub fn expire_idle(&self, idle_ttl: Duration) -> ExpireStats {
+        let sweep_start = Instant::now();
+        let mut stats = ExpireStats::default();
         let keys: Vec<String> = self
             .sessions
             .iter()
             .filter_map(|entry| {
                 let session = entry.value();
+                stats.scanned += 1;
                 if let Ok(guard) = session.try_lock() {
-                    if now.duration_since(guard.last_seen) >= idle_ttl {
+                    if sweep_start.duration_since(guard.last_seen) >= idle_ttl {
                         Some(entry.key().clone())
                     } else {
                         None
                     }
                 } else {
+                    stats.skipped_locks += 1;
                     None
                 }
             })
             .collect();
 
         for key in keys {
-            if self.sessions.remove(&key).is_some() {
-                removed += 1;
+            let still_idle = self.sessions.get(&key).and_then(|entry| {
+                let session = entry.value();
+                if let Ok(guard) = session.try_lock() {
+                    if Instant::now().duration_since(guard.last_seen) >= idle_ttl {
+                        Some(entry.key().clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    stats.skipped_locks += 1;
+                    None
+                }
+            });
+
+            if let Some(key) = still_idle {
+                if self.sessions.remove(&key).is_some() {
+                    stats.expired += 1;
+                }
             }
         }
-        removed
+        stats
     }
 }
