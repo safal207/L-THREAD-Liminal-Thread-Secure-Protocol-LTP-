@@ -1,4 +1,4 @@
-# PR 195 — Limits of LTP (Non-Goals & Boundaries)
+# PR 250 — LTP Scope Boundaries (Non-Goals & Limits)
 
 > A protocol becomes trustworthy not when it explains everything,
 > but when it clearly states what it does not attempt to explain.
@@ -13,11 +13,19 @@ Its goal is to:
 - avoid category errors,
 - and preserve LTP as a neutral infrastructure standard, not a theory of mind, physics, or meaning.
 
+These limits exist to preserve the integrity of the Frozen Core. Violating them would directly conflict with the normative contract.
+
 LTP is intentionally narrow in scope.
 
-## 2. What LTP Explicitly Does NOT Do
+## 2. Scope Legend
 
-### 2.1 LTP is NOT a cognitive model
+- **Out of scope** — will not be implemented by LTP. These are principled exclusions.
+- **Open question** — may be explored externally (see `docs/LTP-OPEN-QUESTIONS.md` from PR #249) without changing the core.
+- **Implementation-defined** — allowed variation for deployments; informative but non-normative for LTP.
+
+## 3. What LTP Explicitly Does NOT Do
+
+### 3.1 LTP is NOT a cognitive model
 
 LTP does not:
 
@@ -30,7 +38,7 @@ Any cognitive interpretation exists above the protocol layer.
 > LTP standardizes continuity of orientation,
 > not cognition itself.
 
-### 2.2 LTP is NOT a decision-making system
+### 3.2 LTP is NOT a decision-making system
 
 LTP does not:
 
@@ -43,7 +51,7 @@ It only defines which futures are admissible under constraints.
 Errors are allowed.
 Loss of orientation is not.
 
-### 2.3 LTP is NOT a prediction engine
+### 3.3 LTP is NOT a prediction engine
 
 LTP does not:
 
@@ -53,7 +61,7 @@ LTP does not:
 
 Future branches are routes, not forecasts.
 
-### 2.4 LTP is NOT a memory store
+### 3.4 LTP is NOT a memory store
 
 LTP does not:
 
@@ -63,7 +71,7 @@ LTP does not:
 
 It references snapshots, not memories.
 
-### 2.5 LTP is NOT an orchestration framework
+### 3.5 LTP is NOT an orchestration framework
 
 LTP does not:
 
@@ -73,7 +81,7 @@ LTP does not:
 
 It remains agnostic to orchestration layers.
 
-## 3. On Physical, Quantum, and Metaphorical Interpretations
+## 4. On Physical, Quantum, and Metaphorical Interpretations
 
 LTP does not assert:
 
@@ -90,7 +98,11 @@ Any such interpretations are:
 > LTP does not describe what orientation is.
 > It standardizes how orientation is represented and preserved.
 
-## 4. Orientation Invariant (Clarification)
+## 5. What Does NOT Violate These Limits
+
+Using LTP traces as input to ML systems is allowed, so long as LTP itself does not learn, adapt, or mutate its Frozen Core semantics. Ecosystem tooling may evolve; the protocol remains frozen.
+
+## 6. Orientation Invariant (Clarification)
 
 To avoid ambiguity, the following definition applies:
 
@@ -104,7 +116,7 @@ Notes:
 
 (This clarifies the usage introduced in PR 194.)
 
-## 5. Why These Limits Matter
+## 7. Why These Limits Matter
 
 Without explicit limits, LTP risks becoming:
 
@@ -119,7 +131,7 @@ With limits, LTP remains:
 - composable,
 - and suitable for standardization.
 
-## 6. Summary
+## 8. Summary
 
 LTP exists to solve one problem:
 
@@ -135,7 +147,7 @@ Everything else is intentionally left outside the protocol.
 ## How this reinforces PR 194
 
 - PR 194 introduces the orientation invariant.
-- PR 195 codifies what the invariant is *not*, keeping the standard narrowly scoped.
+- PR 250 codifies what the invariant is *not*, keeping the standard narrowly scoped.
 - Together they mirror patterns like TCP + what TCP does not guarantee, POSIX + undefined behavior, and RFC + security considerations.
 
 Result: reduced misinterpretation, higher trust for implementers and investors, and a clearer path to future security and formal guarantees.

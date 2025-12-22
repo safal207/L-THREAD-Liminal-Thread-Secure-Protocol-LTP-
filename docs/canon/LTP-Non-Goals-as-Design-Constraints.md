@@ -98,7 +98,7 @@ Implement in your product: scoring, selection, learning, UX, policy, and transpo
 
 ## 7. Relation to Prior PRs
 
-- “Limits of LTP (Non-Goals & Boundaries)” defines explicit limits and boundaries for LTP.
+- “LTP Scope Boundaries (Non-Goals & Limits)” defines explicit limits and boundaries for LTP.
 - “Misuse Patterns: How LTP Is Commonly Broken (And Why This Is Not Allowed)” documents common misuse patterns and how they violate the core.
 - The companion document explains why the boundaries cannot be relaxed without dissolving the protocol.
 
@@ -106,6 +106,6 @@ Together they keep LTP closed under extension and open under composition.
 
 See also:
 
-- `docs/canon/LTP-Limits-of-LTP.md`
+- `docs/canon/LTP-Scope-Boundaries.md`
 - `docs/canon/LTP-Products-on-LTP-Without-Violating-Core.md`
 - `docs/canon/LTP-Misuse-Patterns.md`
