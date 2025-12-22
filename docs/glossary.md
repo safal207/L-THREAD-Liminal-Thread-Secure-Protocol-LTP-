@@ -1,21 +1,28 @@
-# LTP Glossary
+# LTP Glossary (Normative)
 
-## Canonical Terms
+**Orientation** — an explicit, persistent reference frame
+that anchors system state across transitions.
 
-**Orientation**
-Persistent reference frame governing continuity across time.
+**Trajectory** — an ordered sequence of transitions
+preserving continuity of orientation over time.
 
-**Trajectory**
-Ordered sequence of orientation transitions.
+**Transition** — a discrete state change governed by protocol rules.
 
-**Drift**
-Measured deviation from intended orientation.
+**Drift** — accumulated deviation of orientation
+caused by transitions or external perturbations.
 
-**Admissible Future**
-A future state that preserves continuity constraints.
+**Focus Node** — the protocol-defined locus
+where orientation, constraints, and admissible futures intersect.
 
-**Snapshot (Frozen Light)**
-Immutable orientation capture used for replay and recovery.
+**Admissible Future** — a future branch
+that satisfies protocol constraints and invariants.
 
-**Continuity**
-Property that transitions remain coherent across retries, restarts, and agents.
+**Continuity** — the property that system behavior
+remains coherent and replayable across time and retries.
+
+**Replayability** — the ability to deterministically
+reconstruct orientation and transitions from protocol artifacts.
+
+📌 Всё.
+Никаких вторых формулировок, никаких повторов.
+Это словарь стандарта, не учебник.
