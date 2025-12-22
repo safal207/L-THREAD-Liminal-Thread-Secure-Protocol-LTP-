@@ -1,111 +1,119 @@
-# LTP — Non-Goals as Design Constraints (Canonical)
+# Non-goals (as Design Constraints)
 
-> This document defines non-goals of LTP as first-class design constraints.
-> These constraints are not limitations of the protocol,
-> but guarantees of its composability, neutrality, and long-term interoperability.
+## Why this page exists
+This page addresses the most common misunderstandings that arise when engineers first encounter LTP.
+Most misconceptions come from trying to map LTP onto existing categories (framework, agent system, memory, policy engine).
+LTP intentionally does not fit into those boxes.
 
----
+## Misconception 1: “LTP is another agent framework”
+Incorrect.
 
-## 1. Introductory Invariant
+LTP does not define:
+- agents
+- roles
+- tools
+- goals
+- behaviors
 
-The constraints below are canonical: they exist to keep LTP composable under change.
-They are framed as design constraints, not as expressions of scarcity or lack.
+Agent frameworks act.  
+LTP orients.
 
----
+An agent may use LTP, but LTP never becomes an agent.
 
-## 2. Key Principle
+## Misconception 2: “LTP decides what should happen next”
+Incorrect.
 
-> LTP is intentionally minimal.
->
-> Any feature that requires interpretation, optimization, or goal synthesis
-> MUST be implemented above the protocol layer, not within it.
+LTP never answers:
+- what to do
+- which option is best
+- what the user wants
 
-Core state MUST remain deterministic and replayable across implementations and over time.
+It only answers:
+- is this transition admissible
+- does this preserve continuity
+- are we still on the same trajectory
 
-This principle is the shield that keeps LTP stable when products evolve.
+Decision logic always lives outside the protocol.
 
----
+## Misconception 3: “LTP is just memory with a fancy name”
+Incorrect.
 
-## 3. Non-Goals (as Design Constraints)
+Memory stores content.  
+LTP stores orientation.
 
-### 3.1 LTP does not define intelligence
+You can delete all memory and still preserve:
+- direction
+- constraints
+- valid next steps
 
-LTP does not model intelligence, reasoning, or cognition.
-It does not evaluate correctness, optimality, or semantic meaning of actions.
+Without orientation, memory becomes noise.  
+Without memory, orientation can still guide reconstruction.
 
-### 3.2 LTP does not implement learning
+## Misconception 4: “LTP replaces models or reduces hallucinations”
+Incorrect (but related).
 
-LTP does not train, adapt, or update behavior based on outcomes.
-Learning systems may consume LTP traces,
-but learning is strictly external to the protocol.
+LTP does not:
+- fix hallucinations
+- improve accuracy
+- change model weights
 
-### 3.3 LTP does not optimize outcomes
+However, by preserving orientation:
+- hallucinations become traceable
+- failures become local
+- recovery becomes deterministic
 
-LTP does not select optimal paths, maximize rewards, or minimize loss.
-It records admissible trajectories, not preferred ones.
+LTP does not make models smarter.
+It makes systems less fragile.
 
-### 3.4 LTP does not contain emotional or psychological models
+## Misconception 5: “LTP is opinionated or philosophical”
+Incorrect.
 
-LTP does not encode affect, emotion, intention, or mental states.
-Such concepts may be layered above LTP,
-but are explicitly out of scope for the protocol.
+Although LTP uses metaphors in explanations, the protocol itself is:
+- deterministic
+- neutral
+- formally constrained
+- testable via conformance
 
-### 3.5 LTP does not provide observability storage
+No values, ethics, or goals are embedded in the protocol.
+Meaning is observed, not imposed.
 
-LTP describes how traces are structured and replays remain coherent.
-It does not dictate storage backends (e.g., Loki, S3, OpenTelemetry, ClickHouse).
+## Misconception 6: “LTP competes with existing standards”
+Incorrect.
 
-### 3.6 LTP does not define transport security
+LTP does not replace:
+- HTTP
+- gRPC
+- WebSockets
+- message queues
 
-LTP is agnostic to TLS, mTLS, WSS, QUIC, or other transport security choices.
-Crypto policy, ciphers, and key management live below or beside the protocol, not inside it.
+It operates above transport and below decision logic.
+Think of LTP as a continuity layer, not a network protocol.
 
-### 3.7 LTP does not orchestrate agents
+## Misconception 7: “LTP is only for AI systems”
+Incorrect.
 
-LTP is not a scheduler, workflow engine, or queue manager.
-Agent coordination, retries, and backpressure belong to orchestration layers above LTP.
+While LTP emerged from AI failures, it applies to any system where:
+- retries exist
+- restarts happen
+- time matters
+- coherence must survive errors
 
----
+AI systems simply expose the problem earlier.
 
-## 4. Why Extension Would Break LTP
+## Rule of thumb
+If your system asks:
+- “What should we do?” → not LTP
+- “How do we do it?” → not LTP
+- “Are we still the same system over time?” → LTP
 
-Extending LTP with interpretation, scoring, or goal semantics would collapse the separation between protocol and product.
-This would:
+## Why clearing misconceptions matters
+Protocols fail when:
+- people expect features they were never meant to provide
+- scope expands silently
+- invariants become optional
 
-- break determinism,
-- introduce hidden coupling,
-- invalidate conformance guarantees,
-- fragment interoperability.
+LTP survives by being precise about its role.
 
----
-
-## 5. Canonical Escape Hatch
-
-Systems requiring semantics, optimization, or agency must implement such capabilities above LTP, using LTP only as a continuity and orientation substrate.
-The protocol remains neutral; the product layer remains free to innovate.
-
-Use LTP to record: present → focus_node → admissible_branches (deterministic, replayable).
-Implement in your product: scoring, selection, learning, UX, policy, and transport choices.
-
----
-
-## 6. Final Formula
-
-> LTP is not a foundation model.
-> It is a foundation constraint.
-
----
-
-## 7. Relation to Prior PRs
-
-- “Limits of LTP (Non-Goals & Boundaries)” defines explicit limits and boundaries for LTP.
-- “Misuse Patterns: How LTP Is Commonly Broken (And Why This Is Not Allowed)” documents common misuse patterns and how they violate the core.
-- The companion document explains why the boundaries cannot be relaxed without dissolving the protocol.
-
-Together they keep LTP closed under extension and open under composition.
-
-See also:
-
-- `docs/canon/LTP-Limits-of-LTP.md`
-- `docs/canon/LTP-Products-on-LTP-Without-Violating-Core.md`
-- `docs/canon/LTP-Misuse-Patterns.md`
+## Closing note
+Understanding what LTP is not is often more important than understanding what it is.
+That clarity is what allows others to safely build on top.

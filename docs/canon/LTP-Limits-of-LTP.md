@@ -1,106 +1,138 @@
 # PR 252 — Limits and Non-Goals of LTP
 
-> A protocol becomes trustworthy not when it explains everything,
-> but when it clearly states what it does not attempt to explain.
+## Why this document exists
 
-## 1. Purpose of This Document
+LTP is a protocol, not a platform.
 
-This document defines the explicit limits of the Liminal Thread Protocol (LTP).
+This document exists to prevent category errors — attempts to use LTP for problems it was not designed to solve.
+These limits are not temporary gaps; they are intentional design constraints.
 
-Its goal is to:
+They protect the core invariants of the protocol.
 
-- prevent misinterpretation,
-- avoid category errors,
-- and preserve LTP as a neutral infrastructure standard, not a theory of mind, physics, or meaning.
+---
 
-LTP is intentionally narrow in scope.
+## 1. Hard Limits (By Design)
 
 ## 2. Hard Limits (By Design)
 
 These constraints are rooted in the orientation invariant and cannot be relaxed without breaking LTP.
 
-### 2.1 LTP is NOT a cognitive model
+### 1.1 LTP does not make decisions
 
+LTP never selects an action, outcome, or “best” future.
+
+It only defines:
+
+- admissible trajectories
+- orientation constraints
+- continuity across transitions
+
+If you need a system to choose — you are operating above LTP.
+
+---
+
+### 1.2 LTP does not perform inference
+
+### 4) Not an orchestration framework
 LTP does not:
 
-- model consciousness,
-- simulate awareness,
-- represent emotions, intentions, or beliefs as mental states.
+- generate tokens
+- rank model outputs
+- evaluate semantic correctness
 
-Any cognitive interpretation exists above the protocol layer.
-
-> LTP standardizes continuity of orientation,
-> not cognition itself.
-
-### 2.2 LTP is NOT a decision-making system
-
-LTP does not:
-
-- choose actions,
-- optimize outcomes,
-- rank futures as “better” or “worse”.
-
-It only defines which futures are admissible under constraints.
+All inference happens outside the protocol.
 
 If you need LTP to make decisions, you are building the wrong layer.
 
 Errors are allowed.
 Loss of orientation is not.
 
-### 2.3 LTP is NOT a prediction engine
+---
+
+### 1.3 LTP is not a memory database
+
+LTP does not store:
+
+- embeddings
+- knowledge graphs
+- long-term semantic memory
+
+It stores orientation state, not content.
+
+Using LTP as a memory layer breaks determinism and replayability.
+
+---
+
+## 2. Explicit Non-Goals
+
+These are things LTP deliberately does not try to solve, even though they may appear adjacent.
+
+### 2.1 LTP is not an agent framework
+
+LTP does not manage:
+
+- task scheduling
+- tool calling
+- retries or planning loops
+
+It can support agent systems, but it never replaces them.
+
+---
+
+### 2.2 LTP is not an orchestration layer
 
 LTP does not:
 
-- predict the future,
-- estimate probabilities as truth,
-- replace statistical or ML-based inference.
+- route network traffic
+- balance workloads
+- manage distributed execution
 
-Future branches are routes, not forecasts.
+It operates at the orientation layer, not the execution layer.
 
-### 2.4 LTP is NOT a memory store
+---
 
-LTP does not:
+### 2.3 LTP is not a safety or alignment system
 
-- store long-term knowledge,
-- replace databases or vector stores,
-- act as retrieval infrastructure.
+LTP does not define:
 
-It references snapshots, not memories.
+- ethical rules
+- alignment objectives
+- value systems
 
-### 2.5 LTP is NOT an orchestration framework
+It only ensures that whatever rules exist are applied consistently over time.
 
-LTP does not:
+---
 
-- manage agents,
-- schedule tasks,
-- coordinate execution.
+## 3. Anti-Patterns
 
-It remains agnostic to orchestration layers.
+The following uses are explicitly incorrect:
+
+❌ Using LTP to select or rank actions
+❌ Treating orientation as model attention
+❌ Using LTP as a persistence layer for content
+❌ Encoding business logic directly into the protocol
+
+If your design requires any of the above, LTP is the wrong abstraction.
 
 ### 2.6 On physical, quantum, and metaphorical interpretations
 
-LTP does not assert:
+## 4. Relation to Core Invariants
 
-- a physical substrate of orientation,
-- a quantum or string-theoretic basis,
-- any claims about reality, matter, or cosmology.
+These limits exist to protect LTP’s core invariants:
 
 Any such interpretations are optional, external, and strictly out of scope.
 
-> LTP does not describe what orientation is.
-> It standardizes how orientation is represented and preserved.
+---
 
 ## 3. Orientation Invariant (Clarification)
 
-To avoid ambiguity, the following definition applies:
+> LTP defines where you are — not what you should do.
 
-> **Orientation Invariant**
-> A replay-stable state representation that remains coherent across transitions and can be deterministically restored to evaluate admissible futures.
+If a system needs LTP to “decide”, it is built at the wrong layer.
 
-Notes:
+---
 
-- “Frozen” means replayable, not immutable.
-- Orientation may change; the invariant is the ability to restore and evaluate, not the content itself.
+## 6. Architectural Guidance
 
 ## 4. Explicit Non-Goals
 
@@ -124,18 +156,16 @@ The following misuses violate the design intent and should be rejected at review
 
 ## 6. Why These Limits Matter
 
-Without explicit limits, LTP risks becoming:
+Innovation lives above the protocol, not inside it.
 
-- a philosophical claim,
-- a cognitive theory,
-- or an overextended abstraction.
+---
 
-With limits, LTP remains:
+## What this gives the project
 
-- auditable,
-- testable,
-- composable,
-- and suitable for standardization.
+- Protection against misuse
+- Clear mental model for contributors
+- Long-term protocol stability
+- Reduced governance and review friction
 
 These limits exist to protect LTP core invariants:
 
@@ -145,26 +175,26 @@ These limits exist to protect LTP core invariants:
 
 ## 7. Summary
 
-LTP exists to solve one problem:
+## End note
 
-> Preserving coherence across time in systems that would otherwise collapse into stateless inference.
+LTP remains intentionally small.
 
-Everything else is intentionally left outside the protocol.
+Its power comes not from what it does —
+but from what it refuses to do.
 
 ---
 
-> LTP does not explain intelligence.
-> It prevents intelligence from losing its place in time.
+## Что дальше (рекомендую)
 
-## How this reinforces PR 194
+После этого PR логично сделать один из двух:
 
 - PR 194 introduces the orientation invariant.
 - PR 252 codifies what the invariant is *not*, keeping the standard narrowly scoped.
 - Together they mirror patterns like TCP + what TCP does not guarantee, POSIX + undefined behavior, and RFC + security considerations.
 
-Result: reduced misinterpretation, higher trust for implementers and investors, and a clearer path to future security and formal guarantees.
+Бро, если хочешь — в следующем шаге могу:
 
-Future follow-on proposals:
+- привести это в IETF/RFC-тон (ещё суше),
+- или наоборот — сделать короткую версию для README.
 
-- PR 196: Security & Abuse Considerations
-- PR 196: Formal Guarantees vs Undefined Behavior
+Скажи формат — и идём дальше.
