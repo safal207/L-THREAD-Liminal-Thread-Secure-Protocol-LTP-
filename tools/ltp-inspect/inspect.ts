@@ -338,8 +338,14 @@ function validateTraceFrames(frames: LtpFrame[]): { warnings: string[]; violatio
     }
 
     const identity = (frame as any).identity ?? (frame as any).payload?.identity;
-    if (identity !== undefined && (typeof identity !== 'object' || identity === null || Array.isArray(identity))) {
-      violations.push(`${label} identity must be an object if provided`);
+    if (
+      identity !== undefined &&
+      !(
+        (typeof identity === 'string' && identity.trim().length > 0) ||
+        (typeof identity === 'object' && identity !== null && !Array.isArray(identity))
+      )
+    ) {
+      violations.push(`${label} identity must be a string or object if provided`);
     }
 
     const constraints = (frame as any).constraints ?? (frame as any).payload?.constraints;
