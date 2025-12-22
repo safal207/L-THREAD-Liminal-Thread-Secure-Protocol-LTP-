@@ -32,6 +32,7 @@ If you need a system to choose — you are operating above LTP.
 
 ### 1.2 LTP does not perform inference
 
+### 4) Not an orchestration framework
 LTP does not:
 
 - generate tokens

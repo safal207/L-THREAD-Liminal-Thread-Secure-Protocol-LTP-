@@ -83,6 +83,10 @@ See also:
 - [docs/glossary.md](docs/glossary.md)
 - [docs/invariants.md](docs/invariants.md)
 
+Glossary defines canonical terms; Invariants define non-negotiable protocol guarantees (MUST).
+
+For boundaries and non-goals, rely on [docs/invariants.md](docs/invariants.md) and [docs/glossary.md](docs/glossary.md).
+
 These documents define the canonical language of LTP.
 
 ---
