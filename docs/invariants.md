@@ -1,6 +1,13 @@
 # LTP Core Invariants (Normative)
 
-Keywords **MUST/SHOULD/MAY** are to be interpreted as in RFC 2119.
+The key words MUST, MUST NOT, SHOULD, and MAY
+are to be interpreted as described in RFC 2119.
+
+1. Orientation MUST be explicit.
+2. Continuity MUST be preserved across transitions.
+3. Transitions MUST be deterministic and replayable.
+4. Admissible futures MUST respect protocol constraints.
+5. Identity continuity MUST NOT be implicit or inferred.
 
 ## 1. Explicit Orientation
 - **Statement (MUST):** Orientation state MUST be explicit and monotonic with respect to the canonical transition index (or equivalent sequence/clock used for ordering).
@@ -29,3 +36,6 @@ Keywords **MUST/SHOULD/MAY** are to be interpreted as in RFC 2119.
 
 ## Related documents
 - [docs/glossary.md](./glossary.md)
+
+LTP defines protocol invariants.
+Everything else is implementation choice.
