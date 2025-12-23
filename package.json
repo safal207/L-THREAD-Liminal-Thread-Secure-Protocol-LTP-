@@ -43,6 +43,7 @@
     "ltp:inspect:dev": "node packages/inspect/bin/ltp-dev.js"
   },
   "devDependencies": {
+    "@types/node": "^25.0.3",
     "@types/ws": "^8.18.1",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
