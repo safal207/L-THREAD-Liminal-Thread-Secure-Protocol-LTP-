@@ -6,12 +6,12 @@ mod tests;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use anyhow::Context;
 use axum::{http::StatusCode, routing::get, Router};
 use futures_util::{SinkExt, StreamExt};
-use prometheus::{Encoder, Histogram, IntCounter, IntCounterVec, IntGauge, Registry, TextEncoder};
+use prometheus::{Encoder, IntCounter, IntCounterVec, IntGauge, Registry, TextEncoder};
 use protocol::{LtpIncomingMessage, LtpOutgoingMessage};
 use rand::{rngs::StdRng, Rng, SeedableRng};
 use tokio::net::TcpListener;
@@ -19,8 +19,9 @@ use tokio::signal;
 use tokio::sync::watch;
 use tokio::time::timeout;
 use tokio_tungstenite::{
-    accept_async,
+    accept_hdr_async,
     tungstenite::{
+        handshake::server::{ErrorResponse, Request, Response},
         protocol::{frame::coding::CloseCode, CloseFrame},
         Message, Result as WsResult,
     },
@@ -142,10 +143,10 @@ struct Metrics {
     sessions_expired: IntCounterVec,
     messages_total: IntCounterVec,
     messages_rejected: IntCounterVec,
-    janitor_sweep_duration: Histogram,
-    janitor_skipped_lock: IntCounter,
-    janitor_expired_last_sweep: IntGauge,
-    capacity_rejections: IntCounter,
+    invalid_json_total: IntCounter,
+    invalid_json_suppressed_total: IntCounter,
+    rate_limit_violations_total: IntCounter,
+    auth_failures_total: IntCounter,
 }
 
 impl Metrics {
@@ -168,32 +169,26 @@ impl Metrics {
             prometheus::Opts::new("ltp_msg_rejected_total", "Rejected inbound messages"),
             &["reason"],
         )?;
-        let janitor_sweep_duration = Histogram::with_opts(prometheus::HistogramOpts::new(
-            "ltp_janitor_sweep_duration_seconds",
-            "Duration of janitor sweeps",
-        ))?;
-        let janitor_skipped_lock = IntCounter::new(
-            "ltp_janitor_skipped_lock_total",
-            "Sessions skipped during GC because locks were contended",
+        let invalid_json_total =
+            IntCounter::new("ws_invalid_json_total", "Invalid websocket JSON messages")?;
+        let invalid_json_suppressed_total = IntCounter::new(
+            "ws_invalid_json_suppressed_total",
+            "Suppressed invalid JSON logs",
         )?;
-        let janitor_expired_last_sweep = IntGauge::new(
-            "ltp_janitor_expired_last_sweep",
-            "Sessions expired in the most recent GC sweep",
-        )?;
-        let capacity_rejections = IntCounter::new(
-            "ltp_capacity_rejections_total",
-            "Sessions rejected due to capacity limits",
-        )?;
+        let rate_limit_violations_total =
+            IntCounter::new("rate_limit_violations_total", "Rate limit violations total")?;
+        let auth_failures_total =
+            IntCounter::new("auth_failures_total", "Failed websocket authentications")?;
 
         registry.register(Box::new(connections.clone()))?;
         registry.register(Box::new(sessions.clone()))?;
         registry.register(Box::new(sessions_expired.clone()))?;
         registry.register(Box::new(messages_total.clone()))?;
         registry.register(Box::new(messages_rejected.clone()))?;
-        registry.register(Box::new(janitor_sweep_duration.clone()))?;
-        registry.register(Box::new(janitor_skipped_lock.clone()))?;
-        registry.register(Box::new(janitor_expired_last_sweep.clone()))?;
-        registry.register(Box::new(capacity_rejections.clone()))?;
+        registry.register(Box::new(invalid_json_total.clone()))?;
+        registry.register(Box::new(invalid_json_suppressed_total.clone()))?;
+        registry.register(Box::new(rate_limit_violations_total.clone()))?;
+        registry.register(Box::new(auth_failures_total.clone()))?;
 
         Ok(Self {
             registry,
@@ -202,10 +197,10 @@ impl Metrics {
             sessions_expired,
             messages_total,
             messages_rejected,
-            janitor_sweep_duration,
-            janitor_skipped_lock,
-            janitor_expired_last_sweep,
-            capacity_rejections,
+            invalid_json_total,
+            invalid_json_suppressed_total,
+            rate_limit_violations_total,
+            auth_failures_total,
         })
     }
 
@@ -435,9 +430,33 @@ async fn handle_connection(
     peer: SocketAddr,
     ctx: AppContext,
 ) -> anyhow::Result<()> {
+    let auth_identity: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    let metrics_for_handshake = ctx.metrics.clone();
+    let auth_config = ctx.config.auth.clone();
+    let auth_identity_for_cb = auth_identity.clone();
+
     let ws_stream = match timeout(
         Duration::from_millis(ctx.config.handshake_timeout_ms),
-        accept_async(stream),
+        accept_hdr_async(stream, move |req: &Request, response: Response| {
+            if !auth_config.auth_enabled() {
+                return Ok(response);
+            }
+
+            match auth_config.authenticate_header(req) {
+                Ok(identity) => {
+                    if let Some(id) = identity {
+                        if let Ok(mut guard) = auth_identity_for_cb.lock() {
+                            *guard = Some(id);
+                        }
+                    }
+                    Ok(response)
+                }
+                Err(err) => {
+                    metrics_for_handshake.auth_failures_total.inc();
+                    Err(err)
+                }
+            }
+        }),
     )
     .await
     {
@@ -572,6 +591,17 @@ async fn handle_connection(
                 }
             }
             Message::Binary(_) => {
+                let now = Instant::now();
+                let should_log = last_invalid_json_log
+                    .map(|prev| now.duration_since(prev) >= Duration::from_secs(1))
+                    .unwrap_or(true);
+                if should_log {
+                    warn!(remote_addr = %peer, "binary payloads are not supported");
+                    last_invalid_json_log = Some(now);
+                } else {
+                    ctx.metrics.invalid_json_suppressed_total.inc();
+                }
+                ctx.metrics.invalid_json_total.inc();
                 ctx.metrics
                     .messages_rejected
                     .with_label_values(&["invalid_json"])
@@ -913,12 +943,12 @@ fn spawn_janitor(
                 break;
             }
 
-            let sweep_start = Instant::now();
             let stats = ctx.state.expire_idle(idle_ttl);
-            let elapsed = sweep_start.elapsed();
+            let sweep_duration =
+                Duration::from_millis(stats.sweep_ms.min(u128::from(u64::MAX)) as u64);
             ctx.metrics
                 .janitor_sweep_duration
-                .observe(elapsed.as_secs_f64());
+                .observe(sweep_duration.as_secs_f64());
             ctx.metrics
                 .janitor_skipped_lock
                 .inc_by(stats.skipped_locks as u64);
@@ -938,7 +968,7 @@ fn spawn_janitor(
                 expired = stats.expired,
                 scanned = stats.scanned,
                 skipped_locks = stats.skipped_locks,
-                duration_ms = elapsed.as_millis(),
+                duration_ms = stats.sweep_ms,
                 "janitor sweep completed"
             );
         }

@@ -21,7 +21,7 @@ pub enum LtpIncomingMessage {
     RouteRequest {
         session_id: String,
         #[serde(default)]
-        hint_sector: Option<String>,
+        hint_sector: Option<Sector>,
     },
 }
 

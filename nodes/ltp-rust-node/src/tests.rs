@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use crate::node::build_route_suggestion;
 use crate::protocol::{
     ErrorCode, LtpIncomingMessage, LtpOutgoingMessage, TimeOrientationBoostPayload,
@@ -43,8 +45,7 @@ async fn builds_route_suggestion_with_orientation() {
             debug,
             ..
         } => {
-            assert!(suggested_sector.contains("future_planning"));
-            assert!(suggested_sector.contains("high_momentum"));
+            assert_eq!(suggested_sector, Sector::FuturePlanningHighMomentum);
             assert!(reason.unwrap_or_default().len() > 0);
             let debug = debug.expect("debug block should be set");
             assert_eq!(debug.time_orientation.as_ref(), Some(&payload));
@@ -64,7 +65,7 @@ async fn builds_default_route_when_no_state() {
             debug,
             ..
         } => {
-            assert_eq!(suggested_sector, "neutral");
+            assert_eq!(suggested_sector, Sector::Neutral);
             assert_eq!(reason, Some("default".to_string()));
             assert!(debug.is_some());
         }

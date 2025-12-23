@@ -1,5 +1,5 @@
 use crate::protocol::{
-    LtpOutgoingMessage, RouteDebugInfo, TimeOrientationBoostPayload,
+    LtpOutgoingMessage, RouteDebugInfo, Sector, TimeOrientationBoostPayload,
     TimeOrientationDirectionPayload,
 };
 use crate::state::LtpNodeState;
@@ -7,7 +7,7 @@ use crate::state::LtpNodeState;
 pub async fn build_route_suggestion(state: &LtpNodeState, session_id: &str) -> LtpOutgoingMessage {
     let client_state = state.snapshot(session_id).await;
 
-    let mut suggested_sector = "neutral".to_string();
+    let mut suggested_sector = Sector::base_neutral();
     let mut reason = String::from("default");
 
     let mut fm = None;
@@ -20,30 +20,26 @@ pub async fn build_route_suggestion(state: &LtpNodeState, session_id: &str) -> L
         if let Some(orientation) = &cs.time_orientation {
             match orientation.direction {
                 TimeOrientationDirectionPayload::Past => {
-                    suggested_sector = "retrospective_safe".to_string();
+                    suggested_sector = Sector::RetrospectiveSafe;
                     reason = "client leaning towards past".to_string();
                 }
                 TimeOrientationDirectionPayload::Present => {
-                    suggested_sector = "present_focus".to_string();
+                    suggested_sector = Sector::PresentFocus;
                     reason = "client is present-oriented".to_string();
                 }
                 TimeOrientationDirectionPayload::Future => {
-                    suggested_sector = "future_planning".to_string();
+                    suggested_sector = Sector::FuturePlanning;
                     reason = "client oriented to future".to_string();
                 }
                 TimeOrientationDirectionPayload::Multi => {
-                    suggested_sector = "multi_bridge".to_string();
+                    suggested_sector = Sector::MultiBridge;
                     reason = "client in multi-temporal state".to_string();
                 }
             }
         }
 
         if let Some(m) = cs.focus_momentum {
-            if m > 0.7 {
-                suggested_sector.push_str("_high_momentum");
-            } else if m < 0.3 {
-                suggested_sector.push_str("_low_momentum");
-            }
+            suggested_sector = suggested_sector.with_momentum(Some(m));
         }
     }
 

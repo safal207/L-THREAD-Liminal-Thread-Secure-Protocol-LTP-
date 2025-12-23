@@ -37,6 +37,7 @@ pub struct ExpireStats {
     pub expired: usize,
     pub skipped_locks: usize,
     pub scanned: usize,
+    pub sweep_ms: u128,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -115,46 +116,52 @@ impl LtpNodeState {
     pub fn expire_idle(&self, idle_ttl: Duration) -> ExpireStats {
         let sweep_start = Instant::now();
         let mut stats = ExpireStats::default();
+        let first_pass_now = sweep_start;
         let keys: Vec<String> = self
             .sessions
             .iter()
             .filter_map(|entry| {
-                let session = entry.value();
                 stats.scanned += 1;
-                if let Ok(guard) = session.try_lock() {
-                    if sweep_start.duration_since(guard.last_seen) >= idle_ttl {
-                        Some(entry.key().clone())
-                    } else {
+                let session = entry.value();
+                match session.try_lock() {
+                    Ok(guard) => {
+                        let idle = first_pass_now
+                            .checked_duration_since(guard.last_seen)
+                            .unwrap_or(Duration::ZERO);
+                        if idle >= idle_ttl {
+                            Some(entry.key().clone())
+                        } else {
+                            None
+                        }
+                    }
+                    Err(_) => {
+                        stats.skipped_locks += 1;
                         None
                     }
-                } else {
-                    stats.skipped_locks += 1;
-                    None
                 }
             })
             .collect();
 
+        let confirm_now = Instant::now();
         for key in keys {
-            let still_idle = self.sessions.get(&key).and_then(|entry| {
-                let session = entry.value();
-                if let Ok(guard) = session.try_lock() {
-                    if Instant::now().duration_since(guard.last_seen) >= idle_ttl {
-                        Some(entry.key().clone())
-                    } else {
-                        None
+            if let Some(session) = self.sessions.get(&key).map(|entry| entry.value().clone()) {
+                match session.try_lock() {
+                    Ok(guard) => {
+                        let idle = confirm_now
+                            .checked_duration_since(guard.last_seen)
+                            .unwrap_or(Duration::ZERO);
+                        if idle >= idle_ttl && self.sessions.remove(&key).is_some() {
+                            stats.expired += 1;
+                        }
                     }
-                } else {
-                    stats.skipped_locks += 1;
-                    None
-                }
-            });
-
-            if let Some(key) = still_idle {
-                if self.sessions.remove(&key).is_some() {
-                    stats.expired += 1;
+                    Err(_) => {
+                        stats.skipped_locks += 1;
+                    }
                 }
             }
         }
+
+        stats.sweep_ms = sweep_start.elapsed().as_millis();
         stats
     }
 }
