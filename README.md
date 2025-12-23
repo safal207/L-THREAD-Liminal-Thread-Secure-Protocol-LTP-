@@ -339,6 +339,7 @@ LTP was created by Aleksey Safonov to keep routing deterministic and explainable
 - See the [Project Map](./PROJECT_MAP.md) for a broader artifact directory.
 - Governance and RFC process: [LTP Governance](./governance/LTP-Governance.md) and [LTP RFC Process](./governance/LTP-RFC-Process.md).
 - Security / Canon / Docs: [LTP Threat Model & Impossible Attack Classes (by Design)](./docs/canon/LTP-Threat-Model-and-Impossible-Classes.md).
+- Security Baseline v0.1: [docs/security/Security-Baseline-v0.1.md](./docs/security/Security-Baseline-v0.1.md).
 
 ### Governance Mapping (v0.1 Release Slice)
 
