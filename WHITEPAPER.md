@@ -41,6 +41,14 @@ LTP introduces **thread-based continuity**:
 - **Semantic Metadata**: Built-in support for affect and context tags
 - **TOON Encoding**: 30-60% token reduction for array data
 
+### 1.3 Scope: continuity + admissibility, not decisions
+
+- **Protocol remit:** preserve continuity and enforce admissibility boundaries for transitions.
+- **Explicitly out of scope:** optimization, planning, scoring, policy, or goal selection. Those belong above the protocol layer.
+- **Rule of thumb:** If removing LTP changes decisions, decision logic leaked into the protocol where it does not belong.
+
+> **Operational safety rule:** LTP **MUST NOT** directly cause decisions or actions. It transports context and admissibility signals; action logic lives elsewhere.
+
 ---
 
 ## 2. Architecture
@@ -369,6 +377,8 @@ L-THREAD / LTP is a **foundational protocol** whose core remit is continuity and
 
 Extensions such as TOON or semantic metadata can be layered on top for specific products, but they do not change the core: it only inspects continuity and admissibility and intentionally avoids optimization, goal-selection, or solutioning semantics.
 
+Operationally: removing LTP must not change what actions a system takes, only whether transitions remain admissible and coherent.
+
 ---
 
 ## References
@@ -382,7 +392,7 @@ Extensions such as TOON or semantic metadata can be layered on top for specific 
 
 ## Operational Safety Rule
 
-LTP must never exert direct influence over actions or decisions; it only transports context and metadata.
+LTP **MUST NOT** directly cause decisions or actions. It transports context and admissibility signals; action logic and enforcement live above the protocol.
 
 ---
 
