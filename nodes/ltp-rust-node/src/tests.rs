@@ -1,8 +1,13 @@
+use std::time::{Duration, Instant};
+
 use crate::node::build_route_suggestion;
 use crate::protocol::{
-    LtpOutgoingMessage, Sector, TimeOrientationBoostPayload, TimeOrientationDirectionPayload,
+    ErrorCode, LtpIncomingMessage, LtpOutgoingMessage, TimeOrientationBoostPayload,
+    TimeOrientationDirectionPayload,
 };
 use crate::state::LtpNodeState;
+use crate::{process_message, validate_api_key, AppContext, Config, Metrics, TokenBucket};
+use std::sync::Arc;
 
 #[tokio::test]
 async fn updates_orientation_state() {
@@ -13,10 +18,10 @@ async fn updates_orientation_state() {
     };
 
     state
-        .update_orientation("client-1", Some(0.8), Some(payload.clone()))
+        .update_orientation("session-1", Some(0.8), Some(payload.clone()))
         .await;
 
-    let stored = state.snapshot("client-1").await.unwrap();
+    let stored = state.snapshot("session-1").await.unwrap();
     assert_eq!(stored.focus_momentum, Some(0.8));
     assert_eq!(stored.time_orientation.as_ref(), Some(&payload));
 }
@@ -29,10 +34,10 @@ async fn builds_route_suggestion_with_orientation() {
         strength: 0.9,
     };
     state
-        .update_orientation("client-1", Some(0.8), Some(payload.clone()))
+        .update_orientation("session-1", Some(0.8), Some(payload.clone()))
         .await;
 
-    let suggestion = build_route_suggestion(&state, "client-1").await;
+    let suggestion = build_route_suggestion(&state, "session-1").await;
     match suggestion {
         LtpOutgoingMessage::RouteSuggestion {
             suggested_sector,
@@ -88,11 +93,69 @@ async fn heartbeat_updates_last_seen() {
     assert!(after > before);
 }
 
-#[test]
-fn sector_round_trips() {
-    let sector = Sector::FuturePlanningLowMomentum;
-    let serialized = serde_json::to_string(&sector).unwrap();
-    assert_eq!(serialized, "\"future_planning_low_momentum\"");
-    let deserialized: Sector = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(deserialized, sector);
+#[tokio::test]
+async fn validate_api_key_accepts_and_rejects() {
+    let mut cfg = test_config();
+    cfg.api_keys = vec!["valid-key".to_string()];
+    assert!(validate_api_key("valid-key", &cfg).is_some());
+    assert!(validate_api_key("invalid", &cfg).is_none());
+}
+
+#[tokio::test]
+async fn rejects_mismatched_session_id() {
+    let ctx = test_app_context();
+    let auth = crate::AuthContext {
+        auth_id: "auth".to_string(),
+        session_id: "correct-session".to_string(),
+    };
+    let result = process_message(
+        LtpIncomingMessage::Heartbeat {
+            session_id: "wrong-session".to_string(),
+            timestamp_ms: 1,
+        },
+        &ctx,
+        &auth,
+    )
+    .await
+    .unwrap();
+    match &result[0] {
+        LtpOutgoingMessage::Error { code, .. } => assert_eq!(code, &ErrorCode::Forbidden),
+        _ => panic!("expected forbidden error"),
+    }
+}
+
+#[tokio::test]
+async fn token_bucket_enforces_limit() {
+    let mut bucket = TokenBucket::new(2, 2);
+    assert!(bucket.try_consume());
+    assert!(bucket.try_consume());
+    assert!(!bucket.try_consume());
+}
+
+fn test_config() -> Config {
+    Config {
+        addr: "127.0.0.1:1".to_string(),
+        node_id: "node-test".to_string(),
+        metrics_addr: "127.0.0.1:9090".to_string(),
+        max_connections: 10,
+        max_message_bytes: 1024,
+        max_sessions_total: 100,
+        handshake_timeout_ms: 1000,
+        idle_ttl_ms: 1000,
+        gc_interval_ms: 1000,
+        api_keys: vec![],
+        rate_limit_rps: 10,
+        rate_limit_burst: 20,
+    }
+}
+
+fn test_app_context() -> AppContext {
+    let config = Arc::new(test_config());
+    let metrics = Arc::new(Metrics::new().expect("metrics"));
+    let state = Arc::new(LtpNodeState::new());
+    AppContext {
+        config,
+        state,
+        metrics,
+    }
 }

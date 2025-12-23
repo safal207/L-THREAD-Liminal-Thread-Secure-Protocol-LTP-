@@ -43,6 +43,9 @@ const DEFAULT_METRICS_ADDR: &str = "127.0.0.1:9090";
 const DEFAULT_MAX_MESSAGE_BYTES: usize = 64 * 1024;
 const DEFAULT_AUTH_KEYS_RELOAD_SECS: u64 = 30;
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
 #[derive(Clone, Debug)]
 struct Config {
     addr: String,
@@ -100,6 +103,7 @@ impl Config {
             handshake_timeout_ms,
             idle_ttl_ms,
             gc_interval_ms,
+            api_keys,
             rate_limit_rps,
             rate_limit_burst,
             ip_rate_limit_rps,
@@ -333,27 +337,17 @@ impl AuthConfig {
         if let Some(id) = found {
             Ok(Some(id))
         } else {
-            Err(build_error_response(
-                http::StatusCode::UNAUTHORIZED,
-                "invalid api key".to_string(),
-            ))
+            vec![single]
         }
+    } else {
+        vec![]
     }
 }
 
-fn parse_keys(raw: &str) -> std::collections::HashMap<String, String> {
-    raw.split(',')
-        .filter_map(|pair| {
-            let mut iter = pair.split(':');
-            let id = iter.next()?.trim();
-            let key = iter.next()?.trim();
-            if id.is_empty() || key.is_empty() {
-                None
-            } else {
-                Some((id.to_string(), key.to_string()))
-            }
-        })
-        .collect()
+fn auth_id_for_key(api_key: &str) -> String {
+    let mut hasher = DefaultHasher::new();
+    api_key.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
 }
 
 fn constant_time_equal(a: &[u8], b: &[u8]) -> bool {
@@ -573,29 +567,30 @@ struct AppContext {
 #[derive(Debug, Clone)]
 struct RateLimiter {
     tokens: f64,
+    refill_per_sec: f64,
     last_refill: Instant,
-    rate_per_sec: f64,
-    burst: f64,
 }
 
-impl RateLimiter {
-    fn new(rate_per_sec: f64, burst: f64) -> Self {
+impl TokenBucket {
+    fn new(rps: u64, burst: u64) -> Self {
+        let capacity = burst.max(rps) as f64;
         Self {
-            tokens: burst,
+            capacity,
+            tokens: capacity,
+            refill_per_sec: rps as f64,
             last_refill: Instant::now(),
-            rate_per_sec,
-            burst,
         }
     }
 
-    fn allow(&mut self) -> bool {
+    fn try_consume(&mut self) -> bool {
         let now = Instant::now();
-        let elapsed = now
-            .checked_duration_since(self.last_refill)
-            .unwrap_or_default()
-            .as_secs_f64();
-        self.last_refill = now;
-        self.tokens = (self.tokens + elapsed * self.rate_per_sec).min(self.burst);
+        let elapsed = now.duration_since(self.last_refill).as_secs_f64();
+        if elapsed > 0.0 {
+            let new_tokens = elapsed * self.refill_per_sec;
+            self.tokens = (self.tokens + new_tokens).min(self.capacity);
+            self.last_refill = now;
+        }
+
         if self.tokens >= 1.0 {
             self.tokens -= 1.0;
             true
@@ -636,6 +631,14 @@ async fn main() -> anyhow::Result<()> {
     init_tracing();
 
     let config = Arc::new(Config::from_env());
+    if config.api_keys.is_empty() {
+        warn!("no API keys configured; all handshakes will be rejected");
+    } else {
+        info!(
+            api_keys_loaded = config.api_keys.len(),
+            "API key authentication enabled"
+        );
+    }
     let metrics = Arc::new(Metrics::new()?);
     let state = Arc::new(LtpNodeState::new());
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
@@ -841,10 +844,18 @@ async fn handle_connection(
     );
 
     let (mut write, mut read) = ws_stream.split();
-    let enforced_client_id = auth_identity.lock().ok().and_then(|id| id.clone());
-    let mut active_session: Option<String> = None;
-    let mut rate_limiter = RateLimiter::new(ctx.config.rate_limit_rps, ctx.config.rate_limit_burst);
-    let mut last_invalid_json_log: Option<Instant> = None;
+    let mut parse_sampler = ParseErrorSampler::new(Duration::from_secs(1));
+    let mut rate_limiter = TokenBucket::new(ctx.config.rate_limit_rps, ctx.config.rate_limit_burst);
+
+    let auth_ctx =
+        match perform_handshake(&mut write, &mut read, &ctx, peer, &mut parse_sampler).await? {
+            Some(auth_ctx) => auth_ctx,
+            None => {
+                ctx.metrics.connections.dec();
+                return Ok(());
+            }
+        };
+    let active_session = auth_ctx.session_id.clone();
 
     while let Some(msg) = read.next().await {
         let msg = match msg {
@@ -939,21 +950,23 @@ async fn handle_connection(
 
                 match serde_json::from_str::<LtpIncomingMessage>(&text) {
                     Ok(incoming) => {
-                        let incoming =
-                            enforce_client_identity(incoming, enforced_client_id.as_deref());
-                        if let Some(client_id) = extract_client_id(&incoming) {
-                            active_session.get_or_insert_with(|| client_id.clone());
-                        }
-
                         ctx.metrics
                             .messages_total
                             .with_label_values(&[incoming_type(&incoming)])
                             .inc();
 
-                        if let Some(responses) =
-                            process_message(incoming, &ctx, &ctx.config.node_id).await
-                        {
+                        if let Some(responses) = process_message(incoming, &ctx, &auth_ctx).await {
+                            let mut should_close = false;
                             for response in responses {
+                                if let LtpOutgoingMessage::Error { code, .. } = &response {
+                                    if matches!(
+                                        code,
+                                        protocol::ErrorCode::Forbidden
+                                            | protocol::ErrorCode::RateLimit
+                                    ) {
+                                        should_close = true;
+                                    }
+                                }
                                 if let Err(err) = send_json(&mut write, &response).await {
                                     warn!(
                                         remote_addr = %peer,
@@ -963,26 +976,28 @@ async fn handle_connection(
                                     break;
                                 }
                             }
+                            if should_close {
+                                let _ = write.close().await;
+                                break;
+                            }
                         }
                     }
                     Err(err) => {
-                        let now = Instant::now();
-                        let should_log = last_invalid_json_log
-                            .map(|prev| now.duration_since(prev) >= Duration::from_secs(1))
-                            .unwrap_or(true);
-                        if should_log {
-                            warn!(remote_addr = %peer, error = ?err, "invalid JSON payload");
-                            last_invalid_json_log = Some(now);
-                        } else {
-                            ctx.metrics.invalid_json_suppressed_total.inc();
+                        if let Some(suppressed) = parse_sampler.record() {
+                            warn!(
+                                remote_addr = %peer,
+                                error = ?err,
+                                suppressed,
+                                "parse_error rate-limited"
+                            );
                         }
-                        ctx.metrics.invalid_json_total.inc();
                         ctx.metrics
                             .messages_rejected
                             .with_label_values(&["invalid_json"])
                             .inc();
                         let err_msg = LtpOutgoingMessage::Error {
-                            message: "invalid message".to_string(),
+                            code: protocol::ErrorCode::Invalid,
+                            message: Some("invalid message".to_string()),
                         };
                         if let Err(err) = send_json(&mut write, &err_msg).await {
                             warn!(remote_addr = %peer, error = ?err, "failed to send error");
@@ -1008,7 +1023,8 @@ async fn handle_connection(
                     .with_label_values(&["invalid_json"])
                     .inc();
                 let err_msg = LtpOutgoingMessage::Error {
-                    message: "binary messages are not supported".to_string(),
+                    code: protocol::ErrorCode::Invalid,
+                    message: Some("binary messages are not supported".to_string()),
                 };
                 if let Err(err) = send_json(&mut write, &err_msg).await {
                     warn!(remote_addr = %peer, error = ?err, "failed to send binary error");
@@ -1027,25 +1043,23 @@ async fn handle_connection(
         }
     }
 
-    if let Some(client_id) = active_session {
-        if ctx.state.remove(&client_id) {
-            ctx.metrics.sessions.dec();
-            info!(remote_addr = %peer, client_id = %client_id, "session removed on disconnect");
-        }
+    if ctx.state.remove(&active_session) {
+        ctx.metrics.sessions.dec();
+        info!(
+            remote_addr = %peer,
+            auth_id = %auth_ctx.auth_id,
+            session_id = %active_session,
+            "session removed on disconnect"
+        );
     }
 
     ctx.metrics.connections.dec();
-    info!(remote_addr = %peer, "connection closed");
+    info!(
+        remote_addr = %peer,
+        auth_id = %auth_ctx.auth_id,
+        "connection closed"
+    );
     Ok(())
-}
-
-fn extract_client_id(msg: &LtpIncomingMessage) -> Option<String> {
-    match msg {
-        LtpIncomingMessage::Hello { client_id, .. } => Some(client_id.clone()),
-        LtpIncomingMessage::Heartbeat { client_id, .. } => Some(client_id.clone()),
-        LtpIncomingMessage::Orientation { client_id, .. } => Some(client_id.clone()),
-        LtpIncomingMessage::RouteRequest { client_id, .. } => Some(client_id.clone()),
-    }
 }
 
 fn incoming_type(msg: &LtpIncomingMessage) -> &'static str {
@@ -1057,94 +1071,251 @@ fn incoming_type(msg: &LtpIncomingMessage) -> &'static str {
     }
 }
 
-fn enforce_client_identity(msg: LtpIncomingMessage, enforced: Option<&str>) -> LtpIncomingMessage {
-    let Some(enforced_id) = enforced else {
-        return msg;
-    };
+async fn perform_handshake(
+    write: &mut futures_util::stream::SplitSink<
+        tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+        Message,
+    >,
+    read: &mut futures_util::stream::SplitStream<
+        tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,
+    >,
+    ctx: &AppContext,
+    peer: SocketAddr,
+    parse_sampler: &mut ParseErrorSampler,
+) -> anyhow::Result<Option<AuthContext>> {
+    while let Some(msg) = read.next().await {
+        let msg = match msg {
+            Ok(m) => m,
+            Err(err) => {
+                warn!(remote_addr = %peer, error = ?err, "websocket read error during handshake");
+                return Ok(None);
+            }
+        };
 
-    match msg {
-        LtpIncomingMessage::Hello {
-            session_tag,
-            auth_token,
-            ..
-        } => LtpIncomingMessage::Hello {
-            client_id: enforced_id.to_string(),
-            session_tag,
-            auth_token,
-        },
-        LtpIncomingMessage::Heartbeat { timestamp_ms, .. } => LtpIncomingMessage::Heartbeat {
-            client_id: enforced_id.to_string(),
-            timestamp_ms,
-        },
-        LtpIncomingMessage::Orientation {
-            focus_momentum,
-            time_orientation,
-            ..
-        } => LtpIncomingMessage::Orientation {
-            client_id: enforced_id.to_string(),
-            focus_momentum,
-            time_orientation,
-        },
-        LtpIncomingMessage::RouteRequest { hint_sector, .. } => LtpIncomingMessage::RouteRequest {
-            client_id: enforced_id.to_string(),
-            hint_sector,
-        },
+        match msg {
+            Message::Text(text) => {
+                if text.as_bytes().len() > ctx.config.max_message_bytes {
+                    warn!(
+                        remote_addr = %peer,
+                        size = text.as_bytes().len(),
+                        max = ctx.config.max_message_bytes,
+                        "rejecting handshake: message too large"
+                    );
+                    ctx.metrics
+                        .messages_rejected
+                        .with_label_values(&["too_large"])
+                        .inc();
+                    let _ = write
+                        .send(Message::Close(Some(CloseFrame {
+                            code: CloseCode::Size,
+                            reason: "message too large".into(),
+                        })))
+                        .await;
+                    return Ok(None);
+                }
+
+                match serde_json::from_str::<LtpIncomingMessage>(&text) {
+                    Ok(LtpIncomingMessage::Hello { api_key, .. }) => {
+                        if let Some(auth_id) = validate_api_key(&api_key, &ctx.config) {
+                            let session_id = Uuid::new_v4().to_string();
+                            let created = ctx.state.touch_heartbeat(&session_id).await;
+                            if created && reject_when_over_capacity(ctx, &session_id) {
+                                let _ = send_json(
+                                    write,
+                                    &LtpOutgoingMessage::Error {
+                                        code: protocol::ErrorCode::RateLimit,
+                                        message: Some("session limit reached".to_string()),
+                                    },
+                                )
+                                .await;
+                                let _ = write.close().await;
+                                return Ok(None);
+                            }
+                            info!(
+                                remote_addr = %peer,
+                                auth_id = %auth_id,
+                                session_id = %session_id,
+                                "handshake authorized"
+                            );
+                            let ack = LtpOutgoingMessage::HelloAck {
+                                node_id: ctx.config.node_id.clone(),
+                                accepted: true,
+                                session_id: session_id.clone(),
+                            };
+                            send_json(write, &ack).await?;
+                            return Ok(Some(AuthContext {
+                                auth_id,
+                                session_id,
+                            }));
+                        } else {
+                            warn!(remote_addr = %peer, "handshake unauthorized");
+                            ctx.metrics
+                                .messages_rejected
+                                .with_label_values(&["unauthorized"])
+                                .inc();
+                            let _ = send_json(
+                                write,
+                                &LtpOutgoingMessage::Error {
+                                    code: protocol::ErrorCode::Unauthorized,
+                                    message: Some("unauthorized".to_string()),
+                                },
+                            )
+                            .await;
+                            let _ = write.close().await;
+                            return Ok(None);
+                        }
+                    }
+                    Ok(other) => {
+                        warn!(
+                            remote_addr = %peer,
+                            message_type = incoming_type(&other),
+                            "unexpected message before handshake"
+                        );
+                        let _ = send_json(
+                            write,
+                            &LtpOutgoingMessage::Error {
+                                code: protocol::ErrorCode::Invalid,
+                                message: Some("handshake required".to_string()),
+                            },
+                        )
+                        .await;
+                        let _ = write.close().await;
+                        return Ok(None);
+                    }
+                    Err(err) => {
+                        if let Some(suppressed) = parse_sampler.record() {
+                            warn!(
+                                remote_addr = %peer,
+                                error = ?err,
+                                suppressed,
+                                "parse_error rate-limited during handshake"
+                            );
+                        }
+                        ctx.metrics
+                            .messages_rejected
+                            .with_label_values(&["invalid_json"])
+                            .inc();
+                        let _ = send_json(
+                            write,
+                            &LtpOutgoingMessage::Error {
+                                code: protocol::ErrorCode::Invalid,
+                                message: Some("invalid handshake".to_string()),
+                            },
+                        )
+                        .await;
+                        let _ = write.close().await;
+                        return Ok(None);
+                    }
+                }
+            }
+            Message::Close(_) => return Ok(None),
+            Message::Ping(p) => {
+                if let Err(err) = write.send(Message::Pong(p)).await {
+                    warn!(remote_addr = %peer, error = ?err, "failed to respond to ping");
+                    return Ok(None);
+                }
+            }
+            Message::Pong(_) => {}
+            Message::Binary(_) => {
+                ctx.metrics
+                    .messages_rejected
+                    .with_label_values(&["invalid_json"])
+                    .inc();
+                let _ = send_json(
+                    write,
+                    &LtpOutgoingMessage::Error {
+                        code: protocol::ErrorCode::Invalid,
+                        message: Some("binary handshake not supported".to_string()),
+                    },
+                )
+                .await;
+                let _ = write.close().await;
+                return Ok(None);
+            }
+            _ => {}
+        }
     }
+
+    Ok(None)
 }
 
 async fn process_message(
     incoming: LtpIncomingMessage,
     ctx: &AppContext,
-    node_id: &str,
+    auth: &AuthContext,
 ) -> Option<Vec<LtpOutgoingMessage>> {
     match incoming {
-        LtpIncomingMessage::Hello { client_id, .. } => {
-            let created = ctx.state.touch_heartbeat(&client_id).await;
-            if created {
-                if reject_when_over_capacity(&ctx, &client_id) {
-                    return Some(vec![LtpOutgoingMessage::Error {
-                        message: "session limit reached".to_string(),
-                    }]);
-                }
-            }
-            Some(vec![LtpOutgoingMessage::HelloAck {
-                node_id: node_id.to_string(),
-                accepted: true,
-            }])
-        }
+        LtpIncomingMessage::Hello { .. } => Some(vec![LtpOutgoingMessage::Error {
+            code: protocol::ErrorCode::Invalid,
+            message: Some("handshake already completed".to_string()),
+        }]),
         LtpIncomingMessage::Heartbeat {
-            client_id,
+            session_id,
             timestamp_ms,
         } => {
-            let created = ctx.state.touch_heartbeat(&client_id).await;
-            if created && reject_when_over_capacity(&ctx, &client_id) {
+            if session_id != auth.session_id {
+                ctx.metrics
+                    .messages_rejected
+                    .with_label_values(&["forbidden"])
+                    .inc();
                 return Some(vec![LtpOutgoingMessage::Error {
-                    message: "session limit reached".to_string(),
+                    code: protocol::ErrorCode::Forbidden,
+                    message: Some("session mismatch".to_string()),
+                }]);
+            }
+            let created = ctx.state.touch_heartbeat(&auth.session_id).await;
+            if created && reject_when_over_capacity(&ctx, &auth.session_id) {
+                return Some(vec![LtpOutgoingMessage::Error {
+                    code: protocol::ErrorCode::RateLimit,
+                    message: Some("session limit reached".to_string()),
                 }]);
             }
             Some(vec![LtpOutgoingMessage::HeartbeatAck {
-                client_id,
+                session_id: auth.session_id.clone(),
                 timestamp_ms,
             }])
         }
         LtpIncomingMessage::Orientation {
-            client_id,
+            session_id,
             focus_momentum,
             time_orientation,
         } => {
+            if session_id != auth.session_id {
+                ctx.metrics
+                    .messages_rejected
+                    .with_label_values(&["forbidden"])
+                    .inc();
+                return Some(vec![LtpOutgoingMessage::Error {
+                    code: protocol::ErrorCode::Forbidden,
+                    message: Some("session mismatch".to_string()),
+                }]);
+            }
             let created = ctx
                 .state
-                .update_orientation(&client_id, focus_momentum, time_orientation)
+                .update_orientation(&auth.session_id, focus_momentum, time_orientation)
                 .await;
-            if created && reject_when_over_capacity(&ctx, &client_id) {
+            if created && reject_when_over_capacity(&ctx, &auth.session_id) {
                 return Some(vec![LtpOutgoingMessage::Error {
-                    message: "session limit reached".to_string(),
+                    code: protocol::ErrorCode::RateLimit,
+                    message: Some("session limit reached".to_string()),
                 }]);
             }
             None
         }
-        LtpIncomingMessage::RouteRequest { client_id, .. } => {
-            Some(vec![build_route_suggestion(&ctx.state, &client_id).await])
+        LtpIncomingMessage::RouteRequest { session_id, .. } => {
+            if session_id != auth.session_id {
+                ctx.metrics
+                    .messages_rejected
+                    .with_label_values(&["forbidden"])
+                    .inc();
+                return Some(vec![LtpOutgoingMessage::Error {
+                    code: protocol::ErrorCode::Forbidden,
+                    message: Some("session mismatch".to_string()),
+                }]);
+            }
+            Some(vec![
+                build_route_suggestion(&ctx.state, &auth.session_id).await,
+            ])
         }
     }
 }
@@ -1189,12 +1360,12 @@ fn spawn_janitor(
                 break;
             }
 
-            let sweep_start = Instant::now();
             let stats = ctx.state.expire_idle(idle_ttl);
-            let elapsed = sweep_start.elapsed();
+            let sweep_duration =
+                Duration::from_millis(stats.sweep_ms.min(u128::from(u64::MAX)) as u64);
             ctx.metrics
                 .janitor_sweep_duration
-                .observe(elapsed.as_secs_f64());
+                .observe(sweep_duration.as_secs_f64());
             ctx.metrics
                 .janitor_skipped_lock
                 .inc_by(stats.skipped_locks as u64);
@@ -1219,7 +1390,7 @@ fn spawn_janitor(
                 expired = stats.expired,
                 scanned = stats.scanned,
                 skipped_locks = stats.skipped_locks,
-                duration_ms = elapsed.as_millis(),
+                duration_ms = stats.sweep_ms,
                 "janitor sweep completed"
             );
         }
@@ -1227,11 +1398,11 @@ fn spawn_janitor(
     })
 }
 
-fn reject_when_over_capacity(ctx: &AppContext, client_id: &str) -> bool {
+fn reject_when_over_capacity(ctx: &AppContext, session_id: &str) -> bool {
     if ctx.state.len() > ctx.config.max_sessions_total {
-        ctx.state.remove(client_id);
+        ctx.state.remove(session_id);
         warn!(
-            client_id = %client_id,
+            session_id = %session_id,
             max_sessions = ctx.config.max_sessions_total,
             "rejecting session: session limit reached"
         );
