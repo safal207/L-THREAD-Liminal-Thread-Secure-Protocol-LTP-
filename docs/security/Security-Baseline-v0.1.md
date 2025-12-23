@@ -10,17 +10,17 @@ This document defines the minimum security guarantees expected from any LTP node
 ## 1) Threats this baseline addresses
 
 ### Prevents (by baseline)
-- Session hijacking via untrusted client-provided identity
-- Application-level DoS via message flood (per-connection)
-- Operational self-DoS via log flooding (malformed payload spam)
-- Unbounded resource growth (idle session retention / leaks)
+- Session identity spoofing when claims are not authenticated
+- Application-layer request flooding per connection
+- Observability exhaustion from repeated malformed traffic
+- Unbounded resource retention (idle session accumulation / leaks)
 
 ### Does NOT prevent (out of scope for v0.1)
-- MITM without TLS (use reverse proxy TLS termination)
-- Compromised client keys / stolen environment secrets
-- Insider attacks (operator-level access)
-- Sophisticated distributed DoS (needs infra-level mitigation)
-- Full cryptographic identity / attestation / mTLS (v0.2+)
+- Transport interception or tampering on channels without confidentiality
+- Credential exposure or theft of secrets stored in the environment
+- Insider misuse with operator-level access
+- Large-scale volumetric DoS (requires infrastructure-level mitigation)
+- Strong cryptographic identity / attestation / mutual authentication (v0.2+)
 
 ---
 
@@ -68,7 +68,7 @@ Recommended:
 ## 3) Deployment recommendation (SHOULD)
 
 ### TLS termination via reverse proxy
-For v0.1, **SHOULD** terminate TLS at a reverse proxy (Nginx/Caddy/Traefik).
+For v0.1, **SHOULD** terminate TLS at a hardened edge layer such as a reverse proxy or load balancer.
 
 Reasons:
 - mature certificate rotation and ciphers
