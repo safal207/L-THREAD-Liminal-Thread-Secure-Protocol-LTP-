@@ -247,11 +247,12 @@ L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving co
 
 ## Canonical flow (reference)
 
-1. `hello` (client → server)
-2. `heartbeat`
-3. `orientation`
-4. `route_request`
-5. `route_response` with branches: `primary`, `recover`, `explore` (array or map accepted; normalized internally)
+The canonical exchange runs through these frames:
+- `hello` (client → server)
+- `heartbeat`
+- `orientation`
+- `route_request`
+- `route_response` with branches: `primary`, `recover`, `explore` (array or map accepted; normalized internally)
 
 ## DevTools
 
@@ -297,9 +298,10 @@ Contract: [ltp-inspect contract v1](./docs/contracts/ltp-inspect.v1.md).
 
 ## Release v0.1 quickstart (always works)
 
-1. Install dependencies: `pnpm -w install` (fallback: `npm install`).
-2. Run the frozen canonical demo: `pnpm -w demo:canonical-v0.1` (or `pnpm run demo:all` / `make demo`).
-3. Expected log: `hello -> heartbeat -> orientation -> route_request -> route_response` plus routing branches and explainability.
+Follow these quick steps to run the frozen canonical demo:
+- Install dependencies: `pnpm -w install` (fallback: `npm install`).
+- Run the frozen canonical demo: `pnpm -w demo:canonical-v0.1` (or `pnpm run demo:all` / `make demo`).
+- Expect `hello -> heartbeat -> orientation -> route_request -> route_response` plus routing branches and explainability.
 
 Sample output (from `make demo`):
 
@@ -311,11 +313,11 @@ Sequence: hello -> heartbeat -> orientation -> route_request -> route_response (
 
 Frame timeline (v0.1)
 ---------------------
-1. 2023-11-14T22:13:20.025Z :: hello (message=init canonical demo)
-2. 2023-11-14T22:13:20.050Z :: heartbeat (seq=1)
-3. 2023-11-14T22:13:20.075Z :: orientation (origin=client.demo)
-4. 2023-11-14T22:13:20.100Z :: route_request (goal=deliver canonical flow)
-5. 2023-11-14T22:13:20.125Z :: route_response (selection=primary)
+- 2023-11-14T22:13:20.025Z :: hello (message=init canonical demo)
+- 2023-11-14T22:13:20.050Z :: heartbeat (seq=1)
+- 2023-11-14T22:13:20.075Z :: orientation (origin=client.demo)
+- 2023-11-14T22:13:20.100Z :: route_request (goal=deliver canonical flow)
+- 2023-11-14T22:13:20.125Z :: route_response (selection=primary)
 
 Routing branches
 ----------------
@@ -532,13 +534,14 @@ Specs for reference: [LTP Conformance Endpoint v0.1](./specs/LTP-Conformance-End
 
 ### LTP Rust Node + JS demo client
 
-1. Start the Rust LTP node (assumes WebSocket on `127.0.0.1:7070`):
+Run the client demo with these two terminal commands:
+- Start the Rust LTP node (assumes WebSocket on `127.0.0.1:7070`):
 
 ```bash
 LTP_NODE_ADDR=127.0.0.1:7070 cargo run -p ltp-rust-node
 ```
 
-2. In another terminal, run the TypeScript dev client:
+- In another terminal, run the TypeScript dev client:
 
 ```bash
 LTP_NODE_WS_URL=ws://127.0.0.1:7070 \
@@ -586,13 +589,14 @@ The Dev Console client now emits structured log events with severities and keeps
 
 #### Running the Dev Console in scenario mode (simulated OK → WARN → CRITICAL)
 
-1. Start the Rust node (same as before):
+Follow these two steps to run the simulated drift mode:
+- Start the Rust node (same as before):
 
 ```bash
 LTP_NODE_ADDR=127.0.0.1:7070 cargo run -p ltp-rust-node
 ```
 
-2. Launch the Dev Console with scenario mode enabled (no real traffic needed; it simulates heartbeat drift):
+- Launch the Dev Console with scenario mode enabled (no real traffic needed; it simulates heartbeat drift):
 
 ```bash
 pnpm ts-node scripts/dev/ltp-node-demo.ts --scenario
@@ -753,12 +757,11 @@ EXPLORE (p=0.10, m=0.33)
 npm run demo:future-weave
 ```
 
-Скрипт:
-
-1. Считает temporal orientation
-2. Строит multi-path вероятности
-3. Визуализирует итоговый граф
-4. Печатает компактные метаданные каждой ветки
+Короткий сценарий выполнения:
+- Считает temporal orientation
+- Строит multi-path вероятности
+- Визуализирует итоговый граф
+- Печатает компактные метаданные каждой ветки
 
 Это идеальный инструмент для разработки и отладки.
 
@@ -781,11 +784,12 @@ npm run test:future-weave-graph
 
 Следующие шаги:
 
-1. JSON-экспорт графа (для UI, dashboards, HUD)
-2. Web-рендерер (SVG версии графа)
-3. Мультиагентные сценарии (через LTP-gateway)
-4. Интеграция с Liminal OS и Sensor Bridge
-5. «Черепаха времени» — управление перспективой просмотра будущих ветвей
+Ближайшие направления развития:
+- JSON-экспорт графа (для UI, dashboards, HUD)
+- Web-рендерер (SVG версии графа)
+- Мультиагентные сценарии (через LTP-gateway)
+- Интеграция с Liminal OS и Sensor Bridge
+- «Черепаха времени» — управление перспективой просмотра будущих ветвей
 
 ### Dev Console Visual Health View
 
@@ -1052,17 +1056,18 @@ client.sendEvent(
 
 **Option 1: JavaScript Server + Client**
 
-1. **Start the server:**
-   ```bash
-   cd examples/js-minimal-server
-   npm install && npm start
-   ```
+Follow these two commands to run the minimal JavaScript pair:
+- **Start the server:**
+  ```bash
+  cd examples/js-minimal-server
+  npm install && npm start
+  ```
 
-2. **In another terminal, run the client:**
-   ```bash
-   cd examples/js-minimal-client
-   npm install && npm start
-   ```
+- **In another terminal, run the client:**
+  ```bash
+  cd examples/js-minimal-client
+  npm install && npm start
+  ```
 
 **Option 2: Elixir Server**
 
@@ -1300,9 +1305,9 @@ LTP[4f3c9e2a.../b42a6f10...] ctx=evening_reflection affect={0.2,-0.3} intent=ref
 ```
 
 The server can then:
-1. **LTP layer** - Route message, maintain session context
-2. **LRI layer** - Extract intent, match resonance hooks, update RINSE (Resonance INner State Engine)
-3. **Response** - Send back resonance score and insights
+- **LTP layer** - Route message, maintain session context
+- **LRI layer** - Extract intent, match resonance hooks, update RINSE (Resonance INner State Engine)
+- **Response** - Send back resonance score and insights
 
 See `specs/LTP-message-format.md` section 9 for full details.
 
