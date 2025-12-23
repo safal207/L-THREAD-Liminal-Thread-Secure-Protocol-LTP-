@@ -49,7 +49,28 @@ jobs:
         run: |
           set -euxo pipefail
           pnpm -C packages/inspect run build
+          node packages/inspect/bin/ltp.js --help
+          node packages/inspect/bin/ltp.js inspect artifacts/traces/sample.trace.json --format=human --color=never
           node packages/inspect/bin/ltp.js inspect --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --color=never --quiet
+      - name: Fail fast when dist is missing
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rm -rf packages/inspect/dist
+          set +e
+          output=$(node packages/inspect/bin/ltp.js --help 2>&1)
+          status=$?
+          set -e
+          if [ "$status" -eq 0 ]; then
+            echo "expected missing build failure"
+            exit 1
+          fi
+          if [ "$status" -ne 4 ]; then
+            echo "unexpected exit code: $status"
+            echo "$output"
+            exit 1
+          fi
+          echo "$output" | grep -q "@ltp/inspect is not built. Run: pnpm -C packages/inspect build"
       - name: Inspect trace (non-strict, PR visibility)
         if: github.event_name == 'pull_request'
         continue-on-error: true

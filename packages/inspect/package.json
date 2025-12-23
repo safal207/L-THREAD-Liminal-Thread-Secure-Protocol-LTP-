@@ -9,13 +9,15 @@
   "scripts": {
     "clean": "node -e \"try{require('node:fs').rmSync('dist',{recursive:true,force:true});}catch(e){console.warn('WARN: failed to clean dist:',e?.message||e)}\"",
     "build": "tsc -p tsconfig.build.json",
-    "prepack": "npm run clean && npm run build"
+    "prepack": "npm run clean && npm run build",
+    "dev": "node ./bin/ltp-dev.js"
   },
   "files": [
-    "bin",
+    "bin/ltp.js",
     "dist"
   ],
   "devDependencies": {
+    "@types/node": "^20.19.27",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

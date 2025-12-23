@@ -31,6 +31,10 @@ importers:
         version: 8.18.3
 
   packages/inspect:
+    devDependencies:
+      '@types/node':
+        specifier: ^20.19.27
+        version: 20.19.27
     dependencies:
       ts-node:
         specifier: ^10.9.2
