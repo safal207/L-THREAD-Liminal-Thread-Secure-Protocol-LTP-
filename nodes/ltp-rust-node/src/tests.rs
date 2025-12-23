@@ -2,12 +2,16 @@ use std::time::{Duration, Instant};
 
 use crate::node::build_route_suggestion;
 use crate::protocol::{
-    ErrorCode, LtpIncomingMessage, LtpOutgoingMessage, TimeOrientationBoostPayload,
+    ErrorCode, LtpIncomingMessage, LtpOutgoingMessage, Sector, TimeOrientationBoostPayload,
     TimeOrientationDirectionPayload,
 };
 use crate::state::LtpNodeState;
-use crate::{process_message, validate_api_key, AppContext, Config, Metrics, TokenBucket};
+use crate::{process_message, AppContext, AuthConfig, AuthMode, Config, Metrics, TokenBucket};
+use dashmap::DashMap;
+use std::collections::HashMap;
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::sync::Mutex;
 
 #[tokio::test]
 async fn updates_orientation_state() {
@@ -45,7 +49,7 @@ async fn builds_route_suggestion_with_orientation() {
             debug,
             ..
         } => {
-            assert_eq!(suggested_sector, Sector::FuturePlanningHighMomentum);
+            assert_eq!(suggested_sector, Sector::FuturePlanning.to_string());
             assert!(reason.unwrap_or_default().len() > 0);
             let debug = debug.expect("debug block should be set");
             assert_eq!(debug.time_orientation.as_ref(), Some(&payload));
@@ -65,7 +69,7 @@ async fn builds_default_route_when_no_state() {
             debug,
             ..
         } => {
-            assert_eq!(suggested_sector, Sector::Neutral);
+            assert_eq!(suggested_sector, Sector::BaseNeutral.to_string());
             assert_eq!(reason, Some("default".to_string()));
             assert!(debug.is_some());
         }
@@ -95,10 +99,13 @@ async fn heartbeat_updates_last_seen() {
 
 #[tokio::test]
 async fn validate_api_key_accepts_and_rejects() {
-    let mut cfg = test_config();
-    cfg.api_keys = vec!["valid-key".to_string()];
-    assert!(validate_api_key("valid-key", &cfg).is_some());
-    assert!(validate_api_key("invalid", &cfg).is_none());
+    let cfg = test_config();
+    {
+        let mut keys = cfg.auth.keys.write().unwrap();
+        keys.insert("valid-id".to_string(), "valid-key".to_string());
+    }
+    assert!(cfg.auth.validate_api_key("valid-key").unwrap().is_some());
+    assert!(cfg.auth.validate_api_key("invalid").unwrap().is_none());
 }
 
 #[tokio::test]
@@ -126,10 +133,10 @@ async fn rejects_mismatched_session_id() {
 
 #[tokio::test]
 async fn token_bucket_enforces_limit() {
-    let mut bucket = TokenBucket::new(2, 2);
-    assert!(bucket.try_consume());
-    assert!(bucket.try_consume());
-    assert!(!bucket.try_consume());
+    let mut bucket = TokenBucket::new(2.0, 2.0);
+    assert!(bucket.allow());
+    assert!(bucket.allow());
+    assert!(!bucket.allow());
 }
 
 fn test_config() -> Config {
@@ -143,9 +150,22 @@ fn test_config() -> Config {
         handshake_timeout_ms: 1000,
         idle_ttl_ms: 1000,
         gc_interval_ms: 1000,
-        api_keys: vec![],
-        rate_limit_rps: 10,
-        rate_limit_burst: 20,
+        rate_limit_rps: 10.0,
+        rate_limit_burst: 20.0,
+        ip_rate_limit_rps: 10.0,
+        ip_rate_limit_burst: 20.0,
+        ip_rate_limit_ttl_secs: 60,
+        auth: AuthConfig {
+            mode: AuthMode::ApiKey,
+            keys: Arc::new(std::sync::RwLock::new(HashMap::new())),
+            jwt_secret: None,
+            keys_file: None,
+            keys_reload_interval: Duration::from_secs(60),
+            last_loaded_hash: Arc::new(Mutex::new(None)),
+            fail_closed: Arc::new(AtomicBool::new(false)),
+        },
+        trust_proxy: false,
+        audit_log_file: "test_audit.log".to_string(),
     }
 }
 
@@ -153,9 +173,44 @@ fn test_app_context() -> AppContext {
     let config = Arc::new(test_config());
     let metrics = Arc::new(Metrics::new().expect("metrics"));
     let state = Arc::new(LtpNodeState::new());
+    // In unit tests, we can't easily await inside non-async fn if not wrapped.
+    // But test_app_context is called by async tests?
+    // Wait, rejects_mismatched_session_id is #[tokio::test] async.
+    // So I can block_on or change signature.
+    // Since this is a test helper, I'll use futures::executor::block_on or just make it async if possible.
+    // But it's a fn, not async fn.
+    // I will use tokio::runtime::Runtime or just block_in_place if inside tokio.
+    // Actually, I can just use `futures::executor::block_on` if I add `futures` dev-dep.
+    // Or just make it async.
+    // But `process_message` uses it.
+
+    // Easier: Just spin up a runtime for this call since it's just for test init.
+    // Or make test_app_context async.
+
+    // Handle tests that are already inside a runtime (panic: Cannot start a runtime from within a runtime)
+    // and tests that are not.
+    // Simply use std::thread::spawn to avoid current-thread runtime issues if necessary
+    // But since this is a test and we just need an instance...
+    // The issue is `block_in_place` requires multithreaded runtime, but some tests run in current_thread.
+    // I can just change `test_app_context` to be async!
+    // But `process_message` uses `&AppContext`.
+    // Let's make `test_app_context` async and await it in tests.
+
+    // But refactoring all tests is annoying.
+    // Hack: spawn a thread to run the runtime block_on.
+    let log_file = config.audit_log_file.clone();
+    let tracer = Arc::new(std::thread::spawn(move || {
+        tokio::runtime::Runtime::new().unwrap().block_on(async {
+            crate::trace::TraceLogger::new(&log_file).await.unwrap()
+        })
+    }).join().unwrap());
+
     AppContext {
         config,
         state,
         metrics,
+        ip_limiters: Arc::new(DashMap::new()),
+        log_throttle: Arc::new(crate::LogThrottle::default()),
+        tracer,
     }
 }

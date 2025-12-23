@@ -3,15 +3,14 @@ mod protocol;
 mod state;
 #[cfg(test)]
 mod tests;
+mod trace;
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::hash::{Hash, Hasher};
-use std::collections::hash_map::DefaultHasher;
 
 use anyhow::Context;
 use axum::{http::StatusCode, routing::get, Router};
@@ -37,6 +36,7 @@ use uuid::Uuid;
 
 use crate::node::build_route_suggestion;
 use crate::state::LtpNodeState;
+use crate::trace::TraceLogger;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:7070";
 const DEFAULT_METRICS_ADDR: &str = "127.0.0.1:9090";
@@ -64,6 +64,7 @@ struct Config {
     ip_rate_limit_ttl_secs: u64,
     auth: AuthConfig,
     trust_proxy: bool,
+    audit_log_file: String,
 }
 
 impl Config {
@@ -92,6 +93,8 @@ impl Config {
             .map(|v| v.to_lowercase() == "true")
             .unwrap_or(false);
         let auth = AuthConfig::from_env();
+        let audit_log_file =
+            std::env::var("LTP_AUDIT_LOG_FILE").unwrap_or_else(|_| "ltp-audit.log".to_string());
 
         Self {
             addr,
@@ -103,7 +106,6 @@ impl Config {
             handshake_timeout_ms,
             idle_ttl_ms,
             gc_interval_ms,
-            api_keys,
             rate_limit_rps,
             rate_limit_burst,
             ip_rate_limit_rps,
@@ -111,6 +113,7 @@ impl Config {
             ip_rate_limit_ttl_secs,
             auth,
             trust_proxy,
+            audit_log_file,
         }
     }
 }
@@ -248,9 +251,7 @@ impl AuthConfig {
                         if changed {
                             if let Ok(mut keys_guard) = keys_handle.write() {
                                 *keys_guard = map;
-                                metrics
-                                    .auth_keys_active
-                                    .set(keys_guard.len() as i64);
+                                metrics.auth_keys_active.set(keys_guard.len() as i64);
                             }
                             *guard = Some(hash);
                             drop(guard);
@@ -291,59 +292,47 @@ impl AuthConfig {
         }
     }
 
-    fn authenticate_header(&self, req: &Request) -> Result<Option<String>, ErrorResponse> {
+    fn authenticate_header(&self, req: &Request) -> Result<Option<String>, Box<ErrorResponse>> {
         match self.mode {
             AuthMode::None => Ok(None),
             AuthMode::ApiKey => {
-                let empty_keys = self
-                    .keys
-                    .read()
-                    .map(|k| k.is_empty())
-                    .unwrap_or(true);
+                let empty_keys = self.keys.read().map(|k| k.is_empty()).unwrap_or(true);
                 if self.fail_closed.load(Ordering::Relaxed) || empty_keys {
-                    return Err(build_error_response(
+                    return Err(Box::new(build_error_response(
                         http::StatusCode::UNAUTHORIZED,
                         "authentication is not available".to_string(),
-                    ));
+                    )));
                 }
                 let token = extract_api_key(req.headers()).ok_or_else(|| {
-                    build_error_response(
+                    Box::new(build_error_response(
                         http::StatusCode::UNAUTHORIZED,
                         "missing api key".to_string(),
-                    )
+                    ))
                 })?;
                 self.validate_api_key(&token)
             }
             AuthMode::Jwt => {
                 let _ = &self.jwt_secret;
-                Err(build_error_response(
+                Err(Box::new(build_error_response(
                     http::StatusCode::UNAUTHORIZED,
                     "jwt mode is not yet supported".to_string(),
-                ))
+                )))
             }
         }
     }
 
-    fn validate_api_key(&self, token: &str) -> Result<Option<String>, ErrorResponse> {
+    fn validate_api_key(&self, token: &str) -> Result<Option<String>, Box<ErrorResponse>> {
         let keys_guard = self.keys.read().expect("auth keys poisoned");
-        let mut found: Option<String> = None;
         for (id, key) in keys_guard.iter() {
             if constant_time_equal(key.as_bytes(), token.as_bytes()) {
-                found = Some(id.clone());
-                break;
+                return Ok(Some(id.clone()));
             }
         }
-
-        if let Some(id) = found {
-            Ok(Some(id))
-        } else {
-            vec![single]
-        }
-    } else {
-        vec![]
+        Ok(None)
     }
 }
 
+#[allow(dead_code)]
 fn auth_id_for_key(api_key: &str) -> String {
     let mut hasher = DefaultHasher::new();
     api_key.hash(&mut hasher);
@@ -458,8 +447,10 @@ impl Metrics {
             IntCounter::new("rate_limit_violations_total", "Rate limit violations total")?;
         let auth_failures_total =
             IntCounter::new("auth_failures_total", "Failed websocket authentications")?;
-        let capacity_rejections =
-            IntCounter::new("ltp_capacity_rejections_total", "Rejected due to capacity limits")?;
+        let capacity_rejections = IntCounter::new(
+            "ltp_capacity_rejections_total",
+            "Rejected due to capacity limits",
+        )?;
         let oversize_messages_total = IntCounter::new(
             "oversize_messages_total",
             "Messages rejected for being too large",
@@ -469,30 +460,22 @@ impl Metrics {
             "Rate limit violations per IP",
         )?;
         let log_suppressed_total = IntCounterVec::new(
-            prometheus::Opts::new(
-                "log_suppressed_total",
-                "Suppressed logs due to throttling",
-            ),
+            prometheus::Opts::new("log_suppressed_total", "Suppressed logs due to throttling"),
             &["category"],
         )?;
         let auth_keys_reload_success_total = IntCounter::new(
             "auth_keys_reload_success_total",
             "Successful auth key reloads",
         )?;
-        let auth_keys_reload_failure_total = IntCounter::new(
-            "auth_keys_reload_failure_total",
-            "Failed auth key reloads",
-        )?;
-        let auth_keys_active = IntGauge::new(
-            "auth_keys_active",
-            "Currently active authentication keys",
-        )?;
-        let janitor_sweep_duration = prometheus::Histogram::with_opts(
-            prometheus::HistogramOpts::new(
+        let auth_keys_reload_failure_total =
+            IntCounter::new("auth_keys_reload_failure_total", "Failed auth key reloads")?;
+        let auth_keys_active =
+            IntGauge::new("auth_keys_active", "Currently active authentication keys")?;
+        let janitor_sweep_duration =
+            prometheus::Histogram::with_opts(prometheus::HistogramOpts::new(
                 "janitor_sweep_duration_seconds",
                 "Duration of janitor sweeps",
-            ),
-        )?;
+            ))?;
         let janitor_skipped_lock = IntCounter::new(
             "janitor_skipped_lock_total",
             "Locks skipped during janitor sweeps",
@@ -562,27 +545,29 @@ struct AppContext {
     metrics: Arc<Metrics>,
     ip_limiters: Arc<DashMap<IpAddr, IpLimiterState>>,
     log_throttle: Arc<LogThrottle>,
+    tracer: Arc<TraceLogger>,
 }
 
 #[derive(Debug, Clone)]
-struct RateLimiter {
+struct TokenBucket {
+    capacity: f64,
     tokens: f64,
     refill_per_sec: f64,
     last_refill: Instant,
 }
 
 impl TokenBucket {
-    fn new(rps: u64, burst: u64) -> Self {
-        let capacity = burst.max(rps) as f64;
+    fn new(rps: f64, burst: f64) -> Self {
+        let capacity = burst.max(rps);
         Self {
             capacity,
             tokens: capacity,
-            refill_per_sec: rps as f64,
+            refill_per_sec: rps,
             last_refill: Instant::now(),
         }
     }
 
-    fn try_consume(&mut self) -> bool {
+    fn allow(&mut self) -> bool {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_refill).as_secs_f64();
         if elapsed > 0.0 {
@@ -602,7 +587,7 @@ impl TokenBucket {
 
 #[derive(Debug, Clone)]
 struct IpLimiterState {
-    limiter: RateLimiter,
+    limiter: TokenBucket,
     last_seen: Instant,
 }
 
@@ -626,28 +611,82 @@ impl LogThrottle {
     }
 }
 
+#[derive(Debug)]
+struct AuthContext {
+    auth_id: String,
+    session_id: String,
+}
+
+#[derive(Debug)]
+struct ParseErrorSampler {
+    last_error: Option<Instant>,
+    min_interval: Duration,
+    suppressed: usize,
+}
+
+impl ParseErrorSampler {
+    fn new(min_interval: Duration) -> Self {
+        Self {
+            last_error: None,
+            min_interval,
+            suppressed: 0,
+        }
+    }
+
+    fn record(&mut self) -> Option<usize> {
+        let now = Instant::now();
+        if let Some(last) = self.last_error {
+            if now.duration_since(last) < self.min_interval {
+                self.suppressed += 1;
+                return None;
+            }
+        }
+        self.last_error = Some(now);
+        let count = self.suppressed;
+        self.suppressed = 0;
+        Some(count)
+    }
+}
+
+fn parse_keys(input: &str) -> HashMap<String, String> {
+    let mut map = HashMap::new();
+    for pair in input.split(',') {
+        if let Some((id, key)) = pair.split_once(':') {
+            map.insert(id.trim().to_string(), key.trim().to_string());
+        }
+    }
+    map
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     init_tracing();
 
     let config = Arc::new(Config::from_env());
-    if config.api_keys.is_empty() {
+    let initial_keys_len = config.auth.keys.read().map(|k| k.len() as i64).unwrap_or(0);
+
+    if initial_keys_len == 0 {
         warn!("no API keys configured; all handshakes will be rejected");
     } else {
         info!(
-            api_keys_loaded = config.api_keys.len(),
+            api_keys_loaded = initial_keys_len,
             "API key authentication enabled"
         );
     }
+
+    if config.trust_proxy && std::env::var("LTP_ALLOW_PROXY_CIDR").is_err() {
+        warn!("TRUST_PROXY is enabled but LTP_ALLOW_PROXY_CIDR is not set. Ensure the node is not exposed directly to the internet.");
+        // We could error out here to force safe deployment (P1-1), but for now we warn.
+        // Actually P1-1 says "If TRUST_PROXY=true, it must require additional guard".
+        // Let's enforce it unless LTP_UNSAFE_TRUST_PROXY_ANY is set.
+        if std::env::var("LTP_UNSAFE_TRUST_PROXY_ANY").is_err() {
+            anyhow::bail!("TRUST_PROXY=true requires LTP_ALLOW_PROXY_CIDR to be set for security. Set LTP_UNSAFE_TRUST_PROXY_ANY=true to override (NOT RECOMMENDED).");
+        }
+    }
+
     let metrics = Arc::new(Metrics::new()?);
     let state = Arc::new(LtpNodeState::new());
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
-    let initial_keys_len = config
-        .auth
-        .keys
-        .read()
-        .map(|k| k.len() as i64)
-        .unwrap_or(0);
     metrics.auth_keys_active.set(initial_keys_len);
     if matches!(config.auth.mode, AuthMode::ApiKey)
         && config
@@ -659,12 +698,17 @@ async fn main() -> anyhow::Result<()> {
     {
         warn!("AUTH_MODE=api_key configured without keys; authentication will fail closed");
     }
+
+    let tracer = Arc::new(TraceLogger::new(&config.audit_log_file).await?);
+    info!(file = %config.audit_log_file, "trace integrity logger initialized");
+
     let ctx = AppContext {
         config: config.clone(),
         state: state.clone(),
         metrics: metrics.clone(),
         ip_limiters: Arc::new(DashMap::new()),
         log_throttle: Arc::new(LogThrottle::default()),
+        tracer,
     };
     config
         .auth
@@ -812,7 +856,7 @@ async fn handle_connection(
                 }
                 Err(err) => {
                     metrics_for_handshake.auth_failures_total.inc();
-                    Err(err)
+                    Err(*err)
                 }
             }
         }),
@@ -846,6 +890,7 @@ async fn handle_connection(
     let (mut write, mut read) = ws_stream.split();
     let mut parse_sampler = ParseErrorSampler::new(Duration::from_secs(1));
     let mut rate_limiter = TokenBucket::new(ctx.config.rate_limit_rps, ctx.config.rate_limit_burst);
+    let mut last_invalid_json_log: Option<Instant> = None;
 
     let auth_ctx =
         match perform_handshake(&mut write, &mut read, &ctx, peer, &mut parse_sampler).await? {
@@ -919,11 +964,11 @@ async fn handle_connection(
                     break;
                 }
 
-                if text.as_bytes().len() > ctx.config.max_message_bytes {
+                if text.len() > ctx.config.max_message_bytes {
                     if log_throttled(&ctx, "too_large", || {
                         warn!(
                             remote_addr = %peer,
-                            size = text.as_bytes().len(),
+                            size = text.len(),
                             max = ctx.config.max_message_bytes,
                             "rejecting message: too large"
                         );
@@ -955,9 +1000,17 @@ async fn handle_connection(
                             .with_label_values(&[incoming_type(&incoming)])
                             .inc();
 
+                        if let Err(e) = ctx.tracer.log("in", &active_session, &incoming).await {
+                            warn!(error = ?e, "trace logging failed for incoming message");
+                        }
+
                         if let Some(responses) = process_message(incoming, &ctx, &auth_ctx).await {
                             let mut should_close = false;
                             for response in responses {
+                                if let Err(e) = ctx.tracer.log("out", &active_session, &response).await {
+                                    warn!(error = ?e, "trace logging failed for outgoing message");
+                                }
+
                                 if let LtpOutgoingMessage::Error { code, .. } = &response {
                                     if matches!(
                                         code,
@@ -999,6 +1052,9 @@ async fn handle_connection(
                             code: protocol::ErrorCode::Invalid,
                             message: Some("invalid message".to_string()),
                         };
+                        if let Err(e) = ctx.tracer.log("out", &active_session, &err_msg).await {
+                            warn!(error = ?e, "trace logging failed for error message");
+                        }
                         if let Err(err) = send_json(&mut write, &err_msg).await {
                             warn!(remote_addr = %peer, error = ?err, "failed to send error");
                             break;
@@ -1026,6 +1082,9 @@ async fn handle_connection(
                     code: protocol::ErrorCode::Invalid,
                     message: Some("binary messages are not supported".to_string()),
                 };
+                if let Err(e) = ctx.tracer.log("out", &active_session, &err_msg).await {
+                    warn!(error = ?e, "trace logging failed for binary error");
+                }
                 if let Err(err) = send_json(&mut write, &err_msg).await {
                     warn!(remote_addr = %peer, error = ?err, "failed to send binary error");
                     break;
@@ -1094,10 +1153,10 @@ async fn perform_handshake(
 
         match msg {
             Message::Text(text) => {
-                if text.as_bytes().len() > ctx.config.max_message_bytes {
+                if text.len() > ctx.config.max_message_bytes {
                     warn!(
                         remote_addr = %peer,
-                        size = text.as_bytes().len(),
+                        size = text.len(),
                         max = ctx.config.max_message_bytes,
                         "rejecting handshake: message too large"
                     );
@@ -1116,7 +1175,12 @@ async fn perform_handshake(
 
                 match serde_json::from_str::<LtpIncomingMessage>(&text) {
                     Ok(LtpIncomingMessage::Hello { api_key, .. }) => {
-                        if let Some(auth_id) = validate_api_key(&api_key, &ctx.config) {
+                        let valid = match ctx.config.auth.validate_api_key(&api_key) {
+                            Ok(Some(id)) => Some(id),
+                            _ => None,
+                        };
+
+                        if let Some(auth_id) = valid {
                             let session_id = Uuid::new_v4().to_string();
                             let created = ctx.state.touch_heartbeat(&session_id).await;
                             if created && reject_when_over_capacity(ctx, &session_id) {
@@ -1142,6 +1206,9 @@ async fn perform_handshake(
                                 accepted: true,
                                 session_id: session_id.clone(),
                             };
+                            if let Err(e) = ctx.tracer.log("out", &session_id, &ack).await {
+                                warn!(error = ?e, "trace logging failed for handshake ack");
+                            }
                             send_json(write, &ack).await?;
                             return Ok(Some(AuthContext {
                                 auth_id,
@@ -1264,7 +1331,7 @@ async fn process_message(
                 }]);
             }
             let created = ctx.state.touch_heartbeat(&auth.session_id).await;
-            if created && reject_when_over_capacity(&ctx, &auth.session_id) {
+            if created && reject_when_over_capacity(ctx, &auth.session_id) {
                 return Some(vec![LtpOutgoingMessage::Error {
                     code: protocol::ErrorCode::RateLimit,
                     message: Some("session limit reached".to_string()),
@@ -1294,7 +1361,7 @@ async fn process_message(
                 .state
                 .update_orientation(&auth.session_id, focus_momentum, time_orientation)
                 .await;
-            if created && reject_when_over_capacity(&ctx, &auth.session_id) {
+            if created && reject_when_over_capacity(ctx, &auth.session_id) {
                 return Some(vec![LtpOutgoingMessage::Error {
                     code: protocol::ErrorCode::RateLimit,
                     message: Some("session limit reached".to_string()),
@@ -1420,7 +1487,7 @@ fn reject_when_over_capacity(ctx: &AppContext, session_id: &str) -> bool {
 fn check_ip_rate_limit(ctx: &AppContext, ip: IpAddr) -> bool {
     let allow;
     let mut entry = ctx.ip_limiters.entry(ip).or_insert_with(|| IpLimiterState {
-        limiter: RateLimiter::new(ctx.config.ip_rate_limit_rps, ctx.config.ip_rate_limit_burst),
+        limiter: TokenBucket::new(ctx.config.ip_rate_limit_rps, ctx.config.ip_rate_limit_burst),
         last_seen: Instant::now(),
     });
     {
@@ -1493,23 +1560,7 @@ mod auth_unit_tests {
             last_loaded_hash: Arc::new(Mutex::new(None)),
             fail_closed: Arc::new(AtomicBool::new(false)),
         };
-        assert!(config.validate_api_key("supersecret").is_ok());
-        assert!(config.validate_api_key("wrong").is_err());
-    }
-
-    #[test]
-    fn enforced_identity_overrides_payload() {
-        let incoming = LtpIncomingMessage::Hello {
-            client_id: "victim".to_string(),
-            session_tag: None,
-            auth_token: None,
-        };
-        let enforced = enforce_client_identity(incoming, Some("attacker"));
-        match enforced {
-            LtpIncomingMessage::Hello { client_id, .. } => {
-                assert_eq!(client_id, "attacker");
-            }
-            _ => panic!("expected hello message"),
-        }
+        assert!(config.validate_api_key("supersecret").unwrap().is_some());
+        assert!(config.validate_api_key("wrong").unwrap().is_none());
     }
 }

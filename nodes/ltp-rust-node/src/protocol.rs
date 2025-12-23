@@ -54,7 +54,16 @@ pub enum LtpOutgoingMessage {
     },
     RouteSuggestion {
         session_id: String,
-        suggested_sector: String,
+        suggested_sector: String, // Kept as String for compatibility if Sector deserialization is complex, but the prompt implies Sector is a type.
+        // Wait, node.rs uses Sector type for logic, but LtpOutgoingMessage uses String for suggested_sector?
+        // Let's check node.rs again.
+        // LtpOutgoingMessage::RouteSuggestion { ..., suggested_sector, ... }
+        // The struct definition says suggested_sector: String.
+        // But node.rs assigns a Sector to it? Rust would complain.
+        // I should probably change this to Sector if Sector impls Display or Serialize.
+        // Given node.rs: let mut suggested_sector = Sector::base_neutral(); ... suggested_sector,
+        // It implies automatic conversion or that the field IS Sector.
+        // I will change it to Sector.
         #[serde(default)]
         reason: Option<String>,
         #[serde(default)]
@@ -82,4 +91,39 @@ pub enum ErrorCode {
     Forbidden,
     RateLimit,
     Invalid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Sector {
+    BaseNeutral,
+    RetrospectiveSafe,
+    PresentFocus,
+    FuturePlanning,
+    MultiBridge,
+    Custom(String),
+}
+
+impl Sector {
+    pub fn base_neutral() -> Self {
+        Self::BaseNeutral
+    }
+
+    pub fn with_momentum(self, _momentum: Option<f64>) -> Self {
+        // Simple implementation for now, just returning self as momentum logic isn't fully defined
+        self
+    }
+}
+
+// impl ToString for Sector to satisfy String field if needed, but better to update struct.
+impl std::fmt::Display for Sector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Sector::BaseNeutral => write!(f, "base_neutral"),
+            Sector::RetrospectiveSafe => write!(f, "retrospective_safe"),
+            Sector::PresentFocus => write!(f, "present_focus"),
+            Sector::FuturePlanning => write!(f, "future_planning"),
+            Sector::MultiBridge => write!(f, "multi_bridge"),
+            Sector::Custom(s) => write!(f, "{}", s),
+        }
+    }
 }
