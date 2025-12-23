@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use crate::node::build_route_suggestion;
 use crate::protocol::{
-    LtpOutgoingMessage, TimeOrientationBoostPayload, TimeOrientationDirectionPayload,
+    LtpOutgoingMessage, Sector, TimeOrientationBoostPayload, TimeOrientationDirectionPayload,
 };
 use crate::state::LtpNodeState;
 
@@ -42,8 +42,7 @@ async fn builds_route_suggestion_with_orientation() {
             debug,
             ..
         } => {
-            assert!(suggested_sector.contains("future_planning"));
-            assert!(suggested_sector.contains("high_momentum"));
+            assert_eq!(suggested_sector, Sector::FuturePlanningHighMomentum);
             assert!(reason.unwrap_or_default().len() > 0);
             let debug = debug.expect("debug block should be set");
             assert_eq!(debug.time_orientation.as_ref(), Some(&payload));
@@ -63,7 +62,7 @@ async fn builds_default_route_when_no_state() {
             debug,
             ..
         } => {
-            assert_eq!(suggested_sector, "neutral");
+            assert_eq!(suggested_sector, Sector::Neutral);
             assert_eq!(reason, Some("default".to_string()));
             assert!(debug.is_some());
         }
@@ -144,4 +143,13 @@ async fn heartbeat_updates_last_seen() {
     state.touch_heartbeat("client-1").await;
     let after = state.snapshot("client-1").await.unwrap().last_seen;
     assert!(after > before);
+}
+
+#[test]
+fn sector_round_trips() {
+    let sector = Sector::FuturePlanningLowMomentum;
+    let serialized = serde_json::to_string(&sector).unwrap();
+    assert_eq!(serialized, "\"future_planning_low_momentum\"");
+    let deserialized: Sector = serde_json::from_str(&serialized).unwrap();
+    assert_eq!(deserialized, sector);
 }
