@@ -382,8 +382,13 @@ L-THREAD / LTP provides a **foundational protocol** for the next generation of A
 
 ---
 
+## Operational Safety Rule
+
+LTP must never exert direct influence over actions or decisions; it only transports context and metadata.
+
+---
+
 **Authors:** LTP Development Team  
 **Version:** 0.3  
 **Date:** January 2025  
 **License:** MIT
-
