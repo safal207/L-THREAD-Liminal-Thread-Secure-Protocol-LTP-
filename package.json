@@ -42,6 +42,7 @@
     "ltp:inspect": "ts-node tools/ltp-inspect/inspect.ts"
   },
   "devDependencies": {
+    "@types/node": "^25.0.3",
     "@types/ws": "^8.18.1",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
