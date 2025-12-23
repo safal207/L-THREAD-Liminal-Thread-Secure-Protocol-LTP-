@@ -97,6 +97,60 @@ jobs:
               body,
             });
 
+  inspect-cli-smoke:
+    name: Inspector CLI Smoke Test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Enable Corepack + pnpm
+        shell: bash
+        run: |
+          set -euxo pipefail
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+          pnpm -v
+      - name: Build inspector package
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pnpm install --frozen-lockfile
+          pnpm -C packages/inspect run build
+      - name: Pack and Install Global
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd packages/inspect
+          # Pack to generate .tgz
+          pnpm pack
+          TGZ_NAME=$(find . -name "*.tgz")
+          echo "Found tarball: $TGZ_NAME"
+
+          # Create clean temp env
+          mkdir -p ../../tmp-smoke
+          cd ../../tmp-smoke
+
+          # Install globally from the tarball
+          npm install -g ../packages/inspect/$TGZ_NAME
+      - name: Run Smoke Test (Standalone)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          # Verify ltp command exists
+          which ltp
+          ltp --version || true
+
+          # Run inspect on a fixture (path relative to repo root, we are in root here)
+          ltp inspect --input tools/ltp-inspect/fixtures/canonical-clean.json --format=human --color=never
+
+          # Verify exit code logic with strict mode
+          ltp inspect --strict --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --quiet
+
   verify-types:
     name: Verify Cross-SDK Type Consistency
     runs-on: ubuntu-latest

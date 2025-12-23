@@ -3,6 +3,9 @@
   "version": "0.1.1",
   "private": false,
   "type": "commonjs",
+  "engines": {
+    "node": ">=18"
+  },
   "bin": {
     "ltp": "./bin/ltp.js"
   },
