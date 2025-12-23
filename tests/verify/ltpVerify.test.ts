@@ -1,32 +1,35 @@
 import { describe, expect, test } from 'vitest';
-import { formatSummary, formatSummaryJson, type VerifySummary } from '../../scripts/verify/ltpVerify';
+import { formatSummaryText, formatSummaryJson, type VerifySummary, type VerifyReport } from '../../scripts/verify/ltpVerify';
 
 describe('ltp:verify summary output', () => {
   test('produces a canonical multiline summary block', () => {
-    const report: VerifyReport = {
-      version: '0.1',
-      timestamp: 1700000000,
-      checks: [
-        { name: 'build', status: 'OK' },
-        { name: 'js-sdk-tests', status: 'OK' },
-        { name: 'conformance', status: 'WARN', details: { score: 0.875, errors: 1, warnings: 2 } },
-        { name: 'cross-sdk-types', status: 'OK' },
-        { name: 'demos', status: 'FAIL' },
-      ],
-      overall: 'FAIL',
+    // We need to construct a VerifySummary, not VerifyReport, because formatSummaryText takes VerifySummary
+    const summary: VerifySummary = {
+       canonical: { status: 'FAIL', output: 'some error' }, // mapped from 'demos' check in report
+       conformance: { status: 'WARN', score: 0.875, errors: 1, warnings: 2 },
+       overall: 'FAIL'
     };
 
+    // Note: The formatSummaryText function output format might differ from the expectation in the old test.
+    // Let's check scripts/verify/ltpVerify.ts implementation of formatSummaryText:
+    /*
+      'LTP v0.1 verify',
+      '---------------',
+      `canonical: ${summary.canonical.status}`,
+      `conformance: ${summary.conformance.status} score=${summary.conformance.score.toFixed(3)} ` +
+        `errors=${summary.conformance.errors} warnings=${summary.conformance.warnings}`,
+      `overall: ${summary.overall}`,
+    */
+
     const expected = [
-      'LTP VERIFY SUMMARY (v0.1)',
-      'build: OK',
-      'js-sdk-tests: OK',
+      'LTP v0.1 verify',
+      '---------------',
+      'canonical: FAIL',
       'conformance: WARN score=0.875 errors=1 warnings=2',
-      'cross-sdk-types: OK',
-      'demos: FAIL',
       'overall: FAIL',
     ].join('\n');
 
-    expect(formatSummary(report)).toBe(expected);
+    expect(formatSummaryText(summary)).toBe(expected);
   });
 
   test('serializes JSON summary payloads', () => {

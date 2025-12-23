@@ -9,7 +9,8 @@
     "esModuleInterop": true,
     "declaration": false,
     "sourceMap": false,
-    "noEmitOnError": true
+    "noEmitOnError": true,
+    "types": ["node", "pdfkit"]
   },
   "include": ["../../tools/ltp-inspect/inspect.ts", "../../tools/ltp-inspect/types.ts"]
 }
