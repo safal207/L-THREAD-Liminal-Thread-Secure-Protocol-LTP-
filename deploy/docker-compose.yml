@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  ltp-node:
+    image: rust:1.76
+    working_dir: /app/nodes/ltp-rust-node
+    command: cargo run --release
+    environment:
+      - LTP_NODE_ADDR=0.0.0.0:7070
+      - LTP_NODE_METRICS_ADDR=0.0.0.0:9090
+      - AUTH_MODE=api_key
+      - AUTH_KEYS_FILE=/etc/ltp/auth_keys.json
+      - AUTH_KEYS_RELOAD_INTERVAL_SECS=30
+      - RATE_LIMIT_RPS=10
+      - RATE_LIMIT_BURST=20
+      - IP_RATE_LIMIT_RPS=5
+      - IP_RATE_LIMIT_BURST=10
+      - IP_RATE_LIMIT_TTL_SECS=600
+      - MAX_MESSAGE_BYTES=65536
+      - TRUST_PROXY=true
+    volumes:
+      - ../..:/app
+      - ./secrets/auth_keys.json:/etc/ltp/auth_keys.json:ro
+    ports:
+      - "7070:7070"
+      - "9090:9090"
+    depends_on:
+      - proxy
+
+  proxy:
+    image: caddy:2
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    environment:
+      - LTP_NODE_HOST=ltp-node
+      - LTP_NODE_PORT=7070
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - ltp-node
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus

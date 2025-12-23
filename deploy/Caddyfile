@@ -1,0 +1,13 @@
+:8443 {
+  encode gzip
+
+  @websockets {
+    header Connection *Upgrade*
+    header Upgrade websocket
+  }
+
+  reverse_proxy @websockets ${LTP_NODE_HOST}:${LTP_NODE_PORT} {
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Forwarded-Proto {scheme}
+  }
+}

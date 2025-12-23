@@ -73,7 +73,7 @@ async fn expires_idle_sessions() {
     let state = LtpNodeState::new();
     state.touch_heartbeat("stale-client").await;
     let removed = state.expire_idle(std::time::Duration::from_millis(0));
-    assert_eq!(removed, 1);
+    assert_eq!(removed.expired, 1);
 }
 
 #[tokio::test]
