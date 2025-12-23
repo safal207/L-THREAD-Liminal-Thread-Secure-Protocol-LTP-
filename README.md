@@ -107,6 +107,8 @@ See:
 
 ### Versioning & Stability
 
+Track stability by surface:
+
 - **Protocol:** `v0.1` — **Frozen Core**  
   Frames, Canonical Flow, Conformance, and Determinism rules are fixed and governed via RFC.
 
@@ -130,6 +132,8 @@ See:
 - ❌ A black-box intelligence layer
 
 ## Production hardening checklist (Rust node)
+
+Harden a Rust node with these defaults:
 
 - Terminate TLS at a reverse proxy (Caddy/Nginx/Traefik); forward WebSocket upgrades to the node.
 - Enable API-key auth with `AUTH_MODE=api_key` and supply keys via `AUTH_KEYS_FILE` (JSON object) or `AUTH_KEYS` fallback.
@@ -205,6 +209,8 @@ Any change affecting the meaning of **orientation**, **trajectory**, **admissibi
 
 ## Two-Layer Terminology
 
+Primary term references:
+
 - **Orientation** — current semantic state
 - **Route Response** — multiple plausible paths
 - **Focus Snapshot** — state telemetry for diagnostics
@@ -240,6 +246,8 @@ See [Operational Notes on Continuity](./docs/notes/continuity.md) for background
 L-THREAD (Liminal Thread Protocol) is a secure transport layer for preserving context, intent, and orientation between nodes and clients. v0.1 is frozen as a small, deterministic frame surface so demos, SDKs, and conformance tools stay in lockstep.
 
 ## v0.1 protocol surface (frozen)
+
+Reference values for the frozen surface:
 
 - Version: `0.1`
 - Frames: `hello`, `heartbeat`, `orientation`, `route_request`, `route_response`, `focus_snapshot`
@@ -281,6 +289,8 @@ Contract: [ltp-inspect contract v1](./docs/contracts/ltp-inspect.v1.md).
 
 ## Conformance kit (v0.1)
 
+How to interpret fixtures and outputs:
+
 - Expected-negative fixtures: `ok_*` must pass, `warn_*` should warn (but not fail), `fail_*` are expected failures.
 - Badge + report: writes JSON to `reports/ci-report.json` and badge JSON alongside.
 - Commands:
@@ -289,6 +299,8 @@ Contract: [ltp-inspect contract v1](./docs/contracts/ltp-inspect.v1.md).
   - `pnpm -w ltp:conformance selftest --mode calm`
 
 ## Quick verify (one command)
+
+Validate the frozen canon locally:
 
 - Run: `pnpm -w ltp:verify`
 - Actions: replays the frozen Canonical Flow v0.1 and verifies `fixtures/conformance/v0.1` via the conformance kit.
@@ -336,6 +348,8 @@ surface includes: hello, heartbeat, orientation, route_request, route_response, 
 ```
 
 ## Roadmap (v0.2 preview)
+
+Preview changes under evaluation:
 
 - Broader routing semantics (without adding new v0.1 frame types)
 - Optional richer explainability tags
@@ -840,10 +854,14 @@ LTP operates as a dedicated layer in the LIMINAL stack:
 
 ### Semantic Layers: Thread Life Model → Consciousness Web
 
+Layer responsibilities:
+
 - **Thread Life Model** captures the lifecycle of a single thread (birth → active → weakening → switching → archived) with energy/resonance metadata. SDK reference: [`sdk/js/README.consciousness-web.md`](./sdk/js/README.consciousness-web.md).
 - **Consciousness Web & Orientation Shell** build on top of that lifecycle to map relationships between threads (parent/child, shared scope/tags) and rotate focus across sectors. Specification: [`specs/LTP-ConsciousnessWeb.md`](./specs/LTP-ConsciousnessWeb.md).
 
 ## Key Features (v0.1)
+
+Highlights of the frozen release:
 
 - **Liminal Secure Handshake:** Protocol-level session establishment with future crypto hooks
 - **Thread Session Model:** Unique `thread_id` + `session_id` tracking
@@ -853,6 +871,8 @@ LTP operates as a dedicated layer in the LIMINAL stack:
 - **Message Types:** `handshake`, `ping`, `state_update`, `event`
 
 ## LTP v0.2 Overview
+
+Snapshot of v0.2 behavior:
 
 - **Continuity of the thread:** Clients persist `thread_id` in local storage (browser `localStorage`, filesystem, etc.) and attempt `handshake_resume` before falling back to `handshake_init` so liminal state survives reconnects or app restarts.
 - **Heartbeat & reconnect strategy:** SDKs send timed `ping` frames, expect `pong` within a configurable timeout, and automatically reconnect with exponential backoff (default: start at 1s, cap at 30s, stop after 5 tries) before surfacing a permanent failure hook.
@@ -1046,6 +1066,8 @@ client.sendEvent(
 ## Quick Start
 
 ### Prerequisites
+
+Install the language runtimes you plan to use:
 
 - Node.js 18+ (for JavaScript SDK and examples)
 - Python 3.9+ (for Python SDK)

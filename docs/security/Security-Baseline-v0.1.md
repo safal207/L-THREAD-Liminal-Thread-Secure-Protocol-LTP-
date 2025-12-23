@@ -5,26 +5,40 @@ This document defines the minimum security guarantees expected from any LTP node
 > v0.1 goal: prevent trivial hijacking, flooding, and operational self-DoS.
 > Not a full security model. A baseline.
 
----
-
-## 1) Threats this baseline addresses
-
-### Prevents (by baseline)
-- Session identity spoofing when claims are not authenticated
-- Application-layer request flooding per connection
-- Observability exhaustion from repeated malformed traffic
-- Unbounded resource retention (idle session accumulation / leaks)
-
-### Does NOT prevent (out of scope for v0.1)
-- Transport interception or tampering on channels without confidentiality
-- Credential exposure or theft of secrets stored in the environment
-- Insider misuse with operator-level access
-- Large-scale volumetric DoS (requires infrastructure-level mitigation)
-- Strong cryptographic identity / attestation / mutual authentication (v0.2+)
+The baseline is framed in **attack classes and risk categories**, not vendor choices.
+It distinguishes protocol guarantees (continuity + admissibility) from node controls
+(products decide how they meet the controls).
 
 ---
 
-## 2) Required controls (MUST)
+## 1) Attack classes and risk categories
+
+### Prevents (by baseline controls)
+- **Identity spoofing as continuity breach**: unauthenticated client claims cannot become session identity.
+- **Application-layer flooding**: per-connection message spikes cannot exhaust the node.
+- **Observability exhaustion**: repeated malformed traffic cannot drown logs/metrics.
+- **Resource retention**: idle or abandoned sessions cannot accumulate without limit.
+
+### Outside baseline (remain product responsibilities)
+- **Transport confidentiality/integrity**: protection against interception or tampering on plaintext channels.
+- **Secret handling**: credential exposure or theft of secrets stored in the environment.
+- **Operator misuse/insider risk**: privileged misuse beyond protocol reach.
+- **Volumetric denial of service**: large-scale network floods require infrastructure mitigations.
+- **Advanced identity**: mutual authentication, attestation, or hardware roots of trust (v0.2+ topics).
+
+Baseline controls keep continuity and admissibility intact under hostile inputs.
+They do not replace platform security programs.
+
+---
+
+## 2) Protocol guarantees vs node controls
+
+- **Protocol (LTP Core) guarantees**: content is classified as untrusted events; admissibility gating precedes any action layer; replayable traces make violations auditable.
+- **Node controls (this baseline)**: authentication, rate limits, log safety, and session GC prevent the node from being coerced into breaking those guarantees.
+
+Both are required to keep the boundary real.
+
+## 3) Required controls (MUST)
 
 ### A. Authentication at handshake
 **MUST** reject sessions that do not provide valid credentials during protocol handshake.
@@ -32,14 +46,14 @@ This document defines the minimum security guarantees expected from any LTP node
 - Identity must not be trusted if it is only client-supplied
 - Server must derive/validate session identity from an authenticated claim
 
-Minimal acceptable v0.1 options:
+Minimal acceptable v0.1 options (product selects mechanism):
 - static API key(s) via environment variables
 - token passed in handshake frame payload
 
 ### B. Rate limiting (per connection)
 **MUST** enforce application-level rate limits for message handling.
 
-Recommended:
+Recommended pattern (testable as a control, not a vendor lock):
 - Token Bucket
 - allow reasonable bursts, enforce average throughput
 
@@ -65,7 +79,7 @@ Recommended:
 
 ---
 
-## 3) Deployment recommendation (SHOULD)
+## 4) Deployment recommendation (SHOULD)
 
 ### TLS termination via reverse proxy
 For v0.1, **SHOULD** terminate TLS at a hardened edge layer such as a reverse proxy or load balancer.
@@ -79,7 +93,7 @@ mTLS inside the node is a v0.2+ topic.
 
 ---
 
-## 4) Operational notes (SHOULD)
+## 5) Operational notes (SHOULD)
 
 - Expose metrics: active sessions, expired sessions, rate-limit violations, malformed frames
 - Keep all limits configurable (env / config file)
@@ -87,7 +101,7 @@ mTLS inside the node is a v0.2+ topic.
 
 ---
 
-## 5) Conformance checklist (v0.1)
+## 6) Conformance checklist (v0.1)
 
 A node is "Security Baseline v0.1" compliant if:
 - [ ] handshake auth enforced
