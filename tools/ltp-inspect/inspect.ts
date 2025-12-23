@@ -777,6 +777,32 @@ function summarize(
     };
   }
 
+  let auditSummary;
+  if (compliance && complianceProfile === 'fintech') {
+    const failedChecks: string[] = [];
+    if (compliance.trace_integrity !== 'verified') failedChecks.push('trace_integrity');
+    if (compliance.identity_binding !== 'ok') failedChecks.push('identity_binding');
+    if (compliance.replay_determinism !== 'ok') failedChecks.push('replay_determinism');
+
+    // For fintech profile, we require strict compliance
+    const verdict = failedChecks.length === 0 ? 'PASS' : 'FAIL';
+
+    // Risk level logic
+    let riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
+    if (failedChecks.includes('trace_integrity')) {
+        riskLevel = 'HIGH';
+    } else if (failedChecks.length > 0) {
+        riskLevel = 'MEDIUM';
+    }
+
+    auditSummary = {
+        verdict,
+        risk_level: riskLevel,
+        failed_checks: failedChecks,
+        regulator_ready: verdict === 'PASS'
+    };
+  }
+
   const notes = [...warnings];
 
   return {
@@ -815,6 +841,7 @@ function summarize(
       futures: groupFutures(branches),
       notes,
       compliance,
+      audit_summary: auditSummary,
     },
     violations: [...constraintViolations, ...validation.violations, ...violations],
     warnings,
@@ -852,6 +879,18 @@ function exportPdf(summary: InspectSummary, outputPath: string): void {
 
     doc.fontSize(20).text('LTP Compliance Artifact', { align: 'center' });
     doc.moveDown();
+
+    if (summary.audit_summary) {
+        doc.fontSize(16).text('Audit Summary');
+        const verdictColor = summary.audit_summary.verdict === 'PASS' ? 'green' : 'red';
+        doc.fillColor(verdictColor).fontSize(14).text(`Verdict: ${summary.audit_summary.verdict}`);
+        doc.fillColor('black').fontSize(12).text(`Risk Level: ${summary.audit_summary.risk_level}`);
+        doc.text(`Regulator Ready: ${summary.audit_summary.regulator_ready}`);
+        if (summary.audit_summary.failed_checks.length > 0) {
+            doc.text(`Failed Checks: ${summary.audit_summary.failed_checks.join(', ')}`);
+        }
+        doc.moveDown();
+    }
 
     doc.fontSize(12).text(`Generated At: ${summary.generated_at}`);
     doc.text(`Tool: ${summary.tool.name} (build: ${summary.tool.build})`);
@@ -920,6 +959,18 @@ export function formatHuman(summary: InspectSummary): string {
     lines.push(`replay_determinism: ${summary.compliance.replay_determinism}`);
     if (summary.compliance.signatures?.present) {
         lines.push(`signatures: verified (keys: ${summary.compliance.signatures.key_ids.join(', ')})`);
+    }
+  }
+
+  if (summary.audit_summary) {
+    lines.push('');
+    lines.push('AUDIT SUMMARY');
+    const verdict = summary.audit_summary.verdict;
+    lines.push(`VERDICT: ${verdict}`);
+    lines.push(`risk_level: ${summary.audit_summary.risk_level}`);
+    lines.push(`regulator_ready: ${summary.audit_summary.regulator_ready}`);
+    if (summary.audit_summary.failed_checks.length > 0) {
+        lines.push(`FAILED CHECKS: ${summary.audit_summary.failed_checks.join(', ')}`);
     }
   }
 

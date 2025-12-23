@@ -4,12 +4,14 @@ const crypto = require('crypto');
 const frames = [
   {
     id: "f1",
+    v: "0.1",
     type: "hello",
     ts: "2023-01-01T12:00:00Z",
     payload: { agent: "LTP-Demo", version: "0.1" }
   },
   {
     id: "f2",
+    v: "0.1",
     type: "orientation",
     ts: "2023-01-01T12:00:01Z",
     identity: "user:123",
@@ -17,12 +19,14 @@ const frames = [
   },
   {
     id: "f3",
+    v: "0.1",
     type: "route_request",
     ts: "2023-01-01T12:00:02Z",
     payload: { target: "checkout" }
   },
   {
     id: "f4",
+    v: "0.1",
     type: "route_response",
     ts: "2023-01-01T12:00:03Z",
     payload: {
@@ -34,6 +38,7 @@ const frames = [
   },
   {
     id: "f5",
+    v: "0.1",
     type: "focus_snapshot",
     ts: "2023-01-01T12:00:04Z",
     payload: { drift: 0.05, notes: ["stable"] }
@@ -65,8 +70,8 @@ function generateAuditLog() {
       frame: frame,
       prev_hash: prevHash,
       // Signatures would go here, simulated for now
-      signature: "simulated_sig_" + Math.random().toString(36).substring(7),
-      key_id: "key-1",
+      signature: "SIMULATED_DETERMINISTIC_SIGNATURE",
+      key_id: "test-key-1",
       alg: "ed25519"
     };
 

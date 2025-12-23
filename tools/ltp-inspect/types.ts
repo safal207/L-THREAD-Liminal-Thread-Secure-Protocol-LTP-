@@ -39,6 +39,13 @@ export type BranchInsight = {
   constraints?: string[];
 };
 
+export type AuditSummary = {
+  verdict: 'PASS' | 'FAIL';
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+  failed_checks: string[];
+  regulator_ready: boolean;
+};
+
 export type ComplianceReport = {
   profile: string;
   trace_integrity: 'verified' | 'broken' | 'unchecked';
@@ -98,5 +105,6 @@ export type InspectSummary = {
     blocked: BranchInsight[];
   };
   compliance?: ComplianceReport;
+  audit_summary?: AuditSummary;
   notes: string[];
 };
