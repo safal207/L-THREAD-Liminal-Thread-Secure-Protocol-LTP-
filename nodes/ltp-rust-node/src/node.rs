@@ -4,8 +4,8 @@ use crate::protocol::{
 };
 use crate::state::LtpNodeState;
 
-pub async fn build_route_suggestion(state: &LtpNodeState, client_id: &str) -> LtpOutgoingMessage {
-    let client_state = state.snapshot(client_id).await;
+pub async fn build_route_suggestion(state: &LtpNodeState, session_id: &str) -> LtpOutgoingMessage {
+    let client_state = state.snapshot(session_id).await;
 
     let mut suggested_sector = Sector::base_neutral();
     let mut reason = String::from("default");
@@ -44,7 +44,7 @@ pub async fn build_route_suggestion(state: &LtpNodeState, client_id: &str) -> Lt
     }
 
     LtpOutgoingMessage::RouteSuggestion {
-        client_id: client_id.to_string(),
+        session_id: session_id.to_string(),
         suggested_sector,
         reason: Some(reason),
         debug: Some(RouteDebugInfo {
