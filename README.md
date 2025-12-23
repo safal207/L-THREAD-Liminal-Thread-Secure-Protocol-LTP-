@@ -6,7 +6,7 @@ It does not predict, decide, or optimize outcomes.
 ## Try it in 60 seconds
 
 ```bash
-pnpm i -g @ltp/inspect
+npm install -g @ltp/inspect
 ltp inspect artifacts/traces/sample.trace.json
 ```
 
