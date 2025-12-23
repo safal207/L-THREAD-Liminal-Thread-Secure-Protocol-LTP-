@@ -1,3 +1,6 @@
-import { runCli } from '../../scripts/verify/ltpVerify';
+import { main } from '../../scripts/verify/ltpVerify';
 
-runCli(process.argv);
+main(process.argv.slice(2)).catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

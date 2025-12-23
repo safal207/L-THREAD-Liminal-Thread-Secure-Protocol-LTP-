@@ -102,7 +102,7 @@ function determineReason(focusMomentum: number, volatility: number): string {
     return "fragmented focus, suggesting soft shift";
   }
 
-  if (focusMomentum >= 0.5 && volatility > lowVolatility) {
+  if (focusMomentum >= 0.5 && !lowVolatility) {
     return "growing momentum with some fluctuation, proposing careful step";
   }
 

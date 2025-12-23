@@ -178,7 +178,7 @@ function simulateFocusMomentum(now = Date.now()): number {
   return Number((wave + drift).toFixed(2));
 }
 
-function startFocusHud(): LtpClient {
+export function startFocusHud(): LtpClient {
   const endpoint = process.env.LTP_ENDPOINT ?? "ws://localhost:8080/ws";
   const clientId = process.env.LTP_MONITOR_CLIENT_ID ?? "ltp-focus-hud";
 
@@ -278,4 +278,3 @@ if (require.main === module) {
   startFocusHud();
 }
 
-export { FOCUS_HISTORY_LIMIT, startFocusHud };
