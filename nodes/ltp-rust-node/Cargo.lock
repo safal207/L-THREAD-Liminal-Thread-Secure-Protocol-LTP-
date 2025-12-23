@@ -606,6 +606,7 @@ dependencies = [
  "futures-util",
  "http",
  "prometheus",
+ "rand",
  "serde",
  "serde_json",
  "tokio",
