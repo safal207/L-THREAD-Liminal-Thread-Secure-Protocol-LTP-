@@ -19,6 +19,7 @@ export type TraceEntry = {
   hash: string;
   signature?: string;
   alg?: string;
+  key_id?: string;
 };
 
 export type DriftSnapshot = {
@@ -50,6 +51,12 @@ export type ComplianceReport = {
   determinism_details?: string;
   protocol: string;
   node: string;
+  signatures?: {
+    present: boolean;
+    valid: boolean; // simplistic check if we can't verify crypto without keys
+    key_ids: string[];
+    algorithm?: string;
+  };
 };
 
 export type InspectSummary = {
@@ -62,6 +69,7 @@ export type InspectSummary = {
   tool: {
     name: string;
     build: string;
+    hash?: string; // toolchain hash
   };
   input: {
     source: 'stdin' | 'file';
@@ -69,6 +77,7 @@ export type InspectSummary = {
     frames: number;
     format: 'jsonl' | 'json';
     type: 'raw' | 'audit_log';
+    hash_root?: string; // The last hash in the chain
   };
   orientation: {
     identity: string;
