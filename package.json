@@ -43,9 +43,11 @@
   },
   "devDependencies": {
     "@types/node": "^25.0.3",
+    "@types/pdfkit": "^0.17.4",
     "@types/ws": "^8.18.1",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
+    "pdfkit": "^0.17.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "vitest": "^2.0.5",
@@ -54,8 +56,5 @@
   "workspaces": [
     "sdk/js",
     "tools/conformance-kit"
-  ],
-  "dependencies": {
-    "pdfkit": "^0.17.2"
-  }
+  ]
 }

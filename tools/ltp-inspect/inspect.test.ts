@@ -219,7 +219,7 @@ describe('ltp inspect cli', () => {
   it('boots without crashing', async () => {
     const distPath = await buildInspectCli();
     const result = await runCommand('node', [distPath, sampleTrace], {
-      env: { ...process.env, LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z' },
+      env: { ...process.env, LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z', LTP_INSPECT_TEST_RUN: '1' },
     });
 
     expect(result.exitCode).toBe(0);
