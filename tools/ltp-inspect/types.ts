@@ -9,6 +9,18 @@ export type LtpFrame = {
   [key: string]: unknown;
 };
 
+export type TraceEntry = {
+  i: number;
+  timestamp_ms: number;
+  direction: string;
+  session_id: string;
+  frame: LtpFrame;
+  prev_hash: string;
+  hash: string;
+  signature?: string;
+  alg?: string;
+};
+
 export type DriftSnapshot = {
   id?: string;
   ts?: string | number;
@@ -24,6 +36,20 @@ export type BranchInsight = {
   class?: string;
   reason?: string;
   constraints?: string[];
+};
+
+export type ComplianceReport = {
+  profile: string;
+  trace_integrity: 'verified' | 'broken' | 'unchecked';
+  first_violation_index?: number;
+  identity_binding: 'ok' | 'violated' | 'unchecked';
+  continuity: {
+    breaks: number;
+  };
+  replay_determinism: 'ok' | 'failed' | 'unchecked';
+  determinism_details?: string;
+  protocol: string;
+  node: string;
 };
 
 export type InspectSummary = {
@@ -42,6 +68,7 @@ export type InspectSummary = {
     path?: string;
     frames: number;
     format: 'jsonl' | 'json';
+    type: 'raw' | 'audit_log';
   };
   orientation: {
     identity: string;
@@ -61,5 +88,6 @@ export type InspectSummary = {
     degraded: BranchInsight[];
     blocked: BranchInsight[];
   };
+  compliance?: ComplianceReport;
   notes: string[];
 };
