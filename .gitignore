@@ -45,6 +45,8 @@ coverage/
 artifacts/**
 !artifacts/traces/
 !artifacts/traces/sample.trace.json
+reports/
+packages/inspect/.npm-cache/
 
 # Misc
 .cache/

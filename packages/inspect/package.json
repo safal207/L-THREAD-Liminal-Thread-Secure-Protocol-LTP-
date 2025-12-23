@@ -6,10 +6,16 @@
   "bin": {
     "ltp": "./bin/ltp.js"
   },
+  "scripts": {
+    "clean": "node -e \"try{require('node:fs').rmSync('dist',{recursive:true,force:true});}catch(e){console.warn('WARN: failed to clean dist:',e?.message||e)}\"",
+    "build": "tsc -p tsconfig.build.json",
+    "prepack": "npm run clean && npm run build"
+  },
   "files": [
-    "bin"
+    "bin",
+    "dist"
   ],
-  "dependencies": {
+  "devDependencies": {
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
   }

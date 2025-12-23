@@ -43,7 +43,13 @@ jobs:
         run: |
           set -euxo pipefail
           pnpm fetch || echo "pnpm fetch skipped (offline)"
-          pnpm -w install --prefer-offline --no-frozen-lockfile
+          pnpm -w install --prefer-offline --frozen-lockfile
+      - name: Build packaged inspector CLI
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pnpm -C packages/inspect run build
+          node packages/inspect/bin/ltp.js inspect --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --color=never --quiet
       - name: Inspect trace (non-strict, PR visibility)
         if: github.event_name == 'pull_request'
         continue-on-error: true
@@ -148,21 +154,18 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-pnpm-
       - name: Install dependencies (resilient)
         shell: bash
         run: |
           set -euxo pipefail
-          pnpm fetch || echo "pnpm fetch skipped (no lockfile or offline)"
-          if ! pnpm -w install --prefer-offline --no-frozen-lockfile; then
+          pnpm fetch || echo "pnpm fetch skipped (offline)"
+          if ! pnpm -w install --prefer-offline --frozen-lockfile; then
             echo "pnpm install retry"
             sleep 5
-            if ! pnpm -w install --prefer-offline --no-frozen-lockfile; then
-              echo "pnpm install failed twice; falling back to npm install"
-              npm install
-            fi
+            pnpm -w install --prefer-offline --frozen-lockfile
           fi
       - name: Conformance verifier smoke test
         run: |
@@ -297,7 +300,7 @@ jobs:
         run: |
           set -euxo pipefail
           pnpm fetch || echo "pnpm fetch skipped"
-          pnpm -w install --prefer-offline --no-frozen-lockfile
+          pnpm -w install --prefer-offline --frozen-lockfile
 
       - uses: actions/setup-python@v4
         with:
