@@ -129,6 +129,19 @@ See:
 - ❌ A machine learning model  
 - ❌ A black-box intelligence layer
 
+## Production hardening checklist (Rust node)
+
+- Terminate TLS at a reverse proxy (Caddy/Nginx/Traefik); forward WebSocket upgrades to the node.
+- Enable API-key auth with `AUTH_MODE=api_key` and supply keys via `AUTH_KEYS_FILE` (JSON object) or `AUTH_KEYS` fallback.
+- Rotate keys without restart via `AUTH_KEYS_RELOAD_INTERVAL_SECS` (default 30s).
+- Enforce limits:
+  - Per-connection: `RATE_LIMIT_RPS`, `RATE_LIMIT_BURST`
+  - Per-IP: `IP_RATE_LIMIT_RPS`, `IP_RATE_LIMIT_BURST`, `IP_RATE_LIMIT_TTL_SECS`
+  - Message size: `MAX_MESSAGE_BYTES` (default 64KiB)
+- Keep idle sessions bounded: `LTP_NODE_IDLE_TTL_MS`, `LTP_NODE_GC_INTERVAL_MS`
+- Trust proxy headers only when safe: set `TRUST_PROXY=true` only behind a trusted proxy that sets `X-Forwarded-For`.
+- Scrape `/metrics` for flood/auth observability (`auth_keys_*`, `rate_limit_*`, `oversize_messages_total`, `log_suppressed_total`).
+
 ---
 
 ## 🧭 Choose your path

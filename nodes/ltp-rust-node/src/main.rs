@@ -4,12 +4,18 @@ mod state;
 #[cfg(test)]
 mod tests;
 
-use std::net::SocketAddr;
+use std::collections::HashMap;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 use anyhow::Context;
 use axum::{http::StatusCode, routing::get, Router};
+use dashmap::DashMap;
 use futures_util::{SinkExt, StreamExt};
 use prometheus::{Encoder, IntCounter, IntCounterVec, IntGauge, Registry, TextEncoder};
 use protocol::{LtpIncomingMessage, LtpOutgoingMessage};
@@ -34,6 +40,8 @@ use crate::state::LtpNodeState;
 
 const DEFAULT_ADDR: &str = "127.0.0.1:7070";
 const DEFAULT_METRICS_ADDR: &str = "127.0.0.1:9090";
+const DEFAULT_MAX_MESSAGE_BYTES: usize = 64 * 1024;
+const DEFAULT_AUTH_KEYS_RELOAD_SECS: u64 = 30;
 
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
@@ -49,9 +57,13 @@ struct Config {
     handshake_timeout_ms: u64,
     idle_ttl_ms: u64,
     gc_interval_ms: u64,
-    api_keys: Vec<String>,
-    rate_limit_rps: u64,
-    rate_limit_burst: u64,
+    rate_limit_rps: f64,
+    rate_limit_burst: f64,
+    ip_rate_limit_rps: f64,
+    ip_rate_limit_burst: f64,
+    ip_rate_limit_ttl_secs: u64,
+    auth: AuthConfig,
+    trust_proxy: bool,
 }
 
 impl Config {
@@ -62,14 +74,24 @@ impl Config {
         let metrics_addr = std::env::var("LTP_NODE_METRICS_ADDR")
             .unwrap_or_else(|_| DEFAULT_METRICS_ADDR.to_string());
         let max_connections = read_env_usize("LTP_NODE_MAX_CONNECTIONS", 10_000);
-        let max_message_bytes = read_env_usize("LTP_NODE_MAX_MESSAGE_BYTES", 128 * 1024);
+        let max_message_bytes = read_env_usize(
+            "LTP_NODE_MAX_MESSAGE_BYTES",
+            read_env_usize("MAX_MESSAGE_BYTES", DEFAULT_MAX_MESSAGE_BYTES),
+        );
         let max_sessions_total = read_env_usize("LTP_NODE_MAX_SESSIONS", 50_000);
         let handshake_timeout_ms = read_env_u64("LTP_NODE_HANDSHAKE_TIMEOUT_MS", 5_000);
         let idle_ttl_ms = read_env_u64("LTP_NODE_IDLE_TTL_MS", 60_000);
         let gc_interval_ms = read_env_u64("LTP_NODE_GC_INTERVAL_MS", 10_000);
-        let api_keys = read_api_keys();
-        let rate_limit_rps = read_env_u64("LTP_RATE_LIMIT_RPS", 20);
-        let rate_limit_burst = read_env_u64("LTP_RATE_LIMIT_BURST", 40);
+        let rate_limit_rps = read_env_f64("RATE_LIMIT_RPS", 10.0);
+        let rate_limit_burst = read_env_f64("RATE_LIMIT_BURST", 20.0);
+        let ip_rate_limit_rps = read_env_f64("IP_RATE_LIMIT_RPS", 5.0);
+        let ip_rate_limit_burst = read_env_f64("IP_RATE_LIMIT_BURST", 10.0);
+        let ip_rate_limit_ttl_secs = read_env_u64("IP_RATE_LIMIT_TTL_SECS", 600);
+        let trust_proxy = std::env::var("TRUST_PROXY")
+            .ok()
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(false);
+        let auth = AuthConfig::from_env();
 
         Self {
             addr,
@@ -84,6 +106,11 @@ impl Config {
             api_keys,
             rate_limit_rps,
             rate_limit_burst,
+            ip_rate_limit_rps,
+            ip_rate_limit_burst,
+            ip_rate_limit_ttl_secs,
+            auth,
+            trust_proxy,
         }
     }
 }
@@ -102,15 +129,213 @@ fn read_env_u64(key: &str, default: u64) -> u64 {
         .unwrap_or(default)
 }
 
-fn read_api_keys() -> Vec<String> {
-    if let Ok(list) = std::env::var("LTP_API_KEYS") {
-        list.split(',')
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect()
-    } else if let Ok(single) = std::env::var("LTP_API_KEY") {
-        if single.trim().is_empty() {
-            vec![]
+fn read_env_f64(key: &str, default: f64) -> f64 {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .unwrap_or(default)
+}
+
+#[derive(Clone, Debug)]
+enum AuthMode {
+    None,
+    ApiKey,
+    Jwt,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug)]
+enum IdentitySource {
+    Off,
+    ApiKey,
+    MtlsSubject,
+}
+
+#[derive(Clone, Debug)]
+struct AuthConfig {
+    mode: AuthMode,
+    keys: Arc<std::sync::RwLock<HashMap<String, String>>>,
+    jwt_secret: Option<String>,
+    keys_file: Option<String>,
+    keys_reload_interval: Duration,
+    last_loaded_hash: Arc<Mutex<Option<u64>>>,
+    fail_closed: Arc<AtomicBool>,
+}
+
+impl AuthConfig {
+    fn from_env() -> Self {
+        let mode = match std::env::var("AUTH_MODE")
+            .unwrap_or_else(|_| "none".to_string())
+            .to_lowercase()
+            .as_str()
+        {
+            "api_key" => AuthMode::ApiKey,
+            "jwt" => AuthMode::Jwt,
+            _ => AuthMode::None,
+        };
+
+        let keys_reload_interval = Duration::from_secs(read_env_u64(
+            "AUTH_KEYS_RELOAD_INTERVAL_SECS",
+            DEFAULT_AUTH_KEYS_RELOAD_SECS,
+        ));
+        let keys_file = std::env::var("AUTH_KEYS_FILE").ok();
+        let mut source_map = HashMap::new();
+
+        let fail_closed = Arc::new(AtomicBool::new(false));
+        if let Some(path) = keys_file.as_ref() {
+            match Self::load_keys_file(path) {
+                Ok((map, hash)) => {
+                    source_map = map;
+                    return Self {
+                        mode,
+                        keys: Arc::new(std::sync::RwLock::new(source_map)),
+                        jwt_secret: std::env::var("AUTH_JWT_SECRET").ok(),
+                        keys_file,
+                        keys_reload_interval,
+                        last_loaded_hash: Arc::new(Mutex::new(Some(hash))),
+                        fail_closed: fail_closed.clone(),
+                    };
+                }
+                Err(err) => {
+                    warn!(error = %err, file = %path, "failed to load AUTH_KEYS_FILE at startup");
+                    fail_closed.store(true, Ordering::Relaxed);
+                }
+            }
+        }
+
+        if let Ok(raw_keys) = std::env::var("AUTH_KEYS") {
+            source_map.extend(parse_keys(&raw_keys));
+        }
+
+        if matches!(mode, AuthMode::Jwt) {
+            warn!("AUTH_MODE=jwt is configured but JWT verification is not implemented; connections will be rejected");
+        }
+
+        Self {
+            mode,
+            keys: Arc::new(std::sync::RwLock::new(source_map)),
+            jwt_secret: std::env::var("AUTH_JWT_SECRET").ok(),
+            keys_file,
+            keys_reload_interval,
+            last_loaded_hash: Arc::new(Mutex::new(None)),
+            fail_closed,
+        }
+    }
+
+    fn start_reload_task(&self, metrics: Arc<Metrics>, shutdown: watch::Receiver<bool>) {
+        if self.keys_file.is_none() {
+            return;
+        }
+        let path = self.keys_file.clone().unwrap();
+        let keys_handle = self.keys.clone();
+        let last_loaded_hash = self.last_loaded_hash.clone();
+        let interval = self.keys_reload_interval;
+        let fail_closed_flag = self.fail_closed.clone();
+        tokio::spawn(async move {
+            let mut shutdown = shutdown;
+            loop {
+                tokio::select! {
+                    _ = tokio::time::sleep(interval) => {},
+                    _ = shutdown.changed() => {
+                        if *shutdown.borrow() { break; }
+                    }
+                }
+
+                match AuthConfig::load_keys_file(&path) {
+                    Ok((map, hash)) => {
+                        let mut guard = last_loaded_hash.lock().unwrap_or_else(|p| p.into_inner());
+                        let changed = guard.map(|h| h != hash).unwrap_or(true);
+                        if changed {
+                            if let Ok(mut keys_guard) = keys_handle.write() {
+                                *keys_guard = map;
+                                metrics
+                                    .auth_keys_active
+                                    .set(keys_guard.len() as i64);
+                            }
+                            *guard = Some(hash);
+                            drop(guard);
+                            fail_closed_flag.store(false, Ordering::Relaxed);
+                            metrics.auth_keys_reload_success_total.inc();
+                            info!(file = %path, "reloaded auth keys");
+                        }
+                    }
+                    Err(err) => {
+                        metrics.auth_keys_reload_failure_total.inc();
+                        warn!(error = %err, file = %path, "failed to reload auth keys");
+                    }
+                }
+
+                if *shutdown.borrow() {
+                    break;
+                }
+            }
+        });
+    }
+
+    fn load_keys_file(path: &str) -> anyhow::Result<(HashMap<String, String>, u64)> {
+        let content = std::fs::read_to_string(path)?;
+        let map = serde_json::from_str::<HashMap<String, String>>(&content)?;
+        let hash = hash_string(&content);
+        Ok((map, hash))
+    }
+
+    fn auth_enabled(&self) -> bool {
+        !matches!(self.mode, AuthMode::None)
+    }
+
+    fn identity_source(&self) -> IdentitySource {
+        match self.mode {
+            AuthMode::ApiKey => IdentitySource::ApiKey,
+            AuthMode::Jwt => IdentitySource::Off,
+            AuthMode::None => IdentitySource::Off,
+        }
+    }
+
+    fn authenticate_header(&self, req: &Request) -> Result<Option<String>, ErrorResponse> {
+        match self.mode {
+            AuthMode::None => Ok(None),
+            AuthMode::ApiKey => {
+                let empty_keys = self
+                    .keys
+                    .read()
+                    .map(|k| k.is_empty())
+                    .unwrap_or(true);
+                if self.fail_closed.load(Ordering::Relaxed) || empty_keys {
+                    return Err(build_error_response(
+                        http::StatusCode::UNAUTHORIZED,
+                        "authentication is not available".to_string(),
+                    ));
+                }
+                let token = extract_api_key(req.headers()).ok_or_else(|| {
+                    build_error_response(
+                        http::StatusCode::UNAUTHORIZED,
+                        "missing api key".to_string(),
+                    )
+                })?;
+                self.validate_api_key(&token)
+            }
+            AuthMode::Jwt => {
+                let _ = &self.jwt_secret;
+                Err(build_error_response(
+                    http::StatusCode::UNAUTHORIZED,
+                    "jwt mode is not yet supported".to_string(),
+                ))
+            }
+        }
+    }
+
+    fn validate_api_key(&self, token: &str) -> Result<Option<String>, ErrorResponse> {
+        let keys_guard = self.keys.read().expect("auth keys poisoned");
+        let mut found: Option<String> = None;
+        for (id, key) in keys_guard.iter() {
+            if constant_time_equal(key.as_bytes(), token.as_bytes()) {
+                found = Some(id.clone());
+                break;
+            }
+        }
+
+        if let Some(id) = found {
+            Ok(Some(id))
         } else {
             vec![single]
         }
@@ -125,15 +350,59 @@ fn auth_id_for_key(api_key: &str) -> String {
     format!("{:016x}", hasher.finish())
 }
 
-fn validate_api_key(api_key: &str, config: &Config) -> Option<String> {
-    if config.api_keys.is_empty() {
-        return None;
+fn constant_time_equal(a: &[u8], b: &[u8]) -> bool {
+    if a.len() != b.len() {
+        return false;
     }
-    config
-        .api_keys
-        .iter()
-        .find(|k| *k == api_key)
-        .map(|_| auth_id_for_key(api_key))
+    let mut diff: u8 = 0;
+    for (&x, &y) in a.iter().zip(b.iter()) {
+        diff |= x ^ y;
+    }
+    diff == 0
+}
+
+fn extract_api_key(headers: &http::HeaderMap) -> Option<String> {
+    if let Some(value) = headers.get("x-api-key") {
+        if let Ok(val) = value.to_str() {
+            if !val.is_empty() {
+                return Some(val.to_string());
+            }
+        }
+    }
+
+    if let Some(value) = headers.get(http::header::AUTHORIZATION) {
+        if let Ok(val) = value.to_str() {
+            if let Some(rest) = val.strip_prefix("Bearer ") {
+                return Some(rest.trim().to_string());
+            } else if let Some(rest) = val.strip_prefix("ApiKey ") {
+                return Some(rest.trim().to_string());
+            }
+        }
+    }
+
+    None
+}
+
+fn extract_forwarded_for(headers: &http::HeaderMap) -> Option<IpAddr> {
+    headers.get("x-forwarded-for").and_then(|v| {
+        v.to_str().ok().and_then(|s| {
+            s.split(',')
+                .next()
+                .and_then(|ip| ip.trim().parse::<IpAddr>().ok())
+        })
+    })
+}
+
+fn build_error_response(status: StatusCode, message: String) -> ErrorResponse {
+    Response::builder()
+        .status(status)
+        .body(Some(message))
+        .unwrap_or_else(|_| {
+            Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(None)
+                .unwrap()
+        })
 }
 
 struct Metrics {
@@ -147,6 +416,16 @@ struct Metrics {
     invalid_json_suppressed_total: IntCounter,
     rate_limit_violations_total: IntCounter,
     auth_failures_total: IntCounter,
+    capacity_rejections: IntCounter,
+    oversize_messages_total: IntCounter,
+    ip_rate_limit_violations_total: IntCounter,
+    log_suppressed_total: IntCounterVec,
+    auth_keys_reload_success_total: IntCounter,
+    auth_keys_reload_failure_total: IntCounter,
+    auth_keys_active: IntGauge,
+    janitor_sweep_duration: prometheus::Histogram,
+    janitor_skipped_lock: IntCounter,
+    janitor_expired_last_sweep: IntGauge,
 }
 
 impl Metrics {
@@ -179,6 +458,49 @@ impl Metrics {
             IntCounter::new("rate_limit_violations_total", "Rate limit violations total")?;
         let auth_failures_total =
             IntCounter::new("auth_failures_total", "Failed websocket authentications")?;
+        let capacity_rejections =
+            IntCounter::new("ltp_capacity_rejections_total", "Rejected due to capacity limits")?;
+        let oversize_messages_total = IntCounter::new(
+            "oversize_messages_total",
+            "Messages rejected for being too large",
+        )?;
+        let ip_rate_limit_violations_total = IntCounter::new(
+            "ip_rate_limit_violations_total",
+            "Rate limit violations per IP",
+        )?;
+        let log_suppressed_total = IntCounterVec::new(
+            prometheus::Opts::new(
+                "log_suppressed_total",
+                "Suppressed logs due to throttling",
+            ),
+            &["category"],
+        )?;
+        let auth_keys_reload_success_total = IntCounter::new(
+            "auth_keys_reload_success_total",
+            "Successful auth key reloads",
+        )?;
+        let auth_keys_reload_failure_total = IntCounter::new(
+            "auth_keys_reload_failure_total",
+            "Failed auth key reloads",
+        )?;
+        let auth_keys_active = IntGauge::new(
+            "auth_keys_active",
+            "Currently active authentication keys",
+        )?;
+        let janitor_sweep_duration = prometheus::Histogram::with_opts(
+            prometheus::HistogramOpts::new(
+                "janitor_sweep_duration_seconds",
+                "Duration of janitor sweeps",
+            ),
+        )?;
+        let janitor_skipped_lock = IntCounter::new(
+            "janitor_skipped_lock_total",
+            "Locks skipped during janitor sweeps",
+        )?;
+        let janitor_expired_last_sweep = IntGauge::new(
+            "janitor_expired_last_sweep",
+            "Number of sessions expired in last sweep",
+        )?;
 
         registry.register(Box::new(connections.clone()))?;
         registry.register(Box::new(sessions.clone()))?;
@@ -189,6 +511,16 @@ impl Metrics {
         registry.register(Box::new(invalid_json_suppressed_total.clone()))?;
         registry.register(Box::new(rate_limit_violations_total.clone()))?;
         registry.register(Box::new(auth_failures_total.clone()))?;
+        registry.register(Box::new(capacity_rejections.clone()))?;
+        registry.register(Box::new(oversize_messages_total.clone()))?;
+        registry.register(Box::new(ip_rate_limit_violations_total.clone()))?;
+        registry.register(Box::new(log_suppressed_total.clone()))?;
+        registry.register(Box::new(auth_keys_reload_success_total.clone()))?;
+        registry.register(Box::new(auth_keys_reload_failure_total.clone()))?;
+        registry.register(Box::new(auth_keys_active.clone()))?;
+        registry.register(Box::new(janitor_sweep_duration.clone()))?;
+        registry.register(Box::new(janitor_skipped_lock.clone()))?;
+        registry.register(Box::new(janitor_expired_last_sweep.clone()))?;
 
         Ok(Self {
             registry,
@@ -201,6 +533,16 @@ impl Metrics {
             invalid_json_suppressed_total,
             rate_limit_violations_total,
             auth_failures_total,
+            capacity_rejections,
+            oversize_messages_total,
+            ip_rate_limit_violations_total,
+            log_suppressed_total,
+            auth_keys_reload_success_total,
+            auth_keys_reload_failure_total,
+            auth_keys_active,
+            janitor_sweep_duration,
+            janitor_skipped_lock,
+            janitor_expired_last_sweep,
         })
     }
 
@@ -218,17 +560,12 @@ struct AppContext {
     config: Arc<Config>,
     state: Arc<LtpNodeState>,
     metrics: Arc<Metrics>,
+    ip_limiters: Arc<DashMap<IpAddr, IpLimiterState>>,
+    log_throttle: Arc<LogThrottle>,
 }
 
 #[derive(Debug, Clone)]
-struct AuthContext {
-    auth_id: String,
-    session_id: String,
-}
-
-#[derive(Debug)]
-struct TokenBucket {
-    capacity: f64,
+struct RateLimiter {
     tokens: f64,
     refill_per_sec: f64,
     last_refill: Instant,
@@ -263,41 +600,29 @@ impl TokenBucket {
     }
 }
 
-#[derive(Debug)]
-struct ParseErrorSampler {
-    last_log: Option<Instant>,
-    suppressed: u64,
-    interval: Duration,
+#[derive(Debug, Clone)]
+struct IpLimiterState {
+    limiter: RateLimiter,
+    last_seen: Instant,
 }
 
-impl ParseErrorSampler {
-    fn new(interval: Duration) -> Self {
-        Self {
-            last_log: None,
-            suppressed: 0,
-            interval,
-        }
-    }
+#[derive(Default)]
+struct LogThrottle {
+    last: std::sync::Mutex<HashMap<&'static str, Instant>>,
+}
 
-    /// Returns the number of suppressed events if a log should be emitted now.
-    fn record(&mut self) -> Option<u64> {
+impl LogThrottle {
+    fn should_log(&self, category: &'static str, interval: Duration) -> bool {
+        let mut guard = self.last.lock().unwrap_or_else(|p| p.into_inner());
         let now = Instant::now();
-        match self.last_log {
-            None => {
-                self.last_log = Some(now);
-                Some(0)
-            }
-            Some(last) if now.duration_since(last) >= self.interval => {
-                let suppressed = self.suppressed;
-                self.suppressed = 0;
-                self.last_log = Some(now);
-                Some(suppressed)
-            }
-            Some(_) => {
-                self.suppressed += 1;
-                None
-            }
+        let decision = guard
+            .get(category)
+            .map(|t| now.duration_since(*t) >= interval)
+            .unwrap_or(true);
+        if decision {
+            guard.insert(category, now);
         }
+        decision
     }
 }
 
@@ -317,11 +642,33 @@ async fn main() -> anyhow::Result<()> {
     let metrics = Arc::new(Metrics::new()?);
     let state = Arc::new(LtpNodeState::new());
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
+    let initial_keys_len = config
+        .auth
+        .keys
+        .read()
+        .map(|k| k.len() as i64)
+        .unwrap_or(0);
+    metrics.auth_keys_active.set(initial_keys_len);
+    if matches!(config.auth.mode, AuthMode::ApiKey)
+        && config
+            .auth
+            .keys
+            .read()
+            .map(|k| k.is_empty())
+            .unwrap_or(true)
+    {
+        warn!("AUTH_MODE=api_key configured without keys; authentication will fail closed");
+    }
     let ctx = AppContext {
         config: config.clone(),
         state: state.clone(),
         metrics: metrics.clone(),
+        ip_limiters: Arc::new(DashMap::new()),
+        log_throttle: Arc::new(LogThrottle::default()),
     };
+    config
+        .auth
+        .start_reload_task(metrics.clone(), shutdown_rx.clone());
 
     let metrics_app = Router::new().route(
         "/metrics",
@@ -431,15 +778,27 @@ async fn handle_connection(
     ctx: AppContext,
 ) -> anyhow::Result<()> {
     let auth_identity: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+    let client_ip_override: Arc<Mutex<Option<IpAddr>>> = Arc::new(Mutex::new(None));
     let metrics_for_handshake = ctx.metrics.clone();
     let auth_config = ctx.config.auth.clone();
     let auth_identity_for_cb = auth_identity.clone();
+    let trust_proxy = ctx.config.trust_proxy;
+    let client_ip_for_cb = client_ip_override.clone();
+    let identity_source = auth_config.identity_source();
 
     let ws_stream = match timeout(
         Duration::from_millis(ctx.config.handshake_timeout_ms),
         accept_hdr_async(stream, move |req: &Request, response: Response| {
             if !auth_config.auth_enabled() {
                 return Ok(response);
+            }
+
+            if trust_proxy {
+                if let Some(ip) = extract_forwarded_for(req.headers()) {
+                    if let Ok(mut guard) = client_ip_for_cb.lock() {
+                        *guard = Some(ip);
+                    }
+                }
             }
 
             match auth_config.authenticate_header(req) {
@@ -472,7 +831,17 @@ async fn handle_connection(
     };
 
     ctx.metrics.connections.inc();
-    info!(remote_addr = %peer, "websocket connection established");
+    let client_ip = client_ip_override
+        .lock()
+        .ok()
+        .and_then(|guard| *guard)
+        .unwrap_or(peer.ip());
+    info!(
+        remote_addr = %peer,
+        client_ip = %client_ip,
+        identity_source = ?identity_source,
+        "websocket connection established"
+    );
 
     let (mut write, mut read) = ws_stream.split();
     let mut parse_sampler = ParseErrorSampler::new(Duration::from_secs(1));
@@ -499,30 +868,77 @@ async fn handle_connection(
 
         match msg {
             Message::Text(text) => {
-                if !rate_limiter.try_consume() {
-                    warn!(remote_addr = %peer, "rate limit exceeded, closing connection");
-                    let _ = send_json(
-                        &mut write,
-                        &LtpOutgoingMessage::Error {
-                            code: protocol::ErrorCode::RateLimit,
-                            message: Some("too many messages".to_string()),
-                        },
-                    )
-                    .await;
+                if !check_ip_rate_limit(&ctx, client_ip) {
+                    if log_throttled(&ctx, "ip_rate_limit", || {
+                        warn!(remote_addr = %peer, client_ip = %client_ip, "closing connection due to ip rate limit");
+                    }) {
+                    } else {
+                        ctx.metrics
+                            .log_suppressed_total
+                            .with_label_values(&["ip_rate_limit"])
+                            .inc();
+                    }
+                    ctx.metrics.ip_rate_limit_violations_total.inc();
+                    ctx.metrics
+                        .messages_rejected
+                        .with_label_values(&["rate_limit"])
+                        .inc();
+                    let _ = write
+                        .send(Message::Close(Some(CloseFrame {
+                            code: CloseCode::Policy,
+                            reason: "ip rate limit exceeded".into(),
+                        })))
+                        .await;
+                    break;
+                }
+
+                if !rate_limiter.allow() {
+                    if log_throttled(&ctx, "rate_limit", || {
+                        warn!(
+                            remote_addr = %peer,
+                            "closing connection due to rate limit exceeded"
+                        );
+                    }) {
+                    } else {
+                        ctx.metrics
+                            .log_suppressed_total
+                            .with_label_values(&["rate_limit"])
+                            .inc();
+                    }
+                    ctx.metrics.rate_limit_violations_total.inc();
+                    ctx.metrics
+                        .messages_rejected
+                        .with_label_values(&["rate_limit"])
+                        .inc();
+                    let _ = write
+                        .send(Message::Close(Some(CloseFrame {
+                            code: CloseCode::Policy,
+                            reason: "rate limit exceeded".into(),
+                        })))
+                        .await;
                     break;
                 }
 
                 if text.as_bytes().len() > ctx.config.max_message_bytes {
-                    warn!(
-                        remote_addr = %peer,
-                        size = text.as_bytes().len(),
-                        max = ctx.config.max_message_bytes,
-                        "rejecting message: too large"
-                    );
+                    if log_throttled(&ctx, "too_large", || {
+                        warn!(
+                            remote_addr = %peer,
+                            size = text.as_bytes().len(),
+                            max = ctx.config.max_message_bytes,
+                            "rejecting message: too large"
+                        );
+                    }) {
+                    } else {
+                        ctx.metrics
+                            .log_suppressed_total
+                            .with_label_values(&["too_large"])
+                            .inc();
+                    }
                     ctx.metrics
                         .messages_rejected
                         .with_label_values(&["too_large"])
                         .inc();
+                    ctx.metrics.oversize_messages_total.inc();
                     let _ = write
                         .send(Message::Close(Some(CloseFrame {
                             code: CloseCode::Size,
@@ -923,6 +1339,7 @@ fn spawn_janitor(
         info!("janitor task started");
         let idle_ttl = Duration::from_millis(ctx.config.idle_ttl_ms);
         let base_interval = Duration::from_millis(ctx.config.gc_interval_ms);
+        let ip_ttl = Duration::from_secs(ctx.config.ip_rate_limit_ttl_secs);
         let mut rng = StdRng::from_entropy();
         loop {
             let jitter_factor: f64 = rng.gen_range(0.9..=1.1);
@@ -955,6 +1372,11 @@ fn spawn_janitor(
             ctx.metrics
                 .janitor_expired_last_sweep
                 .set(stats.expired as i64);
+
+            let ip_removed = cleanup_ip_limiters(&ctx, ip_ttl);
+            if ip_removed > 0 {
+                info!(removed = ip_removed, "expired idle ip limiters");
+            }
 
             if stats.expired > 0 {
                 ctx.metrics.sessions.sub(stats.expired as i64);
@@ -993,4 +1415,101 @@ fn reject_when_over_capacity(ctx: &AppContext, session_id: &str) -> bool {
     }
     ctx.metrics.sessions.inc();
     false
+}
+
+fn check_ip_rate_limit(ctx: &AppContext, ip: IpAddr) -> bool {
+    let allow;
+    let mut entry = ctx.ip_limiters.entry(ip).or_insert_with(|| IpLimiterState {
+        limiter: RateLimiter::new(ctx.config.ip_rate_limit_rps, ctx.config.ip_rate_limit_burst),
+        last_seen: Instant::now(),
+    });
+    {
+        let state = entry.value_mut();
+        allow = state.limiter.allow();
+        state.last_seen = Instant::now();
+    }
+
+    if !allow {
+        ctx.metrics.ip_rate_limit_violations_total.inc();
+    }
+    allow
+}
+
+fn log_throttled<F: FnOnce()>(ctx: &AppContext, category: &'static str, log_fn: F) -> bool {
+    if ctx
+        .log_throttle
+        .should_log(category, Duration::from_secs(1))
+    {
+        log_fn();
+        true
+    } else {
+        false
+    }
+}
+
+fn cleanup_ip_limiters(ctx: &AppContext, ttl: Duration) -> usize {
+    let now = Instant::now();
+    let mut removed = 0;
+    ctx.ip_limiters.retain(|_, v| {
+        let keep = now.duration_since(v.last_seen) < ttl;
+        if !keep {
+            removed += 1;
+        }
+        keep
+    });
+    removed
+}
+
+fn hash_string(input: &str) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    input.hash(&mut hasher);
+    hasher.finish()
+}
+
+#[cfg(test)]
+mod auth_unit_tests {
+    use super::*;
+
+    #[test]
+    fn parse_keys_handles_pairs() {
+        let map = parse_keys("id1:key1, id2:key2 , bad , id3:key3");
+        assert_eq!(map.get("id1").unwrap(), "key1");
+        assert_eq!(map.get("id2").unwrap(), "key2");
+        assert_eq!(map.get("id3").unwrap(), "key3");
+        assert_eq!(map.len(), 3);
+    }
+
+    #[test]
+    fn constant_time_compare_matches() {
+        let config = AuthConfig {
+            mode: AuthMode::ApiKey,
+            keys: Arc::new(std::sync::RwLock::new(HashMap::from([(
+                "id".to_string(),
+                "supersecret".to_string(),
+            )]))),
+            jwt_secret: None,
+            keys_file: None,
+            keys_reload_interval: Duration::from_secs(30),
+            last_loaded_hash: Arc::new(Mutex::new(None)),
+            fail_closed: Arc::new(AtomicBool::new(false)),
+        };
+        assert!(config.validate_api_key("supersecret").is_ok());
+        assert!(config.validate_api_key("wrong").is_err());
+    }
+
+    #[test]
+    fn enforced_identity_overrides_payload() {
+        let incoming = LtpIncomingMessage::Hello {
+            client_id: "victim".to_string(),
+            session_tag: None,
+            auth_token: None,
+        };
+        let enforced = enforce_client_identity(incoming, Some("attacker"));
+        match enforced {
+            LtpIncomingMessage::Hello { client_id, .. } => {
+                assert_eq!(client_id, "attacker");
+            }
+            _ => panic!("expected hello message"),
+        }
+    }
 }
