@@ -65,11 +65,27 @@ struct Config {
     auth: AuthConfig,
     trust_proxy: bool,
     audit_log_file: String,
+    allow_proxy_cidr: Vec<ipnet::IpNet>,
 }
 
 impl Config {
     fn from_env() -> Self {
         let addr = std::env::var("LTP_NODE_ADDR").unwrap_or_else(|_| DEFAULT_ADDR.to_string());
+
+        // P1-2: Hard Non-Exposure Guarantee
+        let is_unsafe_bind_allowed = std::env::var("LTP_ALLOW_UNSAFE_EXPOSE")
+            .ok()
+            .map(|v| v.to_lowercase() == "true")
+            .unwrap_or(false);
+
+        // Check if addr is 0.0.0.0 (any) and not allowed
+        if !is_unsafe_bind_allowed {
+            // Very basic check. For more robustness could parse IpAddr.
+            if addr.contains("0.0.0.0") || addr.contains("[::]") {
+                panic!("FATAL: Binding to 0.0.0.0 is prohibited by default (Fintech P1 Safety). Set LTP_ALLOW_UNSAFE_EXPOSE=true if you really mean it.");
+            }
+        }
+
         let node_id =
             std::env::var("LTP_NODE_ID").unwrap_or_else(|_| format!("ltp-node-{}", Uuid::new_v4()));
         let metrics_addr = std::env::var("LTP_NODE_METRICS_ADDR")
@@ -92,6 +108,20 @@ impl Config {
             .ok()
             .map(|v| v.to_lowercase() == "true")
             .unwrap_or(false);
+
+        // P1-2: TRUST_PROXY safety
+        let allow_proxy_cidr = if trust_proxy {
+            if let Ok(cidrs_str) = std::env::var("LTP_ALLOW_PROXY_CIDR") {
+                cidrs_str.split(',')
+                    .map(|s| s.trim().parse().expect("Invalid CIDR in LTP_ALLOW_PROXY_CIDR"))
+                    .collect()
+            } else {
+                 panic!("FATAL: TRUST_PROXY=true requires LTP_ALLOW_PROXY_CIDR to be set (Fintech P1 Safety).");
+            }
+        } else {
+            vec![]
+        };
+
         let auth = AuthConfig::from_env();
         let audit_log_file =
             std::env::var("LTP_AUDIT_LOG_FILE").unwrap_or_else(|_| "ltp-audit.log".to_string());
@@ -114,6 +144,7 @@ impl Config {
             auth,
             trust_proxy,
             audit_log_file,
+            allow_proxy_cidr,
         }
     }
 }
@@ -662,6 +693,7 @@ fn parse_keys(input: &str) -> HashMap<String, String> {
 async fn main() -> anyhow::Result<()> {
     init_tracing();
 
+    // Config::from_env already enforces P1-2 safety checks (panic on unsafe bind/proxy)
     let config = Arc::new(Config::from_env());
     let initial_keys_len = config.auth.keys.read().map(|k| k.len() as i64).unwrap_or(0);
 
@@ -672,16 +704,6 @@ async fn main() -> anyhow::Result<()> {
             api_keys_loaded = initial_keys_len,
             "API key authentication enabled"
         );
-    }
-
-    if config.trust_proxy && std::env::var("LTP_ALLOW_PROXY_CIDR").is_err() {
-        warn!("TRUST_PROXY is enabled but LTP_ALLOW_PROXY_CIDR is not set. Ensure the node is not exposed directly to the internet.");
-        // We could error out here to force safe deployment (P1-1), but for now we warn.
-        // Actually P1-1 says "If TRUST_PROXY=true, it must require additional guard".
-        // Let's enforce it unless LTP_UNSAFE_TRUST_PROXY_ANY is set.
-        if std::env::var("LTP_UNSAFE_TRUST_PROXY_ANY").is_err() {
-            anyhow::bail!("TRUST_PROXY=true requires LTP_ALLOW_PROXY_CIDR to be set for security. Set LTP_UNSAFE_TRUST_PROXY_ANY=true to override (NOT RECOMMENDED).");
-        }
     }
 
     let metrics = Arc::new(Metrics::new()?);
@@ -839,7 +861,20 @@ async fn handle_connection(
 
             if trust_proxy {
                 if let Some(ip) = extract_forwarded_for(req.headers()) {
-                    if let Ok(mut guard) = client_ip_for_cb.lock() {
+                     // P1-2: Enforce proxy allows list
+                     // We need access to allowed_cidrs here. But closure capture is tricky.
+                     // For now, let's just extract. We will validate in the main body OR
+                     // we need to pass allowed cidrs to this closure.
+                     // The Config is in AppContext but not passed to this closure easily without Arc.
+                     // However, we rely on the fact that if trust_proxy is true, we panic at startup if allow list is missing.
+                     // But we should CHECK the ip against the list.
+                     // Since `ctx` isn't available inside `accept_hdr_async`'s callback easily (it moves),
+                     // and we want to keep code simple.
+                     // Let's rely on post-handshake check? No, X-Forwarded-For is used for Rate Limiting.
+                     // We should validate the *peer* IP (the proxy) against allowed CIDRs.
+                     // But `peer` is available in `handle_connection`.
+
+                     if let Ok(mut guard) = client_ip_for_cb.lock() {
                         *guard = Some(ip);
                     }
                 }
@@ -873,6 +908,16 @@ async fn handle_connection(
             return Ok(());
         }
     };
+
+    // P1-2: Proxy CIDR check
+    if ctx.config.trust_proxy {
+        let is_allowed = ctx.config.allow_proxy_cidr.iter().any(|cidr| cidr.contains(&peer.ip()));
+        if !is_allowed {
+             warn!(remote_addr = %peer, "connection rejected: trusted proxy enabled but peer not in allowed CIDR");
+             // Close connection
+             return Ok(());
+        }
+    }
 
     ctx.metrics.connections.inc();
     let client_ip = client_ip_override
