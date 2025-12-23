@@ -73,8 +73,9 @@ describe('ltp-inspect golden summary', () => {
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
     const expected = JSON.parse(fs.readFileSync(expectedJsonPath, 'utf-8'));
     const summary = runInspect(fixturePath);
+    const summaryJson = JSON.parse(JSON.stringify(summary));
 
-    expect(summary).toEqual(expected);
+    expect(summaryJson).toEqual(expected);
     expect(formatJson(summary, true)).toEqual(fs.readFileSync(expectedJsonPath, 'utf-8').trim());
     vi.useRealTimers();
   });

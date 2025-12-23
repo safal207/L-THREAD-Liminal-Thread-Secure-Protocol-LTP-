@@ -54,5 +54,8 @@
   "workspaces": [
     "sdk/js",
     "tools/conformance-kit"
-  ]
+  ],
+  "dependencies": {
+    "pdfkit": "^0.17.2"
+  }
 }
