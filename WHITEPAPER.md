@@ -360,16 +360,14 @@ LTP provides **protocol-compatible** SDKs:
 
 ## 10. Conclusion
 
-L-THREAD / LTP provides a **foundational protocol** for the next generation of AI systems:
+L-THREAD / LTP is a **foundational protocol** whose core remit is continuity and admissibility validation:
 
 - ✅ **Context preservation** across sessions
-- ✅ **Token optimization** for LLM workflows
-- ✅ **Semantic awareness** for consciousness research
-- ✅ **Production-ready** with 4 SDKs
+- ✅ **Admissibility checks** to prevent discontinuity
+- ✅ **Protocol-neutral**: products choose goals, optimization, or decision logic outside the core
+- ✅ **Production-ready** with 4 SDKs that implement the continuity contract
 
-**Key Innovation:** Thread-based continuity + TOON encoding = **30-60% cost savings** + **seamless user experience**
-
-**Market Opportunity:** $50B+ LLM infrastructure + $200B+ gaming + emerging AGI research
+Extensions such as TOON or semantic metadata can be layered on top for specific products, but they do not change the core: it only inspects continuity and admissibility and intentionally avoids optimization, goal-selection, or solutioning semantics.
 
 ---
 
@@ -386,4 +384,3 @@ L-THREAD / LTP provides a **foundational protocol** for the next generation of A
 **Version:** 0.3  
 **Date:** January 2025  
 **License:** MIT
-
