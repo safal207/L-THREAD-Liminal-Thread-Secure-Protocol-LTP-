@@ -45,7 +45,7 @@ pub async fn build_route_suggestion(state: &LtpNodeState, session_id: &str) -> L
 
     LtpOutgoingMessage::RouteSuggestion {
         session_id: session_id.to_string(),
-        suggested_sector,
+        suggested_sector: suggested_sector.to_string(), // Fixed mismatch
         reason: Some(reason),
         debug: Some(RouteDebugInfo {
             focus_momentum: fm,

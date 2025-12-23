@@ -14,6 +14,7 @@ build/
 *.egg-info/
 .eggs/
 sdk/rust/ltp-client/target/
+nodes/ltp-rust-node/target/
 sdk/elixir/_build/
 sdk/elixir/deps/
 
@@ -51,3 +52,4 @@ packages/inspect/.npm-cache/
 # Misc
 .cache/
 .temp/
+nodes/ltp-rust-node/*.log
