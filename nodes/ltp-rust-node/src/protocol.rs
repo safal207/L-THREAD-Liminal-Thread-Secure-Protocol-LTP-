@@ -4,22 +4,22 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum LtpIncomingMessage {
     Hello {
-        client_id: String,
+        api_key: String,
         #[serde(default)]
-        session_tag: Option<String>,
+        client_label: Option<String>,
     },
     Heartbeat {
-        client_id: String,
+        session_id: String,
         timestamp_ms: i64,
     },
     Orientation {
-        client_id: String,
+        session_id: String,
         focus_momentum: Option<f64>,
         #[serde(default)]
         time_orientation: Option<TimeOrientationBoostPayload>,
     },
     RouteRequest {
-        client_id: String,
+        session_id: String,
         #[serde(default)]
         hint_sector: Option<String>,
     },
@@ -46,13 +46,14 @@ pub enum LtpOutgoingMessage {
     HelloAck {
         node_id: String,
         accepted: bool,
+        session_id: String,
     },
     HeartbeatAck {
-        client_id: String,
+        session_id: String,
         timestamp_ms: i64,
     },
     RouteSuggestion {
-        client_id: String,
+        session_id: String,
         suggested_sector: String,
         #[serde(default)]
         reason: Option<String>,
@@ -60,7 +61,9 @@ pub enum LtpOutgoingMessage {
         debug: Option<RouteDebugInfo>,
     },
     Error {
-        message: String,
+        code: ErrorCode,
+        #[serde(default)]
+        message: Option<String>,
     },
 }
 
@@ -70,4 +73,13 @@ pub struct RouteDebugInfo {
     pub focus_momentum: Option<f64>,
     #[serde(default)]
     pub time_orientation: Option<TimeOrientationBoostPayload>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ErrorCode {
+    Unauthorized,
+    Forbidden,
+    RateLimit,
+    Invalid,
 }

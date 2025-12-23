@@ -57,11 +57,11 @@ impl LtpNodeState {
         self.sessions.len()
     }
 
-    pub async fn touch_heartbeat(&self, client_id: &str) -> bool {
+    pub async fn touch_heartbeat(&self, session_id: &str) -> bool {
         let mut created = false;
         let session = self
             .sessions
-            .entry(client_id.to_owned())
+            .entry(session_id.to_owned())
             .or_insert_with(|| {
                 created = true;
                 Arc::new(Mutex::new(SessionState::new()))
@@ -74,14 +74,14 @@ impl LtpNodeState {
 
     pub async fn update_orientation(
         &self,
-        client_id: &str,
+        session_id: &str,
         focus_momentum: Option<f64>,
         time_orientation: Option<TimeOrientationBoostPayload>,
     ) -> bool {
         let mut created = false;
         let session = self
             .sessions
-            .entry(client_id.to_owned())
+            .entry(session_id.to_owned())
             .or_insert_with(|| {
                 created = true;
                 Arc::new(Mutex::new(SessionState::new()))
@@ -98,8 +98,8 @@ impl LtpNodeState {
         created
     }
 
-    pub async fn snapshot(&self, client_id: &str) -> Option<SessionSnapshot> {
-        let session = self.sessions.get(client_id)?.clone();
+    pub async fn snapshot(&self, session_id: &str) -> Option<SessionSnapshot> {
+        let session = self.sessions.get(session_id)?.clone();
         let guard = session.lock().await;
         Some(SessionSnapshot {
             last_seen: guard.last_seen,
@@ -108,8 +108,8 @@ impl LtpNodeState {
         })
     }
 
-    pub fn remove(&self, client_id: &str) -> bool {
-        self.sessions.remove(client_id).is_some()
+    pub fn remove(&self, session_id: &str) -> bool {
+        self.sessions.remove(session_id).is_some()
     }
 
     pub fn expire_idle(&self, idle_ttl: Duration) -> ExpireStats {
