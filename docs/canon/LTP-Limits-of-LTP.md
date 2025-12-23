@@ -1,16 +1,12 @@
-# PR 275 — Limits and Non-Goals of LTP
+# Limits and Non-Goals of LTP
 
-## Why this document exists
+## Core Principle
 
-LTP is a protocol, not a platform. This document exists to prevent misclassification of LTP as an agent, policy engine, or decision system. By codifying what LTP does **not** do, we reduce scope creep, prevent category errors, and protect the protocol’s core invariants.
+LTP is a protocol, not a platform. This document prevents misclassification of LTP as an agent, policy engine, or decision system. By codifying what LTP does **not** do, we reduce scope creep, prevent category errors, and protect the protocol’s invariants.
 
----
+## What LTP Is Not
 
-## 1. Hard limits (by design)
-
-These constraints are rooted in the orientation invariant and cannot be relaxed without breaking LTP.
-
-### 1.1 LTP does not make decisions
+### Not decision-making
 
 LTP never selects an action, outcome, or “best” future. It only defines:
 
@@ -20,7 +16,7 @@ LTP never selects an action, outcome, or “best” future. It only defines:
 
 If you need a system to choose — you are operating above LTP.
 
-### 1.2 LTP does not perform inference
+### Not inference
 
 LTP does not:
 
@@ -28,9 +24,11 @@ LTP does not:
 - rank model outputs
 - evaluate semantic correctness
 
-All inference happens outside the protocol. Errors are allowed; loss of orientation is not.
+All inference happens outside the protocol.
 
-### 1.3 LTP is not a memory database
+> Errors are allowed. Loss of orientation is not.
+
+### Not memory
 
 LTP does not store:
 
@@ -40,23 +38,7 @@ LTP does not store:
 
 It stores orientation state, not content. Using LTP as a memory layer breaks determinism and replayability.
 
----
-
-## 2. Explicit non-goals
-
-These are deliberate exclusions: areas where LTP could be extended by other layers but must not be conflated with the protocol itself.
-
-### 2.1 LTP is not an agent framework
-
-LTP does not manage:
-
-- task scheduling
-- tool calling
-- retries or planning loops
-
-It can support agent systems, but it never replaces them.
-
-### 2.2 LTP is not an orchestration layer
+### Not orchestration
 
 LTP does not:
 
@@ -66,19 +48,11 @@ LTP does not:
 
 It operates at the orientation layer, not the execution layer.
 
-### 2.3 LTP is not a safety or alignment system
+### Not optimization
 
-LTP does not define:
+LTP does not embed optimization or policy objectives into protocol semantics. It only ensures that whatever external rules exist are applied consistently over time.
 
-- ethical rules
-- alignment objectives
-- value systems
-
-It only ensures that whatever rules exist are applied consistently over time.
-
----
-
-## 3. Anti-patterns (negative examples)
+## Anti-Patterns
 
 If your implementation does any of the following, it is no longer LTP-compliant:
 
@@ -89,25 +63,12 @@ If your implementation does any of the following, it is no longer LTP-compliant:
 
 If your design requires any of the above, LTP is the wrong abstraction.
 
----
+## Rule of Thumb
 
-## 4. Why these limits matter
-
-These limits protect LTP core invariants:
+These limits protect LTP invariants:
 
 - orientation continuity
 - deterministic replay
 - model-agnostic neutrality
 
 Innovation lives above the protocol, not inside it. LTP defines where you are — not what you should do.
-
----
-
-## 5. Summary
-
-- Protection against misuse
-- Clear mental model for contributors
-- Long-term protocol stability
-- Reduced governance and review friction
-
-LTP remains intentionally small. Its power comes not from what it does — but from what it refuses to do.
