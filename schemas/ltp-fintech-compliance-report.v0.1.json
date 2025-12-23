@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://ltp.dev/schemas/ltp-fintech-compliance-report.v0.1.json",
+  "title": "LTP Fintech Compliance Report",
+  "description": "Standardized output for LTP Fintech Compliance Audit",
+  "type": "object",
+  "required": [
+    "report_version",
+    "spec_version",
+    "node_version",
+    "trace_integrity",
+    "trace_signature",
+    "identity_binding",
+    "generated_at"
+  ],
+  "properties": {
+    "report_version": {
+      "type": "string",
+      "enum": ["0.1"],
+      "description": "Version of this report schema"
+    },
+    "spec_version": {
+      "type": "string",
+      "description": "LTP Specification version verified against"
+    },
+    "node_version": {
+      "type": "string",
+      "description": "Version of the LTP Node implementation (if known from trace)"
+    },
+    "sdk_versions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Detected SDK versions from trace"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Timestamp when the report was generated"
+    },
+    "trace_integrity": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["verified", "broken", "unchecked"]
+        },
+        "hash_root": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "violation_index": {
+          "type": "integer"
+        }
+      }
+    },
+    "trace_signature": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["verified", "present", "missing", "invalid"]
+        },
+        "key_ids": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "algorithm": {
+          "type": "string"
+        }
+      }
+    },
+    "identity_binding": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["verified", "violated", "unknown"]
+        },
+        "identity": {
+          "type": "string"
+        }
+      }
+    },
+    "replay_determinism": {
+      "type": "object",
+      "required": ["status"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["verified", "failed", "unchecked"]
+        }
+      }
+    },
+    "rate_limits": {
+      "type": "object",
+      "description": "Rate limiting compliance status",
+      "properties": {
+         "status": { "type": "string", "enum": ["compliant", "violated", "unchecked"] },
+         "violations": { "type": "integer" }
+      }
+    },
+    "unsafe_expose_guard": {
+      "type": "object",
+      "properties": {
+         "status": { "type": "string", "enum": ["pass", "fail", "unchecked"] }
+      }
+    },
+    "proxy_trust_guard": {
+      "type": "object",
+      "properties": {
+         "status": { "type": "string", "enum": ["pass", "fail", "unchecked"] }
+      }
+    }
+  }
+}
