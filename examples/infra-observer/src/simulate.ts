@@ -22,9 +22,12 @@ async function runSimulation() {
   const trace: TraceEntry[] = [];
   let previousHash = "0000000000000000000000000000000000000000000000000000000000000000";
 
+  // Defined scenario: 7 events showing progression and recovery
   const events: InfraEvent[] = [
     'CONNECTION_BACKLOG_GROWING', // -> DEGRADED
+    'CONNECTION_BACKLOG_GROWING', // (Stay DEGRADED)
     'QUEUE_LATENCY_SPIKE',        // -> SATURATED
+    'WS_RECONNECT_STORM',         // (Stay SATURATED)
     'HEARTBEAT_TIMEOUT_CLUSTER',  // -> FAILED
     'METRICS_STABILIZED',         // -> RECOVERING
     'RECOVERY_COMPLETE'           // -> HEALTHY

@@ -2,10 +2,10 @@
   "name": "ltp-infra-observer",
   "version": "0.1.0",
   "description": "LTP Adaptive Observation Layer reference implementation",
-  "main": "dist/index.js",
+  "main": "dist/src/simulate.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/simulation.js",
+    "start": "node dist/src/simulate.js",
     "test": "node dist/tests/test_observer.js"
   },
   "dependencies": {
