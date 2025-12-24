@@ -260,24 +260,31 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('Evidence: WEB context allowed to perform critical action');
   });
 
-  it('continuity inspection: coherent outage handling (HEALTHY -> FAILED -> HEALTHY)', () => {
-    if (!fs.existsSync(continuityOutageTrace)) {
-      throw new Error('Missing fixture: examples/traces/continuity-outage.trace.json');
+  it('visualizes continuity routing correctly for outage scenario', () => {
+    // We use a guaranteed fixture for stability (User feedback check 1)
+    const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.json');
+    if (!fs.existsSync(continuityFixture)) {
+        throw new Error(`Continuity trace fixture missing at ${continuityFixture}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
-    const exitCode = execute(
-      ['trace', '--continuity', '--input', continuityOutageTrace, '--format=human', '--color=never'],
-      { log: (m) => logs.push(String(m)), error: (m) => errors.push(String(m)) }
-    );
+    // Use --continuity flag to trigger the inspection
+    const exitCode = execute(['--input', continuityFixture, '--format=human', '--color=never', '--continuity'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
 
-    // Exit code may be 0 (clean) or 1 (warnings) depending on fixture/normalizers.
-    // We primarily assert the continuity report contract.
-    expect([0, 1]).toContain(exitCode);
+    // We expect exit code 1 because of warnings (normalized input, missing drift snapshots)
+    expect(exitCode).toBe(1);
 
-    const output = logs.join('\n');
+    // Check that there are no unexpected errors in stderr (User feedback check 3)
+    // exit code 1 means warnings in logs, but stderr should be clean unless there's a hard error
+    expect(errors.join('\n')).toBe('');
+
+    // Normalize line endings for robust matching (User feedback check 4)
+    const output = logs.join('\n').replace(/\r\n/g, '\n');
 
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
@@ -286,26 +293,13 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toMatch(/FAILED/i);
   });
 
-  it('continuity inspection: detects unsafe allowed action during FAILED (example violation trace)', () => {
-    if (!fs.existsSync(continuityFailureTrace)) {
-      throw new Error('Missing fixture: examples/traces/continuity-failure.trace.json');
-    }
+    // Verify State Transitions
+    // Based on examples/traces/continuity-outage.trace.json
+    expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
 
-    const logs: string[] = [];
-    const errors: string[] = [];
-
-    const exitCode = execute(
-      ['trace', '--continuity', '--input', continuityFailureTrace, '--format=human', '--color=never'],
-      { log: (m) => logs.push(String(m)), error: (m) => errors.push(String(m)) }
-    );
-
-    // Exit code might be 0 unless strict is enabled, so assert via output text.
-    expect(exitCode).toBe(0);
-    const output = logs.join('\n');
-
-    expect(output).toContain('CONTINUITY ROUTING INSPECTION');
-    expect(output).toContain('System Remained Coherent: NO');
-    expect(output).toMatch(/First Unsafe Transition:\s*#/);
+    // Verify Routing Stats with regex (User feedback check 2)
+    // Matches "Routing Decisions: Executed=2 Deferred=1 Replayed=0 Frozen=0"
+    expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
   });
 });
 

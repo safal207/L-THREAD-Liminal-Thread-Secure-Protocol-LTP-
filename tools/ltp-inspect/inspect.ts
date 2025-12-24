@@ -1190,6 +1190,11 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
       let currentState = 'HEALTHY';
       const stateHistory: {ts: string|number, state: string}[] = [];
 
+      let executed = 0;
+      let deferred = 0;
+      let replayed = 0;
+      let frozen = 0;
+
       frames.forEach((frame, idx) => {
           if (frame.type === 'orientation') {
              // Look for status in payload
@@ -1204,6 +1209,13 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
           } else if (frame.type === 'route_response') {
               const admissible = (frame.payload as any)?.admissible;
               const targetAction = (frame.payload as any)?.targetState || 'unknown';
+
+              // Count routing decisions
+              if (admissible) {
+                executed++;
+              } else {
+                deferred++;
+              }
 
               // If FAILED, we should mostly see inadmissibility or only specific recovery actions.
               // NOTE: We treat FAILED and UNSTABLE as equivalent for the purpose of "execution freeze".
@@ -1228,7 +1240,8 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
           system_remained_coherent: systemCoherent,
           first_unsafe_transition_index: firstUnsafeIndex === -1 ? null : firstUnsafeIndex,
           state_transitions: stateHistory.length,
-          state_transition_path: stateHistory.map(s => s.state)
+          state_transition_path: stateHistory.map(s => s.state),
+          routing_stats: { executed, deferred, replayed, frozen }
       };
 
       // Also print to writer if human
@@ -1240,6 +1253,7 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
              writer(`First Unsafe Transition: #${firstUnsafeIndex}`);
           }
           writer(`State Transitions Observed: ${stateHistory.map(s => s.state).join(' -> ')}`);
+          writer(`Routing Decisions: Executed=${executed} Deferred=${deferred} Replayed=${replayed} Frozen=${frozen}`);
       }
   }
 
