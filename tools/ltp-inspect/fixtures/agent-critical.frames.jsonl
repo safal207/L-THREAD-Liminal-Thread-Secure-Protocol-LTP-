@@ -1,0 +1,4 @@
+{"v":"0.1","id":"1","type":"hello","payload":{"agent":"test-agent"}}
+{"v":"0.1","id":"2","type":"orientation","continuity_token":"ct-1","payload":{"drift":0,"identity":"test-id"}}
+{"v":"0.1","id":"3","type":"route_request","payload":{"goal":"transfer money"}}
+{"v":"0.1","id":"4","type":"route_response","payload":{"context":"WEB","targetState":"transfer_money","admissible":true}}

@@ -19,6 +19,8 @@ const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-
 const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.json');
 const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
+const agentCriticalFixture = path.join(__dirname, 'fixtures', 'agent-critical.frames.jsonl');
+
 let builtCliPath: string | undefined;
 
 async function runCommand(command: string, args: string[], options: SpawnOptions = {}) {
@@ -65,6 +67,27 @@ async function buildInspectCli(): Promise<string> {
   transpileToDist(path.join(__dirname, 'types.ts'), path.join(distDir, 'types.js'));
   builtCliPath = path.join(distDir, 'inspect.js');
   return builtCliPath;
+}
+
+// Create critical action violation fixture
+const criticalViolationTrace = [
+    { "v": "0.1", "id": "1", "type": "hello", "payload": { "agent": "test-agent" } },
+    { "v": "0.1", "id": "2", "type": "orientation", "continuity_token": "ct-1", "payload": { "drift": 0.0, "identity": "test-id" } },
+    { "v": "0.1", "id": "3", "type": "route_request", "payload": { "goal": "transfer money" } },
+    { "v": "0.1", "id": "4", "type": "route_response", "payload": { "context": "WEB", "targetState": "transfer_money", "admissible": true } }
+].map(f => JSON.stringify(f)).join('\n');
+
+if (!fs.existsSync(agentCriticalFixture)) {
+    // We mock trace entries with hashes for testing compliance
+    // Since verifyTraceIntegrity checks hashes, we need valid ones or to skip integrity checks if testing just the rule
+    // But compliance check enforces integrity.
+    // For unit tests we can mock verifyTraceIntegrity or generate valid trace.
+    // Let's generate a valid trace using node crypto if we really need it,
+    // Or we can just mock the file content and accept that integrity fails (which is also a failure)
+    // But we want to test SPECIFICALLY the rule AGENTS.CRIT.WEB_DIRECT.
+
+    // We will just write the content and expect Integrity Check Failure + Critical Violation
+    fs.writeFileSync(agentCriticalFixture, criticalViolationTrace);
 }
 
 describe('ltp-inspect golden summary', () => {
@@ -212,6 +235,23 @@ describe('ltp-inspect golden summary', () => {
 
     expect(exitCode).toBe(2);
     expect(errors.join('\n')).toContain('non-canonical input');
+  });
+
+  it('detects critical action violations in agents compliance mode', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    // We expect exit code 2 because of Contract Violation (Compliance Failure)
+    const exitCode = execute(['--input', agentCriticalFixture, '--compliance', 'agents'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    // Integrity checks will fail because we manually created the file without hashing
+    // But we also want to verify that AGENTS.CRIT.WEB_DIRECT is flagged
+    expect(exitCode).toBe(2); // Contract violation
+    const output = logs.join('\n');
+    expect(output).toContain('AGENTS.CRIT.WEB_DIRECT');
+    expect(output).toContain('Evidence: WEB context allowed to perform critical action');
   });
 });
 
