@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import PDFDocument from 'pdfkit';
-import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry } from './types';
+import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
 
 const CONTRACT = {
   name: 'ltp-inspect',
@@ -780,11 +780,48 @@ function summarize(
   let auditSummary;
   if (compliance && (complianceProfile === 'fintech' || complianceProfile === 'agentic' || complianceProfile === 'agents')) {
     const failedChecks: string[] = [];
+    const violations: ComplianceViolation[] = [];
+    const violationsCountBySeverity: Record<string, number> = {
+        CRITICAL: 0,
+        HIGH: 0,
+        MODERATE: 0,
+        LOW: 0
+    };
 
     // Core LTP Checks
-    if (compliance.trace_integrity !== 'verified') failedChecks.push('trace_integrity');
-    if (compliance.identity_binding !== 'ok') failedChecks.push('identity_binding');
-    if (compliance.replay_determinism !== 'ok') failedChecks.push('replay_determinism');
+    if (compliance.trace_integrity !== 'verified') {
+        failedChecks.push('trace_integrity');
+        violations.push({
+            rule_id: 'CORE.INTEGRITY',
+            severity: 'CRITICAL',
+            frame_index: compliance.first_violation_index ?? -1,
+            source: 'system',
+            action: 'verify_trace',
+            evidence: 'Trace integrity check failed'
+        });
+    }
+    if (compliance.identity_binding !== 'ok') {
+        failedChecks.push('identity_binding');
+         violations.push({
+            rule_id: 'CORE.IDENTITY',
+            severity: 'HIGH',
+            frame_index: -1,
+            source: 'system',
+            action: 'verify_identity',
+            evidence: 'Identity binding check failed'
+        });
+    }
+    if (compliance.replay_determinism !== 'ok') {
+        failedChecks.push('replay_determinism');
+         violations.push({
+            rule_id: 'CORE.DETERMINISM',
+            severity: 'HIGH',
+            frame_index: -1,
+            source: 'system',
+            action: 'verify_replay',
+            evidence: compliance.determinism_details ?? 'Replay determinism check failed'
+        });
+    }
 
     // Agentic Specific Checks
     if (complianceProfile === 'agentic' || complianceProfile === 'agents') {
@@ -812,9 +849,16 @@ function summarize(
                     const isCritical = criticalActions.some(action => targetState.includes(action));
                     if (isCritical) {
                          if (admissible === true) {
-                             failedChecks.push(`CRITICAL_VIOLATION_DETECTED_AT_INDEX_${index}`);
-                             // Add detailed violation note
+                             failedChecks.push('AGENTS.CRIT.WEB_DIRECT');
                              compliance!.determinism_details = `Security Violation: WEB context allowed to perform critical action '${targetState}' at frame #${index}`;
+                             violations.push({
+                                rule_id: 'AGENTS.CRIT.WEB_DIRECT',
+                                severity: 'CRITICAL',
+                                frame_index: index,
+                                source: context,
+                                action: targetState,
+                                evidence: 'WEB context allowed to perform critical action'
+                             });
                          }
                     }
                 }
@@ -822,12 +866,17 @@ function summarize(
         });
     }
 
+    // Count violations
+    violations.forEach(v => {
+        violationsCountBySeverity[v.severity] = (violationsCountBySeverity[v.severity] || 0) + 1;
+    });
+
     // Verdict Logic
     const verdict = failedChecks.length === 0 ? 'PASS' : 'FAIL';
 
     // Risk level logic
     let riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
-    if (failedChecks.includes('trace_integrity')) {
+    if (failedChecks.includes('trace_integrity') || violationsCountBySeverity['CRITICAL'] > 0) {
         riskLevel = 'HIGH';
     } else if (failedChecks.length > 0) {
         riskLevel = 'MEDIUM';
@@ -837,6 +886,8 @@ function summarize(
         verdict,
         risk_level: riskLevel,
         failed_checks: failedChecks,
+        violations: violations,
+        violations_count_by_severity: violationsCountBySeverity,
         regulator_ready: verdict === 'PASS'
     };
   }
@@ -924,9 +975,16 @@ function exportPdf(summary: InspectSummary, outputPath: string): void {
         doc.fillColor(verdictColor).fontSize(14).text(`Verdict: ${summary.audit_summary.verdict}`);
         doc.fillColor('black').fontSize(12).text(`Risk Level: ${summary.audit_summary.risk_level}`);
         doc.text(`Regulator Ready: ${summary.audit_summary.regulator_ready}`);
-        if (summary.audit_summary.failed_checks.length > 0) {
-            doc.text(`Failed Checks: ${summary.audit_summary.failed_checks.join(', ')}`);
+
+        if (summary.audit_summary.violations && summary.audit_summary.violations.length > 0) {
+            doc.moveDown();
+            doc.fontSize(14).text('Violations');
+            summary.audit_summary.violations.forEach(v => {
+                 doc.fillColor('red').fontSize(10).text(`[${v.severity}] ${v.rule_id} @ Frame #${v.frame_index}`);
+                 doc.fillColor('black').text(`  Evidence: ${v.evidence}`);
+            });
         }
+
         doc.moveDown();
     }
 
@@ -1007,8 +1065,14 @@ export function formatHuman(summary: InspectSummary): string {
     lines.push(`VERDICT: ${verdict}`);
     lines.push(`risk_level: ${summary.audit_summary.risk_level}`);
     lines.push(`regulator_ready: ${summary.audit_summary.regulator_ready}`);
-    if (summary.audit_summary.failed_checks.length > 0) {
-        lines.push(`FAILED CHECKS: ${summary.audit_summary.failed_checks.join(', ')}`);
+
+    if (summary.audit_summary.violations && summary.audit_summary.violations.length > 0) {
+        lines.push('');
+        lines.push('VIOLATIONS:');
+        summary.audit_summary.violations.forEach(v => {
+            lines.push(`  [${v.severity}] ${v.rule_id} @ #${v.frame_index}`);
+            lines.push(`    Evidence: ${v.evidence}`);
+        });
     }
   }
 
@@ -1266,6 +1330,14 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
              }
              if (summary.compliance.replay_determinism === 'failed') {
                  contractBreaches.push(`REPLAY DETERMINISM FAILED`);
+             }
+
+             // Check for audit summary violations (e.g. Critical Actions)
+             if (summary.audit_summary && summary.audit_summary.violations.length > 0) {
+                 const criticalViolations = summary.audit_summary.violations.filter(v => v.severity === 'CRITICAL');
+                 if (criticalViolations.length > 0) {
+                     contractBreaches.push(`CRITICAL COMPLIANCE VIOLATIONS: ${criticalViolations.map(v => v.rule_id).join(', ')}`);
+                 }
              }
           }
 

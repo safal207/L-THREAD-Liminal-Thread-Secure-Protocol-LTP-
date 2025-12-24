@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://lthread.io/schemas/ltp-critical-actions.v0.1.json",
+  "title": "LTP Critical Actions Standard v0.1",
+  "description": "Schema for defining Critical Actions and their associated metadata in LTP-compliant systems.",
+  "type": "object",
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "v0.1"
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$",
+            "description": "The snake_case name of the action."
+          },
+          "description": {
+            "type": "string",
+            "description": "A description of what the action does."
+          },
+          "domain_tags": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["fintech", "ops", "privacy", "content", "social", "commerce", "security"]
+            }
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": ["CRITICAL", "HIGH", "MODERATE"],
+            "default": "CRITICAL"
+          }
+        },
+        "required": ["name", "description"]
+      }
+    }
+  },
+  "required": ["version", "actions"]
+}

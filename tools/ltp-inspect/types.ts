@@ -39,10 +39,21 @@ export type BranchInsight = {
   constraints?: string[];
 };
 
+export type ComplianceViolation = {
+  rule_id: string;
+  severity: 'CRITICAL' | 'HIGH' | 'MODERATE' | 'LOW';
+  frame_index: number;
+  source: string;
+  action: string;
+  evidence: string;
+};
+
 export type AuditSummary = {
   verdict: 'PASS' | 'FAIL';
   risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
   failed_checks: string[];
+  violations: ComplianceViolation[];
+  violations_count_by_severity: Record<string, number>;
   regulator_ready: boolean;
 };
 
