@@ -4,6 +4,7 @@ This repository defines **LTP (Liminal Thread Protocol)** — a continuity layer
 
 ## Start here
 - **Canon (read first)**
+  - `docs/vision/LTP-vs-Blockchain-Crypto-Agents.md` (Market Positioning)
   - `docs/canon/LTP-Limits-of-LTP.md`
   - `docs/canon/LTP-Non-Goals-as-Design-Constraints.md`
   - `docs/canon/How-to-Build-Products-on-LTP-Without-Violating-the-Core.md`
