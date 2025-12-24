@@ -13,6 +13,7 @@ const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt
 const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.json');
 const canonicalFixture = path.join(__dirname, '..', '..', 'examples', 'traces', 'canonical-linear.json');
 const canonicalHumanSnapshot = path.join(__dirname, '..', '..', 'docs', 'devtools', 'inspect-output.txt');
+const goldenTraceOutput = path.join(__dirname, 'fixtures', 'golden.trace_output.txt');
 const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.json');
 const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.json');
 const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.json');
@@ -48,7 +49,7 @@ async function runCommand(command: string, args: string[], options: SpawnOptions
 function transpileToDist(sourcePath: string, outPath: string): void {
   let source = fs.readFileSync(sourcePath, 'utf-8');
   // Hack: Add .js extension to relative imports for ESM execution in Node
-  source = source.replace(/from '(\.\/[^']+)';/g, "from '$1.js';");
+  source = source.replace(/from\s+['"](\.{1,2}\/[^'"]+)['"]/g, "from '$1.js'");
 
   const output = ts.transpileModule(source, {
     compilerOptions: {
@@ -132,6 +133,28 @@ describe('ltp-inspect golden summary', () => {
       expect(exitCode).toBe(1);
       expect(errors.length).toBe(0);
       expect(logs.join('\n').trim()).toEqual(fs.readFileSync(canonicalHumanSnapshot, 'utf-8').trim());
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('matches the golden trace output artifact', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+    // The timestamp in the golden artifact is 2025-12-24T22:08:59.315Z
+    vi.stubEnv('LTP_INSPECT_FROZEN_TIME', '2025-12-24T22:08:59.315Z');
+    try {
+      const exitCode = execute(['--input', sampleTrace, '--format=human', '--color=never'], {
+        log: (message) => logs.push(message),
+        error: (message) => errors.push(message),
+      });
+
+      expect(exitCode).toBe(0);
+      expect(errors.length).toBe(0);
+
+      const expected = fs.readFileSync(goldenTraceOutput, 'utf-8').trim();
+      const actual = logs.join('\n').trim();
+      expect(actual).toEqual(expected);
     } finally {
       vi.unstubAllEnvs();
     }
