@@ -1,14 +1,30 @@
 [
   {
-    "h": "0000000000000000000000000000000000000000000000000000000000000001",
-    "p": null,
-    "t": "hello",
-    "c": {"client": "ltp-cli", "v": 1}
+    "i": 0,
+    "frame": {
+      "v": "0.1",
+      "type": "hello",
+      "payload": {
+        "client": "ltp-cli"
+      }
+    },
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "2a987c3f7413839a3a97e324bdd0fb5144f8c7c3dc9b5954f8fb9a0c1978e960",
+    "timestamp_ms": 1000,
+    "direction": "in",
+    "session_id": "bad-trace"
   },
   {
-    "h": "0000000000000000000000000000000000000000000000000000000000000002",
-    "p": "bad_hash_should_be_0000000000000000000000000000000000000000000000000000000000000001",
-    "t": "heartbeat",
-    "c": {}
+    "i": 1,
+    "frame": {
+      "v": "0.1",
+      "type": "heartbeat",
+      "payload": {}
+    },
+    "prev_hash": "bad_hash_should_be_2a987c3f7413839a3a97e324bdd0fb5144f8c7c3dc9b5",
+    "hash": "be9c921f6d48620d40abf88ea3973710d8bd447c6b24f155508b8423b3fb8893",
+    "timestamp_ms": 1001,
+    "direction": "in",
+    "session_id": "bad-trace"
   }
 ]

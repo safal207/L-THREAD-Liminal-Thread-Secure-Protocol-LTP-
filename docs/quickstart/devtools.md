@@ -52,6 +52,10 @@ If you see **Status: PASS** — you’re good.
 - **Hash Integrity**: Verifies that the hash chain (if present) is unbroken.
 - **Protocol Compliance**: Checks for unknown frames or illegal sequences.
 
+### Troubleshooting
+- **Command not found**: Ensure you installed the tool globally (`npm install -g @ltp/inspect`) or use `npx @ltp/inspect`.
+- **Integrity Check Fails**: If you see `TRACE INTEGRITY BROKEN`, the trace file has been tampered with or corrupted.
+
 ## Link to deeper docs
 
 - [LTP Inspect Tool Documentation](../devtools/inspector.md)

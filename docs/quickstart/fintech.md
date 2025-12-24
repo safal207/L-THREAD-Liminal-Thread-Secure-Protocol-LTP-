@@ -60,5 +60,9 @@ If you see **Verdict: PASS** — you’re good.
 
 > **Tip:** If you are building autonomous agents, see [Agent Safety](./agents.md).
 
+### Troubleshooting
+- **Command not found**: Ensure you installed the tool globally (`npm install -g @ltp/inspect`) or use `npx @ltp/inspect`.
+- **Integrity Check Fails**: If you see `TRACE INTEGRITY BROKEN`, the trace file has been tampered with or corrupted.
+
 - [Fintech Compliance Inspection](../fintech/Compliance-Inspection.md)
 - [How Auditor Reads LTP Trace](../fintech/How-Auditor-Reads-LTP-Trace.md)

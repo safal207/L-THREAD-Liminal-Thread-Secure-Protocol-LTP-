@@ -58,5 +58,9 @@ If you see **Verdict: FAIL** — you’re good (this means the safety catch is w
 
 > **Tip:** If you are building regulated systems, see [Fintech Compliance](./fintech.md).
 
+### Troubleshooting
+- **Command not found**: Ensure you installed the tool globally (`npm install -g @ltp/inspect`) or use `npx @ltp/inspect`.
+- **Integrity Check Fails**: If you see `TRACE INTEGRITY BROKEN`, the trace file has been tampered with or corrupted.
+
 - [Agent Safety Rules](../agents/Agent-Safety-Rules-v0.1.md)
 - [Configuring Critical Actions](../agents/Configuring-Critical-Actions.md)
