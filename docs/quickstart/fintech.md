@@ -58,5 +58,7 @@ If you see **Verdict: PASS** — you’re good.
 
 ## Link to deeper docs
 
+> **Tip:** If you are building autonomous agents, see [Agent Safety](./agents.md).
+
 - [Fintech Compliance Inspection](../fintech/Compliance-Inspection.md)
 - [How Auditor Reads LTP Trace](../fintech/How-Auditor-Reads-LTP-Trace.md)

@@ -56,5 +56,7 @@ If you see **Verdict: FAIL** — you’re good (this means the safety catch is w
 
 ## Link to deeper docs
 
+> **Tip:** If you are building regulated systems, see [Fintech Compliance](./fintech.md).
+
 - [Agent Safety Rules](../agents/Agent-Safety-Rules-v0.1.md)
 - [Configuring Critical Actions](../agents/Configuring-Critical-Actions.md)
