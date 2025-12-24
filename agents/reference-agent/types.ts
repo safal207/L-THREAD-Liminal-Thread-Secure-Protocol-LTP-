@@ -20,11 +20,12 @@ export interface ProposedTransition {
 
 /**
  * A symbol to ensure VerifiedTransition can only be created by the Admissibility Layer.
+ * NOT EXPORTED to prevent forgery.
  */
-export const VERIFIED_SYMBOL = Symbol('LTP_VERIFIED_TRANSITION');
+declare const VERIFIED_BRAND: unique symbol;
 
 export interface VerifiedTransition {
-  [VERIFIED_SYMBOL]: true;
+  readonly [VERIFIED_BRAND]: true;
   id: string;
   originalProposalId: string;
   admissible: true;
