@@ -16,4 +16,8 @@ These traces are intentionally small and human-readable. They are designed for t
   - `continuity_token` stays stable while branch `A` is blocked by read-only guardrails.
   - Branch `B` remains admissible for analysis-only work, illustrating how futures separate safe vs blocked actions.
 
+- `bad.trace.json` — intentionally broken integrity for testing failure modes.
+  - Frame 2 has a `prev_hash` ("bad_hash...") that does not match the hash of Frame 1.
+  - Useful for verifying that `ltp-inspect` correctly reports **Integrity: FAIL**.
+
 Each trace is short enough to read directly and to replay with `pnpm -w ltp:inspect -- replay --input <file>` for step-by-step orientation.

@@ -6,7 +6,7 @@ Fintech applications require immutable audit logs and regulatory compliance veri
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 18 or 20 (LTS)
 - `@ltp/inspect` installed globally
 
 ## 5-minute run
@@ -24,7 +24,15 @@ Fintech applications require immutable audit logs and regulatory compliance veri
    ltp-inspect fintech.trace.json --compliance fintech
    ```
 
-## Expected output
+## Success criteria
+
+Expected command:
+
+```bash
+ltp-inspect fintech.trace.json --compliance fintech
+```
+
+Expected output:
 
 ```text
 LTP INSPECT v0.1.0
@@ -39,6 +47,8 @@ Verdict: PASS
 Risk Level: LOW
 Regulator Ready: YES
 ```
+
+If you see **Verdict: PASS** — you’re good.
 
 ## What guarantees are provided
 

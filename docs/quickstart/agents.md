@@ -6,7 +6,7 @@ AI Agents need to be prevented from taking critical actions (like money transfer
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 18 or 20 (LTS)
 - `@ltp/inspect` installed globally
 
 ## 5-minute run
@@ -24,7 +24,15 @@ AI Agents need to be prevented from taking critical actions (like money transfer
    ltp-inspect risky.trace.json --compliance agents
    ```
 
-## Expected output
+## Success criteria
+
+Expected command:
+
+```bash
+ltp-inspect risky.trace.json --compliance agents
+```
+
+Expected output:
 
 ```text
 LTP INSPECT v0.1.0
@@ -37,6 +45,8 @@ Compliance Profile: AGENTS
 Verdict: FAIL
 Violations: 1
 ```
+
+If you see **Verdict: FAIL** — you’re good (this means the safety catch is working).
 
 ## What guarantees are provided
 

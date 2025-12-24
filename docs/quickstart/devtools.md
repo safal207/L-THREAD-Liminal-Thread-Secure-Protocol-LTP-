@@ -5,7 +5,7 @@ Developers need to inspect, validate, and debug LTP traces without setting up a 
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 18 or 20 (LTS)
 - npm or pnpm
 
 ## 5-minute run
