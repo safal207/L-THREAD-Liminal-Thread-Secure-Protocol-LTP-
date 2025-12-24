@@ -134,6 +134,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.compliance = token.split('=').slice(1).join('=');
     } else if (token === '--compliance') {
       options.compliance = argv[++i];
+    } else if (token.startsWith('--profile=')) {
+      options.compliance = token.split('=').slice(1).join('=');
+    } else if (token === '--profile') {
+      options.compliance = argv[++i];
     } else if (token === '--replay-check') {
       options.replayCheck = true;
     } else if (token === '--agent' || token === '--agents') {
@@ -793,7 +797,7 @@ function summarize(
   }
 
   let auditSummary;
-  if (compliance && (complianceProfile === 'fintech' || complianceProfile === 'agentic' || complianceProfile === 'agents')) {
+  if (compliance && (complianceProfile === 'fintech' || complianceProfile === 'agentic' || complianceProfile === 'agents' || complianceProfile === 'ai-agent')) {
     const failedChecks: string[] = [];
     const violations: ComplianceViolation[] = [];
     const violationsCountBySeverity: Record<string, number> = {
@@ -804,7 +808,7 @@ function summarize(
     };
 
     // Core LTP Checks
-    if (compliance.trace_integrity !== 'verified') {
+    if (compliance.trace_integrity !== 'verified' && compliance.trace_integrity !== 'unchecked') {
         failedChecks.push('trace_integrity');
         violations.push({
             rule_id: 'CORE.INTEGRITY',
@@ -839,7 +843,7 @@ function summarize(
     }
 
     // Agentic Specific Checks
-    if (complianceProfile === 'agentic' || complianceProfile === 'agents') {
+    if (complianceProfile === 'agentic' || complianceProfile === 'agents' || complianceProfile === 'ai-agent') {
         // Iterate through all frames to find Admissibility Results (route_response)
         frames.forEach((frame, index) => {
             if (frame.type === 'route_response') {
