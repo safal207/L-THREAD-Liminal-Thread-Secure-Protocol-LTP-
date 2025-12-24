@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "name": "LTP Critical Actions Registry",
+    "version": "v0.1",
+    "status": "frozen",
+    "canonical_doc": "docs/canon/LTP-Critical-Actions-v0.1.md"
+  },
+  "actions": {
+    "transfer_money": {
+      "domain": "fintech",
+      "description": "Initiating a transfer of value between accounts."
+    },
+    "place_order": {
+      "domain": "commerce, fintech",
+      "description": "Creating a binding order for goods, services, or assets."
+    },
+    "send_message": {
+      "domain": "content, social",
+      "description": "Sending a message to an external party or public channel."
+    },
+    "delete_data": {
+      "domain": "ops, privacy",
+      "description": "Permanently removing data or resources."
+    },
+    "grant_access": {
+      "domain": "ops, security",
+      "description": "Modifying permissions or granting access to resources."
+    },
+    "modify_system": {
+      "domain": "ops",
+      "description": "Changing system configuration or state."
+    },
+    "execute_code": {
+      "domain": "ops, security",
+      "description": "Running arbitrary code or scripts."
+    }
+  },
+  "rules": {
+    "AGENTS.CRIT.WEB_DIRECT": {
+      "description": "WEB cannot directly trigger critical action.",
+      "severity": "CRITICAL"
+    },
+    "AGENTS.CRIT.NO_CAPABILITY": {
+      "description": "Critical action requires explicit capability.",
+      "severity": "CRITICAL"
+    },
+    "AGENTS.CRIT.NO_ADMISSIBILITY": {
+      "description": "Critical action requires admissibility pass.",
+      "severity": "CRITICAL"
+    },
+    "AGENTS.CRIT.UNVERIFIED_IDENTITY": {
+      "description": "Critical action requires verified identity.",
+      "severity": "HIGH"
+    }
+  }
+}

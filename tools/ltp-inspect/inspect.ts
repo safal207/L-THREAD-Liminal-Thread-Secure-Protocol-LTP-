@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import PDFDocument from 'pdfkit';
 import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
+import { CRITICAL_ACTIONS, AGENT_RULES } from './critical_actions';
 
 const CONTRACT = {
   name: 'ltp-inspect',
@@ -825,41 +826,63 @@ function summarize(
 
     // Agentic Specific Checks
     if (complianceProfile === 'agentic' || complianceProfile === 'agents') {
-        const criticalActions = ['transfer_money', 'delete_data', 'send_email', 'approve_trade', 'modify_system', 'delete_file'];
-
         // Iterate through all frames to find Admissibility Results (route_response)
-        // In the Reference Agent trace, these frames contain:
-        // context, targetState, admissible
         frames.forEach((frame, index) => {
             if (frame.type === 'route_response') {
                 const payload = frame.payload || {};
 
-                // We need to check if this was a Critical Action from a WEB context
-                // The Reference Agent v0.1 pipeline puts 'context' and 'targetState' directly in the AdmissibilityResult (which is the payload)
-                // or in the 'params' or 'metadata'.
-                // Let's check existing types: VerifiedTransition/BlockedTransition has 'context' and 'targetState'.
-                // The pipeline likely emits the AdmissibilityResult as the frame payload.
-
+                // Extract relevant fields (adapt to Reference Agent v0.1 schema)
+                // Usually these are in the payload (AdmissibilityResult)
                 const context = (payload as any).context;
-                const targetState = (payload as any).targetState;
+                const targetState = (payload as any).targetState; // Action name
                 const admissible = (payload as any).admissible;
+                const capabilities = (payload as any).capabilities ?? [];
 
-                if (context === 'WEB' && targetState && typeof targetState === 'string') {
-                    // Check if action is critical
-                    const isCritical = criticalActions.some(action => targetState.includes(action));
-                    if (isCritical) {
-                         if (admissible === true) {
-                             failedChecks.push('AGENTS.CRIT.WEB_DIRECT');
+                // Also check if capabilities were required/missing in request?
+                // For simplified trace inspection, we look at the 'AdmissibilityResult' which *should* log the reason if denied.
+                // But we want to catch cases where it was *allowed* incorrectly.
+
+                if (targetState && typeof targetState === 'string') {
+                    const isCritical = CRITICAL_ACTIONS.includes(targetState);
+
+                    if (isCritical && admissible === true) {
+                        // Rule 1: AGENTS.CRIT.WEB_DIRECT
+                        if (context === 'WEB') {
+                             failedChecks.push(AGENT_RULES.WEB_DIRECT);
                              compliance!.determinism_details = `Security Violation: WEB context allowed to perform critical action '${targetState}' at frame #${index}`;
                              violations.push({
-                                rule_id: 'AGENTS.CRIT.WEB_DIRECT',
+                                rule_id: AGENT_RULES.WEB_DIRECT,
                                 severity: 'CRITICAL',
                                 frame_index: index,
                                 source: context,
                                 action: targetState,
                                 evidence: 'WEB context allowed to perform critical action'
                              });
-                         }
+                        }
+
+                        // Rule 2: AGENTS.CRIT.NO_CAPABILITY
+                        // We check if the capability was present in the admissibility record
+                        // Convention: Critical actions need CAPABILITY_{ACTION_NAME_UPPER}
+                        const requiredCap = `CAPABILITY_${targetState.toUpperCase()}`;
+                        const hasCap = Array.isArray(capabilities) && capabilities.includes(requiredCap);
+
+                        // Note: If the agent logic allows it without checking capability, we can only detect it
+                        // if the trace *records* capabilities. If capabilities are missing from trace, we might flag as warning or violation.
+                        // Assuming Reference Agent records 'capabilities' in the AdmissibilityResult.
+                        if (!hasCap) {
+                            // If capabilities field exists but missing required one -> VIOLATION
+                            // If capabilities field is undefined -> Maybe WARNING or strict VIOLATION?
+                            // Let's assume strict for safety.
+                            failedChecks.push(AGENT_RULES.NO_CAPABILITY);
+                            violations.push({
+                                rule_id: AGENT_RULES.NO_CAPABILITY,
+                                severity: 'CRITICAL',
+                                frame_index: index,
+                                source: context || 'unknown',
+                                action: targetState,
+                                evidence: `Missing required capability: ${requiredCap}`
+                             });
+                        }
                     }
                 }
             }
