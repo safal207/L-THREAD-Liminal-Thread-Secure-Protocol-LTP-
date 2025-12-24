@@ -1,4 +1,3 @@
-
 import {
   AgentEvent,
   ContextType,
@@ -16,7 +15,7 @@ import * as crypto from 'crypto';
  */
 export class ContextClassifier {
   classify(event: AgentEvent): ContextType {
-    // Simple mock logic based on event type provided or content analysis
+    // In a real system, this would cryptographically verify the source (e.g. signed webhooks vs user session)
     if (event.type) return event.type;
     return 'USER'; // Default
   }
@@ -50,11 +49,14 @@ export class AgentPipeline {
   async process(event: AgentEvent): Promise<{ result: 'ALLOWED' | 'BLOCKED', traceId: string, details: any }> {
     // 1. Context Classification
     const context = this.classifier.classify(event);
-    // console.log(`[LTP] Context classified as: ${context}`);
 
     // 2. Propose Transition (Cognition Layer)
     // The "LLM" proposes, it does NOT execute.
     const proposal = await this.proposalEngine(event);
+
+    // CRITICAL: We enforce that the proposal carries the TRUE context of the event.
+    // An LLM cannot "hallucinate" that a Web event is a User event.
+    proposal.context = context;
 
     // 3. Admissibility Check (LTP Layer)
     const checkResult: AdmissibilityResult = await this.admissibility.check(proposal);
