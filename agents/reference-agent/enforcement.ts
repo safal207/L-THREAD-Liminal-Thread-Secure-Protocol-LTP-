@@ -1,4 +1,3 @@
-
 import {
   ProposedTransition,
   VerifiedTransition,
@@ -32,7 +31,8 @@ export function mintVerifiedTransition(
     traceId,
     reason,
     targetState: proposal.targetState,
-    params: proposal.params
+    params: proposal.params,
+    context: proposal.context // Carry over context for audit
   } as unknown as VerifiedTransition;
 }
 
@@ -59,10 +59,11 @@ export class LTPAdmissibilityChecker {
         id: crypto.randomUUID(),
         originalProposalId: proposal.id,
         admissible: false,
-        reason: 'Policy Violation: Unsafe action detected',
+        reason: 'Policy Violation: Unsafe action for this context',
         traceId,
         timestamp: Date.now(),
-        violationType: 'SAFETY'
+        violationType: 'SAFETY',
+        context: proposal.context
       };
     }
 
@@ -78,18 +79,26 @@ export class LTPAdmissibilityChecker {
   }
 
   private isViolation(proposal: ProposedTransition): boolean {
-    // Simple heuristic for demonstration: Block "transfer" or "delete" if reasons are weak
-    const unsafeKeywords = ['delete', 'transfer_money', 'rm -rf'];
+    const { context, targetState, reason } = proposal;
 
-    // Check if target state or params look suspicious (mock logic)
-    if (unsafeKeywords.some(k => proposal.targetState.includes(k))) {
-      // In a real agent, we'd check context.
-      // For this P0, we assume 'transfer_money' requires high confidence which we don't have in this mock.
-      return true;
+    // RULE 1: CRITICAL ACTIONS (The "Web != Action" Rule)
+    // If the context is untrusted (WEB), critical actions are FORBIDDEN.
+    const criticalActions = ['transfer_money', 'delete_file', 'modify_system', 'send_email'];
+    if (context === 'WEB' && criticalActions.some(action => targetState.includes(action))) {
+        // Log this drift! This is the system catching a prompt injection or bad actor.
+        console.warn(`[LTP] BLOCKED: Web content attempted critical action '${targetState}'`);
+        return true;
     }
 
-    // Prompt Injection checks (rudimentary)
-    if (proposal.reason && proposal.reason.toLowerCase().includes('ignore previous')) {
+    // RULE 2: GLOBAL SAFETY (No nukes, even from users)
+    const globallyBanned = ['rm -rf', 'format_disk'];
+    if (globallyBanned.some(action => targetState.includes(action))) {
+        return true;
+    }
+
+    // RULE 3: PROMPT INJECTION HEURISTICS (Defense in Depth)
+    // Even if context is USER, we check for obvious manipulation attempts in the reason/chain of thought
+    if (reason && reason.toLowerCase().includes('ignore previous instructions')) {
         return true;
     }
 

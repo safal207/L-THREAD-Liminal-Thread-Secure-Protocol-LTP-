@@ -1,4 +1,3 @@
-
 export type ContextType = 'USER' | 'SYSTEM' | 'WEB' | 'MEMORY';
 
 export interface AgentEvent {
@@ -15,7 +14,9 @@ export interface ProposedTransition {
   targetState: string;
   reason: string;
   params?: Record<string, unknown>;
-  // No action execution logic here
+  // The context of the event that triggered this proposal.
+  // Crucial for the Admissibility Layer to make safety decisions.
+  context: ContextType;
 }
 
 /**
@@ -35,6 +36,7 @@ export interface VerifiedTransition {
   reason: string; // Explanation of why it was allowed
   targetState: string;
   params?: Record<string, unknown>;
+  context: ContextType; // Preserved for audit
 }
 
 export interface BlockedTransition {
@@ -45,6 +47,7 @@ export interface BlockedTransition {
   traceId: string;
   timestamp: number;
   violationType?: 'POLICY' | 'SAFETY' | 'UNCERTAINTY';
+  context: ContextType; // Preserved for audit
 }
 
 export type AdmissibilityResult = VerifiedTransition | BlockedTransition;
