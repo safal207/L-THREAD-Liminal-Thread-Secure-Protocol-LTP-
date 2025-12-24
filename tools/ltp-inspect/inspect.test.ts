@@ -20,7 +20,8 @@ const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.js
 const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
 const agentCriticalFixture = path.join(__dirname, 'fixtures', 'agent-critical.frames.jsonl');
-const failureRecoveryTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-outage.trace.json');
+const continuityOutageTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-outage.trace.json');
+const continuityFailureTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-failure.trace.json');
 
 let builtCliPath: string | undefined;
 
@@ -46,7 +47,10 @@ async function runCommand(command: string, args: string[], options: SpawnOptions
 }
 
 function transpileToDist(sourcePath: string, outPath: string): void {
-  const source = fs.readFileSync(sourcePath, 'utf-8');
+  let source = fs.readFileSync(sourcePath, 'utf-8');
+  // Hack: Add .js extension to relative imports for ESM execution in Node
+  source = source.replace(/from '(\.\/[^']+)';/g, "from '$1.js';");
+
   const output = ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2020,
@@ -282,11 +286,12 @@ describe('ltp-inspect golden summary', () => {
     // Normalize line endings for robust matching (User feedback check 4)
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
-    // Verify Section Header
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
-
-    // Verify System Coherence
     expect(output).toContain('System Remained Coherent: YES');
+    expect(output).toContain('State Transitions Observed:');
+    expect(output).toMatch(/HEALTHY/i);
+    expect(output).toMatch(/FAILED/i);
+  });
 
     // Verify State Transitions
     // Based on examples/traces/continuity-outage.trace.json
