@@ -141,7 +141,12 @@ async function runSimulation() {
   }
 
   // Write Trace
-  const tracePath = path.join(__dirname, '../infra.trace.json');
+  let tracePath = path.join(process.cwd(), 'infra.trace.json');
+  const outIndex = process.argv.indexOf('--out');
+  if (outIndex !== -1 && outIndex + 1 < process.argv.length) {
+    tracePath = process.argv[outIndex + 1];
+  }
+
   fs.writeFileSync(tracePath, JSON.stringify(trace, null, 2));
   console.log(`\nTrace generated at: ${tracePath}`);
 }

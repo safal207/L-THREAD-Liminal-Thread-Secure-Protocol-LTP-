@@ -1,0 +1,282 @@
+[
+  {
+    "hash": "d0875b1232fec58bbb17d1fdd6621cb0f14a2536688e3e1fb3a3e4fe5f6a0df2",
+    "previous_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "timestamp": "2025-12-24T17:41:13.598Z",
+    "type": "orientation",
+    "payload": {
+      "state": "HEALTHY",
+      "message": "Simulation Start",
+      "focus_snapshot": {
+        "vectors": []
+      }
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "1ce2573102f436c434ebf61a4bec348565013af013a498f514a2ae2c9ac92ab2",
+    "previous_hash": "d0875b1232fec58bbb17d1fdd6621cb0f14a2536688e3e1fb3a3e4fe5f6a0df2",
+    "timestamp": "2025-12-24T17:41:13.599Z",
+    "type": "focus_snapshot",
+    "payload": {
+      "drift": 0,
+      "vectors": []
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "af7f94fe18d494fcb1f6eae2afbe93b53243487f1fd62bc53708c9246739bec6",
+    "previous_hash": "1ce2573102f436c434ebf61a4bec348565013af013a498f514a2ae2c9ac92ab2",
+    "timestamp": "2025-12-24T17:41:13.599Z",
+    "type": "hello",
+    "payload": {
+      "event": "CONNECTION_BACKLOG_GROWING"
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "cdade1b6c72c06f067fc711ecf1f890f85e6a17b94e5d3b8195462477be5c9d2",
+    "previous_hash": "af7f94fe18d494fcb1f6eae2afbe93b53243487f1fd62bc53708c9246739bec6",
+    "timestamp": "2025-12-24T17:41:13.600Z",
+    "type": "route_request",
+    "payload": {
+      "target_urn": "urn:ltp:infra:state-manager",
+      "transition": {
+        "from": "HEALTHY",
+        "to": "DEGRADED",
+        "confidence": 1,
+        "risk_level": "MEDIUM",
+        "recommended_pause": false,
+        "explanation": "Backlog growing beyond safe threshold.",
+        "timestamp": "2025-12-24T17:41:13.600Z",
+        "trigger_event": "CONNECTION_BACKLOG_GROWING"
+      }
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "b6f3dd292ee96139b8c8f7ba150dd651a26190029a25d437b93cd501d46b1778",
+    "previous_hash": "cdade1b6c72c06f067fc711ecf1f890f85e6a17b94e5d3b8195462477be5c9d2",
+    "timestamp": "2025-12-24T17:41:13.600Z",
+    "type": "route_response",
+    "payload": {
+      "branches": [
+        {
+          "name": "commit",
+          "confidence": 1,
+          "target_urn": "urn:ltp:infra:state:DEGRADED",
+          "description": "Transition approved"
+        }
+      ]
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "52f272afbfc59ea0e6c45dea03dc303e380fbb9e52c3610237ede64e3d0f0a40",
+    "previous_hash": "b6f3dd292ee96139b8c8f7ba150dd651a26190029a25d437b93cd501d46b1778",
+    "timestamp": "2025-12-24T17:41:13.600Z",
+    "type": "hello",
+    "payload": {
+      "event": "CONNECTION_BACKLOG_GROWING"
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "1552bc8a50250dcdddb307929b3e1154faffcacebdb6e78d68942c56c135b9d2",
+    "previous_hash": "52f272afbfc59ea0e6c45dea03dc303e380fbb9e52c3610237ede64e3d0f0a40",
+    "timestamp": "2025-12-24T17:41:13.600Z",
+    "type": "hello",
+    "payload": {
+      "event": "QUEUE_LATENCY_SPIKE"
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "e3b0e6605bf1b4a0b263898e1cf120f8a334aaf5b2c9fa9d92ec1330e44d0102",
+    "previous_hash": "1552bc8a50250dcdddb307929b3e1154faffcacebdb6e78d68942c56c135b9d2",
+    "timestamp": "2025-12-24T17:41:13.600Z",
+    "type": "route_request",
+    "payload": {
+      "target_urn": "urn:ltp:infra:state-manager",
+      "transition": {
+        "from": "DEGRADED",
+        "to": "SATURATED",
+        "confidence": 1,
+        "risk_level": "HIGH",
+        "recommended_pause": true,
+        "explanation": "Latency spike in degraded state indicates saturation.",
+        "timestamp": "2025-12-24T17:41:13.600Z",
+        "trigger_event": "QUEUE_LATENCY_SPIKE"
+      }
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "9bd7ec302ee1cf6e9ff939529fc248204203eda2344b7385e418a131c20be5a9",
+    "previous_hash": "e3b0e6605bf1b4a0b263898e1cf120f8a334aaf5b2c9fa9d92ec1330e44d0102",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "route_response",
+    "payload": {
+      "branches": [
+        {
+          "name": "commit",
+          "confidence": 1,
+          "target_urn": "urn:ltp:infra:state:SATURATED",
+          "description": "Transition approved"
+        }
+      ]
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "6f33b563acd8d25298b8de9fecbff8d1297c6e97eb96d9c16ed45e332c79b5cb",
+    "previous_hash": "9bd7ec302ee1cf6e9ff939529fc248204203eda2344b7385e418a131c20be5a9",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "hello",
+    "payload": {
+      "event": "WS_RECONNECT_STORM"
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "47b523017ad0e5e2a3628c331b7eb9b74b16c53c4d0a71529f8ca72d88ac0cf4",
+    "previous_hash": "6f33b563acd8d25298b8de9fecbff8d1297c6e97eb96d9c16ed45e332c79b5cb",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "hello",
+    "payload": {
+      "event": "HEARTBEAT_TIMEOUT_CLUSTER"
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "121175554ca0e53c8f43dec5275ba90ec242734d27d374c5dc0db176481ab143",
+    "previous_hash": "47b523017ad0e5e2a3628c331b7eb9b74b16c53c4d0a71529f8ca72d88ac0cf4",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "route_request",
+    "payload": {
+      "target_urn": "urn:ltp:infra:state-manager",
+      "transition": {
+        "from": "SATURATED",
+        "to": "FAILED",
+        "confidence": 1,
+        "risk_level": "CRITICAL",
+        "recommended_pause": true,
+        "explanation": "Cluster losing heartbeats under saturation.",
+        "timestamp": "2025-12-24T17:41:13.601Z",
+        "trigger_event": "HEARTBEAT_TIMEOUT_CLUSTER"
+      }
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "df6cb0c815da1cf3908e4d8a93c300c353d660398c504433bb1abb5a1dd16f94",
+    "previous_hash": "121175554ca0e53c8f43dec5275ba90ec242734d27d374c5dc0db176481ab143",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "route_response",
+    "payload": {
+      "branches": [
+        {
+          "name": "commit",
+          "confidence": 1,
+          "target_urn": "urn:ltp:infra:state:FAILED",
+          "description": "Transition approved"
+        }
+      ]
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "39e5e87b9fe133b0e2f6ab3f852ea3c0f0c98387a6a6be78d4cb1d502e1f4ef4",
+    "previous_hash": "df6cb0c815da1cf3908e4d8a93c300c353d660398c504433bb1abb5a1dd16f94",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "hello",
+    "payload": {
+      "event": "METRICS_STABILIZED"
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "5eb99bee60421c343bb66320f89986d2cb1385e003950d223966432a2f9609cd",
+    "previous_hash": "39e5e87b9fe133b0e2f6ab3f852ea3c0f0c98387a6a6be78d4cb1d502e1f4ef4",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "route_request",
+    "payload": {
+      "target_urn": "urn:ltp:infra:state-manager",
+      "transition": {
+        "from": "FAILED",
+        "to": "RECOVERING",
+        "confidence": 1,
+        "risk_level": "HIGH",
+        "recommended_pause": false,
+        "explanation": "System showing signs of life.",
+        "timestamp": "2025-12-24T17:41:13.601Z",
+        "trigger_event": "METRICS_STABILIZED"
+      }
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "924fe9b4df58e09db3781877d914aabbdf56da8919637f32e84cf75648b24761",
+    "previous_hash": "5eb99bee60421c343bb66320f89986d2cb1385e003950d223966432a2f9609cd",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "route_response",
+    "payload": {
+      "branches": [
+        {
+          "name": "commit",
+          "confidence": 1,
+          "target_urn": "urn:ltp:infra:state:RECOVERING",
+          "description": "Transition approved"
+        }
+      ]
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "21e6a4aec8c175772c87a805405e0737dcde09789ad4271cac60e63260b86ece",
+    "previous_hash": "924fe9b4df58e09db3781877d914aabbdf56da8919637f32e84cf75648b24761",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "hello",
+    "payload": {
+      "event": "RECOVERY_COMPLETE"
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "fd36b962939af771a682c9901c19692de6af513fa0e74a2db4dce20f79f3eabd",
+    "previous_hash": "21e6a4aec8c175772c87a805405e0737dcde09789ad4271cac60e63260b86ece",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "route_request",
+    "payload": {
+      "target_urn": "urn:ltp:infra:state-manager",
+      "transition": {
+        "from": "RECOVERING",
+        "to": "HEALTHY",
+        "confidence": 1,
+        "risk_level": "LOW",
+        "recommended_pause": false,
+        "explanation": "Recovery period complete.",
+        "timestamp": "2025-12-24T17:41:13.601Z",
+        "trigger_event": "RECOVERY_COMPLETE"
+      }
+    },
+    "v": "0.1"
+  },
+  {
+    "hash": "3bee368d7cb66d63dbc51efe522cf0c4f81185cedebccc118fc1af91863c5c4b",
+    "previous_hash": "fd36b962939af771a682c9901c19692de6af513fa0e74a2db4dce20f79f3eabd",
+    "timestamp": "2025-12-24T17:41:13.601Z",
+    "type": "route_response",
+    "payload": {
+      "branches": [
+        {
+          "name": "commit",
+          "confidence": 1,
+          "target_urn": "urn:ltp:infra:state:HEALTHY",
+          "description": "Transition approved"
+        }
+      ]
+    },
+    "v": "0.1"
+  }
+]
