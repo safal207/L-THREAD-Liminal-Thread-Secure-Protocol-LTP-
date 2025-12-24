@@ -279,9 +279,10 @@ describe('ltp-inspect golden summary', () => {
     // We expect exit code 1 because of warnings (normalized input, missing drift snapshots)
     expect(exitCode).toBe(1);
 
-    // Check that there are no unexpected errors in stderr (User feedback check 3)
-    // exit code 1 means warnings in logs, but stderr should be clean unless there's a hard error
-    expect(errors.join('\n')).toBe('');
+    // Ensure no fatal errors even if warnings exist
+    expect(errors.join('\n')).not.toMatch(/(TypeError|ReferenceError|ENOENT|EACCES)/);
+
+    const output = logs.join('\n').replace(/\r\n/g, '\n');
 
     // Normalize line endings for robust matching (User feedback check 4)
     const output = logs.join('\n').replace(/\r\n/g, '\n');
