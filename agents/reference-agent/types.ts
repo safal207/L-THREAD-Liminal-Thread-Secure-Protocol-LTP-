@@ -71,3 +71,24 @@ export enum ReasonCodes {
   PROMPT_INJECTION_DETECTED = 'PROMPT_INJECTION_DETECTED',
   ADMISSIBLE = 'ADMISSIBLE'
 }
+
+export interface AgentAction {
+  agent_id: string;
+  intent: string;
+  action: string;
+  inputs_digest: string;
+  outputs_digest: string;
+  digest_alg: 'sha256' | 'blake3';
+  policy: {
+    id: string;
+    version: string;
+    verdict: 'ALLOW' | 'DENY' | 'DEFER';
+    reasons?: string[];
+  };
+  timestamp: number;
+  signature: string;
+  key_id: string;
+  alg: 'ed25519' | 'secp256k1' | 'hmac-sha256';
+  action_hash: string;
+  prev_hash?: string;
+}

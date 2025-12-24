@@ -275,7 +275,10 @@ describe('ltp-inspect golden summary', () => {
 
     // Exit code may be 0 (clean) or 1 (warnings) depending on fixture/normalizers.
     // We primarily assert the continuity report contract.
-    expect([0, 1]).toContain(exitCode);
+    // expect([0, 1]).toContain(exitCode);
+    if (exitCode !== 0 && exitCode !== 1) {
+        throw new Error(`Unexpected exit code ${exitCode}. Stderr: ${errors.join('\n')}`);
+    }
 
     const output = logs.join('\n');
 

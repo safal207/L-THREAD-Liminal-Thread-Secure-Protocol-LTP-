@@ -42,6 +42,9 @@ type ParsedArgs = {
   compliance?: string;
   replayCheck?: boolean;
   continuity?: boolean; // New flag for E-4
+  agentView?: boolean;
+  criticalOnly?: boolean;
+  policyView?: boolean;
 };
 
 const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
@@ -75,6 +78,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     output: undefined,
     compliance: undefined,
     replayCheck: false,
+    agentView: false,
+    criticalOnly: false,
+    policyView: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -143,6 +149,14 @@ function parseArgs(argv: string[]): ParsedArgs {
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
           options.exportFormat.push(exportFmt);
       }
+    } else if (token === '--agent' || token === '--agents') {
+        // Alias for --profile agents
+        options.compliance = 'agents';
+        options.agentView = true;
+    } else if (token === '--critical-only') {
+        options.criticalOnly = true;
+    } else if (token === '--policy-view') {
+        options.policyView = true;
     } else if (!options.input && !token.startsWith('-')) {
       options.input = token;
     }
@@ -150,6 +164,11 @@ function parseArgs(argv: string[]): ParsedArgs {
 
   // Deduplicate export formats
   options.exportFormat = Array.from(new Set(options.exportFormat));
+
+  // Auto-enable compliance=agents if agentView is on and compliance not set
+  if (options.agentView && !options.compliance) {
+      options.compliance = 'agents';
+  }
 
   return options;
 }
@@ -709,6 +728,7 @@ function summarize(
   format: InspectSummary['input']['format'],
   complianceProfile?: string,
   replayCheck?: boolean,
+  agentView?: boolean,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
@@ -1066,11 +1086,16 @@ function formatDriftHistory(history: DriftSnapshot[]): string {
     .join(' -> ');
 }
 
-export function formatHuman(summary: InspectSummary): string {
+export function formatHuman(summary: InspectSummary, criticalOnly?: boolean): string {
   const lines: string[] = [];
   lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
   const inputLabel = summary.input.path ?? summary.input.source;
   lines.push(`input: ${inputLabel}  time: ${summary.generated_at}`);
+
+  if (criticalOnly) {
+      lines.push('');
+      lines.push('Note: Output filtered by --critical-only (showing critical violations and summary)');
+  }
 
   if (summary.compliance) {
     lines.push('');
@@ -1095,10 +1120,19 @@ export function formatHuman(summary: InspectSummary): string {
     if (summary.audit_summary.violations && summary.audit_summary.violations.length > 0) {
         lines.push('');
         lines.push('VIOLATIONS:');
-        summary.audit_summary.violations.forEach(v => {
-            lines.push(`  [${v.severity}] ${v.rule_id} @ #${v.frame_index}`);
-            lines.push(`    Evidence: ${v.evidence}`);
-        });
+        let violationsToShow = summary.audit_summary.violations;
+        if (criticalOnly) {
+            violationsToShow = violationsToShow.filter(v => v.severity === 'CRITICAL');
+        }
+
+        if (violationsToShow.length > 0) {
+            violationsToShow.forEach(v => {
+                lines.push(`  [${v.severity}] ${v.rule_id} @ #${v.frame_index}`);
+                lines.push(`    Evidence: ${v.evidence}`);
+            });
+        } else if (criticalOnly && summary.audit_summary.violations.length > 0) {
+             lines.push('  (Non-critical violations hidden by --critical-only)');
+        }
     }
   }
 
@@ -1168,7 +1202,7 @@ function canonicalizeSummary(summary: InspectSummary): InspectSummary {
   return JSON.parse(JSON.stringify(summary)) as InspectSummary;
 }
 
-function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean): InspectionResult {
+function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean, agentView?: boolean, criticalOnly?: boolean): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
@@ -1176,7 +1210,8 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
     { path: inputPath, source: inputSource, type, hash_root },
     inputFormat,
     compliance,
-    replayCheck
+    replayCheck,
+    agentView
   );
 
   if (continuityCheck) {
@@ -1244,7 +1279,9 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
   }
 
   if (format === 'json') printJson(summary, pretty, writer);
-  else printHuman(summary, writer);
+  else {
+      writer(formatHuman(summary, criticalOnly));
+  }
 
   if (exportFormats && exportFormats.length > 0) {
      const outputDir = process.cwd();
@@ -1400,7 +1437,18 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
     switch (args.command) {
       case 'trace':
         {
-          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.compliance, args.replayCheck, writer, args.exportFormat, args.continuity);
+          const { violations, warnings, normalizations, summary } = handleTrace(
+              args.input as string,
+              args.format,
+              args.pretty,
+              args.compliance,
+              args.replayCheck,
+              writer,
+              args.exportFormat,
+              args.continuity,
+              args.agentView,
+              args.criticalOnly
+          );
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;
           const hasWarnings = warnings.length > 0 || normalizations.length > 0;
