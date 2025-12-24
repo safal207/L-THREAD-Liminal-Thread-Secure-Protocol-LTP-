@@ -46,7 +46,10 @@ async function runCommand(command: string, args: string[], options: SpawnOptions
 
 function transpileToDist(sourcePath: string, outPath: string): void {
   const source = fs.readFileSync(sourcePath, 'utf-8');
-  const output = ts.transpileModule(source, {
+  // Hack to fix ESM imports in test environment
+  const fixedSource = source.replace(/from '\.\/critical_actions'/g, "from './critical_actions.js'");
+
+  const output = ts.transpileModule(fixedSource, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2020,
       module: ts.ModuleKind.ES2020,
@@ -65,6 +68,7 @@ async function buildInspectCli(): Promise<string> {
   fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify({ type: 'module' }), 'utf-8');
   transpileToDist(path.join(__dirname, 'inspect.ts'), path.join(distDir, 'inspect.js'));
   transpileToDist(path.join(__dirname, 'types.ts'), path.join(distDir, 'types.js'));
+  transpileToDist(path.join(__dirname, 'critical_actions.ts'), path.join(distDir, 'critical_actions.js'));
   builtCliPath = path.join(distDir, 'inspect.js');
   return builtCliPath;
 }
@@ -262,6 +266,10 @@ describe('ltp inspect cli', () => {
       env: { ...process.env, LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z', LTP_INSPECT_TEST_RUN: '1' },
     });
 
+    if (result.exitCode !== 0) {
+      console.log('CLI Error Output:', result.stderr);
+      console.log('CLI Output:', result.stdout);
+    }
     expect(result.exitCode).toBe(0);
     expect(result.stdout.toLowerCase()).toContain('orientation');
   });

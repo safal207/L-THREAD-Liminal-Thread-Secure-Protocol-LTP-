@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import PDFDocument from 'pdfkit';
-import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
+import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation, InfrastructureEvent, RoutingStats } from './types';
 import { CRITICAL_ACTIONS, AGENT_RULES } from './critical_actions';
 
 const CONTRACT = {
@@ -689,7 +689,7 @@ function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
     const status = (branch.status ?? '').toLowerCase();
     if (status.includes('blocked') || status.includes('rejected') || status.includes('inadmissible')) {
       blocked.push(branch);
-    } else if (status.includes('degraded') || status.includes('fallback')) {
+    } else if (status.includes('degraded') || status.includes('fallback') || status.includes('deferred')) {
       degraded.push(branch);
     } else {
       admissible.push(branch);
@@ -697,6 +697,71 @@ function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
   }
 
   return { admissible, degraded, blocked };
+}
+
+function analyzeInfrastructure(frames: LtpFrame[]): InspectSummary['infrastructure'] {
+  const history: InfrastructureEvent[] = [];
+  let currentState = 'UNKNOWN';
+
+  const routing: RoutingStats = {
+    executed: 0,
+    deferred: 0,
+    frozen: 0,
+    rejected: 0,
+    replayed: 0
+  };
+
+  for (const frame of frames) {
+    // 1. Track State History
+    if (frame.type === 'orientation') {
+      const payload = frame.payload || {};
+      const state = payload.state;
+      if (state && typeof state === 'string') {
+        const reason = payload.reason;
+        // Only record if state changed or it's the first one
+        if (history.length === 0 || history[history.length - 1].state !== state) {
+           history.push({
+             ts: frame.ts || 'unknown',
+             state: state,
+             reason: typeof reason === 'string' ? reason : undefined
+           });
+           currentState = state;
+        }
+      }
+    }
+
+    // 2. Track Routing Decisions
+    if (frame.type === 'route_response') {
+      const payload = frame.payload || {};
+      const decision = (payload.decision as string)?.toUpperCase();
+      const admissible = payload.admissible;
+
+      if (decision === 'EXECUTE') routing.executed++;
+      else if (decision === 'DEFER') routing.deferred++;
+      else if (decision === 'FREEZE') routing.frozen++;
+      else if (decision === 'REJECT' || admissible === false) routing.rejected++;
+      else if (admissible === true) routing.executed++; // Default fallback
+    }
+
+    // 3. Track Replays
+    if (frame.type === 'route_request') {
+       const payload = frame.payload || {};
+       if (payload.replay_context || payload.replayContext) {
+         routing.replayed++;
+       }
+    }
+  }
+
+  // If no infra events found, return undefined to avoid cluttering standard reports
+  if (history.length === 0 && routing.deferred === 0 && routing.frozen === 0) {
+    return undefined;
+  }
+
+  return {
+    current_state: currentState,
+    history,
+    routing
+  };
 }
 
 function summarize(
@@ -721,6 +786,8 @@ function summarize(
   const { branches, notes: branchNotes, violations, normalizations } = normalizeBranches(
     lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload,
   );
+
+  const infrastructure = analyzeInfrastructure(normalizedFrames);
 
   const warnings = [
     ...validation.warnings,
@@ -949,6 +1016,7 @@ function summarize(
         notes: continuity.notes,
         ...(continuity.token ? { token: continuity.token } : {}),
       },
+      infrastructure,
       branches,
       futures: groupFutures(branches),
       notes,
@@ -1104,6 +1172,20 @@ export function formatHuman(summary: InspectSummary): string {
   lines.push(`identity: ${summary.orientation.identity}`);
   lines.push(`continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}${summary.continuity.token ? ` (${summary.continuity.token})` : ''}`);
   lines.push('');
+
+  if (summary.infrastructure) {
+    lines.push('INFRASTRUCTURE / CONTINUITY');
+    lines.push(`current_state: ${summary.infrastructure.current_state}`);
+    lines.push(`routing: executed=${summary.infrastructure.routing.executed} deferred=${summary.infrastructure.routing.deferred} replayed=${summary.infrastructure.routing.replayed} frozen=${summary.infrastructure.routing.frozen}`);
+    if (summary.infrastructure.history.length > 0) {
+      lines.push('state_history:');
+      summary.infrastructure.history.forEach(evt => {
+        lines.push(`  - ${evt.ts}: ${evt.state}${evt.reason ? ` (${evt.reason})` : ''}`);
+      });
+    }
+    lines.push('');
+  }
+
   lines.push('ORIENTATION');
   lines.push(`stable: ${summary.orientation.stable ? 'yes' : 'unknown'}`);
   lines.push(`focus_momentum: ${summary.orientation.focus_momentum ?? 'unknown'}`);
