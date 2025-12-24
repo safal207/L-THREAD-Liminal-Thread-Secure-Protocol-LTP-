@@ -2,8 +2,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import PDFDocument from 'pdfkit';
-import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation, InfrastructureEvent, RoutingStats } from './types';
-import { CRITICAL_ACTIONS, AGENT_RULES } from './critical_actions';
+import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
+import { CRITICAL_ACTIONS, AGENT_RULES } from './critical_actions.js';
 
 const CONTRACT = {
   name: 'ltp-inspect',
@@ -41,9 +41,7 @@ type ParsedArgs = {
   output?: string;
   compliance?: string;
   replayCheck?: boolean;
-  agent?: boolean;
-  criticalOnly?: boolean;
-  policyView?: boolean;
+  continuity?: boolean; // New flag for E-4
 };
 
 const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
@@ -77,9 +75,6 @@ function parseArgs(argv: string[]): ParsedArgs {
     output: undefined,
     compliance: undefined,
     replayCheck: false,
-    agent: false,
-    criticalOnly: false,
-    policyView: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -134,19 +129,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.compliance = token.split('=').slice(1).join('=');
     } else if (token === '--compliance') {
       options.compliance = argv[++i];
-    } else if (token.startsWith('--profile=')) {
-      options.compliance = token.split('=').slice(1).join('=');
-    } else if (token === '--profile') {
-      options.compliance = argv[++i];
     } else if (token === '--replay-check') {
       options.replayCheck = true;
-    } else if (token === '--agent' || token === '--agents') {
-      options.agent = true;
-      if (!options.compliance) options.compliance = 'agents';
-    } else if (token === '--critical-only') {
-      options.criticalOnly = true;
-    } else if (token === '--policy-view') {
-      options.policyView = true;
+    } else if (token === '--continuity') {
+      options.continuity = true;
     } else if (token.startsWith('--export=')) {
       const exportFmt = token.split('=').slice(1).join('=') as ExportFormat;
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
@@ -706,7 +692,7 @@ function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
     const status = (branch.status ?? '').toLowerCase();
     if (status.includes('blocked') || status.includes('rejected') || status.includes('inadmissible')) {
       blocked.push(branch);
-    } else if (status.includes('degraded') || status.includes('fallback') || status.includes('deferred')) {
+    } else if (status.includes('degraded') || status.includes('fallback')) {
       degraded.push(branch);
     } else {
       admissible.push(branch);
@@ -716,71 +702,6 @@ function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
   return { admissible, degraded, blocked };
 }
 
-function analyzeInfrastructure(frames: LtpFrame[]): InspectSummary['infrastructure'] {
-  const history: InfrastructureEvent[] = [];
-  let currentState = 'UNKNOWN';
-
-  const routing: RoutingStats = {
-    executed: 0,
-    deferred: 0,
-    frozen: 0,
-    rejected: 0,
-    replayed: 0
-  };
-
-  for (const frame of frames) {
-    // 1. Track State History
-    if (frame.type === 'orientation') {
-      const payload = frame.payload || {};
-      const state = payload.state;
-      if (state && typeof state === 'string') {
-        const reason = payload.reason;
-        // Only record if state changed or it's the first one
-        if (history.length === 0 || history[history.length - 1].state !== state) {
-           history.push({
-             ts: frame.ts || 'unknown',
-             state: state,
-             reason: typeof reason === 'string' ? reason : undefined
-           });
-           currentState = state;
-        }
-      }
-    }
-
-    // 2. Track Routing Decisions
-    if (frame.type === 'route_response') {
-      const payload = frame.payload || {};
-      const decision = (payload.decision as string)?.toUpperCase();
-      const admissible = payload.admissible;
-
-      if (decision === 'EXECUTE') routing.executed++;
-      else if (decision === 'DEFER') routing.deferred++;
-      else if (decision === 'FREEZE') routing.frozen++;
-      else if (decision === 'REJECT' || admissible === false) routing.rejected++;
-      else if (admissible === true) routing.executed++; // Default fallback
-    }
-
-    // 3. Track Replays
-    if (frame.type === 'route_request') {
-       const payload = frame.payload || {};
-       if (payload.replay_context || payload.replayContext) {
-         routing.replayed++;
-       }
-    }
-  }
-
-  // If no infra events found, return undefined to avoid cluttering standard reports
-  if (history.length === 0 && routing.deferred === 0 && routing.frozen === 0) {
-    return undefined;
-  }
-
-  return {
-    current_state: currentState,
-    history,
-    routing
-  };
-}
-
 function summarize(
   frames: LtpFrame[],
   entries: TraceEntry[],
@@ -788,7 +709,6 @@ function summarize(
   format: InspectSummary['input']['format'],
   complianceProfile?: string,
   replayCheck?: boolean,
-  agentView?: boolean,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
@@ -805,8 +725,6 @@ function summarize(
     lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload,
   );
 
-  const infrastructure = analyzeInfrastructure(normalizedFrames);
-
   const warnings = [
     ...validation.warnings,
     ...(Array.isArray(lastRouteResponse?.payload?.notes) ? lastRouteResponse?.payload?.notes : []),
@@ -819,7 +737,7 @@ function summarize(
   if (!lastRouteResponse) warnings.push('no route_response frame observed');
 
   let compliance: ComplianceReport | undefined;
-  if (complianceProfile || replayCheck || agentView || input.type === 'audit_log') {
+  if (complianceProfile || replayCheck || input.type === 'audit_log') {
     const integrity = verifyTraceIntegrity(entries);
     const traceIntegrity = input.type === 'audit_log'
         ? (integrity.valid ? 'verified' : 'broken')
@@ -864,7 +782,7 @@ function summarize(
   }
 
   let auditSummary;
-  if (compliance && (complianceProfile === 'fintech' || complianceProfile === 'agentic' || complianceProfile === 'agents' || complianceProfile === 'ai-agent')) {
+  if (compliance && (complianceProfile === 'fintech' || complianceProfile === 'agentic' || complianceProfile === 'agents')) {
     const failedChecks: string[] = [];
     const violations: ComplianceViolation[] = [];
     const violationsCountBySeverity: Record<string, number> = {
@@ -875,7 +793,7 @@ function summarize(
     };
 
     // Core LTP Checks
-    if (compliance.trace_integrity !== 'verified' && compliance.trace_integrity !== 'unchecked') {
+    if (compliance.trace_integrity !== 'verified') {
         failedChecks.push('trace_integrity');
         violations.push({
             rule_id: 'CORE.INTEGRITY',
@@ -910,7 +828,7 @@ function summarize(
     }
 
     // Agentic Specific Checks
-    if (complianceProfile === 'agentic' || complianceProfile === 'agents' || complianceProfile === 'ai-agent') {
+    if (complianceProfile === 'agentic' || complianceProfile === 'agents') {
         // Iterate through all frames to find Admissibility Results (route_response)
         frames.forEach((frame, index) => {
             if (frame.type === 'route_response') {
@@ -1034,7 +952,6 @@ function summarize(
         notes: continuity.notes,
         ...(continuity.token ? { token: continuity.token } : {}),
       },
-      infrastructure,
       branches,
       futures: groupFutures(branches),
       notes,
@@ -1149,7 +1066,7 @@ function formatDriftHistory(history: DriftSnapshot[]): string {
     .join(' -> ');
 }
 
-export function formatHuman(summary: InspectSummary, options: { criticalOnly?: boolean; policyView?: boolean } = {}): string {
+export function formatHuman(summary: InspectSummary): string {
   const lines: string[] = [];
   lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
   const inputLabel = summary.input.path ?? summary.input.source;
@@ -1175,29 +1092,14 @@ export function formatHuman(summary: InspectSummary, options: { criticalOnly?: b
     lines.push(`risk_level: ${summary.audit_summary.risk_level}`);
     lines.push(`regulator_ready: ${summary.audit_summary.regulator_ready}`);
 
-    const violationsToShow = summary.audit_summary.violations.filter(v =>
-        !options.criticalOnly || v.severity === 'CRITICAL'
-    );
-    if (violationsToShow.length > 0) {
+    if (summary.audit_summary.violations && summary.audit_summary.violations.length > 0) {
         lines.push('');
         lines.push('VIOLATIONS:');
-        violationsToShow.forEach(v => {
+        summary.audit_summary.violations.forEach(v => {
             lines.push(`  [${v.severity}] ${v.rule_id} @ #${v.frame_index}`);
             lines.push(`    Evidence: ${v.evidence}`);
-            if (options.policyView) {
-                lines.push(`    Action: ${v.action} | Source: ${v.source}`);
-            }
         });
-    } else if (options.criticalOnly && summary.audit_summary.violations.length > 0) {
-         lines.push('');
-         lines.push(`(Hidden ${summary.audit_summary.violations.length} non-critical violations due to --critical-only)`);
     }
-  }
-
-  if (options.criticalOnly) {
-      lines.push('');
-      lines.push('Note: Output filtered by --critical-only');
-      return lines.join('\n');
   }
 
   lines.push('');
@@ -1205,20 +1107,6 @@ export function formatHuman(summary: InspectSummary, options: { criticalOnly?: b
   lines.push(`identity: ${summary.orientation.identity}`);
   lines.push(`continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}${summary.continuity.token ? ` (${summary.continuity.token})` : ''}`);
   lines.push('');
-
-  if (summary.infrastructure) {
-    lines.push('INFRASTRUCTURE / CONTINUITY');
-    lines.push(`current_state: ${summary.infrastructure.current_state}`);
-    lines.push(`routing: executed=${summary.infrastructure.routing.executed} deferred=${summary.infrastructure.routing.deferred} replayed=${summary.infrastructure.routing.replayed} frozen=${summary.infrastructure.routing.frozen}`);
-    if (summary.infrastructure.history.length > 0) {
-      lines.push('state_history:');
-      summary.infrastructure.history.forEach(evt => {
-        lines.push(`  - ${evt.ts}: ${evt.state}${evt.reason ? ` (${evt.reason})` : ''}`);
-      });
-    }
-    lines.push('');
-  }
-
   lines.push('ORIENTATION');
   lines.push(`stable: ${summary.orientation.stable ? 'yes' : 'unknown'}`);
   lines.push(`focus_momentum: ${summary.orientation.focus_momentum ?? 'unknown'}`);
@@ -1266,7 +1154,7 @@ export function formatHuman(summary: InspectSummary, options: { criticalOnly?: b
 
 export function runInspect(file: string): InspectSummary {
   const { frames, entries, format, inputPath, inputSource, type, hash_root } = loadFrames(file);
-  return summarize(frames, entries, { path: inputPath, source: inputSource, type, hash_root }, format, undefined, false, false).summary;
+  return summarize(frames, entries, { path: inputPath, source: inputSource, type, hash_root }, format, undefined, false).summary;
 }
 
 type InspectionResult = {
@@ -1280,18 +1168,7 @@ function canonicalizeSummary(summary: InspectSummary): InspectSummary {
   return JSON.parse(JSON.stringify(summary)) as InspectSummary;
 }
 
-function handleTrace(
-    file: string,
-    format: OutputFormat,
-    pretty: boolean,
-    compliance: string | undefined,
-    replayCheck: boolean,
-    agent: boolean,
-    criticalOnly: boolean,
-    policyView: boolean,
-    writer: Writer,
-    exportFormats: ExportFormat[]
-): InspectionResult {
+function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
@@ -1299,12 +1176,72 @@ function handleTrace(
     { path: inputPath, source: inputSource, type, hash_root },
     inputFormat,
     compliance,
-    replayCheck,
-    agent
+    replayCheck
   );
 
+  if (continuityCheck) {
+      // E-4: Continuity Inspection Logic
+      // 1. Check for State Degradation events (HEALTHY -> FAILED)
+      // 2. Verify "Execution Freeze" (No forbidden actions during FAILED)
+      // 3. Output "System Remained Coherent"
+
+      let systemCoherent = true;
+      let firstUnsafeIndex = -1;
+      let currentState = 'HEALTHY';
+      const stateHistory: {ts: string|number, state: string}[] = [];
+
+      frames.forEach((frame, idx) => {
+          if (frame.type === 'orientation') {
+             // Look for status in payload
+             const status = (frame.payload as any)?.status;
+             if (status) {
+                 currentState = String(status).toUpperCase();
+                 stateHistory.push({ ts: frame.ts || idx, state: currentState });
+             }
+          } else if (frame.type === 'route_request') {
+              // Check if we allowed critical actions in FAILED state
+              // But strictly, we check the RESPONSE (admissibility).
+          } else if (frame.type === 'route_response') {
+              const admissible = (frame.payload as any)?.admissible;
+              const targetAction = (frame.payload as any)?.targetState || 'unknown';
+
+              // If FAILED, we should mostly see inadmissibility or only specific recovery actions.
+              if (currentState === 'FAILED' || currentState === 'UNSTABLE') {
+                  if (admissible) {
+                      // Is it a recovery action?
+                      const isRecovery = targetAction.includes('RECOVERY') || targetAction.includes('PING') || targetAction.includes('STATUS') || targetAction.includes('HANDSHAKE');
+                      if (!isRecovery) {
+                          systemCoherent = false;
+                          if (firstUnsafeIndex === -1) firstUnsafeIndex = idx;
+                          violations.push(`Continuity Violation: Action '${targetAction}' allowed during ${currentState} state at frame #${idx}`);
+                      }
+                  }
+              }
+          }
+      });
+
+      // Inject into summary
+      summary.continuity_routing = {
+          checked: true,
+          system_remained_coherent: systemCoherent,
+          first_unsafe_transition_index: firstUnsafeIndex === -1 ? null : firstUnsafeIndex,
+          state_transitions: stateHistory.length
+      };
+
+      // Also print to writer if human
+      if (format === 'human') {
+          writer('');
+          writer('CONTINUITY ROUTING INSPECTION');
+          writer(`System Remained Coherent: ${systemCoherent ? 'YES' : 'NO'}`);
+          if (!systemCoherent) {
+             writer(`First Unsafe Transition: #${firstUnsafeIndex}`);
+          }
+          writer(`State Transitions Observed: ${stateHistory.map(s => s.state).join(' -> ')}`);
+      }
+  }
+
   if (format === 'json') printJson(summary, pretty, writer);
-  else printHuman(summary, writer, { criticalOnly, policyView });
+  else printHuman(summary, writer);
 
   if (exportFormats && exportFormats.length > 0) {
      const outputDir = process.cwd();
@@ -1356,7 +1293,7 @@ function handleExplain(file: string, at: string | undefined, branchId: string | 
 
   // We don't support partial audit log verification easily without context, passing empty entries for now as explanation doesn't usually need it
   const { summary, violations } = summarize(window, [], { path: inputPath, source: inputSource, type }, format, undefined, false);
-  const previous = prior.length ? summarize(prior, [], { path: inputPath, source: inputSource, type }, format, undefined, false, false).summary : undefined;
+  const previous = prior.length ? summarize(prior, [], { path: inputPath, source: inputSource, type }, format, undefined, false).summary : undefined;
 
   const targetBranch = branchId ?? summary.branches[0]?.id;
   const branch = targetBranch ? summary.branches.find((b) => b.id === targetBranch) : undefined;
@@ -1408,13 +1345,13 @@ function printHelp(writer: Writer): void {
   writer('');
   writer('Usage:');
   writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
-  writer('                                [--agent] [--critical-only] [--policy-view]');
   writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
   writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
   writer('Examples:');
   writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=human');
   writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=json');
+  writer('  pnpm -w ltp:inspect -- --continuity --input examples/traces/outage.json');
   writer('  pnpm -w ltp:inspect -- --format=json --quiet --input examples/traces/drift-recovery.json | jq .orientation');
   writer('  pnpm -w ltp:inspect -- explain --input examples/traces/drift-recovery.json --at step-3');
   writer('');
@@ -1434,8 +1371,8 @@ function printJson(summary: InspectSummary, pretty = false, writer: Writer): voi
   writer(formatJson(summary, pretty));
 }
 
-function printHuman(summary: InspectSummary, writer: Writer, options: { criticalOnly?: boolean; policyView?: boolean } = {}): void {
-  writer(formatHuman(summary, options));
+function printHuman(summary: InspectSummary, writer: Writer): void {
+  writer(formatHuman(summary));
 }
 
 export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> = console): number {
@@ -1460,18 +1397,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
     switch (args.command) {
       case 'trace':
         {
-          const { violations, warnings, normalizations, summary } = handleTrace(
-              args.input as string,
-              args.format,
-              args.pretty,
-              args.compliance,
-              args.replayCheck,
-              args.agent || false,
-              args.criticalOnly || false,
-              args.policyView || false,
-              writer,
-              args.exportFormat
-            );
+          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.compliance, args.replayCheck, writer, args.exportFormat, args.continuity);
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;
           const hasWarnings = warnings.length > 0 || normalizations.length > 0;

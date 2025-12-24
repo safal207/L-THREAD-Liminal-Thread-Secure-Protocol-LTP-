@@ -19,17 +19,6 @@ export interface ProposedTransition {
   context: ContextType;
 }
 
-export interface AgentAction {
-  agent_id: string;
-  intent: string;
-  action: string;
-  inputs_digest: string;
-  outputs_digest: string;
-  policy_context: Record<string, unknown>;
-  timestamp: number;
-  signature: string;
-}
-
 /**
  * A symbol to ensure VerifiedTransition can only be created by the Admissibility Layer.
  * NOT EXPORTED to prevent forgery.

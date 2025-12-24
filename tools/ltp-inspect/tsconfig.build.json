@@ -5,5 +5,5 @@
     "rootDir": ".",
     "noEmit": false
   },
-  "include": ["./inspect.ts", "./types.ts"]
+  "include": ["./inspect.ts", "./types.ts", "./critical_actions.ts"]
 }

@@ -24,6 +24,14 @@ This repository defines **LTP (Liminal Thread Protocol)** — a continuity layer
 - **Specs**
   - `specs/LTP-Conformance-v0.1.md`
 
+## Market-Specific Documentation
+
+### Market E: Infrastructure & Continuity
+- **[Continuity Router Architecture](./markets/infrastructure/LTP-Continuity-Router.md)**
+- **[WebSocket Outage Scenario](./markets/infrastructure/WebSocket-Outage-Scenario.md)**
+- **[Continuity Flow](./markets/infrastructure/Continuity-Router-Flow.md)**
+- **[Failure Recovery Semantics](./markets/infrastructure/Failure-Recovery-Semantics.md)**
+
 ## One sentence
 
 LTP does not decide outcomes. It validates **admissible transitions** to preserve continuity over time.

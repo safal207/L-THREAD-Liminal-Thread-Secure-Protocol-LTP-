@@ -12,15 +12,15 @@ To define a canonical list of "Critical Actions" for LTP-compliant Agent Systems
 
 Action names must use `snake_case`.
 
-| Action Name | Domain Tag (Optional) | Description | Requirements |
-| :--- | :--- | :--- | :--- |
-| `transfer_money` | `fintech` | Initiating a transfer of value between accounts. | **Signature**, **Replay-Check** |
-| `place_order` | `commerce`, `fintech` | Creating a binding order for goods, services, or assets. | **Signature**, **Replay-Check** |
-| `send_message` | `content`, `social` | Sending a message to an external party or public channel. | **Policy-Check** |
-| `delete_data` | `ops`, `privacy` | Permanently removing data or resources. | **Confirmation**, **Policy-Check** |
-| `grant_access` | `ops`, `security` | Modifying permissions or granting access to resources. | **Signature**, **Audit-Log** |
-| `modify_system` | `ops` | Changing system configuration or state. | **Audit-Log**, **Policy-Check** |
-| `execute_code` | `ops`, `security` | Running arbitrary code or scripts. | **Isolation**, **Audit-Log** |
+| Action Name | Domain Tag (Optional) | Description |
+| :--- | :--- | :--- |
+| `transfer_money` | `fintech` | Initiating a transfer of value between accounts. |
+| `place_order` | `commerce`, `fintech` | Creating a binding order for goods, services, or assets. |
+| `send_message` | `content`, `social` | Sending a message to an external party or public channel. |
+| `delete_data` | `ops`, `privacy` | Permanently removing data or resources. |
+| `grant_access` | `ops`, `security` | Modifying permissions or granting access to resources. |
+| `modify_system` | `ops` | Changing system configuration or state. |
+| `execute_code` | `ops`, `security` | Running arbitrary code or scripts. |
 
 *Note: This list is extensible via specific domain profiles, but these are the core reserved actions.*
 
