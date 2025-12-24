@@ -68,6 +68,7 @@ export class AgentPipeline {
         traceId: checkResult.traceId,
         details: {
           reason: checkResult.reason,
+          reasonCode: checkResult.reasonCode,
           violation: 'violationType' in checkResult ? checkResult.violationType : undefined
         }
       };

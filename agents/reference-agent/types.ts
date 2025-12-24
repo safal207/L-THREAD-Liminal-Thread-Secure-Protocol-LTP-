@@ -34,6 +34,7 @@ export interface VerifiedTransition {
   timestamp: number;
   traceId: string;
   reason: string; // Explanation of why it was allowed
+  reasonCode?: string; // Stable machine-readable code
   targetState: string;
   params?: Record<string, unknown>;
   context: ContextType; // Preserved for audit
@@ -44,6 +45,7 @@ export interface BlockedTransition {
   originalProposalId: string;
   admissible: false;
   reason: string;
+  reasonCode: string; // Stable machine-readable code (Mandatory for Blocked)
   traceId: string;
   timestamp: number;
   violationType?: 'POLICY' | 'SAFETY' | 'UNCERTAINTY';
@@ -58,4 +60,14 @@ export interface ActionResult {
   output?: any;
   error?: string;
   traceId: string;
+}
+
+export enum ReasonCodes {
+  WEB_ORIGIN_FORBIDDEN_FOR_CRITICAL_ACTION = 'WEB_ORIGIN_FORBIDDEN_FOR_CRITICAL_ACTION',
+  MISSING_AUTHORITY = 'MISSING_AUTHORITY',
+  UNTRUSTED_SOURCE = 'UNTRUSTED_SOURCE',
+  INVALID_TRANSITION = 'INVALID_TRANSITION',
+  GLOBAL_SAFETY_VIOLATION = 'GLOBAL_SAFETY_VIOLATION',
+  PROMPT_INJECTION_DETECTED = 'PROMPT_INJECTION_DETECTED',
+  ADMISSIBLE = 'ADMISSIBLE'
 }
