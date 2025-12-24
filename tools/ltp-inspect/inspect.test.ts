@@ -20,6 +20,7 @@ const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.js
 const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
 const agentCriticalFixture = path.join(__dirname, 'fixtures', 'agent-critical.frames.jsonl');
+const failureRecoveryTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'failure-recovery.trace.json');
 
 let builtCliPath: string | undefined;
 
@@ -256,6 +257,40 @@ describe('ltp-inspect golden summary', () => {
     const output = logs.join('\n');
     expect(output).toContain('AGENTS.CRIT.WEB_DIRECT');
     expect(output).toContain('Evidence: WEB context allowed to perform critical action');
+  });
+
+  it('visualizes infrastructure continuity correctly for STABLE->UNSTABLE transition', () => {
+    // Generate the failure recovery trace if not exists (or rely on existing)
+    // The test assumes examples/traces/failure-recovery.trace.json exists
+    if (!fs.existsSync(failureRecoveryTrace)) {
+        throw new Error('Failure recovery trace fixture missing. Run generate-failure-recovery-trace.js first.');
+    }
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    // We run without strict compliance to focus on visualization
+    const exitCode = execute(['--input', failureRecoveryTrace, '--format=human', '--color=never'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    expect(exitCode).toBe(0);
+    const output = logs.join('\n');
+
+    // Verify Section Header
+    expect(output).toContain('INFRASTRUCTURE / CONTINUITY');
+
+    // Verify Stats
+    expect(output).toContain('routing: executed=2 deferred=1 replayed=1 frozen=0');
+
+    // Verify State History
+    expect(output).toContain('UNSTABLE (DB Connection Timeout)');
+    expect(output).toContain('RECOVERING (DB Connection Restored)');
+    expect(output).toContain('STABLE');
+
+    // Verify Current State
+    expect(output).toContain('current_state: STABLE');
   });
 });
 
