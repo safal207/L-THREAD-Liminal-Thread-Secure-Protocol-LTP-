@@ -29,22 +29,22 @@ Developers need to inspect, validate, and debug LTP traces without setting up a 
    ltp-inspect test.trace.json
    ```
 
-## Expected output
+## Success criteria
+
+Expected command:
+
+```bash
+ltp-inspect test.trace.json
+```
+
+Expected output:
 
 ```text
-LTP INSPECT v0.1.0
-==================
-Trace: test.trace.json
 Status: PASS (Valid Structure)
-
-[0] hello (Hash: 0000...)
-    Client: ltp-cli
-
-SUMMARY:
-- Frames: 1
-- Integrity: OK
-- Violations: 0
+Integrity: OK
 ```
+
+If you see **Status: PASS** — you’re good.
 
 ## What guarantees are provided
 
