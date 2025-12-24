@@ -51,6 +51,9 @@ importers:
         specifier: ^9.0.0
         version: 9.0.1
     devDependencies:
+      '@ltp/inspect':
+        specifier: workspace:*
+        version: link:../../packages/inspect
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.27

@@ -6,12 +6,16 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/src/simulate.js",
-    "test": "node dist/tests/test_observer.js"
+    "gen:trace": "node dist/src/simulate.js",
+    "inspect": "ltp inspect infra.trace.json --format human --color=never --strict",
+    "test": "pnpm run gen:trace && pnpm run inspect",
+    "test:unit": "node dist/tests/test_observer.js"
   },
   "dependencies": {
     "uuid": "^9.0.0"
   },
   "devDependencies": {
+    "@ltp/inspect": "workspace:*",
     "@types/node": "^20.0.0",
     "@types/uuid": "^9.0.0",
     "typescript": "^5.0.0"

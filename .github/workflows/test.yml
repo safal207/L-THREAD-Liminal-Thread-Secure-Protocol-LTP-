@@ -228,6 +228,9 @@ jobs:
       - name: Conformance verifier smoke test
         run: |
           pnpm -w test:conformance
+      - name: Example infra-observer test (generation + inspection)
+        run: |
+          pnpm -C examples/infra-observer test
       - name: LTP conformance kit (fixtures, expectation-aware)
         run: |
           set -euxo pipefail
