@@ -7,6 +7,8 @@ AI Agents need to be prevented from taking critical actions (like money transfer
 ## Prerequisites
 
 - Node.js 18 or 20 (LTS)
+- pnpm >= 8.7
+- Git installed
 - `@ltp/inspect` installed globally
 
 ## 5-minute run

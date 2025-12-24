@@ -7,6 +7,8 @@ Fintech applications require immutable audit logs and regulatory compliance veri
 ## Prerequisites
 
 - Node.js 18 or 20 (LTS)
+- pnpm >= 8.7
+- Git installed
 - `@ltp/inspect` installed globally
 
 ## 5-minute run
