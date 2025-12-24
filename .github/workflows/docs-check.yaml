@@ -1,0 +1,35 @@
+name: Docs Hygiene
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**/*.md'
+      - 'README.md'
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**/*.md'
+      - 'README.md'
+
+jobs:
+  markdown-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Markdown Lint
+        uses: DavidAnson/markdownlint-cli2-action@v9
+        with:
+          globs: 'docs/**/*.md'
+
+  link-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Check Relative Links
+        uses: lycheeverse/lychee-action@v1.5.0
+        with:
+          args: --no-progress --offline 'docs/**/*.md' 'README.md'
+          fail: true
