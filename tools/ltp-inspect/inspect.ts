@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import PDFDocument from 'pdfkit';
-import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
+import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation, InfrastructureEvent, RoutingStats } from './types';
 import { CRITICAL_ACTIONS, AGENT_RULES } from './critical_actions';
 
 const CONTRACT = {
@@ -41,7 +41,9 @@ type ParsedArgs = {
   output?: string;
   compliance?: string;
   replayCheck?: boolean;
-  continuity?: boolean; // New flag for E-4
+  agent?: boolean;
+  criticalOnly?: boolean;
+  policyView?: boolean;
 };
 
 const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
@@ -75,6 +77,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     output: undefined,
     compliance: undefined,
     replayCheck: false,
+    agent: false,
+    criticalOnly: false,
+    policyView: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -128,6 +133,10 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (token.startsWith('--compliance=')) {
       options.compliance = token.split('=').slice(1).join('=');
     } else if (token === '--compliance') {
+      options.compliance = argv[++i];
+    } else if (token.startsWith('--profile=')) {
+      options.compliance = token.split('=').slice(1).join('=');
+    } else if (token === '--profile') {
       options.compliance = argv[++i];
     } else if (token === '--replay-check') {
       options.replayCheck = true;
@@ -692,7 +701,7 @@ function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
     const status = (branch.status ?? '').toLowerCase();
     if (status.includes('blocked') || status.includes('rejected') || status.includes('inadmissible')) {
       blocked.push(branch);
-    } else if (status.includes('degraded') || status.includes('fallback')) {
+    } else if (status.includes('degraded') || status.includes('fallback') || status.includes('deferred')) {
       degraded.push(branch);
     } else {
       admissible.push(branch);
@@ -702,6 +711,71 @@ function groupFutures(branches: BranchInsight[]): InspectSummary['futures'] {
   return { admissible, degraded, blocked };
 }
 
+function analyzeInfrastructure(frames: LtpFrame[]): InspectSummary['infrastructure'] {
+  const history: InfrastructureEvent[] = [];
+  let currentState = 'UNKNOWN';
+
+  const routing: RoutingStats = {
+    executed: 0,
+    deferred: 0,
+    frozen: 0,
+    rejected: 0,
+    replayed: 0
+  };
+
+  for (const frame of frames) {
+    // 1. Track State History
+    if (frame.type === 'orientation') {
+      const payload = frame.payload || {};
+      const state = payload.state;
+      if (state && typeof state === 'string') {
+        const reason = payload.reason;
+        // Only record if state changed or it's the first one
+        if (history.length === 0 || history[history.length - 1].state !== state) {
+           history.push({
+             ts: frame.ts || 'unknown',
+             state: state,
+             reason: typeof reason === 'string' ? reason : undefined
+           });
+           currentState = state;
+        }
+      }
+    }
+
+    // 2. Track Routing Decisions
+    if (frame.type === 'route_response') {
+      const payload = frame.payload || {};
+      const decision = (payload.decision as string)?.toUpperCase();
+      const admissible = payload.admissible;
+
+      if (decision === 'EXECUTE') routing.executed++;
+      else if (decision === 'DEFER') routing.deferred++;
+      else if (decision === 'FREEZE') routing.frozen++;
+      else if (decision === 'REJECT' || admissible === false) routing.rejected++;
+      else if (admissible === true) routing.executed++; // Default fallback
+    }
+
+    // 3. Track Replays
+    if (frame.type === 'route_request') {
+       const payload = frame.payload || {};
+       if (payload.replay_context || payload.replayContext) {
+         routing.replayed++;
+       }
+    }
+  }
+
+  // If no infra events found, return undefined to avoid cluttering standard reports
+  if (history.length === 0 && routing.deferred === 0 && routing.frozen === 0) {
+    return undefined;
+  }
+
+  return {
+    current_state: currentState,
+    history,
+    routing
+  };
+}
+
 function summarize(
   frames: LtpFrame[],
   entries: TraceEntry[],
@@ -709,6 +783,7 @@ function summarize(
   format: InspectSummary['input']['format'],
   complianceProfile?: string,
   replayCheck?: boolean,
+  agentView?: boolean,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
@@ -725,6 +800,8 @@ function summarize(
     lastRouteResponse?.payload?.branches ?? lastRouteResponse?.payload?.routes ?? lastRouteResponse?.payload,
   );
 
+  const infrastructure = analyzeInfrastructure(normalizedFrames);
+
   const warnings = [
     ...validation.warnings,
     ...(Array.isArray(lastRouteResponse?.payload?.notes) ? lastRouteResponse?.payload?.notes : []),
@@ -737,7 +814,7 @@ function summarize(
   if (!lastRouteResponse) warnings.push('no route_response frame observed');
 
   let compliance: ComplianceReport | undefined;
-  if (complianceProfile || replayCheck || input.type === 'audit_log') {
+  if (complianceProfile || replayCheck || agentView || input.type === 'audit_log') {
     const integrity = verifyTraceIntegrity(entries);
     const traceIntegrity = input.type === 'audit_log'
         ? (integrity.valid ? 'verified' : 'broken')
@@ -782,7 +859,7 @@ function summarize(
   }
 
   let auditSummary;
-  if (compliance && (complianceProfile === 'fintech' || complianceProfile === 'agentic' || complianceProfile === 'agents')) {
+  if (compliance && (complianceProfile === 'fintech' || complianceProfile === 'agentic' || complianceProfile === 'agents' || complianceProfile === 'ai-agent')) {
     const failedChecks: string[] = [];
     const violations: ComplianceViolation[] = [];
     const violationsCountBySeverity: Record<string, number> = {
@@ -793,7 +870,7 @@ function summarize(
     };
 
     // Core LTP Checks
-    if (compliance.trace_integrity !== 'verified') {
+    if (compliance.trace_integrity !== 'verified' && compliance.trace_integrity !== 'unchecked') {
         failedChecks.push('trace_integrity');
         violations.push({
             rule_id: 'CORE.INTEGRITY',
@@ -828,7 +905,7 @@ function summarize(
     }
 
     // Agentic Specific Checks
-    if (complianceProfile === 'agentic' || complianceProfile === 'agents') {
+    if (complianceProfile === 'agentic' || complianceProfile === 'agents' || complianceProfile === 'ai-agent') {
         // Iterate through all frames to find Admissibility Results (route_response)
         frames.forEach((frame, index) => {
             if (frame.type === 'route_response') {
@@ -952,6 +1029,7 @@ function summarize(
         notes: continuity.notes,
         ...(continuity.token ? { token: continuity.token } : {}),
       },
+      infrastructure,
       branches,
       futures: groupFutures(branches),
       notes,
@@ -1066,7 +1144,7 @@ function formatDriftHistory(history: DriftSnapshot[]): string {
     .join(' -> ');
 }
 
-export function formatHuman(summary: InspectSummary): string {
+export function formatHuman(summary: InspectSummary, options: { criticalOnly?: boolean; policyView?: boolean } = {}): string {
   const lines: string[] = [];
   lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
   const inputLabel = summary.input.path ?? summary.input.source;
@@ -1092,14 +1170,29 @@ export function formatHuman(summary: InspectSummary): string {
     lines.push(`risk_level: ${summary.audit_summary.risk_level}`);
     lines.push(`regulator_ready: ${summary.audit_summary.regulator_ready}`);
 
-    if (summary.audit_summary.violations && summary.audit_summary.violations.length > 0) {
+    const violationsToShow = summary.audit_summary.violations.filter(v =>
+        !options.criticalOnly || v.severity === 'CRITICAL'
+    );
+    if (violationsToShow.length > 0) {
         lines.push('');
         lines.push('VIOLATIONS:');
-        summary.audit_summary.violations.forEach(v => {
+        violationsToShow.forEach(v => {
             lines.push(`  [${v.severity}] ${v.rule_id} @ #${v.frame_index}`);
             lines.push(`    Evidence: ${v.evidence}`);
+            if (options.policyView) {
+                lines.push(`    Action: ${v.action} | Source: ${v.source}`);
+            }
         });
+    } else if (options.criticalOnly && summary.audit_summary.violations.length > 0) {
+         lines.push('');
+         lines.push(`(Hidden ${summary.audit_summary.violations.length} non-critical violations due to --critical-only)`);
     }
+  }
+
+  if (options.criticalOnly) {
+      lines.push('');
+      lines.push('Note: Output filtered by --critical-only');
+      return lines.join('\n');
   }
 
   lines.push('');
@@ -1107,6 +1200,20 @@ export function formatHuman(summary: InspectSummary): string {
   lines.push(`identity: ${summary.orientation.identity}`);
   lines.push(`continuity: ${summary.continuity.preserved ? 'preserved' : 'rotated'}${summary.continuity.token ? ` (${summary.continuity.token})` : ''}`);
   lines.push('');
+
+  if (summary.infrastructure) {
+    lines.push('INFRASTRUCTURE / CONTINUITY');
+    lines.push(`current_state: ${summary.infrastructure.current_state}`);
+    lines.push(`routing: executed=${summary.infrastructure.routing.executed} deferred=${summary.infrastructure.routing.deferred} replayed=${summary.infrastructure.routing.replayed} frozen=${summary.infrastructure.routing.frozen}`);
+    if (summary.infrastructure.history.length > 0) {
+      lines.push('state_history:');
+      summary.infrastructure.history.forEach(evt => {
+        lines.push(`  - ${evt.ts}: ${evt.state}${evt.reason ? ` (${evt.reason})` : ''}`);
+      });
+    }
+    lines.push('');
+  }
+
   lines.push('ORIENTATION');
   lines.push(`stable: ${summary.orientation.stable ? 'yes' : 'unknown'}`);
   lines.push(`focus_momentum: ${summary.orientation.focus_momentum ?? 'unknown'}`);
@@ -1154,7 +1261,7 @@ export function formatHuman(summary: InspectSummary): string {
 
 export function runInspect(file: string): InspectSummary {
   const { frames, entries, format, inputPath, inputSource, type, hash_root } = loadFrames(file);
-  return summarize(frames, entries, { path: inputPath, source: inputSource, type, hash_root }, format, undefined, false).summary;
+  return summarize(frames, entries, { path: inputPath, source: inputSource, type, hash_root }, format, undefined, false, false).summary;
 }
 
 type InspectionResult = {
@@ -1176,7 +1283,8 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
     { path: inputPath, source: inputSource, type, hash_root },
     inputFormat,
     compliance,
-    replayCheck
+    replayCheck,
+    agent
   );
 
   if (continuityCheck) {
@@ -1241,7 +1349,7 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
   }
 
   if (format === 'json') printJson(summary, pretty, writer);
-  else printHuman(summary, writer);
+  else printHuman(summary, writer, { criticalOnly, policyView });
 
   if (exportFormats && exportFormats.length > 0) {
      const outputDir = process.cwd();
@@ -1293,7 +1401,7 @@ function handleExplain(file: string, at: string | undefined, branchId: string | 
 
   // We don't support partial audit log verification easily without context, passing empty entries for now as explanation doesn't usually need it
   const { summary, violations } = summarize(window, [], { path: inputPath, source: inputSource, type }, format, undefined, false);
-  const previous = prior.length ? summarize(prior, [], { path: inputPath, source: inputSource, type }, format, undefined, false).summary : undefined;
+  const previous = prior.length ? summarize(prior, [], { path: inputPath, source: inputSource, type }, format, undefined, false, false).summary : undefined;
 
   const targetBranch = branchId ?? summary.branches[0]?.id;
   const branch = targetBranch ? summary.branches.find((b) => b.id === targetBranch) : undefined;
@@ -1345,6 +1453,7 @@ function printHelp(writer: Writer): void {
   writer('');
   writer('Usage:');
   writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
+  writer('                                [--agent] [--critical-only] [--policy-view]');
   writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
   writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
@@ -1371,8 +1480,8 @@ function printJson(summary: InspectSummary, pretty = false, writer: Writer): voi
   writer(formatJson(summary, pretty));
 }
 
-function printHuman(summary: InspectSummary, writer: Writer): void {
-  writer(formatHuman(summary));
+function printHuman(summary: InspectSummary, writer: Writer, options: { criticalOnly?: boolean; policyView?: boolean } = {}): void {
+  writer(formatHuman(summary, options));
 }
 
 export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> = console): number {
