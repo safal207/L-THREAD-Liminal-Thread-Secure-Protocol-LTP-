@@ -8,6 +8,7 @@
     "start": "node dist/src/simulate.js",
     "gen:trace": "node dist/src/simulate.js",
     "inspect": "ltp inspect infra.trace.json --format human --color=never --strict",
+    "pretest": "pnpm run build",
     "test": "pnpm run gen:trace && pnpm run inspect",
     "test:unit": "node dist/tests/test_observer.js"
   },

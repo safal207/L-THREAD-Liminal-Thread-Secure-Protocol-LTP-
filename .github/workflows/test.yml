@@ -228,8 +228,17 @@ jobs:
       - name: Conformance verifier smoke test
         run: |
           pnpm -w test:conformance
-      - name: Example infra-observer test (generation + inspection)
+      - name: Build and Test infra-observer (compliance)
+        shell: bash
         run: |
+          set -euxo pipefail
+          # 1. Force install dependencies for the example to ensure local node_modules exist
+          pnpm install --filter ltp-infra-observer... --frozen-lockfile=false
+
+          # 2. Build the inspector tool (dependency)
+          pnpm -C packages/inspect run build
+
+          # 3. Run the test (includes pretest build + gen:trace + inspect)
           pnpm -C examples/infra-observer test
       - name: LTP conformance kit (fixtures, expectation-aware)
         run: |
