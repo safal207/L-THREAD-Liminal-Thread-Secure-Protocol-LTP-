@@ -274,7 +274,10 @@ describe('ltp-inspect golden summary', () => {
     // We primarily assert the continuity report contract.
     expect([0, 1]).toContain(exitCode);
 
-    const output = logs.join('\n');
+    // Ensure no fatal errors even if warnings exist
+    expect(errors.join('\n')).not.toMatch(/(TypeError|ReferenceError|ENOENT|EACCES)/);
+
+    const output = logs.join('\n').replace(/\r\n/g, '\n');
 
     // Verify Section Header
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
