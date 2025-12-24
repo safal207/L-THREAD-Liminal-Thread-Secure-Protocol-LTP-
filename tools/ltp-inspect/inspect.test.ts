@@ -257,22 +257,30 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('visualizes continuity routing correctly for outage scenario', () => {
-    if (!fs.existsSync(failureRecoveryTrace)) {
-        throw new Error(`Continuity trace fixture missing at ${failureRecoveryTrace}`);
+    // We use a guaranteed fixture for stability (User feedback check 1)
+    const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.json');
+    if (!fs.existsSync(continuityFixture)) {
+        throw new Error(`Continuity trace fixture missing at ${continuityFixture}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
     // Use --continuity flag to trigger the inspection
-    const exitCode = execute(['--input', failureRecoveryTrace, '--format=human', '--color=never', '--continuity'], {
+    const exitCode = execute(['--input', continuityFixture, '--format=human', '--color=never', '--continuity'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
     // We expect exit code 1 because of warnings (normalized input, missing drift snapshots)
     expect(exitCode).toBe(1);
-    const output = logs.join('\n');
+
+    // Check that there are no unexpected errors in stderr (User feedback check 3)
+    // exit code 1 means warnings in logs, but stderr should be clean unless there's a hard error
+    expect(errors.join('\n')).toBe('');
+
+    // Normalize line endings for robust matching (User feedback check 4)
+    const output = logs.join('\n').replace(/\r\n/g, '\n');
 
     // Verify Section Header
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
@@ -283,6 +291,10 @@ describe('ltp-inspect golden summary', () => {
     // Verify State Transitions
     // Based on examples/traces/continuity-outage.trace.json
     expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
+
+    // Verify Routing Stats with regex (User feedback check 2)
+    // Matches "Routing Decisions: Executed=2 Deferred=1 Replayed=0 Frozen=0"
+    expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
   });
 });
 
