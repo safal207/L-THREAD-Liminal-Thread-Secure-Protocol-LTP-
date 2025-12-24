@@ -41,6 +41,9 @@ type ParsedArgs = {
   output?: string;
   compliance?: string;
   replayCheck?: boolean;
+  agent?: boolean;
+  criticalOnly?: boolean;
+  policyView?: boolean;
 };
 
 const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
@@ -74,6 +77,9 @@ function parseArgs(argv: string[]): ParsedArgs {
     output: undefined,
     compliance: undefined,
     replayCheck: false,
+    agent: false,
+    criticalOnly: false,
+    policyView: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -130,6 +136,13 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.compliance = argv[++i];
     } else if (token === '--replay-check') {
       options.replayCheck = true;
+    } else if (token === '--agent' || token === '--agents') {
+      options.agent = true;
+      if (!options.compliance) options.compliance = 'agents';
+    } else if (token === '--critical-only') {
+      options.criticalOnly = true;
+    } else if (token === '--policy-view') {
+      options.policyView = true;
     } else if (token.startsWith('--export=')) {
       const exportFmt = token.split('=').slice(1).join('=') as ExportFormat;
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
@@ -706,6 +719,7 @@ function summarize(
   format: InspectSummary['input']['format'],
   complianceProfile?: string,
   replayCheck?: boolean,
+  agentView?: boolean,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
@@ -734,7 +748,7 @@ function summarize(
   if (!lastRouteResponse) warnings.push('no route_response frame observed');
 
   let compliance: ComplianceReport | undefined;
-  if (complianceProfile || replayCheck || input.type === 'audit_log') {
+  if (complianceProfile || replayCheck || agentView || input.type === 'audit_log') {
     const integrity = verifyTraceIntegrity(entries);
     const traceIntegrity = input.type === 'audit_log'
         ? (integrity.valid ? 'verified' : 'broken')
@@ -1063,7 +1077,7 @@ function formatDriftHistory(history: DriftSnapshot[]): string {
     .join(' -> ');
 }
 
-export function formatHuman(summary: InspectSummary): string {
+export function formatHuman(summary: InspectSummary, options: { criticalOnly?: boolean; policyView?: boolean } = {}): string {
   const lines: string[] = [];
   lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
   const inputLabel = summary.input.path ?? summary.input.source;
@@ -1089,14 +1103,29 @@ export function formatHuman(summary: InspectSummary): string {
     lines.push(`risk_level: ${summary.audit_summary.risk_level}`);
     lines.push(`regulator_ready: ${summary.audit_summary.regulator_ready}`);
 
-    if (summary.audit_summary.violations && summary.audit_summary.violations.length > 0) {
+    const violationsToShow = summary.audit_summary.violations.filter(v =>
+        !options.criticalOnly || v.severity === 'CRITICAL'
+    );
+    if (violationsToShow.length > 0) {
         lines.push('');
         lines.push('VIOLATIONS:');
-        summary.audit_summary.violations.forEach(v => {
+        violationsToShow.forEach(v => {
             lines.push(`  [${v.severity}] ${v.rule_id} @ #${v.frame_index}`);
             lines.push(`    Evidence: ${v.evidence}`);
+            if (options.policyView) {
+                lines.push(`    Action: ${v.action} | Source: ${v.source}`);
+            }
         });
+    } else if (options.criticalOnly && summary.audit_summary.violations.length > 0) {
+         lines.push('');
+         lines.push(`(Hidden ${summary.audit_summary.violations.length} non-critical violations due to --critical-only)`);
     }
+  }
+
+  if (options.criticalOnly) {
+      lines.push('');
+      lines.push('Note: Output filtered by --critical-only');
+      return lines.join('\n');
   }
 
   lines.push('');
@@ -1151,7 +1180,7 @@ export function formatHuman(summary: InspectSummary): string {
 
 export function runInspect(file: string): InspectSummary {
   const { frames, entries, format, inputPath, inputSource, type, hash_root } = loadFrames(file);
-  return summarize(frames, entries, { path: inputPath, source: inputSource, type, hash_root }, format, undefined, false).summary;
+  return summarize(frames, entries, { path: inputPath, source: inputSource, type, hash_root }, format, undefined, false, false).summary;
 }
 
 type InspectionResult = {
@@ -1165,7 +1194,18 @@ function canonicalizeSummary(summary: InspectSummary): InspectSummary {
   return JSON.parse(JSON.stringify(summary)) as InspectSummary;
 }
 
-function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[]): InspectionResult {
+function handleTrace(
+    file: string,
+    format: OutputFormat,
+    pretty: boolean,
+    compliance: string | undefined,
+    replayCheck: boolean,
+    agent: boolean,
+    criticalOnly: boolean,
+    policyView: boolean,
+    writer: Writer,
+    exportFormats: ExportFormat[]
+): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
@@ -1173,11 +1213,12 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
     { path: inputPath, source: inputSource, type, hash_root },
     inputFormat,
     compliance,
-    replayCheck
+    replayCheck,
+    agent
   );
 
   if (format === 'json') printJson(summary, pretty, writer);
-  else printHuman(summary, writer);
+  else printHuman(summary, writer, { criticalOnly, policyView });
 
   if (exportFormats && exportFormats.length > 0) {
      const outputDir = process.cwd();
@@ -1229,7 +1270,7 @@ function handleExplain(file: string, at: string | undefined, branchId: string | 
 
   // We don't support partial audit log verification easily without context, passing empty entries for now as explanation doesn't usually need it
   const { summary, violations } = summarize(window, [], { path: inputPath, source: inputSource, type }, format, undefined, false);
-  const previous = prior.length ? summarize(prior, [], { path: inputPath, source: inputSource, type }, format, undefined, false).summary : undefined;
+  const previous = prior.length ? summarize(prior, [], { path: inputPath, source: inputSource, type }, format, undefined, false, false).summary : undefined;
 
   const targetBranch = branchId ?? summary.branches[0]?.id;
   const branch = targetBranch ? summary.branches.find((b) => b.id === targetBranch) : undefined;
@@ -1281,6 +1322,7 @@ function printHelp(writer: Writer): void {
   writer('');
   writer('Usage:');
   writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
+  writer('                                [--agent] [--critical-only] [--policy-view]');
   writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
   writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
@@ -1306,8 +1348,8 @@ function printJson(summary: InspectSummary, pretty = false, writer: Writer): voi
   writer(formatJson(summary, pretty));
 }
 
-function printHuman(summary: InspectSummary, writer: Writer): void {
-  writer(formatHuman(summary));
+function printHuman(summary: InspectSummary, writer: Writer, options: { criticalOnly?: boolean; policyView?: boolean } = {}): void {
+  writer(formatHuman(summary, options));
 }
 
 export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> = console): number {
@@ -1332,7 +1374,18 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
     switch (args.command) {
       case 'trace':
         {
-          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.compliance, args.replayCheck, writer, args.exportFormat);
+          const { violations, warnings, normalizations, summary } = handleTrace(
+              args.input as string,
+              args.format,
+              args.pretty,
+              args.compliance,
+              args.replayCheck,
+              args.agent || false,
+              args.criticalOnly || false,
+              args.policyView || false,
+              writer,
+              args.exportFormat
+            );
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;
           const hasWarnings = warnings.length > 0 || normalizations.length > 0;
