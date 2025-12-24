@@ -307,15 +307,11 @@ describe('ltp-inspect golden summary', () => {
 
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
-    // Normalize line endings for robust matching (User feedback check 4)
-    const output = logs.join('\n').replace(/\r\n/g, '\n');
-
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
     expect(output).toContain('State Transitions Observed:');
     expect(output).toMatch(/HEALTHY/i);
     expect(output).toMatch(/FAILED/i);
-  });
 
     // Verify State Transitions
     // Based on examples/traces/continuity-outage.trace.json
@@ -324,6 +320,37 @@ describe('ltp-inspect golden summary', () => {
     // Verify Routing Stats with regex (User feedback check 2)
     // Matches "Routing Decisions: Executed=2 Deferred=1 Replayed=0 Frozen=0"
     expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
+  });
+
+  it('verifies failure recovery trace (generated)', () => {
+    // New test case for the generated failure-recovery.trace.json
+    const recoveryTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'failure-recovery.trace.json');
+    if (!fs.existsSync(recoveryTrace)) {
+        throw new Error(`Failure recovery trace missing at ${recoveryTrace}`);
+    }
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    // Use --continuity flag
+    const exitCode = execute(['--input', recoveryTrace, '--format=human', '--color=never', '--continuity'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    // We expect clean exit (0) or warnings (1)
+    expect([0, 1]).toContain(exitCode);
+
+    const output = logs.join('\n').replace(/\r\n/g, '\n');
+
+    expect(output).toContain('CONTINUITY ROUTING INSPECTION');
+    expect(output).toContain('System Remained Coherent: YES');
+
+    // Check State Transitions: HEALTHY -> FAILED -> UNSTABLE -> HEALTHY
+    expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> UNSTABLE -> HEALTHY');
+
+    // Check Routing: 1 executed (before failure), 1 deferred (during failure)
+    expect(output).toMatch(/Routing Decisions: Executed=1 Deferred=1/);
   });
 });
 
