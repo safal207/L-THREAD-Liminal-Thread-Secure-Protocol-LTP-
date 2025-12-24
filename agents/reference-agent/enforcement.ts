@@ -1,11 +1,12 @@
 import {
   ProposedTransition,
   VerifiedTransition,
-  BlockedTransition,
   AdmissibilityResult,
-  ActionResult
+  ActionResult,
+  ReasonCodes
 } from './types';
 import { EnforcementError } from './errors';
+import { enforceActionBoundary } from './policy';
 import * as crypto from 'crypto';
 
 // PRIVATE BRAND SYMBOL
@@ -19,7 +20,8 @@ const VERIFIED_BRAND = Symbol('LTP_VERIFIED_TRANSITION') as any;
 export function mintVerifiedTransition(
   proposal: ProposedTransition,
   traceId: string,
-  reason: string
+  reason: string,
+  reasonCode?: string
 ): VerifiedTransition {
   return {
     [VERIFIED_BRAND]: true,
@@ -30,6 +32,7 @@ export function mintVerifiedTransition(
     timestamp: Date.now(),
     traceId,
     reason,
+    reasonCode,
     targetState: proposal.targetState,
     params: proposal.params,
     context: proposal.context // Carry over context for audit
@@ -53,56 +56,34 @@ export class LTPAdmissibilityChecker {
   async check(proposal: ProposedTransition): Promise<AdmissibilityResult> {
     const traceId = crypto.randomUUID();
 
-    // 1. Simulating Policy Checks
-    if (this.isViolation(proposal)) {
+    // Use the reusable Action Boundary logic (P1-2)
+    const decision = enforceActionBoundary(proposal);
+
+    if (!decision.admissible) {
+      // Return BlockedTransition
+      console.warn(`[LTP] BLOCKED: ${decision.reason} (${decision.reasonCode})`);
       return {
         id: crypto.randomUUID(),
         originalProposalId: proposal.id,
         admissible: false,
-        reason: 'Policy Violation: Unsafe action for this context',
+        reason: decision.reason,
+        reasonCode: decision.reasonCode,
         traceId,
         timestamp: Date.now(),
-        violationType: 'SAFETY',
+        violationType: decision.violationType,
         context: proposal.context
       };
     }
 
-    // 2. If Allowed, Mint the Verified Token
-    // We use the internal factory to create the branded type
+    // If Allowed, Mint the Verified Token
     const verified = mintVerifiedTransition(
       proposal,
       traceId,
-      'Admissible: Fits within safe orientation'
+      decision.reason,
+      decision.reasonCode
     );
 
     return verified;
-  }
-
-  private isViolation(proposal: ProposedTransition): boolean {
-    const { context, targetState, reason } = proposal;
-
-    // RULE 1: CRITICAL ACTIONS (The "Web != Action" Rule)
-    // If the context is untrusted (WEB), critical actions are FORBIDDEN.
-    const criticalActions = ['transfer_money', 'delete_file', 'modify_system', 'send_email'];
-    if (context === 'WEB' && criticalActions.some(action => targetState.includes(action))) {
-        // Log this drift! This is the system catching a prompt injection or bad actor.
-        console.warn(`[LTP] BLOCKED: Web content attempted critical action '${targetState}'`);
-        return true;
-    }
-
-    // RULE 2: GLOBAL SAFETY (No nukes, even from users)
-    const globallyBanned = ['rm -rf', 'format_disk'];
-    if (globallyBanned.some(action => targetState.includes(action))) {
-        return true;
-    }
-
-    // RULE 3: PROMPT INJECTION HEURISTICS (Defense in Depth)
-    // Even if context is USER, we check for obvious manipulation attempts in the reason/chain of thought
-    if (reason && reason.toLowerCase().includes('ignore previous instructions')) {
-        return true;
-    }
-
-    return false;
   }
 }
 
