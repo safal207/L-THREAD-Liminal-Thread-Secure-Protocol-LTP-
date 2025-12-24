@@ -46,7 +46,10 @@ async function runCommand(command: string, args: string[], options: SpawnOptions
 
 function transpileToDist(sourcePath: string, outPath: string): void {
   const source = fs.readFileSync(sourcePath, 'utf-8');
-  const output = ts.transpileModule(source, {
+  // Hack to fix ESM imports in test environment
+  const fixedSource = source.replace(/from '\.\/critical_actions'/g, "from './critical_actions.js'");
+
+  const output = ts.transpileModule(fixedSource, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2020,
       module: ts.ModuleKind.ES2020,
@@ -263,10 +266,11 @@ describe('ltp inspect cli', () => {
       env: { ...process.env, LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z', LTP_INSPECT_TEST_RUN: '1' },
     });
 
-    // The sample trace might trigger warnings depending on its content, so we accept 0 or 1.
-    // If it's a "clean" trace it should be 0.
-    // The previous failure showed exitCode 1, meaning it had warnings.
-    expect([0, 1]).toContain(result.exitCode);
+    if (result.exitCode !== 0) {
+      console.log('CLI Error Output:', result.stderr);
+      console.log('CLI Output:', result.stdout);
+    }
+    expect(result.exitCode).toBe(0);
     expect(result.stdout.toLowerCase()).toContain('orientation');
   });
 });
