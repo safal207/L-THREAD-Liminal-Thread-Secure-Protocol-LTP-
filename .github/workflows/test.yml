@@ -22,6 +22,10 @@ jobs:
       - name: Check for hidden Unicode characters
         run: |
           ./scripts/check-no-bidi.mjs
+      - name: Check for Trojan Source / Hidden Unicode (P0)
+        run: |
+          chmod +x scripts/check-bidi.sh
+          ./scripts/check-bidi.sh
 
   ltp-inspect:
     name: Inspector contract check

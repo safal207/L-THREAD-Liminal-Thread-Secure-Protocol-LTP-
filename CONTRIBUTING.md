@@ -56,7 +56,7 @@ git checkout -b fix/your-bug-fix
 - Add comments for complex logic
 - Update documentation as needed
 - Stay within the contributor scope unless a Core Maintainer sponsors the change and an RFC is in flight
-- Do not introduce bidirectional controls or hidden Unicode characters into normative specs; rewrite affected lines using visible ASCII/Unicode only
+- Do not introduce bidirectional controls or hidden Unicode characters (e.g., U+202A-U+202E, U+200B) into any file. This is enforced by CI, and PRs containing them will fail.
 
 ### 3. Write Tests
 

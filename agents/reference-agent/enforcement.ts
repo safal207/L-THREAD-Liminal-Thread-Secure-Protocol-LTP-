@@ -4,11 +4,45 @@ import {
   VerifiedTransition,
   BlockedTransition,
   AdmissibilityResult,
-  VERIFIED_SYMBOL,
   ActionResult
 } from './types';
 import { EnforcementError } from './errors';
 import * as crypto from 'crypto';
+
+// PRIVATE BRAND SYMBOL
+// This is not exported, so no external code can create a VerifiedTransition literal
+const VERIFIED_BRAND = Symbol('LTP_VERIFIED_TRANSITION') as any;
+
+/**
+ * Factory function to create a VerifiedTransition.
+ * In a real implementation, this might also sign the transition.
+ */
+export function mintVerifiedTransition(
+  proposal: ProposedTransition,
+  traceId: string,
+  reason: string
+): VerifiedTransition {
+  return {
+    [VERIFIED_BRAND]: true,
+    id: crypto.randomUUID(),
+    originalProposalId: proposal.id,
+    admissible: true,
+    signedByLtp: true,
+    timestamp: Date.now(),
+    traceId,
+    reason,
+    targetState: proposal.targetState,
+    params: proposal.params
+  } as unknown as VerifiedTransition;
+}
+
+/**
+ * Type guard to check if an object is a VerifiedTransition.
+ * Checks for the presence of the private brand symbol.
+ */
+export function isVerifiedTransition(x: unknown): x is VerifiedTransition {
+  return typeof x === 'object' && x !== null && (x as any)[VERIFIED_BRAND] === true;
+}
 
 /**
  * The Admissibility Layer (LTP) is the ONLY entity allowed to create VerifiedTransitions.
@@ -33,19 +67,12 @@ export class LTPAdmissibilityChecker {
     }
 
     // 2. If Allowed, Mint the Verified Token
-    // We cast to any to assign the symbol, or we can use a factory function inside the module
-    const verified: VerifiedTransition = {
-      [VERIFIED_SYMBOL]: true,
-      id: crypto.randomUUID(),
-      originalProposalId: proposal.id,
-      admissible: true,
-      signedByLtp: true,
-      timestamp: Date.now(),
+    // We use the internal factory to create the branded type
+    const verified = mintVerifiedTransition(
+      proposal,
       traceId,
-      reason: 'Admissible: Fits within safe orientation',
-      targetState: proposal.targetState,
-      params: proposal.params
-    };
+      'Admissible: Fits within safe orientation'
+    );
 
     return verified;
   }
@@ -84,7 +111,7 @@ export class ActionBoundary {
   async execute(transition: VerifiedTransition, executor: (t: VerifiedTransition) => Promise<ActionResult>): Promise<ActionResult> {
 
     // 1. Runtime Integrity Check
-    if (!transition || transition[VERIFIED_SYMBOL] !== true) {
+    if (!isVerifiedTransition(transition)) {
       throw new EnforcementError('SECURITY VIOLATION: Attempted to execute unverified transition.');
     }
 
