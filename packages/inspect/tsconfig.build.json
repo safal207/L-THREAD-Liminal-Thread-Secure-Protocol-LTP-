@@ -12,5 +12,5 @@
     "noEmitOnError": true,
     "types": ["node", "pdfkit"]
   },
-  "include": ["../../tools/ltp-inspect/inspect.ts", "../../tools/ltp-inspect/types.ts"]
+  "include": ["../../tools/ltp-inspect/inspect.ts", "../../tools/ltp-inspect/types.ts", "../../tools/ltp-inspect/critical_actions.ts"]
 }

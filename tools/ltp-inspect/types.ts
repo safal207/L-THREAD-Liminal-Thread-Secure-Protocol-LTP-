@@ -39,20 +39,6 @@ export type BranchInsight = {
   constraints?: string[];
 };
 
-export type InfrastructureEvent = {
-  ts: string | number;
-  state: string; // STABLE, DEGRADED, UNSTABLE, RECOVERING
-  reason?: string;
-};
-
-export type RoutingStats = {
-  executed: number;
-  deferred: number;
-  frozen: number;
-  rejected: number;
-  replayed: number;
-};
-
 export type ComplianceViolation = {
   rule_id: string;
   severity: 'CRITICAL' | 'HIGH' | 'MODERATE' | 'LOW';
@@ -123,11 +109,6 @@ export type InspectSummary = {
     notes: string[];
     token?: string;
   };
-  infrastructure?: {
-    current_state: string;
-    history: InfrastructureEvent[];
-    routing: RoutingStats;
-  };
   branches: BranchInsight[];
   futures: {
     admissible: BranchInsight[];
@@ -136,5 +117,11 @@ export type InspectSummary = {
   };
   compliance?: ComplianceReport;
   audit_summary?: AuditSummary;
+  continuity_routing?: {
+    checked: boolean;
+    system_remained_coherent: boolean;
+    first_unsafe_transition_index: number | null;
+    state_transitions: number;
+  };
   notes: string[];
 };

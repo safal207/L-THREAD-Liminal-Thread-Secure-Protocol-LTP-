@@ -27,10 +27,10 @@ This repository defines **LTP (Liminal Thread Protocol)** — a continuity layer
 ## Market-Specific Documentation
 
 ### Market E: Infrastructure & Continuity
-- **[Continuity Router Architecture](./market/infrastructure/LTP-Continuity-Router.md)**
-- **[WebSocket Outage Scenario](./market/infrastructure/WebSocket-Outage-Scenario.md)**
-- **[Continuity Flow](./market/infrastructure/Continuity-Router-Flow.md)**
-- **[Failure Recovery Semantics](./market/infrastructure/Failure-Recovery-Semantics.md)**
+- **[Continuity Router Architecture](./markets/infrastructure/LTP-Continuity-Router.md)**
+- **[WebSocket Outage Scenario](./markets/infrastructure/WebSocket-Outage-Scenario.md)**
+- **[Continuity Flow](./markets/infrastructure/Continuity-Router-Flow.md)**
+- **[Failure Recovery Semantics](./markets/infrastructure/Failure-Recovery-Semantics.md)**
 
 ## One sentence
 
