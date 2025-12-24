@@ -1,0 +1,18 @@
+LTP INSPECTOR  v1.0
+input: samples/golden.trace.json  time: 2025-12-24T22:08:59.315Z
+
+IDENTITY
+identity: ct-sample
+continuity: preserved (ct-sample)
+
+ORIENTATION
+stable: yes
+focus_momentum: unknown
+drift: low
+drift_history: g1:low
+
+FUTURES (admissible / degraded / blocked)
+admissible:
+- main score=0.70 status=admissible constraints=policy:on-call
+
+RESULT: OK  exit: 0

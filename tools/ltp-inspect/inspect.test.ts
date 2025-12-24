@@ -21,6 +21,7 @@ const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branc
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
 const agentCriticalFixture = path.join(__dirname, 'fixtures', 'agent-critical.frames.jsonl');
 const continuityOutageTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-outage.trace.json');
+const continuityFailureTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-failure.trace.json');
 
 let builtCliPath: string | undefined;
 
@@ -46,7 +47,10 @@ async function runCommand(command: string, args: string[], options: SpawnOptions
 }
 
 function transpileToDist(sourcePath: string, outPath: string): void {
-  const source = fs.readFileSync(sourcePath, 'utf-8');
+  let source = fs.readFileSync(sourcePath, 'utf-8');
+  // Hack: Add .js extension to relative imports for ESM execution in Node
+  source = source.replace(/from '(\.\/[^']+)';/g, "from '$1.js';");
+
   const output = ts.transpileModule(source, {
     compilerOptions: {
       target: ts.ScriptTarget.ES2020,
@@ -257,37 +261,46 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('visualizes continuity routing correctly for outage scenario', () => {
-    if (!fs.existsSync(continuityOutageTrace)) {
-        throw new Error(`Continuity trace fixture missing at ${continuityOutageTrace}`);
+    // We use a guaranteed fixture for stability (User feedback check 1)
+    const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.json');
+    if (!fs.existsSync(continuityFixture)) {
+        throw new Error(`Continuity trace fixture missing at ${continuityFixture}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
     // Use --continuity flag to trigger the inspection
-    const exitCode = execute(['--input', continuityOutageTrace, '--format=human', '--color=never', '--continuity'], {
+    const exitCode = execute(['--input', continuityFixture, '--format=human', '--color=never', '--continuity'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    // Exit code may be 0 (clean) or 1 (warnings) depending on fixture/normalizers.
-    // We primarily assert the continuity report contract.
-    expect([0, 1]).toContain(exitCode);
+    // We expect exit code 1 because of warnings (normalized input, missing drift snapshots)
+    expect(exitCode).toBe(1);
 
     // Ensure no fatal errors even if warnings exist
     expect(errors.join('\n')).not.toMatch(/(TypeError|ReferenceError|ENOENT|EACCES)/);
 
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
-    // Verify Section Header
-    expect(output).toContain('CONTINUITY ROUTING INSPECTION');
+    // Normalize line endings for robust matching (User feedback check 4)
+    const output = logs.join('\n').replace(/\r\n/g, '\n');
 
-    // Verify System Coherence
+    expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
+    expect(output).toContain('State Transitions Observed:');
+    expect(output).toMatch(/HEALTHY/i);
+    expect(output).toMatch(/FAILED/i);
+  });
 
     // Verify State Transitions
     // Based on examples/traces/continuity-outage.trace.json
     expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
+
+    // Verify Routing Stats with regex (User feedback check 2)
+    // Matches "Routing Decisions: Executed=2 Deferred=1 Replayed=0 Frozen=0"
+    expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
   });
 });
 
