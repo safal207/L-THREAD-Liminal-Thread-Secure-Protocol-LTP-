@@ -122,6 +122,7 @@ export type InspectSummary = {
     system_remained_coherent: boolean;
     first_unsafe_transition_index: number | null;
     state_transitions: number;
+    state_transition_path: string[];
   };
   notes: string[];
 };

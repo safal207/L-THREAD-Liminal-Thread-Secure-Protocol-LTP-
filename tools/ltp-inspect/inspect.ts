@@ -3,7 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import PDFDocument from 'pdfkit';
 import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
-import { CRITICAL_ACTIONS, AGENT_RULES } from './critical_actions.js';
+import { CRITICAL_ACTIONS, AGENT_RULES, RECOVERY_ACTIONS } from './critical_actions';
 
 const CONTRACT = {
   name: 'ltp-inspect',
@@ -1206,10 +1206,12 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
               const targetAction = (frame.payload as any)?.targetState || 'unknown';
 
               // If FAILED, we should mostly see inadmissibility or only specific recovery actions.
+              // NOTE: We treat FAILED and UNSTABLE as equivalent for the purpose of "execution freeze".
+              // While UNSTABLE might allow some read-only handshakes, those are covered by the RECOVERY_ACTIONS list.
               if (currentState === 'FAILED' || currentState === 'UNSTABLE') {
                   if (admissible) {
                       // Is it a recovery action?
-                      const isRecovery = targetAction.includes('RECOVERY') || targetAction.includes('PING') || targetAction.includes('STATUS') || targetAction.includes('HANDSHAKE');
+                      const isRecovery = RECOVERY_ACTIONS.some(action => targetAction.includes(action));
                       if (!isRecovery) {
                           systemCoherent = false;
                           if (firstUnsafeIndex === -1) firstUnsafeIndex = idx;
@@ -1225,7 +1227,8 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
           checked: true,
           system_remained_coherent: systemCoherent,
           first_unsafe_transition_index: firstUnsafeIndex === -1 ? null : firstUnsafeIndex,
-          state_transitions: stateHistory.length
+          state_transitions: stateHistory.length,
+          state_transition_path: stateHistory.map(s => s.state)
       };
 
       // Also print to writer if human
