@@ -41,6 +41,7 @@ type ParsedArgs = {
   output?: string;
   compliance?: string;
   replayCheck?: boolean;
+  continuity?: boolean; // New flag for E-4
 };
 
 const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
@@ -130,6 +131,8 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.compliance = argv[++i];
     } else if (token === '--replay-check') {
       options.replayCheck = true;
+    } else if (token === '--continuity') {
+      options.continuity = true;
     } else if (token.startsWith('--export=')) {
       const exportFmt = token.split('=').slice(1).join('=') as ExportFormat;
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
@@ -1165,7 +1168,7 @@ function canonicalizeSummary(summary: InspectSummary): InspectSummary {
   return JSON.parse(JSON.stringify(summary)) as InspectSummary;
 }
 
-function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[]): InspectionResult {
+function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
@@ -1175,6 +1178,67 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
     compliance,
     replayCheck
   );
+
+  if (continuityCheck) {
+      // E-4: Continuity Inspection Logic
+      // 1. Check for State Degradation events (HEALTHY -> FAILED)
+      // 2. Verify "Execution Freeze" (No forbidden actions during FAILED)
+      // 3. Output "System Remained Coherent"
+
+      let systemCoherent = true;
+      let firstUnsafeIndex = -1;
+      let currentState = 'HEALTHY';
+      const stateHistory: {ts: string|number, state: string}[] = [];
+
+      frames.forEach((frame, idx) => {
+          if (frame.type === 'orientation') {
+             // Look for status in payload
+             const status = (frame.payload as any)?.status;
+             if (status) {
+                 currentState = String(status).toUpperCase();
+                 stateHistory.push({ ts: frame.ts || idx, state: currentState });
+             }
+          } else if (frame.type === 'route_request') {
+              // Check if we allowed critical actions in FAILED state
+              // But strictly, we check the RESPONSE (admissibility).
+          } else if (frame.type === 'route_response') {
+              const admissible = (frame.payload as any)?.admissible;
+              const targetAction = (frame.payload as any)?.targetState || 'unknown';
+
+              // If FAILED, we should mostly see inadmissibility or only specific recovery actions.
+              if (currentState === 'FAILED' || currentState === 'UNSTABLE') {
+                  if (admissible) {
+                      // Is it a recovery action?
+                      const isRecovery = targetAction.includes('RECOVERY') || targetAction.includes('PING') || targetAction.includes('STATUS') || targetAction.includes('HANDSHAKE');
+                      if (!isRecovery) {
+                          systemCoherent = false;
+                          if (firstUnsafeIndex === -1) firstUnsafeIndex = idx;
+                          violations.push(`Continuity Violation: Action '${targetAction}' allowed during ${currentState} state at frame #${idx}`);
+                      }
+                  }
+              }
+          }
+      });
+
+      // Inject into summary (hacky but effective for this task without schema change)
+      (summary as any).continuity_routing = {
+          checked: true,
+          system_remained_coherent: systemCoherent,
+          first_unsafe_transition_index: firstUnsafeIndex === -1 ? null : firstUnsafeIndex,
+          state_transitions: stateHistory.length
+      };
+
+      // Also print to writer if human
+      if (format === 'human') {
+          writer('');
+          writer('CONTINUITY ROUTING INSPECTION');
+          writer(`System Remained Coherent: ${systemCoherent ? 'YES' : 'NO'}`);
+          if (!systemCoherent) {
+             writer(`First Unsafe Transition: #${firstUnsafeIndex}`);
+          }
+          writer(`State Transitions Observed: ${stateHistory.map(s => s.state).join(' -> ')}`);
+      }
+  }
 
   if (format === 'json') printJson(summary, pretty, writer);
   else printHuman(summary, writer);
@@ -1287,6 +1351,7 @@ function printHelp(writer: Writer): void {
   writer('Examples:');
   writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=human');
   writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=json');
+  writer('  pnpm -w ltp:inspect -- --continuity --input examples/traces/outage.json');
   writer('  pnpm -w ltp:inspect -- --format=json --quiet --input examples/traces/drift-recovery.json | jq .orientation');
   writer('  pnpm -w ltp:inspect -- explain --input examples/traces/drift-recovery.json --at step-3');
   writer('');
@@ -1332,7 +1397,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
     switch (args.command) {
       case 'trace':
         {
-          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.compliance, args.replayCheck, writer, args.exportFormat);
+          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.compliance, args.replayCheck, writer, args.exportFormat, args.continuity);
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;
           const hasWarnings = warnings.length > 0 || normalizations.length > 0;
