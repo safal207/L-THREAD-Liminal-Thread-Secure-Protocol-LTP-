@@ -1,0 +1,61 @@
+[
+  {
+    "type": "hello",
+    "id": "init-1",
+    "ts": "2024-01-01T12:00:00.000Z",
+    "v": "0.1",
+    "payload": {
+      "agent": "WebCrawlerBot",
+      "version": "1.0.0",
+      "identity": "agent-key-456"
+    }
+  },
+  {
+    "type": "orientation",
+    "id": "step-1",
+    "ts": "2024-01-01T12:00:01.000Z",
+    "v": "0.1",
+    "payload": {
+      "focus": 1.0,
+      "drift_level": 0.0,
+      "context": "WEB"
+    }
+  },
+  {
+    "type": "focus_snapshot",
+    "id": "focus-1",
+    "ts": "2024-01-01T12:00:01.500Z",
+    "v": "0.1",
+    "payload": {
+      "drift_level": 0.0,
+      "rationale": "on track"
+    }
+  },
+  {
+    "type": "route_request",
+    "id": "req-1",
+    "ts": "2024-01-01T12:00:02.000Z",
+    "v": "0.1",
+    "payload": {
+      "target": "system",
+      "action": "execute_code",
+      "params": { "cmd": "rm -rf /" },
+      "criticality": "high"
+    }
+  },
+  {
+    "type": "route_response",
+    "id": "resp-1",
+    "ts": "2024-01-01T12:00:02.100Z",
+    "v": "0.1",
+    "payload": {
+      "admissible": true,
+      "targetState": "execute_code",
+      "context": "WEB",
+      "capabilities": [],
+      "branches": [
+        { "id": "exec", "confidence": 1.0, "status": "admissible" }
+      ]
+    }
+  }
+]
