@@ -56,3 +56,7 @@ If you see **Status: PASS** — you’re good.
 
 - [LTP Inspect Tool Documentation](../devtools/inspector.md)
 - [Trace Format Specification](../../specs/LTP-message-format.md)
+
+### Next steps
+- [Agents Safety Quickstart](./agents.md)
+- [Fintech Compliance Quickstart](./fintech.md)
