@@ -20,7 +20,7 @@ const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.js
 const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
 const agentCriticalFixture = path.join(__dirname, 'fixtures', 'agent-critical.frames.jsonl');
-const failureRecoveryTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'failure-recovery.trace.json');
+const failureRecoveryTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-outage.trace.json');
 
 let builtCliPath: string | undefined;
 
@@ -256,38 +256,33 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('Evidence: WEB context allowed to perform critical action');
   });
 
-  it('visualizes infrastructure continuity correctly for STABLE->UNSTABLE transition', () => {
-    // Generate the failure recovery trace if not exists (or rely on existing)
-    // The test assumes examples/traces/failure-recovery.trace.json exists
+  it('visualizes continuity routing correctly for outage scenario', () => {
     if (!fs.existsSync(failureRecoveryTrace)) {
-        throw new Error('Failure recovery trace fixture missing. Run generate-failure-recovery-trace.js first.');
+        throw new Error(`Continuity trace fixture missing at ${failureRecoveryTrace}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // We run without strict compliance to focus on visualization
-    const exitCode = execute(['--input', failureRecoveryTrace, '--format=human', '--color=never'], {
+    // Use --continuity flag to trigger the inspection
+    const exitCode = execute(['--input', failureRecoveryTrace, '--format=human', '--color=never', '--continuity'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    expect(exitCode).toBe(0);
+    // We expect exit code 1 because of warnings (normalized input, missing drift snapshots)
+    expect(exitCode).toBe(1);
     const output = logs.join('\n');
 
     // Verify Section Header
-    expect(output).toContain('INFRASTRUCTURE / CONTINUITY');
+    expect(output).toContain('CONTINUITY ROUTING INSPECTION');
 
-    // Verify Stats
-    expect(output).toContain('routing: executed=2 deferred=1 replayed=1 frozen=0');
+    // Verify System Coherence
+    expect(output).toContain('System Remained Coherent: YES');
 
-    // Verify State History
-    expect(output).toContain('UNSTABLE (DB Connection Timeout)');
-    expect(output).toContain('RECOVERING (DB Connection Restored)');
-    expect(output).toContain('STABLE');
-
-    // Verify Current State
-    expect(output).toContain('current_state: STABLE');
+    // Verify State Transitions
+    // Based on examples/traces/continuity-outage.trace.json
+    expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
   });
 });
 
