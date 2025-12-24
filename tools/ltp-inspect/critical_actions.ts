@@ -8,6 +8,13 @@ export const CRITICAL_ACTIONS = [
   'execute_code',
 ];
 
+export const RECOVERY_ACTIONS = [
+  'RECOVERY',
+  'PING',
+  'STATUS',
+  'HANDSHAKE',
+];
+
 export const AGENT_RULES = {
   WEB_DIRECT: 'AGENTS.CRIT.WEB_DIRECT',
   NO_CAPABILITY: 'AGENTS.CRIT.NO_CAPABILITY',
