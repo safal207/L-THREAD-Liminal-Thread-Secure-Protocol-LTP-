@@ -45,6 +45,22 @@ importers:
         specifier: ^8.18.3
         version: 8.18.3
 
+  examples/infra-observer:
+    dependencies:
+      uuid:
+        specifier: ^9.0.0
+        version: 9.0.1
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.27
+      '@types/uuid':
+        specifier: ^9.0.0
+        version: 9.0.8
+      typescript:
+        specifier: ^5.0.0
+        version: 5.9.3
+
   packages/inspect:
     dependencies:
       pdfkit:
@@ -379,6 +395,9 @@ packages:
   '@types/pdfkit@0.17.4':
     resolution: {integrity: sha512-odAmVuuguRxKh1X4pbMrJMp8ecwNqHRw6lweupvzK+wuyNmi6wzlUlGVZ9EqMvp3Bs2+L9Ty0sRlrvKL+gsQZg==}
 
+  '@types/uuid@9.0.8':
+    resolution: {integrity: sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==}
+
   '@types/ws@8.18.1':
     resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
@@ -652,6 +671,10 @@ packages:
   unicode-trie@2.0.0:
     resolution: {integrity: sha512-x7bc76x0bm4prf1VLg79uhAzKw8DVboClSN5VxJuQ+LKDOVEW9CdH+VY7SP+vX7xCYQqzzgQpFqz15zeLvAtZQ==}
 
+  uuid@9.0.1:
+    resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
+    hasBin: true
+
   v8-compile-cache-lib@3.0.1:
     resolution: {integrity: sha512-wa7YjyUGfNZngI/vtK0UHAN+lgDCxBPCylVXGp0zu59Fz5aiGtNXaq3DhIov063MorB+VfufLh3JlF2KdTK3xg==}
 
@@ -919,6 +942,8 @@ snapshots:
   '@types/pdfkit@0.17.4':
     dependencies:
       '@types/node': 20.19.27
+
+  '@types/uuid@9.0.8': {}
 
   '@types/ws@8.18.1':
     dependencies:
@@ -1226,6 +1251,8 @@ snapshots:
     dependencies:
       pako: 0.2.9
       tiny-inflate: 1.0.3
+
+  uuid@9.0.1: {}
 
   v8-compile-cache-lib@3.0.1: {}
 

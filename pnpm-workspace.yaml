@@ -2,3 +2,4 @@ packages:
   - sdk/js
   - tools/conformance-kit
   - packages/inspect
+  - examples/infra-observer

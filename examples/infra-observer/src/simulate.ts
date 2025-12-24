@@ -11,6 +11,7 @@ interface TraceEntry {
   timestamp: string;
   type: string;
   payload: any;
+  v?: string;
 }
 
 function sha256(data: any): string {
@@ -38,7 +39,10 @@ async function runSimulation() {
   // 1. Initial State Record
   const initPayload = {
     state: observer.getCurrentState(),
-    message: "Simulation Start"
+    message: "Simulation Start",
+    focus_snapshot: { // Added to satisfy drift check
+        vectors: []
+    }
   };
   const initEntry: TraceEntry = {
     hash: "",
@@ -46,12 +50,27 @@ async function runSimulation() {
     timestamp: new Date().toISOString(),
     type: "orientation", // Using standard frame type
     payload: initPayload,
-    // @ts-ignore
     v: "0.1"
   };
   initEntry.hash = sha256({ previous_hash: initEntry.previous_hash, timestamp: initEntry.timestamp, type: initEntry.type, payload: initEntry.payload });
   trace.push(initEntry);
   previousHash = initEntry.hash;
+
+  // 1.5 Emit initial focus snapshot (Drift baseline)
+  const snapshotEntry: TraceEntry = {
+    hash: "",
+    previous_hash: previousHash,
+    timestamp: new Date().toISOString(),
+    type: "focus_snapshot",
+    payload: {
+        drift: 0.0,
+        vectors: []
+    },
+    v: "0.1"
+  };
+  snapshotEntry.hash = sha256({ previous_hash: snapshotEntry.previous_hash, timestamp: snapshotEntry.timestamp, type: snapshotEntry.type, payload: snapshotEntry.payload });
+  trace.push(snapshotEntry);
+  previousHash = snapshotEntry.hash;
 
   // 2. Event Loop
   for (const event of events) {
@@ -65,7 +84,6 @@ async function runSimulation() {
       timestamp: new Date().toISOString(),
       type: "hello", // Mapping generic event to hello/heartbeat or custom for now, using hello as generic signal in this simplifed trace
       payload: eventPayload,
-      // @ts-ignore
       v: "0.1"
     };
     eventEntry.hash = sha256({ previous_hash: eventEntry.previous_hash, timestamp: eventEntry.timestamp, type: eventEntry.type, payload: eventEntry.payload });
@@ -87,7 +105,6 @@ async function runSimulation() {
           target_urn: "urn:ltp:infra:state-manager",
           transition: proposal
         },
-        // @ts-ignore
         v: "0.1"
       };
       propEntry.hash = sha256({ previous_hash: propEntry.previous_hash, timestamp: propEntry.timestamp, type: propEntry.type, payload: propEntry.payload });
@@ -103,10 +120,15 @@ async function runSimulation() {
         timestamp: new Date().toISOString(),
         type: "route_response",
         payload: {
-            allowed: true,
-            new_orientation: proposal.to
+            branches: [
+                {
+                    name: "commit",
+                    confidence: 1.0,
+                    target_urn: `urn:ltp:infra:state:${proposal.to}`,
+                    description: "Transition approved"
+                }
+            ]
         },
-        // @ts-ignore
         v: "0.1"
       };
       responseEntry.hash = sha256({ previous_hash: responseEntry.previous_hash, timestamp: responseEntry.timestamp, type: responseEntry.type, payload: responseEntry.payload });
