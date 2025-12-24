@@ -1,7 +1,7 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "../../dist",
+    "outDir": "../../packages/inspect/dist",
     "rootDir": ".",
     "noEmit": false
   },
