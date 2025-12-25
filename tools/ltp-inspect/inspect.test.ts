@@ -317,7 +317,7 @@ describe('ltp-inspect golden summary', () => {
     expect(errOutput).toContain('TRACE INTEGRITY ERROR: unchecked');
   });
 
-  it('visualizes continuity routing correctly for outage scenario', () => {
+  it('continuity inspection: outage is coherent (HEALTHY -> FAILED -> HEALTHY)', () => {
     // We use a guaranteed fixture for stability (User feedback check 1)
     const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.json');
     if (!fs.existsSync(continuityFixture)) {
@@ -333,14 +333,37 @@ describe('ltp-inspect golden summary', () => {
       error: (message) => errors.push(message),
     });
 
-    // Exit code might be 0 unless strict is enabled, so assert via output text.
-    expect([0, 1, 2]).toContain(exitCode);
+    // Expect 0 or 1 (warnings), but NOT 2 (violation)
+    expect([0, 1]).toContain(exitCode);
     const output = logs.join('\n');
 
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
+    expect(output).toContain('System Remained Coherent: YES');
+    // We expect the transition path to be visible
+    // Note: The fixture actually has HEALTHY -> FAILED -> HEALTHY
+    expect(output).toMatch(/State Transitions Observed:.*HEALTHY.*FAILED.*HEALTHY/s);
+  });
+
+  it('continuity inspection: failure trace is NOT coherent and reports unsafe transition', () => {
+    if (!fs.existsSync(continuityFailureTrace)) {
+      console.warn('Skipping failure trace test: fixture not found');
+      return;
+    }
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    const exitCode = execute(['--input', continuityFailureTrace, '--format=human', '--color=never', '--continuity'], {
+      log: (message) => logs.push(message),
+      error: (message) => errors.push(message),
+    });
+
+    // Can be 2 depending on if the tool treats incoherence as a hard failure, or 1 if just a warning
+    expect([0, 1, 2]).toContain(exitCode);
+    const output = logs.join('\n');
+
     expect(output).toContain('System Remained Coherent: NO');
-    expect(output).toMatch(/First Unsafe Transition/i);
-    expect(output).toMatch(/(Index|#)\s*\d+/i);
+    expect(output).toMatch(/First Unsafe Transition:\s*(Index|#)\s*\d+/i);
   });
 });
 
