@@ -4,7 +4,7 @@ This example demonstrates a compliant agent trace where a critical action is pro
 
 ## Contents
 
-- `sample.trace.json`: A trace showing a safe interaction flow.
+- `sample.trace.jsonl`: A trace showing a safe interaction flow.
 
 ## How to Run
 
@@ -15,7 +15,7 @@ This example demonstrates a compliant agent trace where a critical action is pro
 
 2. **Verify agent safety**:
    ```bash
-   ltp-inspect sample.trace.json --compliance agents
+   ltp-inspect sample.trace.jsonl --compliance agents
    ```
 
 ## Expected Output

@@ -191,6 +191,6 @@ const kidsModeFrames = [
 
 // --- Execution ---
 
-writeTrace('safe_stream.trace.json', safeStreamFrames);
-writeTrace('blocked_ai_joke.trace.json', blockedAiFrames);
-writeTrace('kids_mode.trace.json', kidsModeFrames);
+writeTrace('safe_stream.trace.jsonl', safeStreamFrames);
+writeTrace('blocked_ai_joke.trace.jsonl', blockedAiFrames);
+writeTrace('kids_mode.trace.jsonl', kidsModeFrames);

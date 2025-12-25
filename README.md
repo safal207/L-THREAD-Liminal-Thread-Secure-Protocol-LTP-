@@ -12,11 +12,11 @@ See [docs/fintech/Compliance-Inspection.md](docs/fintech/Compliance-Inspection.m
 
 ```bash
 npm install -g @ltp/inspect
-ltp inspect artifacts/traces/sample.trace.json
+ltp inspect trace --input artifacts/traces/sample.trace.jsonl
 ```
 
 If your shell cannot find the `ltp` command, restart the session or ensure the PNPM global bin directory is on your `PATH`.  
-Prefer a workspace local run? Use: `pnpm -w ltp:inspect -- --input artifacts/traces/sample.trace.json`.
+Prefer a workspace local run? Use: `pnpm -w ltp:inspect -- --input artifacts/traces/sample.trace.jsonl`.
 
 No model. No agent framework. Just orientation, drift, and replay.
 

@@ -141,7 +141,7 @@ async function runSimulation() {
   }
 
   // Write Trace
-  let tracePath = path.join(process.cwd(), 'infra.trace.json');
+  let tracePath = path.join(process.cwd(), 'infra.trace.jsonl');
   const outIndex = process.argv.indexOf('--out');
   if (outIndex !== -1 && outIndex + 1 < process.argv.length) {
     tracePath = process.argv[outIndex + 1];

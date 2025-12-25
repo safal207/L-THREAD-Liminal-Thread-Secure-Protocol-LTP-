@@ -12,15 +12,15 @@ const expectedHumanOkPath = path.join(__dirname, 'expected', 'human.ok.txt');
 const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt');
 const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt');
 const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.jsonl');
-const canonicalFixture = path.join(__dirname, '..', '..', 'examples', 'traces', 'canonical-linear.json');
+const canonicalFixture = path.join(__dirname, '..', '..', 'examples', 'traces', 'canonical-linear.jsonl');
 const canonicalHumanSnapshot = path.join(__dirname, '..', '..', 'docs', 'devtools', 'inspect-output.txt');
 const goldenTraceOutput = path.join(__dirname, 'fixtures', 'golden.trace_output.txt');
-const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.json');
-const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.json');
-const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.json');
-const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.json');
-const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
-const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
+const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.jsonl');
+const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.jsonl');
+const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.jsonl');
+const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.jsonl');
+const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.jsonl');
+const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.jsonl');
 
 // Canonical agent traces
 const allowedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'allowed-critical.trace.jsonl');

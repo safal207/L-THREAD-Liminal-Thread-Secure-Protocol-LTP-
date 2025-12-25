@@ -4,7 +4,7 @@ This example demonstrates a trace that adheres to the Fintech compliance profile
 
 ## Contents
 
-- `sample.trace.json`: A trace simulating a financial transaction approval flow.
+- `sample.trace.jsonl`: A trace simulating a financial transaction approval flow.
 
 ## How to Run
 
@@ -15,7 +15,7 @@ This example demonstrates a trace that adheres to the Fintech compliance profile
 
 2. **Verify compliance**:
    ```bash
-   ltp-inspect sample.trace.json --compliance fintech
+   ltp-inspect sample.trace.jsonl --compliance fintech
    ```
 
 ## Expected Output

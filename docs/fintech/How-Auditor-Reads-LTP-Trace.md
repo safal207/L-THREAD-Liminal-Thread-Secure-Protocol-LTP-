@@ -23,7 +23,7 @@ You do not need to check hashes manually. The `ltp inspect` tool does this for y
 
 Run the inspection command:
 ```bash
-ltp inspect golden.auditlog.jsonl --compliance fintech
+ltp inspect trace --input golden.auditlog.jsonl --compliance fintech
 ```
 
 ### The Verdict
@@ -46,12 +46,12 @@ The entire verification process is automated.
 
 **For Engineers/CI:**
 ```bash
-ltp inspect <file> --compliance fintech --format json
+ltp inspect trace --input <file> --compliance fintech --format json
 ```
 Check if `"verdict": "PASS"` in the output.
 
 **For Auditors:**
 ```bash
-ltp inspect <file> --compliance fintech --export pdf
+ltp inspect trace --input <file> --compliance fintech --export pdf
 ```
 This generates a PDF report with a clear PASS/FAIL summary.

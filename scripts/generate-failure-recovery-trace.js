@@ -143,6 +143,7 @@ frames.forEach((frame, i) => {
   prevHash = hash;
 });
 
-const outputPath = process.argv[2] || path.join(__dirname, '..', 'examples', 'traces', 'failure-recovery.trace.json');
-fs.writeFileSync(outputPath, JSON.stringify(entries, null, 2) + '\n'); // Ensure newline
+const outputPath = process.argv[2] || path.join(__dirname, '..', 'examples', 'traces', 'failure-recovery.trace.jsonl');
+const jsonlContent = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
+fs.writeFileSync(outputPath, jsonlContent);
 console.log(`Generated trace at ${outputPath}`);

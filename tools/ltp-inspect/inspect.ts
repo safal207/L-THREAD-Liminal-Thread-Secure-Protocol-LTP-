@@ -58,7 +58,16 @@ class CliError extends Error {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const commands: Command[] = ['trace', 'replay', 'explain', 'help'];
-  const positionalCommand = commands.includes(argv[0] as Command) ? (argv.shift() as Command) : 'trace';
+
+  // Canonical enforcement: Command is mandatory. No defaults.
+  let positionalCommand: Command = 'help';
+  if (commands.includes(argv[0] as Command)) {
+      positionalCommand = argv.shift() as Command;
+  } else {
+      // If we are here, the first argument is NOT a known command.
+      // We will default to 'help' to show usage, effectively disabling implicit 'trace'.
+      positionalCommand = 'help';
+  }
 
   const options: ParsedArgs = {
     command: positionalCommand,
@@ -383,13 +392,8 @@ function loadFrames(
   let format: 'json' | 'jsonl' = 'json';
 
   if (raw.startsWith('[')) {
-    try {
-      parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) throw new Error('Expected JSON array');
-      format = 'json';
-    } catch (err) {
-      throw new CliError(`Invalid JSON array: ${(err as Error).message}`, 2);
-    }
+    // Canon Enforcement: Legacy JSON array format is forbidden.
+    throw new CliError('Legacy JSON array format is not supported. Use JSONL.', 2);
   } else {
     try {
       parsed = raw
@@ -1387,16 +1391,16 @@ function printHelp(writer: Writer): void {
   writer('ltp:inspect — orientation inspector (no decisions, no model execution).');
   writer('');
   writer('Usage:');
-  writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
+  writer('  pnpm -w ltp:inspect -- trace --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
   writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
   writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
   writer('Examples:');
-  writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=human');
-  writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=json');
-  writer('  pnpm -w ltp:inspect -- --continuity --input examples/traces/outage.json');
-  writer('  pnpm -w ltp:inspect -- --format=json --quiet --input examples/traces/drift-recovery.json | jq .orientation');
-  writer('  pnpm -w ltp:inspect -- explain --input examples/traces/drift-recovery.json --at step-3');
+  writer('  pnpm -w ltp:inspect -- trace --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=human');
+  writer('  pnpm -w ltp:inspect -- trace --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=json');
+  writer('  pnpm -w ltp:inspect -- trace --continuity --input examples/traces/outage.jsonl');
+  writer('  pnpm -w ltp:inspect -- trace --format=json --quiet --input examples/traces/drift-recovery.jsonl | jq .orientation');
+  writer('  pnpm -w ltp:inspect -- explain --input examples/traces/drift-recovery.jsonl --at step-3');
   writer('');
   writer('Output:');
   writer('  JSON (v1 contract) with deterministic ordering for CI. Additional fields remain optional.');

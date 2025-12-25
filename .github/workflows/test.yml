@@ -53,7 +53,7 @@ jobs:
         run: |
           set -euxo pipefail
           pnpm -C packages/inspect run build
-          node packages/inspect/bin/ltp.js inspect --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --color=never --quiet
+          node packages/inspect/bin/ltp.js inspect --input tools/ltp-inspect/fixtures/canonical-clean.jsonl --format=json --color=never --quiet
       - name: Inspect trace (non-strict, PR visibility)
         if: github.event_name == 'pull_request'
         continue-on-error: true
@@ -66,7 +66,7 @@ jobs:
         run: |
           set -euxo pipefail
           mkdir -p docs/devtools
-          pnpm -w ltp:inspect -- --strict --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --quiet > docs/devtools/inspect-output.txt
+          pnpm -w ltp:inspect -- --strict --input tools/ltp-inspect/fixtures/canonical-clean.jsonl --format=json --quiet > docs/devtools/inspect-output.txt
       - name: Upload golden traces
         if: always()
         uses: actions/upload-artifact@v4
@@ -150,10 +150,10 @@ jobs:
           ltp --version || true
 
           # Run inspect on a fixture (path relative to repo root, we are in root here)
-          ltp inspect --input tools/ltp-inspect/fixtures/canonical-clean.json --format=human --color=never
+          ltp inspect trace --input tools/ltp-inspect/fixtures/canonical-clean.jsonl --format=human --color=never
 
           # Verify exit code logic with strict mode
-          ltp inspect --strict --input tools/ltp-inspect/fixtures/canonical-clean.json --format=json --quiet
+          ltp inspect trace --strict --input tools/ltp-inspect/fixtures/canonical-clean.jsonl --format=json --quiet
 
   verify-types:
     name: Verify Cross-SDK Type Consistency

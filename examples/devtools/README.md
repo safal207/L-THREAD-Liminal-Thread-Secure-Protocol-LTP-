@@ -4,7 +4,7 @@ This directory contains resources to demonstrate the usage of LTP developer tool
 
 ## Contents
 
-- `sample.trace.json`: A minimal valid LTP trace file for testing.
+- `sample.trace.jsonl`: A minimal valid LTP trace file for testing.
 
 ## How to Run
 
@@ -15,13 +15,13 @@ This directory contains resources to demonstrate the usage of LTP developer tool
 
 2. **Inspect the trace**:
    ```bash
-   ltp-inspect sample.trace.json
+   ltp-inspect sample.trace.jsonl
    ```
 
 ## Expected Output
 
 ```text
-Trace: sample.trace.json
+Trace: sample.trace.jsonl
 Status: PASS (Valid Structure)
 ...
 ```

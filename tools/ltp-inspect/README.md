@@ -8,30 +8,31 @@ Inspector emits a versioned, deterministic state summary suitable for CI, audits
 
 ## Constraint alignment
 - Inspector is justified by LTP core constraints (see [`docs/canon/LTP-Non-Goals-as-Design-Constraints.md`](../../docs/canon/LTP-Non-Goals-as-Design-Constraints.md)): it never executes models, chooses branches, or adapts heuristically.
-- Input traces must be immutable, deterministic orientation logs. Frames lacking `v`/`version`, non-object payloads, duplicate branch ids, or non-numeric drift/focus values are rejected as contract violations.
+- Input traces must be **JSONL (newline-delimited)**. Legacy JSON arrays are not supported.
+- Frames lacking `v`/`version`, non-object payloads, duplicate branch ids, or non-numeric drift/focus values are rejected as contract violations.
 - The CLI is read-only; it consumes schema-defined fields (`identity`, `focus_momentum`, `drift`, `constraints`) and emits summaries. Any requirement for inference or normalization lives outside Inspector.
 
 ## One-command entrypoint
 
-Run from the repo root (JSON by default):
+Run from the repo root (requires `trace` subcommand):
 
 ```bash
-pnpm -w ltp:inspect -- --input examples/traces/canonical-linear.json
-pnpm -w ltp:inspect -- --format human --input examples/traces/drift-recovery.json
-pnpm -w ltp:inspect -- replay --input examples/traces/canonical-linear.json --from step-2
-pnpm -w ltp:inspect -- explain --input examples/traces/constraint-blocked.json --at step-3
+pnpm -w ltp:inspect -- trace --input examples/traces/canonical-linear.jsonl
+pnpm -w ltp:inspect -- trace --format human --input examples/traces/drift-recovery.jsonl
+pnpm -w ltp:inspect -- replay --input examples/traces/canonical-linear.jsonl --from step-2
+pnpm -w ltp:inspect -- explain --input examples/traces/constraint-blocked.jsonl --at step-3
 ```
 
 Flags:
 - `--format json|human` (default: `human`)
 - `--pretty` for pretty-printed JSON
-- `--input <path>` to point at a JSON array or JSONL frame log
+- `--input <path>` to point at a JSONL frame log
 - `--color auto|always|never` for human output (default: `auto`)
 - `--strict` to treat canonicalization needs as contract violations (exit 2)
 - `--quiet` to emit only the final status line
 - `--output <file>` to write the formatted output to disk
 
-Frames may be a JSON array or JSONL with one frame per line. Existing conformance fixtures work as input.
+Frames must be JSONL with one frame per line. Existing conformance fixtures work as input.
 
 ## Deterministic snapshots
 
@@ -66,8 +67,10 @@ This README defers to the canonical table to avoid drift. Practical shorthand:
 - `2` when the contract is violated (`--strict` escalates normalization to `2`).
 
 Suggested workflow integration:
-- Pull requests: run `pnpm -w ltp:inspect -- --input <trace>` (non-strict) to surface warnings without blocking.
-- Protected branches/conformance folders: run `pnpm -w ltp:inspect -- --strict --input <trace>` to gate on canonical traces (exit 2 on normalization).
+- Pull requests: run `pnpm -w ltp:inspect -- trace --input <trace>` (non-strict) to surface warnings without blocking.
+- Protected branches/conformance folders: run `pnpm -w ltp:inspect -- trace --strict --input <trace>` to gate on canonical traces (exit 2 on normalization).
+
+**Note:** CI checks should always parse the `--format json` output. Human output is for humans only and not a stable API.
 
 ## Output contract v1 (deterministic ordering)
 
@@ -87,16 +90,9 @@ See [`docs/contracts/ltp-inspect.v1.schema.json`](../../docs/contracts/ltp-inspe
 ## Human format (kubectl describe vibes)
 
 ```
-LTP INSPECT (v1.0)
-identity: ct-1
-focus_momentum: unknown
-drift_history: t1:0.55
-continuity: preserved
-futures:
-  admissible:
-    - A status=admissible score=0.62
-notes:
-  - retry updated drift
+LTP INSPECTOR (v1.0)
+input: example.trace.jsonl  time: ...
+...
 ```
 
 ## Why DevOps use LTP Inspect

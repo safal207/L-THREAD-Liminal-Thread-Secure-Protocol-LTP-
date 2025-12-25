@@ -10,9 +10,9 @@ from an existing trace — no model execution required.
 pnpm i -g @ltp/inspect
 
 ## Run
-ltp inspect artifacts/traces/sample.trace.json
+ltp inspect trace --input artifacts/traces/sample.trace.jsonl
 > If your shell cannot find `ltp`, restart the session or ensure the PNPM global bin directory is on your `PATH`.
-> Prefer a workspace-local run? Use: `pnpm -w ltp:inspect -- --input artifacts/traces/sample.trace.json`.
+> Prefer a workspace-local run? Use: `pnpm -w ltp:inspect -- --input artifacts/traces/sample.trace.jsonl`.
 
 ## What you’ll see
 - Stable identity across transitions
@@ -28,7 +28,7 @@ This command does NOT:
 It only inspects orientation.
 
 ## Where does the trace come from?
-- Any JSON array of LTP frames at protocol version `v0.1` works.
+- Any JSONL stream of LTP frames at protocol version `v0.1` works.
 - Each frame should include an `id`, `ts`, `type`, and `payload`; optional metadata such as `source`, `node_id`, or `session_id` help anchor the trace to real systems.
 
 ## Sample inspector output (no execution needed)
