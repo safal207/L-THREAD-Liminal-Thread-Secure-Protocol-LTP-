@@ -31,7 +31,7 @@
     "test:focus-hud": "ts-node scripts/monitor/__tests__/hudModes.test.ts && ts-node scripts/monitor/__tests__/ltp-focus-hud.test.ts && ts-node scripts/monitor/__tests__/hudTheme.test.ts && ts-node scripts/gateway/__tests__/ltp-node-gateway.test.ts && ts-node src/routing/__tests__/focusRoutingPreview.test.ts && ts-node tests/visualization/futureWeaveGraph.test.ts",
     "test:future-weave-graph": "ts-node tests/visualization/futureWeaveGraph.test.ts",
     "test:explain-routing": "ts-node src/demos/__tests__/explainRoutingDemo.test.ts",
-    "test": "vitest run",
+    "test": "pnpm generate:agent-traces && vitest run",
     "test:turtle": "vitest run src/turtle/__tests__",
     "conformance:report": "ts-node scripts/conformance/generateConformanceReport.ts",
     "ltp:conformance": "ts-node tools/conformance-kit/src/cli.ts",
@@ -39,7 +39,8 @@
     "ltp:verify": "ts-node --project scripts/tsconfig.verify.json scripts/verify/ltpVerify.ts --out artifacts/conformance-report.json",
     "ltp:badge": "ts-node scripts/conformance/ltpBadge.ts",
     "ltp:report:validate": "ts-node --project scripts/tsconfig.verify.json scripts/verify/validateConformanceReport.ts",
-    "ltp:inspect": "ts-node tools/ltp-inspect/inspect.ts"
+    "ltp:inspect": "ts-node tools/ltp-inspect/inspect.ts",
+    "generate:agent-traces": "ts-node scripts/generate-agent-traces.ts"
   },
   "devDependencies": {
     "@types/chai": "^5.2.3",

@@ -265,8 +265,9 @@ describe('ltp-inspect golden summary', () => {
 
   it('detects critical action violations in agents compliance mode', () => {
     if (!fs.existsSync(allowedCriticalTracePath)) {
-        console.warn('Skipping agent safety test: allowed-critical.trace.jsonl not found');
-        return;
+        throw new Error(
+            `Missing ${allowedCriticalTracePath}. Run: pnpm ts-node scripts/generate-agent-traces.ts (or pnpm generate:agent-traces)`
+        );
     }
 
     const logs: string[] = [];
@@ -288,7 +289,11 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('verifies safe agent trace passes checks', () => {
-    if (!fs.existsSync(blockedCriticalTracePath)) return;
+    if (!fs.existsSync(blockedCriticalTracePath)) {
+        throw new Error(
+            `Missing ${blockedCriticalTracePath}. Run: pnpm ts-node scripts/generate-agent-traces.ts (or pnpm generate:agent-traces)`
+        );
+    }
 
     const logs: string[] = [];
     const errors: string[] = [];
@@ -352,8 +357,7 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
     expect(output).toContain('State Transitions Observed:');
-    expect(output).toMatch(/HEALTHY/i);
-    expect(output).toMatch(/FAILED/i);
+    expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
     expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
   });
 
