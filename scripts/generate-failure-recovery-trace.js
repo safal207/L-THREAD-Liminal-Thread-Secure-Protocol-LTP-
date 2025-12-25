@@ -26,19 +26,21 @@ function canonicalJsonBytes(frame) {
 
 const frames = [
   {
+    v: "0.1",
     type: "hello",
-    version: "0.1",
     ts: "2024-03-15T14:00:00.000Z"
   },
   {
+    v: "0.1",
     type: "orientation",
     ts: "2024-03-15T14:00:01.000Z",
     payload: {
-      status: "stable",
+      status: "HEALTHY",
       drift: 0.01
     }
   },
   {
+    v: "0.1",
     type: "route_request",
     ts: "2024-03-15T14:00:02.000Z",
     payload: {
@@ -47,22 +49,26 @@ const frames = [
     }
   },
   {
+    v: "0.1",
     type: "route_response",
     ts: "2024-03-15T14:00:03.000Z",
     payload: {
       decision: "EXECUTE",
-      admissible: true
+      admissible: true,
+      branches: [{id: "execute", confidence: 1.0}]
     }
   },
   {
+    v: "0.1",
     type: "orientation",
     ts: "2024-03-15T14:00:04.000Z",
     payload: {
-      status: "failed",
+      status: "FAILED",
       error: "db_connection_lost"
     }
   },
   {
+    v: "0.1",
     type: "route_request",
     ts: "2024-03-15T14:00:05.000Z",
     payload: {
@@ -71,32 +77,51 @@ const frames = [
     }
   },
   {
+    v: "0.1",
     type: "route_response",
     ts: "2024-03-15T14:00:06.000Z",
     payload: {
       decision: "DEFER",
       admissible: false,
-      reason: "system_state_failed"
+      reason: "system_state_failed",
+      branches: [{id: "defer", confidence: 1.0}]
     }
   },
   {
+    v: "0.1",
     type: "orientation",
     ts: "2024-03-15T14:00:07.000Z",
     payload: {
-      status: "recovering"
+      status: "UNSTABLE"
     }
   },
   {
+    v: "0.1",
     type: "orientation",
     ts: "2024-03-15T14:00:08.000Z",
     payload: {
-      status: "stable"
+      status: "HEALTHY",
+      identity: "recovery-test-agent"
     }
   }
 ];
 
 const entries = [];
 let prevHash = "0000000000000000000000000000000000000000000000000000000000000000";
+
+// Rule-based direction assignment
+function getDirection(type) {
+  switch (type) {
+    case 'hello':
+    case 'orientation':
+    case 'route_request':
+      return 'out';
+    case 'route_response':
+      return 'in';
+    default:
+      return 'out';
+  }
+}
 
 frames.forEach((frame, i) => {
   const frameBytes = canonicalJsonBytes(frame);
@@ -108,7 +133,7 @@ frames.forEach((frame, i) => {
   entries.push({
     i: i,
     timestamp_ms: new Date(frame.ts).getTime(),
-    direction: i % 2 === 0 ? "in" : "out", // Simplistic direction assignment
+    direction: getDirection(frame.type),
     session_id: "rec-123",
     frame: frame,
     prev_hash: prevHash,
