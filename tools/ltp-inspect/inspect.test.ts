@@ -429,6 +429,7 @@ describe('ltp inspect cli', () => {
 
       expect(exitCode).toBe(2);
       expect(errors.join('\n')).toContain('Legacy JSON array format is not supported');
+      expect(errors.join('\n')).toContain('jq -c');
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

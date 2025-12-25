@@ -401,7 +401,11 @@ function loadFrames(
   let format: 'json' | 'jsonl' = 'json';
 
   if (raw.startsWith('[')) {
-    throw new CliError('Legacy JSON array format is not supported. Use JSONL.', 2);
+    throw new CliError(
+      'Legacy JSON array format is not supported. Use JSONL (newline-delimited).\n' +
+        "hint: Try: jq -c '.[]' input.json > output.jsonl",
+      2,
+    );
   } else {
     try {
       parsed = raw
@@ -1438,16 +1442,17 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
 
   try {
     if (args.command === 'help') {
-        printHelp(writer);
-        // If help was explicitly requested, exit 0.
-        // If it defaulted to help because command was missing, exit 2.
+        // If help was explicitly requested, print help and exit 0.
+        // If it defaulted to help because command was missing, print concise error and exit 2.
         if (args.explicitHelp) {
+            printHelp(writer);
             if (!args.quiet) buffer.forEach((line) => logger.log(line));
             return 0;
         } else {
             errorWriter('ERROR: Missing command (trace | replay | explain)');
-            errorWriter('hint: ltp inspect trace --input ...');
-            if (!args.quiet) buffer.forEach((line) => logger.log(line));
+            errorWriter('hint: ltp inspect trace --input <file.jsonl>');
+            errorWriter('hint: ltp inspect --help');
+            // Do NOT print full help here to reduce noise
             process.exitCode = 2;
             return 2;
         }
