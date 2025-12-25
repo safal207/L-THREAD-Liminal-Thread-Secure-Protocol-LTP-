@@ -1,10 +1,8 @@
-[
-  { "v": "0.1", "type": "hello", "payload": { "agent": "infra-router", "version": "1.0.0" } },
-  { "v": "0.1", "type": "orientation", "payload": { "status": "HEALTHY", "drift": 0.0 } },
-  { "v": "0.1", "type": "route_request", "payload": { "targetState": "normal_operation" } },
-  { "v": "0.1", "type": "route_response", "payload": { "targetState": "normal_operation", "admissible": true } },
-  { "v": "0.1", "type": "orientation", "payload": { "status": "FAILED", "drift": 1.0, "reason": "db_connection_lost" } },
-  { "v": "0.1", "type": "route_request", "payload": { "targetState": "transfer_money" } },
-  { "v": "0.1", "type": "route_response", "payload": { "targetState": "transfer_money", "admissible": true, "reason": "unsafe_execution" } },
-  { "v": "0.1", "type": "orientation", "payload": { "status": "HEALTHY", "drift": 0.0 } }
-]
+{"v": "0.1", "type": "hello", "payload": {"agent": "infra-router", "version": "1.0.0"}}
+{"v": "0.1", "type": "orientation", "payload": {"status": "HEALTHY", "drift": 0.0}}
+{"v": "0.1", "type": "route_request", "payload": {"targetState": "normal_operation"}}
+{"v": "0.1", "type": "route_response", "payload": {"targetState": "normal_operation", "admissible": true, "decision": "EXECUTE"}}
+{"v": "0.1", "type": "orientation", "payload": {"status": "FAILED", "drift": 1.0, "reason": "db_connection_lost"}}
+{"v": "0.1", "type": "route_request", "payload": {"targetState": "transfer_money"}}
+{"v": "0.1", "type": "route_response", "payload": {"targetState": "transfer_money", "admissible": true, "decision": "EXECUTE", "reason": "unsafe_execution"}}
+{"v": "0.1", "type": "orientation", "payload": {"status": "HEALTHY", "drift": 0.0}}
