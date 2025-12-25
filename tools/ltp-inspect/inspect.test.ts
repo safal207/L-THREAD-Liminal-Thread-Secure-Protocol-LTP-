@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 import { execute, formatHuman, formatJson, runInspect } from './inspect';
 
-const fixturePath = path.join(__dirname, 'fixtures', 'minimal.frames.jsonl');
+const minimalFixture = path.join(__dirname, 'fixtures', 'minimal.frames.jsonl');
 const expectedJsonPath = path.join(__dirname, 'expected', 'summary.json');
 const expectedHumanOkPath = path.join(__dirname, 'expected', 'human.ok.txt');
 const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt');
@@ -93,7 +93,7 @@ describe('ltp-inspect golden summary', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
     const expected = JSON.parse(fs.readFileSync(expectedJsonPath, 'utf-8'));
-    const summary = runInspect(fixturePath);
+    const summary = runInspect(minimalFixture);
     const summaryJson = JSON.parse(JSON.stringify(summary));
 
     expect(summaryJson).toEqual(expected);
@@ -104,7 +104,7 @@ describe('ltp-inspect golden summary', () => {
   it('renders human format deterministically', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
-    const summary = runInspect(fixturePath);
+    const summary = runInspect(minimalFixture);
     const human = formatHuman(summary);
     const expectedHuman = fs.readFileSync(expectedHumanOkPath, 'utf-8').trim();
 
@@ -266,8 +266,8 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('detects critical action violations in agents compliance mode', () => {
-    if (!fs.existsSync(unsafeAgentTracePath)) {
-        console.warn('Skipping agent safety test: unsafe-agent.trace.json not found');
+    if (!fs.existsSync(allowedCriticalTracePath)) {
+        console.warn('Skipping agent safety test: allowed-critical.trace.jsonl not found');
         return;
     }
 
@@ -279,40 +279,41 @@ describe('ltp-inspect golden summary', () => {
       error: (message) => errors.push(message),
     });
 
-    expect(exitCode).toBe(2);
-    const output = logs.join('\n');
-    expect(output).toContain('AGENTS.CRIT.WEB_DIRECT');
-    expect(output).toContain('Evidence: WEB context allowed to perform critical action');
+    expect(exitCode).toBe(2); // Contract violation
+    const output = JSON.parse(logs.join('\n'));
 
-    // Integrity should be verified since we use generated signed trace
-    expect(output).toContain('trace_integrity: verified');
+    expect(output.audit_summary.verdict).toBe('FAIL');
+    const violations = output.audit_summary.violations;
+    expect(violations.some((v: any) => v.rule_id === 'AGENTS.CRIT.WEB_DIRECT')).toBe(true);
+
+    expect(output.compliance.trace_integrity).toBe('verified');
   });
 
   it('verifies safe agent trace passes checks', () => {
-    const safeAgentTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'safe-agent.trace.json');
-    if (!fs.existsSync(safeAgentTracePath)) return;
+    if (!fs.existsSync(blockedCriticalTracePath)) return;
 
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', safeAgentTracePath, '--profile', 'agents'], {
+    // Using --format=json for robust assertion
+    const exitCode = execute(['--input', blockedCriticalTracePath, '--profile', 'agents', '--format=json'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
     // Safe agent blocks the action, so it should PASS compliance
     expect([0, 1]).toContain(exitCode);
-    const output = logs.join('\n');
-    expect(output).toContain('VERDICT: PASS');
+
+    const output = JSON.parse(logs.join('\n'));
+    expect(output.audit_summary.verdict).toBe('PASS');
+    expect(output.compliance.trace_integrity).toBe('verified');
   });
 
   it('fails compliance if trace integrity is unchecked (strict enforcement)', () => {
-    // Create a temporary unsigned trace
-    const unsignedTrace = fixturePath; // minimal.frames.jsonl is unsigned
+    // minimalFixture is raw frames, so it will be loaded as 'raw' and integrity will be 'unchecked'
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // minimal.frames.jsonl is raw frames, so it will be loaded as 'raw' and integrity will be 'unchecked'
-    const exitCode = execute(['--input', unsignedTrace, '--profile', 'fintech'], {
+    const exitCode = execute(['--input', minimalFixture, '--profile', 'fintech'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -326,7 +327,7 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('VERDICT: FAIL');
     expect(output).toContain('CORE.INTEGRITY');
 
-    // Check for CLI error reporting
+    // Check for CLI error reporting in stderr
     expect(errOutput).toContain('TRACE INTEGRITY ERROR: unchecked');
   });
 
@@ -352,11 +353,10 @@ describe('ltp-inspect golden summary', () => {
 
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
+    expect(output).toContain('State Transitions Observed:');
 
-    // Verify State Transitions
-    expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
-    expect(output).toMatch(/HEALTHY/i);
-    expect(output).toMatch(/FAILED/i);
+    // Use regex for State Transitions to handle potential whitespace or casing differences
+    expect(output).toMatch(/State Transitions Observed:\s*HEALTHY\s*->\s*FAILED\s*->\s*HEALTHY/i);
 
     // Verify Routing Stats with regex
     expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
@@ -372,8 +372,8 @@ describe('ltp-inspect golden summary', () => {
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // Correct CLI contract
-    const exitCode = execute(['trace', '--input', failureFixture, '--format=human', '--color=never', '--continuity'], {
+    // Use --continuity flag
+    const exitCode = execute(['--input', recoveryTrace, '--format=human', '--color=never', '--continuity'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
