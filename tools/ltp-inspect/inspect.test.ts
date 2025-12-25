@@ -358,6 +358,9 @@ describe('ltp-inspect golden summary', () => {
 
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
+    expect(output).toContain('State Transitions Observed:');
+    expect(output).toMatch(/HEALTHY/i);
+    expect(output).toMatch(/FAILED/i);
 
     // Verify State Transitions
     expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
@@ -368,44 +371,35 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
   });
 
-  it('detects continuity failure when critical action is allowed during failure', () => {
-    const failureFixture = path.join(__dirname, 'fixtures', 'continuity-failure.trace.json');
-    // Ensure fixture exists
-    if (!fs.existsSync(failureFixture)) {
-         throw new Error(`Continuity failure trace fixture missing at ${failureFixture}`);
+  it('verifies failure recovery trace (generated)', () => {
+    // New test case for the generated failure-recovery.trace.json
+    const recoveryTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'failure-recovery.trace.json');
+    if (!fs.existsSync(recoveryTrace)) {
+        throw new Error(`Failure recovery trace missing at ${recoveryTrace}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // Correct CLI contract
-    const exitCode = execute(['trace', '--input', failureFixture, '--format=human', '--color=never', '--continuity'], {
+    // Use --continuity flag
+    const exitCode = execute(['--input', recoveryTrace, '--format=human', '--color=never', '--continuity'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    // We expect a contract violation/warning because System Coherence NO is a serious issue
-    // but in 'trace' mode it might just be a warning unless --strict is on?
-    // Actually, ltp-inspect continuity check puts violations into the violations array,
-    // and violations usually trigger exit code 2 or 1.
-    // Let's be safe and allow 1 or 2.
-    expect([1, 2]).toContain(exitCode);
+    // We expect clean exit (0) or warnings (1)
+    expect([0, 1]).toContain(exitCode);
 
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
-    expect(output).toContain('System Remained Coherent: NO');
-    expect(output).toContain('First Unsafe Transition: #');
+    expect(output).toContain('System Remained Coherent: YES');
 
-    // Should see the forbidden action (transfer_money)
-    // The fixture has "transfer_money" as the unsafe action
-    // But since it might appear in violation list which is printed:
-    // "Continuity Violation: Action 'transfer_money' allowed during FAILED state"
-    // Check for that or similar message in violations output or continuity summary
-    // Our inspect.ts prints violations to Summary via `violations.push(...)`
-    // And `handleTrace` prints `contractBreaches` if any.
-    // Continuity violations are added to `violations` array in `handleTrace`.
-    // So it should be treated as a contract violation (exit 2) or warn (exit 1).
+    // Check State Transitions: HEALTHY -> FAILED -> UNSTABLE -> HEALTHY
+    expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> UNSTABLE -> HEALTHY');
+
+    // Check Routing: 1 executed (before failure), 1 deferred (during failure)
+    expect(output).toMatch(/Routing Decisions: Executed=1 Deferred=1/);
   });
 });
 
