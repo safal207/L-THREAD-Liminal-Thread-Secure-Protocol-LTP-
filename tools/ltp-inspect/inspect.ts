@@ -40,6 +40,7 @@ type ParsedArgs = {
   verbose: boolean;
   output?: string;
   compliance?: string;
+  profile?: string; // Explicit profile selection
   replayCheck?: boolean;
   continuity?: boolean; // New flag for E-4
 };
@@ -74,6 +75,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     verbose: false,
     output: undefined,
     compliance: undefined,
+    profile: undefined,
     replayCheck: false,
   };
 
@@ -129,6 +131,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.compliance = token.split('=').slice(1).join('=');
     } else if (token === '--compliance') {
       options.compliance = argv[++i];
+    } else if (token.startsWith('--profile=')) {
+      options.profile = token.split('=').slice(1).join('=');
+    } else if (token === '--profile') {
+      options.profile = argv[++i];
     } else if (token === '--replay-check') {
       options.replayCheck = true;
     } else if (token === '--continuity') {
@@ -707,9 +713,15 @@ function summarize(
   entries: TraceEntry[],
   input: { path?: string; source: InspectSummary['input']['source']; type: 'raw' | 'audit_log'; hash_root?: string },
   format: InspectSummary['input']['format'],
-  complianceProfile?: string,
+  complianceArg?: string,
   replayCheck?: boolean,
+  profileArg?: string,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
+  // Determine effective compliance profile
+  // profile takes precedence over compliance (deprecated/alias) if we want separation,
+  // but for now we treat them as setting the same "mode".
+  // The user requested: options.compliance = options.profile ?? options.compliance
+  const complianceProfile = profileArg ?? complianceArg;
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
   const validation = validateTraceFrames(normalizedFrames);
@@ -793,6 +805,8 @@ function summarize(
     };
 
     // Core LTP Checks
+    // Strict integrity enforcement: 'unchecked' is NOT sufficient for compliance passing.
+    // It must be strictly 'verified'.
     if (compliance.trace_integrity !== 'verified') {
         failedChecks.push('trace_integrity');
         violations.push({
@@ -801,7 +815,7 @@ function summarize(
             frame_index: compliance.first_violation_index ?? -1,
             source: 'system',
             action: 'verify_trace',
-            evidence: 'Trace integrity check failed'
+            evidence: `Trace integrity check failed or unchecked (status: ${compliance.trace_integrity})`
         });
     }
     if (compliance.identity_binding !== 'ok') {
@@ -1168,7 +1182,7 @@ function canonicalizeSummary(summary: InspectSummary): InspectSummary {
   return JSON.parse(JSON.stringify(summary)) as InspectSummary;
 }
 
-function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean): InspectionResult {
+function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean, profile?: string): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
@@ -1176,7 +1190,8 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
     { path: inputPath, source: inputSource, type, hash_root },
     inputFormat,
     compliance,
-    replayCheck
+    replayCheck,
+    profile
   );
 
   if (continuityCheck) {
@@ -1414,7 +1429,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
     switch (args.command) {
       case 'trace':
         {
-          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.compliance, args.replayCheck, writer, args.exportFormat, args.continuity);
+          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.compliance, args.replayCheck, writer, args.exportFormat, args.continuity, args.profile);
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;
           const hasWarnings = warnings.length > 0 || normalizations.length > 0;
@@ -1427,8 +1442,9 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
 
           // Compliance failures are strict errors
           if (summary.compliance) {
-             if (summary.compliance.trace_integrity === 'broken') {
-                 contractBreaches.push(`TRACE INTEGRITY BROKEN at index ${summary.compliance.first_violation_index}`);
+             // Strict enforcement: if not verified, it's a breach.
+             if (summary.compliance.trace_integrity !== 'verified') {
+                 contractBreaches.push(`TRACE INTEGRITY ERROR: ${summary.compliance.trace_integrity} (must be 'verified')`);
              }
              if (summary.compliance.identity_binding === 'violated') {
                  contractBreaches.push(`IDENTITY BINDING VIOLATED`);
