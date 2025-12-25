@@ -355,6 +355,8 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('State Transitions Observed:');
     expect(output).toMatch(/HEALTHY/i);
     expect(output).toMatch(/FAILED/i);
+    expect(output).toMatch(/Routing Decisions:/);
+  });
 
   it('verifies failure recovery trace (generated)', () => {
     // New test case for the generated failure-recovery.trace.json

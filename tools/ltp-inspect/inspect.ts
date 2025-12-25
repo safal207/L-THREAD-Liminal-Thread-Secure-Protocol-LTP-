@@ -713,14 +713,10 @@ function summarize(
   entries: TraceEntry[],
   input: { path?: string; source: InspectSummary['input']['source']; type: 'raw' | 'audit_log'; hash_root?: string },
   format: InspectSummary['input']['format'],
-  complianceArg?: string,
+  effectiveProfile?: string,
   replayCheck?: boolean,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
-  // Determine effective compliance profile
-  // profile takes precedence over compliance (deprecated/alias) if we want separation,
-  // but for now we treat them as setting the same "mode".
-  // The user requested: options.compliance = options.profile ?? options.compliance
-  const complianceProfile = complianceArg;
+  const complianceProfile = effectiveProfile;
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
   const validation = validateTraceFrames(normalizedFrames);
@@ -1183,12 +1179,13 @@ function canonicalizeSummary(summary: InspectSummary): InspectSummary {
 
 function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean, profile?: string): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
+  const effectiveProfile = profile ?? compliance;
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
     entries,
     { path: inputPath, source: inputSource, type, hash_root },
     inputFormat,
-    profile ?? compliance, // Prioritize profile if set, fallback to compliance
+    effectiveProfile,
     replayCheck,
   );
 
