@@ -413,14 +413,14 @@ describe('ltp inspect cli', () => {
     expect(result.stdout.toLowerCase()).toContain('orientation');
   });
 
-  it('rejects legacy JSON arrays with exit code 2', () => {
+  it('rejects legacy JSON arrays (even with leading whitespace) with exit code 2', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
     const legacyFixture = path.join(tmpDir, 'legacy-array.json');
     const logs: string[] = [];
     const errors: string[] = [];
 
     try {
-      fs.writeFileSync(legacyFixture, '[{"v":"0.1"}]');
+      fs.writeFileSync(legacyFixture, '\n   [{"v":"0.1"}]\n');
 
       const exitCode = execute(['trace', '--input', legacyFixture], {
         log: (m) => logs.push(m),
@@ -430,6 +430,28 @@ describe('ltp inspect cli', () => {
       expect(exitCode).toBe(2);
       expect(errors.join('\n')).toContain('Legacy JSON array format is not supported');
       expect(errors.join('\n')).toContain('jq -c');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects invalid JSONL where multiple JSON objects appear on the same line', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
+    const badJsonl = path.join(tmpDir, 'two-objects-one-line.jsonl');
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      // This looks like "JSONL", but it is NOT: two objects on one line.
+      fs.writeFileSync(badJsonl, '{"v":"0.1"} {"v":"0.1"}\n');
+
+      const exitCode = execute(['trace', '--input', badJsonl], {
+        log: (m) => logs.push(m),
+        error: (m) => errors.push(m)
+      });
+
+      expect(exitCode).toBe(2);
+      expect(errors.join('\n')).toMatch(/Invalid JSONL line/i);
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

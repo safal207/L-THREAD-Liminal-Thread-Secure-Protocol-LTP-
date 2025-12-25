@@ -400,7 +400,9 @@ function loadFrames(
   let parsed: any[] = [];
   let format: 'json' | 'jsonl' = 'json';
 
-  if (raw.startsWith('[')) {
+  const rawTrimStart = raw.trimStart();
+
+  if (rawTrimStart.startsWith('[')) {
     throw new CliError(
       'Legacy JSON array format is not supported. Use JSONL (newline-delimited).\n' +
         "hint: Try: jq -c '.[]' input.json > output.jsonl",
@@ -410,11 +412,21 @@ function loadFrames(
     try {
       parsed = raw
         .split(/\r?\n/)
-        .filter((line) => line.trim().length > 0)
-        .map((line) => JSON.parse(line));
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line, i) => {
+          try {
+            return JSON.parse(line);
+          } catch (err) {
+            throw new CliError(
+              `Invalid JSONL line ${i + 1}: ${(err as Error).message}`,
+              2,
+            );
+          }
+        });
       format = 'jsonl';
     } catch (err) {
-      throw new CliError(`Invalid JSONL: ${(err as Error).message}`, 2);
+      throw err;
     }
   }
 
