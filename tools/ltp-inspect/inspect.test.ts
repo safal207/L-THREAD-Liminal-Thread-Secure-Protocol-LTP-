@@ -331,7 +331,7 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('visualizes continuity routing correctly for outage scenario', () => {
-    const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.json');
+    const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.jsonl');
     if (!fs.existsSync(continuityFixture)) {
         throw new Error(`Continuity trace fixture missing at ${continuityFixture}`);
     }
@@ -366,8 +366,8 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
   });
 
-  it('detects continuity failure when critical action is allowed during failure', () => {
-    const failureFixture = path.join(__dirname, 'fixtures', 'continuity-failure.trace.json');
+  it('detects continuity failure when action is allowed during FAILED state', () => {
+    const failureFixture = path.join(__dirname, 'fixtures', 'continuity-failure.trace.jsonl');
     // Ensure fixture exists
     if (!fs.existsSync(failureFixture)) {
          throw new Error(`Continuity failure trace fixture missing at ${failureFixture}`);
@@ -376,15 +376,14 @@ describe('ltp-inspect golden summary', () => {
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // Use --continuity flag
-    const exitCode = execute(['--input', recoveryTrace, '--format=human', '--color=never', '--continuity'], {
+    // Use --continuity flag with --strict to ensure exit code 2
+    const exitCode = execute(['--input', failureFixture, '--format=human', '--color=never', '--continuity', '--strict'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    // We expect a contract violation/warning because System Coherence NO is a serious issue
-    // With strict off, it should be a warning (exit 1).
-    expect([1, 2]).toContain(exitCode);
+    // We expect a strict contract violation (exit 2) because action was allowed during FAILED state
+    expect(exitCode).toBe(2);
 
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
