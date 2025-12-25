@@ -334,17 +334,21 @@ describe('ltp-inspect golden summary', () => {
       error: (message) => errors.push(message),
     });
 
-    // Expect 0 or 1 depending on warnings (e.g. drift snapshots missing)
+    // We expect exit code 1 because of warnings (normalized input, missing drift snapshots)
+    // Relaxed to [0, 1] to avoid flakes if warnings are not triggered in some envs
     expect([0, 1]).toContain(exitCode);
 
-    // Check that there are no hard errors in stderr
-    expect(errors.join('\n')).not.toMatch(/Error:|stack/i);
+    // Ensure no fatal errors even if warnings exist
+    expect(errors.join('\n')).not.toMatch(/(TypeError|ReferenceError|ENOENT|EACCES|Error:|stack)/i);
 
-    // Normalize line endings for robust matching
+    // Normalize line endings for robust matching (User feedback check 4)
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
+    expect(output).toContain('State Transitions Observed:');
+    expect(output).toMatch(/HEALTHY/i);
+    expect(output).toMatch(/FAILED/i);
 
     // Verify State Transitions
     expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
