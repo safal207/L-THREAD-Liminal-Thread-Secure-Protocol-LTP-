@@ -413,14 +413,15 @@ describe('ltp inspect cli', () => {
     expect(result.stdout.toLowerCase()).toContain('orientation');
   });
 
-  it('rejects legacy JSON arrays (even with leading whitespace) with exit code 2', () => {
+  it('rejects legacy JSON arrays (even with leading whitespace or BOM) with exit code 2', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
     const legacyFixture = path.join(tmpDir, 'legacy-array.json');
     const logs: string[] = [];
     const errors: string[] = [];
 
     try {
-      fs.writeFileSync(legacyFixture, '\n   [{"v":"0.1"}]\n');
+      // Write with BOM \uFEFF and leading newline
+      fs.writeFileSync(legacyFixture, '\uFEFF\n   [{"v":"0.1"}]\n');
 
       const exitCode = execute(['trace', '--input', legacyFixture], {
         log: (m) => logs.push(m),

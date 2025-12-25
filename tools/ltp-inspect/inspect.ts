@@ -400,7 +400,9 @@ function loadFrames(
   let parsed: any[] = [];
   let format: 'json' | 'jsonl' = 'json';
 
-  const rawTrimStart = raw.trimStart();
+  // Handle UTF-8 BOM (common on Windows) so format detection is stable.
+  const rawNoBom = raw.replace(/^\uFEFF/, '');
+  const rawTrimStart = rawNoBom.trimStart();
 
   if (rawTrimStart.startsWith('[')) {
     throw new CliError(
@@ -1463,8 +1465,12 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
         } else {
             errorWriter('ERROR: Missing command (trace | replay | explain)');
             errorWriter('hint: ltp inspect trace --input <file.jsonl>');
+            errorWriter('hint: pnpm -w ltp:inspect -- trace --input <file.jsonl>');
             errorWriter('hint: ltp inspect --help');
-            // Do NOT print full help here to reduce noise
+
+            // Ensure errors are actually visible to the caller/CI.
+            if (!args.quiet) buffer.forEach((line) => logger.error(line));
+
             process.exitCode = 2;
             return 2;
         }
