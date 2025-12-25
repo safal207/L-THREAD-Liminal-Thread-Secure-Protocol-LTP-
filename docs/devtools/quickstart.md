@@ -12,7 +12,7 @@ pnpm i -g @ltp/inspect
 ## Run
 ltp inspect trace --input artifacts/traces/sample.trace.jsonl
 > If your shell cannot find `ltp`, restart the session or ensure the PNPM global bin directory is on your `PATH`.
-> Prefer a workspace-local run? Use: `pnpm -w ltp:inspect -- --input artifacts/traces/sample.trace.jsonl`.
+> Prefer a workspace-local run? Use: `pnpm -w ltp:inspect -- trace --input artifacts/traces/sample.trace.jsonl`.
 
 ## What you’ll see
 - Stable identity across transitions
