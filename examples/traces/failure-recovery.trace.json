@@ -1,0 +1,142 @@
+[
+  {
+    "i": 0,
+    "timestamp_ms": 1710511200000,
+    "direction": "in",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "hello",
+      "version": "0.1",
+      "ts": "2024-03-15T14:00:00.000Z"
+    },
+    "prev_hash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "hash": "2431514a250f55f8d7128c4f0c0cb5da47fefbec15f814ed1c18e1c2784b245b"
+  },
+  {
+    "i": 1,
+    "timestamp_ms": 1710511201000,
+    "direction": "out",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "orientation",
+      "ts": "2024-03-15T14:00:01.000Z",
+      "payload": {
+        "status": "stable",
+        "drift": 0.01
+      }
+    },
+    "prev_hash": "2431514a250f55f8d7128c4f0c0cb5da47fefbec15f814ed1c18e1c2784b245b",
+    "hash": "e0bb67434a078e5bbc1ae19cfee9ed5f1f606bea7749da53af0e2c7d22a1375e"
+  },
+  {
+    "i": 2,
+    "timestamp_ms": 1710511202000,
+    "direction": "in",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "route_request",
+      "ts": "2024-03-15T14:00:02.000Z",
+      "payload": {
+        "intent": "transfer_funds",
+        "amount": 100
+      }
+    },
+    "prev_hash": "e0bb67434a078e5bbc1ae19cfee9ed5f1f606bea7749da53af0e2c7d22a1375e",
+    "hash": "1a828290435d7963e2a4fc96fd8edf6858b8a25e4d93562d649cb39d25725f81"
+  },
+  {
+    "i": 3,
+    "timestamp_ms": 1710511203000,
+    "direction": "out",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "route_response",
+      "ts": "2024-03-15T14:00:03.000Z",
+      "payload": {
+        "decision": "EXECUTE",
+        "admissible": true
+      }
+    },
+    "prev_hash": "1a828290435d7963e2a4fc96fd8edf6858b8a25e4d93562d649cb39d25725f81",
+    "hash": "7969c3d18929ffb0ac58713a5832b148ea7acba1df29d7e03becb81f8201c5ca"
+  },
+  {
+    "i": 4,
+    "timestamp_ms": 1710511204000,
+    "direction": "in",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "orientation",
+      "ts": "2024-03-15T14:00:04.000Z",
+      "payload": {
+        "status": "failed",
+        "error": "db_connection_lost"
+      }
+    },
+    "prev_hash": "7969c3d18929ffb0ac58713a5832b148ea7acba1df29d7e03becb81f8201c5ca",
+    "hash": "ad037e9a72619c02dd017e14a02c3afe917ef9e6aae134785eb74479a28349fa"
+  },
+  {
+    "i": 5,
+    "timestamp_ms": 1710511205000,
+    "direction": "out",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "route_request",
+      "ts": "2024-03-15T14:00:05.000Z",
+      "payload": {
+        "intent": "transfer_funds",
+        "amount": 500
+      }
+    },
+    "prev_hash": "ad037e9a72619c02dd017e14a02c3afe917ef9e6aae134785eb74479a28349fa",
+    "hash": "da8739dd7c76a379439c0fb50ab5d9137c66eee908d3eabb2c0abe94e1f10c56"
+  },
+  {
+    "i": 6,
+    "timestamp_ms": 1710511206000,
+    "direction": "in",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "route_response",
+      "ts": "2024-03-15T14:00:06.000Z",
+      "payload": {
+        "decision": "DEFER",
+        "admissible": false,
+        "reason": "system_state_failed"
+      }
+    },
+    "prev_hash": "da8739dd7c76a379439c0fb50ab5d9137c66eee908d3eabb2c0abe94e1f10c56",
+    "hash": "bb28697b7a8d15b7b236042272496d0807769cac8051a06c18463bfc8f7e991f"
+  },
+  {
+    "i": 7,
+    "timestamp_ms": 1710511207000,
+    "direction": "out",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "orientation",
+      "ts": "2024-03-15T14:00:07.000Z",
+      "payload": {
+        "status": "recovering"
+      }
+    },
+    "prev_hash": "bb28697b7a8d15b7b236042272496d0807769cac8051a06c18463bfc8f7e991f",
+    "hash": "4bdf56108ec4686085cc6bf525eae3dc0588fc02401cbb4de624a89760063379"
+  },
+  {
+    "i": 8,
+    "timestamp_ms": 1710511208000,
+    "direction": "in",
+    "session_id": "rec-123",
+    "frame": {
+      "type": "orientation",
+      "ts": "2024-03-15T14:00:08.000Z",
+      "payload": {
+        "status": "stable"
+      }
+    },
+    "prev_hash": "4bdf56108ec4686085cc6bf525eae3dc0588fc02401cbb4de624a89760063379",
+    "hash": "cdd9e9961ec814457b24c65cb594646a85fa73c354d79418b75564a1a066564a"
+  }
+]
