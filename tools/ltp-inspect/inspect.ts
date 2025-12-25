@@ -1182,7 +1182,7 @@ function canonicalizeSummary(summary: InspectSummary): InspectSummary {
   return JSON.parse(JSON.stringify(summary)) as InspectSummary;
 }
 
-function handleTrace(file: string, format: OutputFormat, pretty: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean, profile?: string): InspectionResult {
+function handleTrace(file: string, format: OutputFormat, pretty: boolean, strict: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean, profile?: string): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
@@ -1209,6 +1209,7 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
       let deferred = 0;
       let replayed = 0;
       let frozen = 0;
+      const continuityMessages: string[] = [];
 
       frames.forEach((frame, idx) => {
           if (frame.type === 'orientation') {
@@ -1247,7 +1248,13 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
                       if (!isRecovery) {
                           systemCoherent = false;
                           if (firstUnsafeIndex === -1) firstUnsafeIndex = idx;
-                          violations.push(`Continuity Violation: Action '${targetAction}' allowed during ${currentState} state at frame #${idx}`);
+                          const msg = `Continuity Violation: Action '${targetAction}' allowed during ${currentState} state at frame #${idx}`;
+                          continuityMessages.push(msg);
+                          if (strict) {
+                              violations.push(msg);
+                          } else {
+                              warnings.push(msg);
+                          }
                       }
                   }
               }
@@ -1271,6 +1278,7 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
           writer(`System Remained Coherent: ${systemCoherent ? 'YES' : 'NO'}`);
           if (!systemCoherent) {
              writer(`First Unsafe Transition: #${firstUnsafeIndex}`);
+             continuityMessages.forEach(msg => writer(msg));
           }
           writer(`State Transitions Observed: ${stateHistory.map(s => s.state).join(' -> ')}`);
           writer(`Routing Decisions: Executed=${executed} Deferred=${deferred} Replayed=${replayed} Frozen=${frozen}`);
@@ -1434,7 +1442,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
     switch (args.command) {
       case 'trace':
         {
-          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.compliance, args.replayCheck, writer, args.exportFormat, args.continuity, args.profile);
+          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.strict, args.compliance, args.replayCheck, writer, args.exportFormat, args.continuity, args.profile);
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;
           const hasWarnings = warnings.length > 0 || normalizations.length > 0;

@@ -370,10 +370,7 @@ describe('ltp-inspect golden summary', () => {
     });
 
     // We expect a contract violation/warning because System Coherence NO is a serious issue
-    // but in 'trace' mode it might just be a warning unless --strict is on?
-    // Actually, ltp-inspect continuity check puts violations into the violations array,
-    // and violations usually trigger exit code 2 or 1.
-    // Let's be safe and allow 1 or 2.
+    // With strict off, it should be a warning (exit 1).
     expect([1, 2]).toContain(exitCode);
 
     const output = logs.join('\n').replace(/\r\n/g, '\n');
@@ -381,6 +378,7 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: NO');
     expect(output).toContain('First Unsafe Transition: #');
+    expect(output).toContain('Continuity Violation: Action \'transfer_money\' allowed during FAILED state');
 
     // Should see the forbidden action (transfer_money)
     // The fixture has "transfer_money" as the unsafe action
