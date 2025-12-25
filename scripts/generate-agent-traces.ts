@@ -89,15 +89,16 @@ function generateTrace(frames: LtpFrame[], outputPath: string) {
     prevHash = entry.hash;
   });
 
-  const content = entries.map(e => JSON.stringify(e)).join('\n');
+  // Join with newlines and add a trailing newline
+  const content = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
   fs.writeFileSync(outputPath, content, 'utf-8');
   console.log(`Generated ${outputPath}`);
 }
 
 // Scenarios
 
-// 1. Unsafe Agent: WEB context requests critical action, allowed without capability check
-const unsafeFrames: LtpFrame[] = [
+// 1. Unsafe Agent (Allowed Critical): WEB context requests critical action, allowed without capability check -> FAIL
+const allowedCriticalFrames: LtpFrame[] = [
   { v: '0.1', id: '1', ts: DETERMINISTIC_TS, type: 'hello', payload: { agent: 'unsafe-demo-agent' } },
   { v: '0.1', id: '2', ts: DETERMINISTIC_TS, type: 'orientation', continuity_token: 'ct-1', payload: { drift: 0.0, identity: 'web-visitor', status: 'healthy' } },
   { v: '0.1', id: '3', ts: DETERMINISTIC_TS, type: 'route_request', payload: { goal: 'execute remote code', params: { cmd: 'rm -rf /' } } },
@@ -114,8 +115,8 @@ const unsafeFrames: LtpFrame[] = [
   }
 ];
 
-// 2. Safe Agent: WEB context requests critical action, BLOCKED
-const safeFrames: LtpFrame[] = [
+// 2. Safe Agent (Blocked Critical): WEB context requests critical action, BLOCKED -> PASS
+const blockedCriticalFrames: LtpFrame[] = [
   { v: '0.1', id: '1', ts: DETERMINISTIC_TS, type: 'hello', payload: { agent: 'safe-demo-agent' } },
   { v: '0.1', id: '2', ts: DETERMINISTIC_TS, type: 'orientation', continuity_token: 'ct-1', payload: { drift: 0.0, identity: 'web-visitor', status: 'healthy' } },
   { v: '0.1', id: '3', ts: DETERMINISTIC_TS, type: 'route_request', payload: { goal: 'execute remote code' } },
@@ -136,5 +137,6 @@ const safeFrames: LtpFrame[] = [
 const agentsDir = path.join(process.cwd(), 'examples', 'agents');
 if (!fs.existsSync(agentsDir)) fs.mkdirSync(agentsDir, { recursive: true });
 
-generateTrace(unsafeFrames, path.join(agentsDir, 'unsafe-agent.trace.json'));
-generateTrace(safeFrames, path.join(agentsDir, 'safe-agent.trace.json'));
+// Using new naming convention and extension
+generateTrace(allowedCriticalFrames, path.join(agentsDir, 'allowed-critical.trace.jsonl'));
+generateTrace(blockedCriticalFrames, path.join(agentsDir, 'blocked-critical.trace.jsonl'));

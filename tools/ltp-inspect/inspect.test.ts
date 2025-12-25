@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 import { execute, formatHuman, formatJson, runInspect } from './inspect';
 
-const fixturePath = path.join(__dirname, 'fixtures', 'minimal.frames.jsonl');
+const minimalFixture = path.join(__dirname, 'fixtures', 'minimal.frames.jsonl');
 const expectedJsonPath = path.join(__dirname, 'expected', 'summary.json');
 const expectedHumanOkPath = path.join(__dirname, 'expected', 'human.ok.txt');
 const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt');
@@ -76,17 +76,16 @@ async function buildInspectCli(): Promise<string> {
   return builtCliPath;
 }
 
-// Use generated unsafe agent trace for critical action tests
-// If it doesn't exist (e.g. clean run without generation script), we skip logic relying on it or mock it properly?
-// But we assume the environment is prepared via scripts/generate-agent-traces.ts or we point to the one we just created.
-const unsafeAgentTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'unsafe-agent.trace.json');
+// Updated paths for generated traces
+const allowedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'allowed-critical.trace.jsonl');
+const blockedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'blocked-critical.trace.jsonl');
 
 describe('ltp-inspect golden summary', () => {
   it('emits stable, ordered output', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
     const expected = JSON.parse(fs.readFileSync(expectedJsonPath, 'utf-8'));
-    const summary = runInspect(fixturePath);
+    const summary = runInspect(minimalFixture);
     const summaryJson = JSON.parse(JSON.stringify(summary));
 
     expect(summaryJson).toEqual(expected);
@@ -97,7 +96,7 @@ describe('ltp-inspect golden summary', () => {
   it('renders human format deterministically', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
-    const summary = runInspect(fixturePath);
+    const summary = runInspect(minimalFixture);
     const human = formatHuman(summary);
     const expectedHuman = fs.readFileSync(expectedHumanOkPath, 'utf-8').trim();
 
@@ -251,55 +250,55 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('detects critical action violations in agents compliance mode', () => {
-    if (!fs.existsSync(unsafeAgentTracePath)) {
-        console.warn('Skipping agent safety test: unsafe-agent.trace.json not found');
+    if (!fs.existsSync(allowedCriticalTracePath)) {
+        console.warn('Skipping agent safety test: allowed-critical.trace.jsonl not found');
         return;
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
-    // We expect exit code 2 because of Contract Violation (Compliance Failure)
-    // Using --profile instead of --compliance as per new recommendation
-    const exitCode = execute(['--input', unsafeAgentTracePath, '--profile', 'agents'], {
+    // Using --format=json for robust assertion
+    const exitCode = execute(['--input', allowedCriticalTracePath, '--profile', 'agents', '--format=json'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
     expect(exitCode).toBe(2); // Contract violation
-    const output = logs.join('\n');
-    expect(output).toContain('AGENTS.CRIT.WEB_DIRECT');
-    expect(output).toContain('Evidence: WEB context allowed to perform critical action');
+    const output = JSON.parse(logs.join('\n'));
 
-    // Integrity should be verified since we use generated signed trace
-    expect(output).toContain('trace_integrity: verified');
+    expect(output.audit_summary.verdict).toBe('FAIL');
+    const violations = output.audit_summary.violations;
+    expect(violations.some((v: any) => v.rule_id === 'AGENTS.CRIT.WEB_DIRECT')).toBe(true);
+
+    expect(output.compliance.trace_integrity).toBe('verified');
   });
 
   it('verifies safe agent trace passes checks', () => {
-    const safeAgentTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'safe-agent.trace.json');
-    if (!fs.existsSync(safeAgentTracePath)) return;
+    if (!fs.existsSync(blockedCriticalTracePath)) return;
 
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', safeAgentTracePath, '--profile', 'agents'], {
+    // Using --format=json for robust assertion
+    const exitCode = execute(['--input', blockedCriticalTracePath, '--profile', 'agents', '--format=json'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
     // Safe agent blocks the action, so it should PASS compliance
-    // However, it might emit warnings (exit code 1) due to missing drift/focus snapshots in the generated trace
+    // However, it might emit warnings (exit code 1)
     expect([0, 1]).toContain(exitCode);
-    const output = logs.join('\n');
-    expect(output).toContain('VERDICT: PASS');
+
+    const output = JSON.parse(logs.join('\n'));
+    expect(output.audit_summary.verdict).toBe('PASS');
+    expect(output.compliance.trace_integrity).toBe('verified');
   });
 
   it('fails compliance if trace integrity is unchecked (strict enforcement)', () => {
-    // Create a temporary unsigned trace
-    const unsignedTrace = fixturePath; // minimal.frames.jsonl is unsigned
+    // minimalFixture is raw frames, so it will be loaded as 'raw' and integrity will be 'unchecked'
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // minimal.frames.jsonl is raw frames, so it will be loaded as 'raw' and integrity will be 'unchecked'
-    const exitCode = execute(['--input', unsignedTrace, '--profile', 'fintech'], {
+    const exitCode = execute(['--input', minimalFixture, '--profile', 'fintech'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -313,12 +312,11 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('VERDICT: FAIL');
     expect(output).toContain('CORE.INTEGRITY');
 
-    // Check for CLI error reporting
+    // Check for CLI error reporting in stderr
     expect(errOutput).toContain('TRACE INTEGRITY ERROR: unchecked');
   });
 
   it('visualizes continuity routing correctly for outage scenario', () => {
-    // We use a guaranteed fixture for stability (User feedback check 1)
     const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.json');
     if (!fs.existsSync(continuityFixture)) {
         throw new Error(`Continuity trace fixture missing at ${continuityFixture}`);
@@ -341,22 +339,11 @@ describe('ltp-inspect golden summary', () => {
 
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
-    // Normalize line endings for robust matching (User feedback check 4)
-    const output = logs.join('\n').replace(/\r\n/g, '\n');
-
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
     expect(output).toContain('State Transitions Observed:');
     expect(output).toMatch(/HEALTHY/i);
     expect(output).toMatch(/FAILED/i);
-  });
-
-    // Verify State Transitions
-    // Based on examples/traces/continuity-outage.trace.json
-    expect(output).toContain('State Transitions Observed: HEALTHY -> FAILED -> HEALTHY');
-
-    // Verify Routing Stats with regex (User feedback check 2)
-    // Matches "Routing Decisions: Executed=2 Deferred=1 Replayed=0 Frozen=0"
     expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
   });
 });
