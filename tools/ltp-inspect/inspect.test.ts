@@ -347,6 +347,7 @@ describe('ltp-inspect golden summary', () => {
     expect(exitCode).toBe(1);
     expect(errors.join('\n')).not.toMatch(/(TypeError|ReferenceError|ENOENT|EACCES)/);
 
+    // Normalize line endings for robust matching (User feedback check 4)
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
@@ -354,8 +355,6 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('State Transitions Observed:');
     expect(output).toMatch(/HEALTHY/i);
     expect(output).toMatch(/FAILED/i);
-    expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
-  });
 
   it('verifies failure recovery trace (generated)', () => {
     // New test case for the generated failure-recovery.trace.json

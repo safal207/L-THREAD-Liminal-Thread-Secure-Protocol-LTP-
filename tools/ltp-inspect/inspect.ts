@@ -715,13 +715,12 @@ function summarize(
   format: InspectSummary['input']['format'],
   complianceArg?: string,
   replayCheck?: boolean,
-  profileArg?: string,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
   // Determine effective compliance profile
   // profile takes precedence over compliance (deprecated/alias) if we want separation,
   // but for now we treat them as setting the same "mode".
   // The user requested: options.compliance = options.profile ?? options.compliance
-  const complianceProfile = profileArg ?? complianceArg;
+  const complianceProfile = complianceArg;
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
   const validation = validateTraceFrames(normalizedFrames);
@@ -1189,9 +1188,8 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
     entries,
     { path: inputPath, source: inputSource, type, hash_root },
     inputFormat,
-    compliance,
+    profile ?? compliance, // Prioritize profile if set, fallback to compliance
     replayCheck,
-    profile
   );
 
   if (continuityCheck) {
