@@ -84,9 +84,9 @@ pnpm -w install
 
 ### 2) Run inspector on canonical fixture
 ```bash
-pnpm -w ltp:inspect -- \
+pnpm -w ltp:inspect -- trace \
   --strict \
-  --input tools/ltp-inspect/fixtures/canonical-clean.json \
+  --input tools/ltp-inspect/fixtures/canonical-clean.jsonl \
   --format=json
 ```
 

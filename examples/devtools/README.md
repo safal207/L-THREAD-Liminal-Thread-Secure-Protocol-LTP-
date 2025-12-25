@@ -15,7 +15,7 @@ This directory contains resources to demonstrate the usage of LTP developer tool
 
 2. **Inspect the trace**:
    ```bash
-   ltp-inspect sample.trace.jsonl
+   ltp inspect trace --input sample.trace.jsonl
    ```
 
 ## Expected Output

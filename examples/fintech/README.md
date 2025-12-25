@@ -15,7 +15,7 @@ This example demonstrates a trace that adheres to the Fintech compliance profile
 
 2. **Verify compliance**:
    ```bash
-   ltp-inspect sample.trace.jsonl --compliance fintech
+   ltp inspect trace --input sample.trace.jsonl --compliance fintech
    ```
 
 ## Expected Output

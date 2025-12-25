@@ -15,7 +15,7 @@ This example demonstrates a compliant agent trace where a critical action is pro
 
 2. **Verify agent safety**:
    ```bash
-   ltp-inspect sample.trace.jsonl --compliance agents
+   ltp inspect trace --input sample.trace.jsonl --compliance agents
    ```
 
 ## Expected Output

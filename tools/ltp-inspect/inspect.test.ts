@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawn, type SpawnOptions } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
@@ -413,22 +414,24 @@ describe('ltp inspect cli', () => {
   });
 
   it('rejects legacy JSON arrays with exit code 2', () => {
-    const legacyFixture = path.join(__dirname, 'fixtures', 'legacy-array.json');
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
+    const legacyFixture = path.join(tmpDir, 'legacy-array.json');
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // Ensure fixture exists
-    if (!fs.existsSync(legacyFixture)) {
-        fs.writeFileSync(legacyFixture, '[{"v":"0.1"}]');
+    try {
+      fs.writeFileSync(legacyFixture, '[{"v":"0.1"}]');
+
+      const exitCode = execute(['trace', '--input', legacyFixture], {
+        log: (m) => logs.push(m),
+        error: (m) => errors.push(m)
+      });
+
+      expect(exitCode).toBe(2);
+      expect(errors.join('\n')).toContain('Legacy JSON array format is not supported');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
     }
-
-    const exitCode = execute(['trace', '--input', legacyFixture], {
-      log: (m) => logs.push(m),
-      error: (m) => errors.push(m)
-    });
-
-    expect(exitCode).toBe(2);
-    expect(errors.join('\n')).toContain('Legacy JSON array format is not supported');
   });
 
   it('requires a subcommand (trace/replay/explain) or fails with exit 2', () => {
