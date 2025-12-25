@@ -1,12 +1,10 @@
-[
-  { "v": "0.1", "type": "hello", "payload": { "agent": "infra-router", "version": "1.0.0" } },
-  { "v": "0.1", "type": "orientation", "payload": { "status": "HEALTHY", "drift": 0.0 } },
-  { "v": "0.1", "type": "route_request", "payload": { "targetState": "normal_operation" } },
-  { "v": "0.1", "type": "route_response", "payload": { "targetState": "normal_operation", "admissible": true } },
-  { "v": "0.1", "type": "orientation", "payload": { "status": "FAILED", "drift": 1.0, "reason": "db_connection_lost" } },
-  { "v": "0.1", "type": "route_request", "payload": { "targetState": "transfer_money" } },
-  { "v": "0.1", "type": "route_response", "payload": { "targetState": "transfer_money", "admissible": false, "reason": "system_failed" } },
-  { "v": "0.1", "type": "route_request", "payload": { "targetState": "SYSTEM_RECOVERY_PING" } },
-  { "v": "0.1", "type": "route_response", "payload": { "targetState": "SYSTEM_RECOVERY_PING", "admissible": true, "reason": "recovery_action" } },
-  { "v": "0.1", "type": "orientation", "payload": { "status": "HEALTHY", "drift": 0.0 } }
-]
+{"v": "0.1", "type": "hello", "payload": {"agent": "infra-router", "version": "1.0.0"}}
+{"v": "0.1", "type": "orientation", "payload": {"status": "HEALTHY", "drift": 0.0}}
+{"v": "0.1", "type": "route_request", "payload": {"targetState": "normal_operation"}}
+{"v": "0.1", "type": "route_response", "payload": {"targetState": "normal_operation", "admissible": true, "decision": "EXECUTE"}}
+{"v": "0.1", "type": "orientation", "payload": {"status": "FAILED", "drift": 1.0, "reason": "db_connection_lost"}}
+{"v": "0.1", "type": "route_request", "payload": {"targetState": "transfer_money"}}
+{"v": "0.1", "type": "route_response", "payload": {"targetState": "transfer_money", "admissible": false, "decision": "DEFER", "reason": "system_failed"}}
+{"v": "0.1", "type": "route_request", "payload": {"targetState": "SYSTEM_RECOVERY_PING"}}
+{"v": "0.1", "type": "route_response", "payload": {"targetState": "SYSTEM_RECOVERY_PING", "admissible": true, "decision": "EXECUTE", "reason": "recovery_action"}}
+{"v": "0.1", "type": "orientation", "payload": {"status": "HEALTHY", "drift": 0.0}}
