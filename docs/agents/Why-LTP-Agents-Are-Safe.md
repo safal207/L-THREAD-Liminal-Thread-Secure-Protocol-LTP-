@@ -37,4 +37,4 @@ Safety is not just claimed; it is proven. The `@ltp/inspect` tool verifies that:
 1.  All critical actions executed were preceded by a valid authorization.
 2.  No Web-originated context ever successfully triggered a Critical Action.
 
-Run `ltp-inspect --compliance agents` to mathematically verify these invariants on any trace.
+Run `ltp inspect trace --compliance agents` to mathematically verify these invariants on any trace.

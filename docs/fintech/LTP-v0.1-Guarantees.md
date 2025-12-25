@@ -6,7 +6,7 @@ This document outlines the specific guarantees provided by LTP Node v0.1 in a fi
 
 ### 1. Trace Integrity
 *   **Guarantee**: The audit log (`ltp-audit.log`) is a tamper-evident hash chain. It is computationally infeasible to modify an entry without breaking the chain or regenerating all subsequent hashes.
-*   **Verification**: `ltp inspect --compliance fintech` validates this integrity.
+*   **Verification**: `ltp inspect trace --compliance fintech` validates this integrity.
 
 ### 2. Identity Consistency
 *   **Guarantee**: A session is bound to a single `identity`. The protocol enforcement prevents identity spoofing mid-session.

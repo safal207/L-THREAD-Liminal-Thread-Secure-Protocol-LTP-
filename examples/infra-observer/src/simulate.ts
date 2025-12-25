@@ -147,7 +147,9 @@ async function runSimulation() {
     tracePath = process.argv[outIndex + 1];
   }
 
-  fs.writeFileSync(tracePath, JSON.stringify(trace, null, 2));
+  // UPDATED: Write JSONL instead of JSON Array
+  const jsonlContent = trace.map(entry => JSON.stringify(entry)).join('\n') + '\n';
+  fs.writeFileSync(tracePath, jsonlContent);
   console.log(`\nTrace generated at: ${tracePath}`);
 }
 

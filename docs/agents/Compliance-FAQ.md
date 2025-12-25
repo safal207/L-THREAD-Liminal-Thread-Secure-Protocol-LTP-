@@ -8,7 +8,7 @@
 **A: No.** LTP is an admissibility layer, not a decision engine. It answers "Can I do this?" based on context and policy, not "What should I do?". The LLM/Agent decides the action; LTP validates if that action is permissible.
 
 ### Q: What guarantees does the "agents" compliance profile provide?
-**A:** The `ltp-inspect --compliance agents` report guarantees that:
+**A:** The `ltp inspect trace --compliance agents` report guarantees that:
 1.  **Trace Integrity:** The history of the agent's operation has not been tampered with (cryptographically verified).
 2.  **No Critical Leaks:** No Critical Action (e.g., money transfer) was executed from an untrusted `WEB` context without explicit admissibility checks.
 3.  **Identity Continuity:** The agent's identity remained stable throughout the session.

@@ -23,7 +23,7 @@ Fintech applications require immutable audit logs and regulatory compliance veri
 2. **Run compliance check:**
 
    ```bash
-   ltp-inspect fintech.trace.jsonl --compliance fintech
+   ltp inspect trace --input fintech.trace.jsonl --compliance fintech
    ```
 
 ## Success criteria
@@ -31,7 +31,7 @@ Fintech applications require immutable audit logs and regulatory compliance veri
 Expected command:
 
 ```bash
-ltp-inspect fintech.trace.jsonl --compliance fintech
+ltp inspect trace --input fintech.trace.jsonl --compliance fintech
 ```
 
 Expected output:

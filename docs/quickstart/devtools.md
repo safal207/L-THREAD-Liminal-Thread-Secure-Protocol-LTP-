@@ -26,7 +26,7 @@ Developers need to inspect, validate, and debug LTP traces without setting up a 
 3. **Inspect the trace:**
 
    ```bash
-   ltp-inspect test.trace.jsonl
+   ltp inspect trace --input test.trace.jsonl
    ```
 
 ## Success criteria
@@ -34,7 +34,7 @@ Developers need to inspect, validate, and debug LTP traces without setting up a 
 Expected command:
 
 ```bash
-ltp-inspect test.trace.jsonl
+ltp inspect trace --input test.trace.jsonl
 ```
 
 Expected output:

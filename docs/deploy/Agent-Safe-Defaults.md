@@ -49,7 +49,7 @@ LTP_CRITICAL_ACTIONS="transfer_money,delete_production_db"
 
 Before deploying your agent to production:
 
-- [ ] Run `ltp-inspect --compliance agents` on your test traces.
+- [ ] Run `ltp inspect trace --compliance agents` on your test traces.
 - [ ] Verify that `LTP_ACTION_POLICY` is NOT set to `allow-all`.
 - [ ] Ensure `LTP_ALLOW_WEB_CRITICAL` is false or unset.
 - [ ] Audit your custom `LTP_CRITICAL_ACTIONS` list.

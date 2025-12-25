@@ -53,20 +53,20 @@ jobs:
         run: |
           set -euxo pipefail
           pnpm -C packages/inspect run build
-          node packages/inspect/bin/ltp.js inspect --input tools/ltp-inspect/fixtures/canonical-clean.jsonl --format=json --color=never --quiet
+          node packages/inspect/bin/ltp.js inspect trace --input tools/ltp-inspect/fixtures/canonical-clean.jsonl --format=json --color=never --quiet
       - name: Inspect trace (non-strict, PR visibility)
         if: github.event_name == 'pull_request'
         continue-on-error: true
         run: |
           set -euxo pipefail
           mkdir -p docs/devtools
-          pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/unsorted-branches.json --format=human --color=never --quiet > docs/devtools/inspect-output.txt
+          pnpm -w ltp:inspect -- trace --input tools/ltp-inspect/fixtures/unsorted-branches.jsonl --format=human --color=never --quiet > docs/devtools/inspect-output.txt
       - name: Inspect trace (strict gate)
         if: github.event_name != 'pull_request'
         run: |
           set -euxo pipefail
           mkdir -p docs/devtools
-          pnpm -w ltp:inspect -- --strict --input tools/ltp-inspect/fixtures/canonical-clean.jsonl --format=json --quiet > docs/devtools/inspect-output.txt
+          pnpm -w ltp:inspect -- trace --strict --input tools/ltp-inspect/fixtures/canonical-clean.jsonl --format=json --quiet > docs/devtools/inspect-output.txt
       - name: Upload golden traces
         if: always()
         uses: actions/upload-artifact@v4

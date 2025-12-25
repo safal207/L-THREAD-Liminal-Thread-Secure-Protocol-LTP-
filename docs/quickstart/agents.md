@@ -23,7 +23,7 @@ AI Agents need to be prevented from taking critical actions (like money transfer
 2. **Verify against Agent Safety Rules:**
 
    ```bash
-   ltp-inspect risky.trace.jsonl --compliance agents
+   ltp inspect trace --input risky.trace.jsonl --compliance agents
    ```
 
 ## Success criteria
@@ -31,7 +31,7 @@ AI Agents need to be prevented from taking critical actions (like money transfer
 Expected command:
 
 ```bash
-ltp-inspect risky.trace.jsonl --compliance agents
+ltp inspect trace --input risky.trace.jsonl --compliance agents
 ```
 
 Expected output:
