@@ -1221,16 +1221,21 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
           } else if (frame.type === 'route_request') {
               // Check if we allowed critical actions in FAILED state
               // But strictly, we check the RESPONSE (admissibility).
+              if ((frame.payload as any)?.replay_context) {
+                  replayed++;
+              }
           } else if (frame.type === 'route_response') {
-              const admissible = (frame.payload as any)?.admissible;
-              const targetAction = (frame.payload as any)?.targetState || 'unknown';
+              const payload = (frame.payload as any) || {};
+              const admissible = payload.admissible;
+              const targetAction = payload.targetState || 'unknown';
+              const decision = String(payload.decision ?? '').toUpperCase();
 
               // Count routing decisions
-              if (admissible) {
-                executed++;
-              } else {
-                deferred++;
-              }
+              if (decision === 'EXECUTE') executed++;
+              else if (decision === 'DEFER') deferred++;
+              else if (decision === 'FREEZE') frozen++;
+              else if (!decision && admissible === true) executed++;
+              else if (!decision && admissible === false) deferred++; // Fallback
 
               // If FAILED, we should mostly see inadmissibility or only specific recovery actions.
               // NOTE: We treat FAILED and UNSTABLE as equivalent for the purpose of "execution freeze".
