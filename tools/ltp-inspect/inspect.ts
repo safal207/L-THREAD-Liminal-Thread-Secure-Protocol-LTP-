@@ -40,6 +40,7 @@ type ParsedArgs = {
   verbose: boolean;
   output?: string;
   compliance?: string;
+  profile?: string; // Explicit profile selection
   replayCheck?: boolean;
   continuity?: boolean; // New flag for E-4
   agentView?: boolean;
@@ -77,6 +78,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     verbose: false,
     output: undefined,
     compliance: undefined,
+    profile: undefined,
     replayCheck: false,
     agentView: false,
     criticalOnly: false,
@@ -135,6 +137,10 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.compliance = token.split('=').slice(1).join('=');
     } else if (token === '--compliance') {
       options.compliance = argv[++i];
+    } else if (token.startsWith('--profile=')) {
+      options.profile = token.split('=').slice(1).join('=');
+    } else if (token === '--profile') {
+      options.profile = argv[++i];
     } else if (token === '--replay-check') {
       options.replayCheck = true;
     } else if (token === '--continuity') {
@@ -726,10 +732,15 @@ function summarize(
   entries: TraceEntry[],
   input: { path?: string; source: InspectSummary['input']['source']; type: 'raw' | 'audit_log'; hash_root?: string },
   format: InspectSummary['input']['format'],
-  complianceProfile?: string,
+  complianceArg?: string,
   replayCheck?: boolean,
   agentView?: boolean,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
+  // Determine effective compliance profile
+  // profile takes precedence over compliance (deprecated/alias) if we want separation,
+  // but for now we treat them as setting the same "mode".
+  // The user requested: options.compliance = options.profile ?? options.compliance
+  const complianceProfile = profileArg ?? complianceArg;
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
   const validation = validateTraceFrames(normalizedFrames);
@@ -813,6 +824,8 @@ function summarize(
     };
 
     // Core LTP Checks
+    // Strict integrity enforcement: 'unchecked' is NOT sufficient for compliance passing.
+    // It must be strictly 'verified'.
     if (compliance.trace_integrity !== 'verified') {
         failedChecks.push('trace_integrity');
         violations.push({
@@ -821,7 +834,7 @@ function summarize(
             frame_index: compliance.first_violation_index ?? -1,
             source: 'system',
             action: 'verify_trace',
-            evidence: 'Trace integrity check failed'
+            evidence: `Trace integrity check failed or unchecked (status: ${compliance.trace_integrity})`
         });
     }
     if (compliance.identity_binding !== 'ok') {
@@ -1225,6 +1238,11 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
       let currentState = 'HEALTHY';
       const stateHistory: {ts: string|number, state: string}[] = [];
 
+      let executed = 0;
+      let deferred = 0;
+      let replayed = 0;
+      let frozen = 0;
+
       frames.forEach((frame, idx) => {
           if (frame.type === 'orientation') {
              // Look for status in payload
@@ -1239,6 +1257,13 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
           } else if (frame.type === 'route_response') {
               const admissible = (frame.payload as any)?.admissible;
               const targetAction = (frame.payload as any)?.targetState || 'unknown';
+
+              // Count routing decisions
+              if (admissible) {
+                executed++;
+              } else {
+                deferred++;
+              }
 
               // If FAILED, we should mostly see inadmissibility or only specific recovery actions.
               // NOTE: We treat FAILED and UNSTABLE as equivalent for the purpose of "execution freeze".
@@ -1263,7 +1288,8 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
           system_remained_coherent: systemCoherent,
           first_unsafe_transition_index: firstUnsafeIndex === -1 ? null : firstUnsafeIndex,
           state_transitions: stateHistory.length,
-          state_transition_path: stateHistory.map(s => s.state)
+          state_transition_path: stateHistory.map(s => s.state),
+          routing_stats: { executed, deferred, replayed, frozen }
       };
 
       // Also print to writer if human
@@ -1275,6 +1301,7 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, compli
              writer(`First Unsafe Transition: #${firstUnsafeIndex}`);
           }
           writer(`State Transitions Observed: ${stateHistory.map(s => s.state).join(' -> ')}`);
+          writer(`Routing Decisions: Executed=${executed} Deferred=${deferred} Replayed=${replayed} Frozen=${frozen}`);
       }
   }
 
@@ -1461,8 +1488,9 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
 
           // Compliance failures are strict errors
           if (summary.compliance) {
-             if (summary.compliance.trace_integrity === 'broken') {
-                 contractBreaches.push(`TRACE INTEGRITY BROKEN at index ${summary.compliance.first_violation_index}`);
+             // Strict enforcement: if not verified, it's a breach.
+             if (summary.compliance.trace_integrity !== 'verified') {
+                 contractBreaches.push(`TRACE INTEGRITY ERROR: ${summary.compliance.trace_integrity} (must be 'verified')`);
              }
              if (summary.compliance.identity_binding === 'violated') {
                  contractBreaches.push(`IDENTITY BINDING VIOLATED`);

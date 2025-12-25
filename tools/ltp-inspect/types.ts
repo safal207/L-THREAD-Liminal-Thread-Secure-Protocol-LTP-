@@ -123,6 +123,12 @@ export type InspectSummary = {
     first_unsafe_transition_index: number | null;
     state_transitions: number;
     state_transition_path: string[];
+    routing_stats: {
+      executed: number;
+      deferred: number;
+      replayed: number;
+      frozen: number;
+    };
   };
   notes: string[];
 };
