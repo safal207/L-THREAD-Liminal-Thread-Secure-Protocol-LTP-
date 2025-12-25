@@ -60,7 +60,7 @@ function generateAuditLog(frames, keyId = "stream-key-1") {
 
 function writeTrace(filename, frames) {
     const log = generateAuditLog(frames);
-    const jsonl = log.map(e => JSON.stringify(e)).join('\n');
+    const jsonl = log.map(e => JSON.stringify(e)).join('\n') + '\n';
 
     const dir = 'artifacts/traces/content';
     if (!fs.existsSync(dir)){

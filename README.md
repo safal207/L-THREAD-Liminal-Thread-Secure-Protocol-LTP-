@@ -16,7 +16,7 @@ ltp inspect trace --input artifacts/traces/sample.trace.jsonl
 ```
 
 If your shell cannot find the `ltp` command, restart the session or ensure the PNPM global bin directory is on your `PATH`.  
-Prefer a workspace local run? Use: `pnpm -w ltp:inspect -- --input artifacts/traces/sample.trace.jsonl`.
+Prefer a workspace local run? Use: `pnpm -w ltp:inspect -- trace --input artifacts/traces/sample.trace.jsonl`.
 
 No model. No agent framework. Just orientation, drift, and replay.
 
