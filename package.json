@@ -52,7 +52,7 @@
     "pdfkit": "^0.17.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
-    "vitest": "^2.0.5",
+    "vitest": "^2.1.9",
     "ws": "^8.18.3"
   },
   "workspaces": [
