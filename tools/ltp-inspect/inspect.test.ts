@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawn, type SpawnOptions } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
+import type { InspectSummary } from './types';
 import { execute, formatHuman, formatJson, runInspect } from './inspect';
 
 const minimalFixture = path.join(__dirname, 'fixtures', 'minimal.frames.jsonl');
@@ -10,7 +11,7 @@ const expectedJsonPath = path.join(__dirname, 'expected', 'summary.json');
 const expectedHumanOkPath = path.join(__dirname, 'expected', 'human.ok.txt');
 const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt');
 const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt');
-const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.json');
+const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.jsonl');
 const canonicalFixture = path.join(__dirname, '..', '..', 'examples', 'traces', 'canonical-linear.json');
 const canonicalHumanSnapshot = path.join(__dirname, '..', '..', 'docs', 'devtools', 'inspect-output.txt');
 const goldenTraceOutput = path.join(__dirname, 'fixtures', 'golden.trace_output.txt');

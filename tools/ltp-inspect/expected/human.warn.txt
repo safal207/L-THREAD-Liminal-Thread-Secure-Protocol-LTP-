@@ -1,5 +1,5 @@
 LTP INSPECTOR  v1.0
-input: tools/ltp-inspect/fixtures/continuity-rotated.json  time: 2024-01-01T00:00:00.000Z
+input: tools/ltp-inspect/fixtures/continuity-rotated.jsonl  time: 2024-01-01T00:00:00.000Z
 
 IDENTITY
 identity: test
