@@ -339,8 +339,6 @@ describe('ltp-inspect golden summary', () => {
     // Ensure no fatal errors even if warnings exist
     expect(errors.join('\n')).not.toMatch(/(TypeError|ReferenceError|ENOENT|EACCES)/);
 
-    const output = logs.join('\n').replace(/\r\n/g, '\n');
-
     // Normalize line endings for robust matching (User feedback check 4)
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
@@ -349,7 +347,6 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('State Transitions Observed:');
     expect(output).toMatch(/HEALTHY/i);
     expect(output).toMatch(/FAILED/i);
-  });
 
     // Verify State Transitions
     // Based on examples/traces/continuity-outage.trace.json
