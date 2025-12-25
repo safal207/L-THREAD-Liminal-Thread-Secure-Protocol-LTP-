@@ -21,8 +21,8 @@ const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.js
 const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
 const agentCriticalFixture = path.join(__dirname, 'fixtures', 'agent-critical.frames.jsonl');
-const continuityOutageTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-outage.trace.json');
-const continuityFailureTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-failure.trace.json');
+const continuityOutageTrace = path.join(__dirname, 'fixtures', 'continuity-outage.trace.jsonl');
+const continuityFailureTrace = path.join(__dirname, 'fixtures', 'continuity-failure.trace.jsonl');
 
 let builtCliPath: string | undefined;
 
@@ -331,15 +331,14 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('visualizes continuity routing correctly for outage scenario', () => {
-    const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.json');
-    if (!fs.existsSync(continuityFixture)) {
-        throw new Error(`Continuity trace fixture missing at ${continuityFixture}`);
+    if (!fs.existsSync(continuityOutageTrace)) {
+        throw new Error(`Continuity trace fixture missing at ${continuityOutageTrace}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
-    const exitCode = execute(['--input', continuityFixture, '--format=human', '--color=never', '--continuity'], {
+    const exitCode = execute(['--input', continuityOutageTrace, '--format=human', '--color=never', '--continuity'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -355,26 +354,26 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('State Transitions Observed:');
     expect(output).toMatch(/HEALTHY/i);
     expect(output).toMatch(/FAILED/i);
+  });
 
   it('verifies failure recovery trace (generated)', () => {
-    // New test case for the generated failure-recovery.trace.json
-    const recoveryTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'failure-recovery.trace.json');
-    if (!fs.existsSync(recoveryTrace)) {
-        throw new Error(`Failure recovery trace missing at ${recoveryTrace}`);
+    const failureFixture = continuityFailureTrace;
+
+    if (!fs.existsSync(failureFixture)) {
+        throw new Error(`Failure recovery trace missing at ${failureFixture}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // Use --continuity flag
-    const exitCode = execute(['--input', recoveryTrace, '--format=human', '--color=never', '--continuity'], {
+    // Use --continuity flag AND --strict to enforce exit code 2 on violation
+    const exitCode = execute(['--input', failureFixture, '--format=human', '--color=never', '--continuity', '--strict'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    // We expect a contract violation/warning because System Coherence NO is a serious issue
-    // With strict off, it should be a warning (exit 1).
-    expect([1, 2]).toContain(exitCode);
+    // Expecting 2 because strict mode promotes continuity violations to contract breaches
+    expect(exitCode).toBe(2);
 
     const output = logs.join('\n').replace(/\r\n/g, '\n');
 
@@ -382,16 +381,6 @@ describe('ltp-inspect golden summary', () => {
     expect(output).toContain('System Remained Coherent: NO');
     expect(output).toContain('First Unsafe Transition: #');
     expect(output).toContain('Continuity Violation: Action \'transfer_money\' allowed during FAILED state');
-
-    // Should see the forbidden action (transfer_money)
-    // The fixture has "transfer_money" as the unsafe action
-    // But since it might appear in violation list which is printed:
-    // "Continuity Violation: Action 'transfer_money' allowed during FAILED state"
-    // Check for that or similar message in violations output or continuity summary
-    // Our inspect.ts prints violations to Summary via `violations.push(...)`
-    // And `handleTrace` prints `contractBreaches` if any.
-    // Continuity violations are added to `violations` array in `handleTrace`.
-    // So it should be treated as a contract violation (exit 2) or warn (exit 1).
   });
 });
 
