@@ -3,6 +3,7 @@ import path from 'node:path';
 import { spawn, type SpawnOptions } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
+import type { InspectSummary } from './types';
 import { execute, formatHuman, formatJson, runInspect } from './inspect';
 
 const minimalFixture = path.join(__dirname, 'fixtures', 'minimal.frames.jsonl');
@@ -10,7 +11,7 @@ const expectedJsonPath = path.join(__dirname, 'expected', 'summary.json');
 const expectedHumanOkPath = path.join(__dirname, 'expected', 'human.ok.txt');
 const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt');
 const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt');
-const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.json');
+const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.jsonl');
 const canonicalFixture = path.join(__dirname, '..', '..', 'examples', 'traces', 'canonical-linear.json');
 const canonicalHumanSnapshot = path.join(__dirname, '..', '..', 'docs', 'devtools', 'inspect-output.txt');
 const goldenTraceOutput = path.join(__dirname, 'fixtures', 'golden.trace_output.txt');
@@ -20,9 +21,15 @@ const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-
 const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.json');
 const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
-const unsafeAgentTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'unsafe-agent.trace.json');
-const continuityOutageTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-outage.trace.json');
-const continuityFailureTrace = path.join(__dirname, '..', '..', 'examples', 'traces', 'continuity-failure.trace.json');
+
+// Canonical agent traces
+const allowedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'allowed-critical.trace.jsonl');
+const blockedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'blocked-critical.trace.jsonl');
+
+// Canonical continuity fixtures
+const continuityOutageFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.jsonl');
+const continuityFailureFixture = path.join(__dirname, 'fixtures', 'continuity-failure.trace.jsonl');
+
 
 let builtCliPath: string | undefined;
 
@@ -81,11 +88,16 @@ async function buildInspectCli(): Promise<string> {
 }
 
 function expectNoFatal(errors: string[]) {
-    expect(errors.join('\n')).not.toMatch(/(TypeError|ReferenceError|ENOENT|EACCES)/i);
+  expect(errors.join('\n')).not.toMatch(/(TypeError|ReferenceError|ENOENT|EACCES|Unhandled|FATAL|panic)/i);
 }
 
 function normalizeOutput(text: string): string {
-    return text.replace(/\r\n/g, '\n').trim();
+  return text.replace(/\r\n/g, '\n').trim();
+}
+
+function normalizeInputLine(text: string): string {
+  // Removes path differences in "input: ... time:"
+  return text.replace(/^input: .* time:/m, 'input: <redacted>  time:');
 }
 
 describe('ltp-inspect golden summary', () => {
@@ -117,7 +129,7 @@ describe('ltp-inspect golden summary', () => {
     const errors: string[] = [];
     vi.stubEnv('LTP_INSPECT_FROZEN_TIME', '2024-01-01T00:00:00.000Z');
     try {
-      const exitCode = execute(['--input', canonicalFixture, '--format=human', '--color=never'], {
+      const exitCode = execute(['trace', '--input', canonicalFixture, '--format=human', '--color=never'], {
         log: (message) => logs.push(message),
         error: (message) => errors.push(message),
       });
@@ -130,15 +142,13 @@ describe('ltp-inspect golden summary', () => {
     }
   });
 
-  it('matches the golden trace output artifact', () => {
+  it('renders golden sample deterministically', () => {
     const logs: string[] = [];
     const errors: string[] = [];
-    // The timestamp in the golden artifact is 2025-12-24T22:08:59.315Z
     vi.stubEnv('LTP_INSPECT_FROZEN_TIME', '2025-12-24T22:08:59.315Z');
 
     try {
-      // Use absolute path, then normalize output content
-      const exitCode = execute(['--input', sampleTrace, '--format=human', '--color=never'], {
+      const exitCode = execute(['trace', '--input', sampleTrace, '--format=human', '--color=never'], {
         log: (message) => logs.push(message),
         error: (message) => errors.push(message),
       });
@@ -146,14 +156,10 @@ describe('ltp-inspect golden summary', () => {
       expect(exitCode).toBe(0);
       expectNoFatal(errors);
 
-      let expected = fs.readFileSync(goldenTraceOutput, 'utf-8').trim();
+      let expected = normalizeOutput(fs.readFileSync(goldenTraceOutput, 'utf-8'));
       let actual = normalizeOutput(logs.join('\n'));
-
-      // Normalize input: ... time: line to avoid path differences
-      // Regex matches "input: <anything>  time:" and replaces with generic
-      actual = actual.replace(/^input: .* time:/m, 'input: <redacted>  time:');
-      expected = expected.replace(/^input: .* time:/m, 'input: <redacted>  time:');
-
+      expected = normalizeInputLine(expected);
+      actual = normalizeInputLine(actual);
       expect(actual).toEqual(expected);
     } finally {
       vi.unstubAllEnvs();
@@ -164,7 +170,7 @@ describe('ltp-inspect golden summary', () => {
     const missingPath = path.join(__dirname, 'fixtures', 'does-not-exist.jsonl');
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', missingPath], {
+    const exitCode = execute(['trace', '--input', missingPath], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -178,7 +184,7 @@ describe('ltp-inspect golden summary', () => {
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', invalidFixture, '--format=human', '--color=never'], {
+    const exitCode = execute(['trace', '--input', invalidFixture, '--format=human', '--color=never'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -194,7 +200,7 @@ describe('ltp-inspect golden summary', () => {
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', warnFixture, '--format=human', '--color=never'], {
+    const exitCode = execute(['trace', '--input', warnFixture, '--format=human', '--color=never'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -208,7 +214,7 @@ describe('ltp-inspect golden summary', () => {
   it('returns exit code 1 for normalized output in non-strict mode', () => {
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', unsortedBranchesFixture], {
+    const exitCode = execute(['trace', '--input', unsortedBranchesFixture], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -220,7 +226,7 @@ describe('ltp-inspect golden summary', () => {
   it('fails loudly when trace version is missing', () => {
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', missingVersionFixture, '--format=human', '--color=never'], {
+    const exitCode = execute(['trace', '--input', missingVersionFixture, '--format=human', '--color=never'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -232,7 +238,7 @@ describe('ltp-inspect golden summary', () => {
   it('fails loudly for mixed trace versions', () => {
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', mixedVersionsFixture, '--format=human', '--color=never'], {
+    const exitCode = execute(['trace', '--input', mixedVersionsFixture, '--format=human', '--color=never'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -244,7 +250,7 @@ describe('ltp-inspect golden summary', () => {
   it('fails loudly for unsupported versions', () => {
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', unsupportedVersionFixture, '--format=human', '--color=never'], {
+    const exitCode = execute(['trace', '--input', unsupportedVersionFixture, '--format=human', '--color=never'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -256,7 +262,7 @@ describe('ltp-inspect golden summary', () => {
   it('treats canonical gaps as contract violations in strict mode', () => {
     const logs: string[] = [];
     const errors: string[] = [];
-    const exitCode = execute(['--input', unsortedBranchesFixture, '--strict'], {
+    const exitCode = execute(['trace', '--input', unsortedBranchesFixture, '--strict'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -266,26 +272,22 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('detects critical action violations in agents compliance mode', () => {
-    if (!fs.existsSync(allowedCriticalTracePath)) {
-        console.warn('Skipping agent safety test: allowed-critical.trace.jsonl not found');
-        return;
-    }
+    if (!fs.existsSync(allowedCriticalTracePath)) return;
 
     const logs: string[] = [];
     const errors: string[] = [];
-    // Use the actual unsafe agent trace instead of manual fixture
-    const exitCode = execute(['--input', unsafeAgentTracePath, '--compliance', 'agents'], {
+    const exitCode = execute(['trace', '--input', allowedCriticalTracePath, '--profile', 'agents', '--format=json'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    expect(exitCode).toBe(2); // Contract violation
-    const output = JSON.parse(logs.join('\n'));
+    expect(exitCode).toBe(2);
+    expectNoFatal(errors);
 
+    const output = JSON.parse(logs.join('\n')) as any;
     expect(output.audit_summary.verdict).toBe('FAIL');
-    const violations = output.audit_summary.violations;
-    expect(violations.some((v: any) => v.rule_id === 'AGENTS.CRIT.WEB_DIRECT')).toBe(true);
-
+    expect(Array.isArray(output.audit_summary.violations)).toBe(true);
+    expect(output.audit_summary.violations.some((v: any) => v.rule_id === 'AGENTS.CRIT.WEB_DIRECT')).toBe(true);
     expect(output.compliance.trace_integrity).toBe('verified');
   });
 
@@ -294,16 +296,16 @@ describe('ltp-inspect golden summary', () => {
 
     const logs: string[] = [];
     const errors: string[] = [];
-    // Using --format=json for robust assertion
-    const exitCode = execute(['--input', blockedCriticalTracePath, '--profile', 'agents', '--format=json'], {
+    const exitCode = execute(['trace', '--input', blockedCriticalTracePath, '--profile', 'agents', '--format=json'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    // Safe agent blocks the action, so it should PASS compliance
+    // PASS, but warnings allowed -> 0 or 1
     expect([0, 1]).toContain(exitCode);
+    expectNoFatal(errors);
 
-    const output = JSON.parse(logs.join('\n'));
+    const output = JSON.parse(logs.join('\n')) as any;
     expect(output.audit_summary.verdict).toBe('PASS');
     expect(output.compliance.trace_integrity).toBe('verified');
   });
@@ -313,7 +315,7 @@ describe('ltp-inspect golden summary', () => {
     const logs: string[] = [];
     const errors: string[] = [];
 
-    const exitCode = execute(['--input', minimalFixture, '--profile', 'fintech'], {
+    const exitCode = execute(['trace', '--input', minimalFixture, '--profile', 'fintech'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
@@ -332,67 +334,76 @@ describe('ltp-inspect golden summary', () => {
   });
 
   it('visualizes continuity routing correctly for outage scenario', () => {
-    const continuityFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.json');
-    if (!fs.existsSync(continuityFixture)) {
-        throw new Error(`Continuity trace fixture missing at ${continuityFixture}`);
+    if (!fs.existsSync(continuityOutageFixture)) {
+      throw new Error(`Continuity outage fixture missing at ${continuityOutageFixture}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // Explicit 'trace' subcommand
-    const exitCode = execute(['trace', '--input', continuityFixture, '--format=human', '--color=never', '--continuity'], {
+    const exitCode = execute(['trace', '--input', continuityOutageFixture, '--format=human', '--color=never', '--continuity'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
+    // warnings possible (normalization/snaps), but not violation
     expect([0, 1]).toContain(exitCode);
     expectNoFatal(errors);
-
     const output = normalizeOutput(logs.join('\n'));
 
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: YES');
-    expect(output).toContain('State Transitions Observed:');
-
-    // Use regex for State Transitions to handle potential whitespace or casing differences
     expect(output).toMatch(/State Transitions Observed:\s*HEALTHY\s*->\s*FAILED\s*->\s*HEALTHY/i);
-
-    // Verify Routing Stats with regex
     expect(output).toMatch(/Routing Decisions:\s+Executed=\d+\s+Deferred=\d+\s+Replayed=\d+\s+Frozen=\d+/);
   });
 
-  it('detects continuity failure when critical action is allowed during failure', () => {
-    const failureFixture = path.join(__dirname, 'fixtures', 'continuity-failure.trace.json');
-    // Ensure fixture exists
-    if (!fs.existsSync(failureFixture)) {
-         throw new Error(`Continuity failure trace fixture missing at ${failureFixture}`);
+  it('detects continuity failure (non-strict = warning)', () => {
+    if (!fs.existsSync(continuityFailureFixture)) {
+      throw new Error(`Continuity failure fixture missing at ${continuityFailureFixture}`);
     }
 
     const logs: string[] = [];
     const errors: string[] = [];
 
-    // Use --continuity flag
-    const exitCode = execute(['--input', recoveryTrace, '--format=human', '--color=never', '--continuity'], {
+    const exitCode = execute(['trace', '--input', continuityFailureFixture, '--format=human', '--color=never', '--continuity'], {
       log: (message) => logs.push(message),
       error: (message) => errors.push(message),
     });
 
-    // We expect a contract violation/warning because System Coherence NO is a serious issue
-    expect([0, 1, 2]).toContain(exitCode);
+    expect(exitCode).toBe(1);
+    expectNoFatal(errors);
 
     const output = normalizeOutput(logs.join('\n'));
-
     expect(output).toContain('CONTINUITY ROUTING INSPECTION');
     expect(output).toContain('System Remained Coherent: NO');
-    expect(output).toMatch(/First Unsafe Transition: (index\s)?#\d+/i);
+    expect(output).toMatch(/First Unsafe Transition:\s*#\d+/i);
+    expect(output).toMatch(/transfer_money/i);
+  });
+
+  it('detects continuity failure (strict = violation)', () => {
+    if (!fs.existsSync(continuityFailureFixture)) return;
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    const exitCode = execute(
+      ['trace', '--input', continuityFailureFixture, '--format=human', '--color=never', '--continuity', '--strict'],
+      { log: (m) => logs.push(m), error: (m) => errors.push(m) }
+    );
+
+    expect(exitCode).toBe(2);
+    expectNoFatal(errors);
+
+    const output = normalizeOutput(logs.join('\n'));
+    expect(output).toContain('System Remained Coherent: NO');
+    expect(output).toMatch(/Continuity Violation:/i);
   });
 });
 
 describe('ltp inspect cli', () => {
   it('boots without crashing', async () => {
     const distPath = await buildInspectCli();
-    const result = await runCommand('node', [distPath, sampleTrace], {
+    const result = await runCommand('node', [distPath, 'trace', sampleTrace], {
       env: { ...process.env, LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z', LTP_INSPECT_TEST_RUN: '1' },
     });
 
