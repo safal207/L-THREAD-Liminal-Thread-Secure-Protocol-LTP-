@@ -42,7 +42,7 @@ Each transition proposal is bound to a specific `traceId` and parent state hash.
 
 ## Verification
 
-To verify an agent implementation against these guarantees, run the `ltp-inspect` tool with the agent compliance profile:
+To verify an agent implementation against these guarantees, run the `ltp inspect` tool with the agent compliance profile:
 
 ```bash
 ltp inspect trace --compliance agentic --target ./agent-logs

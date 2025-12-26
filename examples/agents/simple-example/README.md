@@ -8,7 +8,7 @@ This example demonstrates a compliant agent trace where a critical action is pro
 
 ## How to Run
 
-1. **Install ltp-inspect**:
+1. **Install ltp inspect**:
    ```bash
    npm install -g @ltp/inspect
    ```

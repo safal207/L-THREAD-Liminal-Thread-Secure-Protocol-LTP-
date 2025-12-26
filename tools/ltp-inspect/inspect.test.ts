@@ -452,7 +452,8 @@ describe('ltp inspect cli', () => {
       });
 
       expect(exitCode).toBe(2);
-      expect(errors.join('\n')).toMatch(/Invalid JSONL line/i);
+      // We expect the specific error message for multiple objects, not generic invalid JSONL
+      expect(errors.join('\n')).toContain('Only one JSON object per line allowed');
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }

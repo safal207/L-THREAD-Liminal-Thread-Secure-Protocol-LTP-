@@ -1,6 +1,6 @@
-# Continuity Inspection with ltp-inspect
+# Continuity Inspection with ltp inspect
 
-The `ltp-inspect` tool includes a specialized mode for verifying **Infrastructure Continuity** and failure recovery semantics.
+The `ltp inspect` tool includes a specialized mode for verifying **Infrastructure Continuity** and failure recovery semantics.
 
 ## Usage
 

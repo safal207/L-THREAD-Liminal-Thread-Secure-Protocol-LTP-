@@ -28,7 +28,7 @@ A simplified summary document designed for auditors and non-technical stakeholde
 
 ```bash
 # Export all artifacts for a trace
-ltp inspect trace.json \
+ltp inspect trace --input trace.jsonl \
   --compliance fintech \
   --export json \
   --export pdf

@@ -15,7 +15,7 @@ npm install -g @ltp/inspect
 Inspect a trace file:
 
 ```bash
-ltp inspect path/to/trace.json
+ltp inspect trace --input path/to/trace.jsonl
 ```
 
 Options:
