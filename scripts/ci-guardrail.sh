@@ -21,5 +21,15 @@ if grep -r "canonical-clean.json" . --exclude-dir=.git --exclude="ci-guardrail.s
   exit 1
 fi
 
+# 3. Check for deprecated `ltp-inspect` usage in docs and examples
+if grep -r "ltp-inspect" docs examples --exclude-dir=.git > /dev/null; then
+  # Filter out schema/contract references and file paths (tools/ltp-inspect)
+  if grep -r "ltp-inspect" docs examples | grep -v "schema.json" | grep -v "contract" | grep -v "ltp-inspect.v1.md" | grep -v "tools/ltp-inspect"; then
+      echo "FAIL: Found references to legacy 'ltp-inspect' in docs/examples. Please use 'ltp inspect'."
+      grep -r "ltp-inspect" docs examples | grep -v "schema.json" | grep -v "contract" | grep -v "ltp-inspect.v1.md" | grep -v "tools/ltp-inspect"
+      exit 1
+  fi
+fi
+
 echo "Guardrail checks passed!"
 exit 0

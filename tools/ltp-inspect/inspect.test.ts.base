@@ -1,0 +1,138 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { execSync } from 'child_process';
+import path from 'path';
+import fs from 'fs';
+import os from 'os';
+
+describe('ltp-inspect golden summary', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
+    const minimalTrace = 'tools/ltp-inspect/fixtures/minimal.frames.jsonl';
+
+    // Helper to run inspector
+    const runInspect = (args: string) => {
+        try {
+            return execSync(`pnpm exec ts-node tools/ltp-inspect/inspect.ts ${args}`, {
+                env: { ...process.env, LTP_INSPECT_TEST_RUN: '1', LTP_INSPECT_FREEZE_CLOCK: '1', LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z' },
+                encoding: 'utf-8',
+                stdio: 'pipe' // Capture stdout/stderr
+            });
+        } catch (err: any) {
+            // Some "success" cases return exit code 1 (warnings)
+            // If exit code is 1, treat as output.
+            if (err.status === 1) {
+                return err.stdout;
+            }
+            throw err;
+        }
+    };
+
+    const runInspectFail = (args: string): { output: string, exitCode: number } => {
+        try {
+            const output = execSync(`pnpm exec ts-node tools/ltp-inspect/inspect.ts ${args}`, {
+                env: { ...process.env, LTP_INSPECT_TEST_RUN: '1', LTP_INSPECT_FREEZE_CLOCK: '1', LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z' },
+                encoding: 'utf-8',
+                stdio: 'pipe'
+            });
+            return { output, exitCode: 0 };
+        } catch (err: any) {
+            return { output: err.stdout + err.stderr, exitCode: err.status };
+        }
+    };
+
+    it('generates expected json summary for minimal trace (trace subcommand)', () => {
+        const output = runInspect(`trace --input ${minimalTrace} --format json`);
+        const summary = JSON.parse(output);
+
+        expect(summary.contract.name).toBe('ltp-inspect');
+        // minimal trace uses continuity token 'ct-1' which becomes identity if explicit identity missing
+        expect(summary.orientation.identity).toBe('ct-1');
+        expect(summary.futures.admissible.length).toBeGreaterThan(0);
+    });
+
+    it('generates expected human output (trace subcommand)', () => {
+        const output = runInspect(`trace --input ${minimalTrace} --format human`);
+        expect(output).toContain('LTP INSPECTOR');
+        expect(output).toContain('identity: ct-1');
+        expect(output).toContain('admissible:');
+    });
+
+    it('fails when no subcommand is provided', () => {
+        const result = runInspectFail(`--input ${minimalTrace}`);
+        expect(result.exitCode).toBe(2);
+        expect(result.output).toContain('ERROR: Missing command');
+    });
+
+    it('fails when legacy JSON array is used', () => {
+        const fixturePath = path.join(tmpDir, 'legacy.json');
+        fs.writeFileSync(fixturePath, '[{"v":"0.1", "type":"orientation"}]');
+
+        const result = runInspectFail(`trace --input ${fixturePath}`);
+        expect(result.exitCode).toBe(2);
+        expect(result.output).toContain('Legacy JSON array format is not supported');
+        expect(result.output).toContain('Try: jq');
+    });
+
+    it('fails when file contains multiple JSON objects on one line', () => {
+        const fixturePath = path.join(tmpDir, 'bad-multiobj.jsonl');
+        // This is invalid JSONL because two objects are on one line
+        fs.writeFileSync(fixturePath, '{"v":"0.1", "type":"orientation"}{"v":"0.1", "type":"heartbeat"}');
+
+        const result = runInspectFail(`trace --input ${fixturePath}`);
+        expect(result.exitCode).toBe(2);
+        // "Line 1: Only one JSON object per line allowed"
+        expect(result.output).toContain('Only one JSON object per line allowed');
+    });
+
+    it('passes with BOM and leading spaces', () => {
+        const fixturePath = path.join(tmpDir, 'bom-spaces.jsonl');
+        const content = '\uFEFF   {"v":"0.1", "type":"orientation", "payload":{"identity":"test"}}\n{"v":"0.1", "type":"heartbeat"}';
+        fs.writeFileSync(fixturePath, content);
+
+        const output = runInspect(`trace --input ${fixturePath} --format json`);
+        const summary = JSON.parse(output);
+        expect(summary.orientation.identity).toBe('test');
+    });
+
+    it('processes canonical-linear.jsonl correctly', () => {
+        const output = runInspect('trace --input tools/ltp-inspect/fixtures/canonical-linear.jsonl --format json');
+        const summary = JSON.parse(output);
+        expect(summary.orientation.identity).toBe('canonical');
+    });
+
+    it('handles --continuity check correctly', () => {
+        const outageTrace = 'examples/traces/continuity-outage.trace.jsonl';
+        // Note: continuity outage trace might produce warnings, which exits with 1.
+        // We need to capture that and assert exit code is 0 or 1.
+        // runInspect helper throws on non-zero exit code.
+        // So we should use runInspectFail or check if we expect success.
+        // For 'continuity-outage.trace.jsonl', it likely contains violations/warnings?
+        // Let's use runInspectFail and check content.
+
+        const result = runInspectFail(`trace --input ${outageTrace} --continuity --format human`);
+        // We accept exit code 0 or 1 (warnings). But 2 is error.
+        expect([0, 1]).toContain(result.exitCode);
+        expect(result.output).toContain('CONTINUITY ROUTING INSPECTION');
+        expect(result.output).toContain('System Remained Coherent:');
+        expect(result.output).toContain('Routing Decisions:');
+    });
+
+    it('verifies replay determinism in strict mode', () => {
+        // We use a fixture that has trace integrity (audit log format).
+        // Minimal trace is raw frames, so integrity check returns 'unchecked'.
+        // In strict mode, 'unchecked' integrity -> Error (Exit 2).
+        // So we should expect failure for minimal trace.
+        const result = runInspectFail(`trace --input ${minimalTrace} --replay-check --format json`);
+
+        // If it's minimal trace, it doesn't have prev_hash, so integrity is 'unchecked'.
+        // Code: if (summary.compliance.trace_integrity !== 'verified') contractBreaches.push(...)
+        // So exit code should be 2.
+        expect(result.exitCode).toBe(2);
+        expect(result.output).toContain('TRACE INTEGRITY ERROR: unchecked');
+    });
+
+    afterAll(() => {
+        try {
+            fs.rmSync(tmpDir, { recursive: true, force: true });
+        } catch (e) {}
+    });
+});
