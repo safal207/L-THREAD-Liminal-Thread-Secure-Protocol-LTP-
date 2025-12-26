@@ -4,20 +4,17 @@ set -e
 # Fail if forbidden patterns exist
 echo "Checking for forbidden patterns..."
 
-# Common excludes to avoid false positives from build artifacts / deps
-EXCLUDES=(
-  -path "./.git" -prune -o
-  -path "./node_modules" -prune -o
-  -path "./dist" -prune -o
-  -path "./build" -prune -o
-  -path "./.turbo" -prune -o
-  -path "./.next" -prune -o
-)
-
 # 1. Check for .trace.json files (excluding .jsonl)
 # We ignore common artifact dirs via pruning
 FOUND_TRACE_JSON=$(
-  find . "${EXCLUDES[@]}" -name "*.trace.json" -print 2>/dev/null || true
+  find . \
+    -path "./.git" -prune -o \
+    -path "./node_modules" -prune -o \
+    -path "./dist" -prune -o \
+    -path "./build" -prune -o \
+    -path "./.turbo" -prune -o \
+    -path "./.next" -prune -o \
+    -name "*.trace.json" -print 2>/dev/null || true
 )
 if [ -n "$FOUND_TRACE_JSON" ]; then
   echo "FAIL: Found .trace.json files. Please rename to .trace.jsonl"
