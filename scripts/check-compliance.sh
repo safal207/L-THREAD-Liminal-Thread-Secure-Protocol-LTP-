@@ -4,27 +4,22 @@ set -e
 # Fintech Compliance Verification Script
 # Usage: ./scripts/check-compliance.sh <trace_file>
 
-TRACE_FILE=$1
-
-if [ -z "$TRACE_FILE" ]; then
-  echo "Usage: $0 <trace_file>"
-  exit 1
-fi
+TRACE_FILE="${1:-examples/fintech/sample.trace.jsonl}"
 
 echo "Verifying fintech compliance for $TRACE_FILE..."
 
-# Assuming @ltp/inspect is available in PATH or via pnpm
-# If in CI environment within monorepo:
-INSPECT_CMD=(pnpm -w ltp:inspect trace)
+# Run inspector via workspace script.
+# Use -s (silent) so stdout is ONLY the JSON contract (no pnpm banners).
+# Note: In this environment, passing '--' with '-s' seems to cause argument parsing issues,
+# so we pass 'trace' directly which works for this script.
+INSPECT_CMD=(pnpm -s -w ltp:inspect trace)
 
-# Keep the invocation style consistent with other CI scripts
+# Write ONLY JSON to file. If something goes wrong, we keep errors on stderr.
 "${INSPECT_CMD[@]}" --input "$TRACE_FILE" --compliance fintech --format json > compliance_report.json
 
-# Check exit code
-if [ $? -ne 0 ]; then
-  echo "Compliance check FAILED"
-  exit 1
-fi
+# If we got here, command succeeded due to `set -e`.
+
+echo "Compliance report written to compliance_report.json"
 
 # Parse JSON result (simple grep for now, proper JSON parsing recommended)
 if grep -q '"trace_integrity": "verified"' compliance_report.json && \
