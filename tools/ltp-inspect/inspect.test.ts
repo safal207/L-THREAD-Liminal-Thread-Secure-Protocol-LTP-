@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { spawn, type SpawnOptions } from 'node:child_process';
 import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
@@ -12,15 +13,15 @@ const expectedHumanOkPath = path.join(__dirname, 'expected', 'human.ok.txt');
 const expectedHumanWarnPath = path.join(__dirname, 'expected', 'human.warn.txt');
 const expectedHumanErrorPath = path.join(__dirname, 'expected', 'human.error.txt');
 const warnFixture = path.join(__dirname, 'fixtures', 'continuity-rotated.jsonl');
-const canonicalFixture = path.join(__dirname, '..', '..', 'examples', 'traces', 'canonical-linear.json');
+const canonicalFixture = path.join(__dirname, '..', '..', 'examples', 'traces', 'canonical-linear.jsonl');
 const canonicalHumanSnapshot = path.join(__dirname, '..', '..', 'docs', 'devtools', 'inspect-output.txt');
 const goldenTraceOutput = path.join(__dirname, 'fixtures', 'golden.trace_output.txt');
-const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.json');
-const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.json');
-const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.json');
-const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.json');
-const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.json');
-const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.json');
+const invalidFixture = path.join(__dirname, 'fixtures', 'invalid-confidence.jsonl');
+const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.jsonl');
+const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.jsonl');
+const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.jsonl');
+const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.jsonl');
+const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.jsonl');
 
 // Canonical agent traces
 const allowedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'allowed-critical.trace.jsonl');
@@ -410,5 +411,64 @@ describe('ltp inspect cli', () => {
     // Accept 0 (clean) or 1 (warnings)
     expect([0, 1]).toContain(result.exitCode);
     expect(result.stdout.toLowerCase()).toContain('orientation');
+  });
+
+  it('rejects legacy JSON arrays (even with leading whitespace or BOM) with exit code 2', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
+    const legacyFixture = path.join(tmpDir, 'legacy-array.json');
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      // Write with BOM \uFEFF and leading newline
+      fs.writeFileSync(legacyFixture, '\uFEFF\n   [{"v":"0.1"}]\n');
+
+      const exitCode = execute(['trace', '--input', legacyFixture], {
+        log: (m) => logs.push(m),
+        error: (m) => errors.push(m)
+      });
+
+      expect(exitCode).toBe(2);
+      expect(errors.join('\n')).toContain('Legacy JSON array format is not supported');
+      expect(errors.join('\n')).toContain('jq -c');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects invalid JSONL where multiple JSON objects appear on the same line', () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
+    const badJsonl = path.join(tmpDir, 'two-objects-one-line.jsonl');
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    try {
+      // This looks like "JSONL", but it is NOT: two objects on one line.
+      fs.writeFileSync(badJsonl, '{"v":"0.1"} {"v":"0.1"}\n');
+
+      const exitCode = execute(['trace', '--input', badJsonl], {
+        log: (m) => logs.push(m),
+        error: (m) => errors.push(m)
+      });
+
+      expect(exitCode).toBe(2);
+      expect(errors.join('\n')).toMatch(/Invalid JSONL line/i);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it('requires a subcommand (trace/replay/explain) or fails with exit 2', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    // Calling without subcommand
+    const exitCode = execute(['--input', sampleTrace], {
+      log: (m) => logs.push(m),
+      error: (m) => errors.push(m)
+    });
+
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('Missing command');
   });
 });

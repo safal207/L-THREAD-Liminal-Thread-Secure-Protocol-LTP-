@@ -7,7 +7,7 @@
 - **Top-level fields:** `contract`, `generated_at`, `tool`, `input`, `orientation`, `continuity`, `futures`, `branches`, `notes`.
 - **Schema:** canonical JSON Schema lives at [`docs/contracts/ltp-inspect.v1.schema.json`](./ltp-inspect.v1.schema.json).
 - **Compatibility:** v1 fields are stable; additions will be backward-compatible via optional keys.
-- **Input surface:** accepts JSON arrays or JSONL streams of canonical LTP frames.
+- **Input surface:** accepts JSONL streams of canonical LTP frames.
 - **Trace validation:** input frames must declare `v`/`version` = `0.1`, use object payloads, and keep branch ids unique and pre-sorted; violations fail with exit code `2`.
 
 ## Field stability

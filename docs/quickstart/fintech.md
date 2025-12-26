@@ -17,13 +17,13 @@ Fintech applications require immutable audit logs and regulatory compliance veri
 
    ```bash
    # In a real scenario, this comes from your application
-   echo '[{"h":"hash1","p":null,"t":"hello","c":{"id":"req-1"}}, {"h":"hash2","p":"hash1","t":"orientation","c":{"decision":"permit"}}]' > fintech.trace.json
+   printf '{"h":"hash1","p":null,"t":"hello","c":{"id":"req-1"}}\n{"h":"hash2","p":"hash1","t":"orientation","c":{"decision":"permit"}}' > fintech.trace.jsonl
    ```
 
 2. **Run compliance check:**
 
    ```bash
-   ltp-inspect fintech.trace.json --compliance fintech
+   ltp inspect trace --input fintech.trace.jsonl --compliance fintech
    ```
 
 ## Success criteria
@@ -31,7 +31,7 @@ Fintech applications require immutable audit logs and regulatory compliance veri
 Expected command:
 
 ```bash
-ltp-inspect fintech.trace.json --compliance fintech
+ltp inspect trace --input fintech.trace.jsonl --compliance fintech
 ```
 
 Expected output:

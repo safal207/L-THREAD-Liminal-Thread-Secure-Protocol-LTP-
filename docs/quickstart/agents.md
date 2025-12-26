@@ -17,13 +17,13 @@ AI Agents need to be prevented from taking critical actions (like money transfer
 
    ```bash
    # Simulating a WEB context triggering a critical action directly
-   echo '[{"h":"1","t":"route_request","c":{"context":"WEB","intent":"transfer_money"}}]' > risky.trace.json
+   echo '{"h":"1","t":"route_request","c":{"context":"WEB","intent":"transfer_money"}}' > risky.trace.jsonl
    ```
 
 2. **Verify against Agent Safety Rules:**
 
    ```bash
-   ltp-inspect risky.trace.json --compliance agents
+   ltp inspect trace --input risky.trace.jsonl --compliance agents
    ```
 
 ## Success criteria
@@ -31,7 +31,7 @@ AI Agents need to be prevented from taking critical actions (like money transfer
 Expected command:
 
 ```bash
-ltp-inspect risky.trace.json --compliance agents
+ltp inspect trace --input risky.trace.jsonl --compliance agents
 ```
 
 Expected output:

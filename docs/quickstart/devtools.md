@@ -20,13 +20,13 @@ Developers need to inspect, validate, and debug LTP traces without setting up a 
 
    ```bash
    # Create a dummy trace for testing
-   echo '[{"h": "0000", "p": null, "t": "hello", "c": {"client": "ltp-cli"}}]' > test.trace.json
+   echo '{"h": "0000", "p": null, "t": "hello", "c": {"client": "ltp-cli"}}' > test.trace.jsonl
    ```
 
 3. **Inspect the trace:**
 
    ```bash
-   ltp-inspect test.trace.json
+   ltp inspect trace --input test.trace.jsonl
    ```
 
 ## Success criteria
@@ -34,7 +34,7 @@ Developers need to inspect, validate, and debug LTP traces without setting up a 
 Expected command:
 
 ```bash
-ltp-inspect test.trace.json
+ltp inspect trace --input test.trace.jsonl
 ```
 
 Expected output:

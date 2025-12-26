@@ -5,7 +5,7 @@ The `ltp-inspect` tool includes a specialized mode for verifying **Infrastructur
 ## Usage
 
 ```bash
-ltp-inspect --continuity --input <trace_file>
+ltp inspect trace --continuity --input <trace_file>
 ```
 
 ## What It Checks
@@ -46,5 +46,5 @@ You can use this flag in your CI pipeline to ensure that your failure recovery t
 ```yaml
 - name: Verify Failure Recovery
   run: |
-    ltp-inspect --continuity --input ./traces/outage_simulation.jsonl --strict
+    ltp inspect trace --continuity --input ./traces/outage_simulation.jsonl --strict
 ```

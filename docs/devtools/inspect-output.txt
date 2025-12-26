@@ -1,5 +1,5 @@
 LTP INSPECTOR  v1.0
-input: examples/traces/canonical-linear.json  time: 2024-01-01T00:00:00.000Z
+input: examples/traces/canonical-linear.jsonl  time: 2024-01-01T00:00:00.000Z
 
 IDENTITY
 identity: demo.client

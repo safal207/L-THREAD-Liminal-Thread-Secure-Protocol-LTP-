@@ -59,5 +59,6 @@ Add this step to your pipeline:
 
 ```yaml
 - name: Verify Fintech Compliance
-  run: ltp inspect ltp-audit.log --compliance fintech --format json > compliance_report.json
+  run: ltp inspect trace --input ltp-audit.log --compliance fintech --format json > compliance_report.json
+> Note: `ltp-audit.log` must be a valid JSONL file (one frame per line).
 ```

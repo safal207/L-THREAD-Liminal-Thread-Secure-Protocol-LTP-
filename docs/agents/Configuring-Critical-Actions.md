@@ -46,7 +46,7 @@ If no configuration is provided, the system defaults to the Standard Safety Prof
 You can verify your configuration is active by running:
 
 ```bash
-ltp-inspect --compliance agents --input <trace-file>
+ltp inspect trace --compliance agents --input <trace-file>
 ```
 
 The inspector will validate that no Web-origin events successfully triggered any action in your configured list.

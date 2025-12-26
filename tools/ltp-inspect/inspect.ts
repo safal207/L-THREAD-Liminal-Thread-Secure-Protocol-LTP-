@@ -27,6 +27,7 @@ type Command = 'trace' | 'replay' | 'explain' | 'help';
 
 type ParsedArgs = {
   command: Command;
+  explicitHelp: boolean;
   input?: string;
   strict: boolean;
   format: OutputFormat;
@@ -58,10 +59,27 @@ class CliError extends Error {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const commands: Command[] = ['trace', 'replay', 'explain', 'help'];
-  const positionalCommand = commands.includes(argv[0] as Command) ? (argv.shift() as Command) : 'trace';
+  let positionalCommand: Command = 'help';
+  let explicitHelp = false;
+  let commandFound = false;
+
+  if (commands.includes(argv[0] as Command)) {
+      positionalCommand = argv.shift() as Command;
+      commandFound = true;
+  }
+
+  // Check if user explicitly asked for help
+  if (commandFound && positionalCommand === 'help') {
+      explicitHelp = true;
+  }
+  if (argv.includes('--help') || argv.includes('-h')) {
+      explicitHelp = true;
+      positionalCommand = 'help';
+  }
 
   const options: ParsedArgs = {
     command: positionalCommand,
+    explicitHelp,
     input: undefined,
     strict: false,
     format: 'human',
@@ -382,23 +400,35 @@ function loadFrames(
   let parsed: any[] = [];
   let format: 'json' | 'jsonl' = 'json';
 
-  if (raw.startsWith('[')) {
-    try {
-      parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) throw new Error('Expected JSON array');
-      format = 'json';
-    } catch (err) {
-      throw new CliError(`Invalid JSON array: ${(err as Error).message}`, 2);
-    }
+  // Handle UTF-8 BOM (common on Windows) so format detection is stable.
+  const rawNoBom = raw.replace(/^\uFEFF/, '');
+  const rawTrimStart = rawNoBom.trimStart();
+
+  if (rawTrimStart.startsWith('[')) {
+    throw new CliError(
+      'Legacy JSON array format is not supported. Use JSONL (newline-delimited).\n' +
+        "hint: Try: jq -c '.[]' input.json > output.jsonl",
+      2,
+    );
   } else {
     try {
       parsed = raw
         .split(/\r?\n/)
-        .filter((line) => line.trim().length > 0)
-        .map((line) => JSON.parse(line));
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line, i) => {
+          try {
+            return JSON.parse(line);
+          } catch (err) {
+            throw new CliError(
+              `Invalid JSONL line ${i + 1}: ${(err as Error).message}`,
+              2,
+            );
+          }
+        });
       format = 'jsonl';
     } catch (err) {
-      throw new CliError(`Invalid JSONL: ${(err as Error).message}`, 2);
+      throw err;
     }
   }
 
@@ -1425,7 +1455,29 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
   const args = parseArgs(argv);
 
   try {
-    if (!args.input && args.command !== 'help') {
+    if (args.command === 'help') {
+        // If help was explicitly requested, print help and exit 0.
+        // If it defaulted to help because command was missing, print concise error and exit 2.
+        if (args.explicitHelp) {
+            printHelp(writer);
+            if (!args.quiet) buffer.forEach((line) => logger.log(line));
+            return 0;
+        } else {
+            errorWriter('ERROR: Missing command (trace | replay | explain)');
+            errorWriter('hint: ltp inspect trace --input <file.jsonl>');
+            errorWriter('hint: pnpm -w ltp:inspect -- trace --input <file.jsonl>');
+            errorWriter('hint: ltp inspect --help');
+
+            // Ensure errors are actually visible to the caller/CI.
+            if (!args.quiet) buffer.forEach((line) => logger.error(line));
+
+            process.exitCode = 2;
+            return 2;
+        }
+    }
+
+    if (!args.input) {
+      // Should handle help above, but safety check
       printHelp(writer);
       throw new CliError('Missing --input <frames.jsonl>', 2);
     }
@@ -1518,8 +1570,9 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
         }
         break;
       default:
-        printHelp(writer);
+        // Should be covered by initial check, but for safety
         if (!args.quiet) buffer.forEach((line) => logger.log(line));
+        return 2;
     }
     return 0;
   } catch (err) {
