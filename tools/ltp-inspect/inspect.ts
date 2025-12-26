@@ -62,16 +62,13 @@ function parseArgs(argv: string[]): ParsedArgs {
   let positionalCommand: Command | undefined;
   let explicitHelp = false;
 
-  // Extract subcommand if present
-  // The first argument SHOULD be the command if it matches known commands
-  // We prioritize this over flags.
+  // Extract subcommand if present (argv[0])
   if (argv.length > 0 && commands.includes(argv[0] as Command)) {
-      positionalCommand = argv[0] as Command;
-      // We consume it, so the loop starts from index 1 for flags?
-      // Actually, we should just identify it.
+    positionalCommand = argv[0] as Command;
+    // consume command token so flag parsing doesn't see it as input
+    argv = argv.slice(1);
   }
 
-  // Check if user explicitly asked for help
   if (positionalCommand === 'help') {
       explicitHelp = true;
   }
@@ -101,10 +98,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     replayCheck: false,
   };
 
-  // If we found a positional command at index 0, we start parsing flags from index 1.
-  const startIndex = (positionalCommand && argv[0] === positionalCommand) ? 1 : 0;
-
-  for (let i = startIndex; i < argv.length; i += 1) {
+  for (let i = 0; i < argv.length; i += 1) {
     const token = argv[i];
     if (token === '--help' || token === '-h') {
       // already handled
@@ -175,10 +169,7 @@ function parseArgs(argv: string[]): ParsedArgs {
           options.exportFormat.push(exportFmt);
       }
     } else if (!options.input && !token.startsWith('-')) {
-      // If we haven't found a command yet, maybe this is it?
-      // But we checked argv[0] already.
-      // If start index was 0, and we are here, it means argv[0] was NOT a command.
-      // So this token is treated as input (legacy fallback or just argument).
+      // Treat first bare token as input (legacy positional input support)
       options.input = token;
     }
   }
