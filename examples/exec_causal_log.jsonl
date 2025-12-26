@@ -1,0 +1,2 @@
+{"id": "550e8400-e29b-41d4-a716-446655440000", "timestamp": 1690000000000000000, "actor": {"pid": 2341, "ppid": 1200, "uid": 1000}, "action": "exec", "object": "/usr/bin/bash", "permitted_by": "parent_process_context", "parent_cause": "d3b07384-d113-4ec6-88d3-05536412497e"}
+{"id": "a6b78912-3c4d-4e5f-9012-345678901234", "timestamp": 1690000005000000000, "actor": {"pid": 2342, "ppid": 1200, "uid": 1000}, "action": "exec", "object": "/usr/bin/curl", "permitted_by": "parent_process_context", "parent_cause": null}
