@@ -15,9 +15,9 @@ echo "Verifying fintech compliance for $TRACE_FILE..."
 
 # Assuming @ltp/inspect is available in PATH or via pnpm
 # If in CI environment within monorepo:
-INSPECT_CMD="pnpm -w ltp:inspect"
+INSPECT_CMD="pnpm -w ltp:inspect -- trace"
 
-$INSPECT_CMD -- --input "$TRACE_FILE" --compliance fintech --format json > compliance_report.json
+$INSPECT_CMD --input "$TRACE_FILE" --compliance fintech --format json > compliance_report.json
 
 # Check exit code
 if [ $? -ne 0 ]; then

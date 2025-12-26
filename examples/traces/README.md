@@ -18,6 +18,6 @@ These traces are intentionally small and human-readable. They are designed for t
 
 - `bad.trace.jsonl` — intentionally broken integrity for testing failure modes.
   - Frame 2 has a `prev_hash` ("bad_hash...") that does not match the hash of Frame 1.
-  - Useful for verifying that `ltp-inspect` correctly reports **Integrity: FAIL**.
+  - Useful for verifying that `ltp inspect` correctly reports **Integrity: FAIL**.
 
 Each trace is short enough to read directly and to replay with `pnpm -w ltp:inspect -- replay --input <file>` for step-by-step orientation.

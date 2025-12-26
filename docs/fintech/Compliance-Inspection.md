@@ -15,10 +15,10 @@ The `ltp inspect` tool now supports a specific compliance profile for Fintech (`
 
 ```bash
 # JSON output for CI/CD pipelines
-ltp inspect trace.json --compliance fintech --format json
+ltp inspect trace --input trace.jsonl --compliance fintech --format json
 
 # Human-readable output for auditors
-ltp inspect trace.json --compliance fintech --format human
+ltp inspect trace --input trace.jsonl --compliance fintech --format human
 ```
 
 ## Report Structure

@@ -1,6 +1,6 @@
 # Developer Tools Example
 
-This directory contains resources to demonstrate the usage of LTP developer tools, specifically `ltp-inspect`.
+This directory contains resources to demonstrate the usage of LTP developer tools, specifically `ltp inspect`.
 
 ## Contents
 
@@ -8,7 +8,7 @@ This directory contains resources to demonstrate the usage of LTP developer tool
 
 ## How to Run
 
-1. **Install ltp-inspect**:
+1. **Install ltp inspect**:
    ```bash
    npm install -g @ltp/inspect
    ```

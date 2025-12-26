@@ -8,7 +8,7 @@ This example demonstrates a trace that adheres to the Fintech compliance profile
 
 ## How to Run
 
-1. **Install ltp-inspect**:
+1. **Install ltp inspect**:
    ```bash
    npm install -g @ltp/inspect
    ```

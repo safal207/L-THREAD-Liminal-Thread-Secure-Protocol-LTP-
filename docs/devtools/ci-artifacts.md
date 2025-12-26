@@ -86,7 +86,7 @@ pnpm -w install
 ```bash
 pnpm -w ltp:inspect -- trace \
   --strict \
-  --input tools/ltp-inspect/fixtures/canonical-clean.jsonl \
+  --input tools/ltp-inspect/fixtures/canonical-linear.jsonl \
   --format=json
 ```
 

@@ -26,12 +26,12 @@ type Writer = (message: string) => void;
 type Command = 'trace' | 'replay' | 'explain' | 'help';
 
 type ParsedArgs = {
-  command: Command;
+  command?: Command;
   explicitHelp: boolean;
   input?: string;
   strict: boolean;
   format: OutputFormat;
-  exportFormat: ExportFormat[]; // Changed to array
+  exportFormat: ExportFormat[];
   pretty: boolean;
   from?: string;
   branch?: string;
@@ -41,9 +41,9 @@ type ParsedArgs = {
   verbose: boolean;
   output?: string;
   compliance?: string;
-  profile?: string; // Explicit profile selection
+  profile?: string;
   replayCheck?: boolean;
-  continuity?: boolean; // New flag for E-4
+  continuity?: boolean;
 };
 
 const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
@@ -59,22 +59,26 @@ class CliError extends Error {
 
 function parseArgs(argv: string[]): ParsedArgs {
   const commands: Command[] = ['trace', 'replay', 'explain', 'help'];
-  let positionalCommand: Command = 'help';
+  let positionalCommand: Command | undefined;
   let explicitHelp = false;
-  let commandFound = false;
 
-  if (commands.includes(argv[0] as Command)) {
-      positionalCommand = argv.shift() as Command;
-      commandFound = true;
+  // Extract subcommand if present
+  // The first argument SHOULD be the command if it matches known commands
+  // We prioritize this over flags.
+  if (argv.length > 0 && commands.includes(argv[0] as Command)) {
+      positionalCommand = argv[0] as Command;
+      // We consume it, so the loop starts from index 1 for flags?
+      // Actually, we should just identify it.
   }
 
   // Check if user explicitly asked for help
-  if (commandFound && positionalCommand === 'help') {
+  if (positionalCommand === 'help') {
       explicitHelp = true;
   }
   if (argv.includes('--help') || argv.includes('-h')) {
       explicitHelp = true;
-      positionalCommand = 'help';
+      // If no command was set, help becomes the command
+      if (!positionalCommand) positionalCommand = 'help';
   }
 
   const options: ParsedArgs = {
@@ -97,10 +101,13 @@ function parseArgs(argv: string[]): ParsedArgs {
     replayCheck: false,
   };
 
-  for (let i = 0; i < argv.length; i += 1) {
+  // If we found a positional command at index 0, we start parsing flags from index 1.
+  const startIndex = (positionalCommand && argv[0] === positionalCommand) ? 1 : 0;
+
+  for (let i = startIndex; i < argv.length; i += 1) {
     const token = argv[i];
     if (token === '--help' || token === '-h') {
-      options.command = 'help';
+      // already handled
     } else if (token.startsWith('--input=')) {
       options.input = token.split('=').slice(1).join('=');
     } else if (token === '--input' || token === '-i') {
@@ -168,6 +175,10 @@ function parseArgs(argv: string[]): ParsedArgs {
           options.exportFormat.push(exportFmt);
       }
     } else if (!options.input && !token.startsWith('-')) {
+      // If we haven't found a command yet, maybe this is it?
+      // But we checked argv[0] already.
+      // If start index was 0, and we are here, it means argv[0] was NOT a command.
+      // So this token is treated as input (legacy fallback or just argument).
       options.input = token;
     }
   }
@@ -219,8 +230,6 @@ function canonicalize(obj: any): any {
 }
 
 // Emulate serde_json::to_vec behavior on canonicalized object
-// Main differences usually: spacing. Rust serde_json defaults to no space. JSON.stringify also defaults to no space.
-// Unicode handling might differ but for standard ASCII keys/values it should match.
 function canonicalJsonBytes(frame: any): Buffer {
   const canon = canonicalize(frame);
   return Buffer.from(JSON.stringify(canon), 'utf8');
@@ -228,12 +237,6 @@ function canonicalJsonBytes(frame: any): Buffer {
 
 function verifyTraceIntegrity(entries: TraceEntry[]): { valid: boolean; firstViolation?: number } {
   if (!entries.length) return { valid: true };
-
-  // First entry check (prev_hash should be zeros if it's start, or just needs to be valid hex)
-  // The rust node initializes with 64 zeros if file empty.
-  // If we inspect a partial trace, we can't verify the FIRST prev_hash unless it's the start.
-  // However, we CAN verify that entry[i].prev_hash + entry[i].frame -> entry[i].hash
-  // AND entry[i].hash == entry[i+1].prev_hash
 
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
@@ -259,65 +262,14 @@ function verifyTraceIntegrity(entries: TraceEntry[]): { valid: boolean; firstVio
 }
 
 function verifyReplayDeterminism(entries: TraceEntry[]): { valid: boolean; error?: string; at?: number } {
-  // Check 1: Trace integrity must be valid (prerequisite)
   const integrity = verifyTraceIntegrity(entries);
   if (!integrity.valid) return { valid: false, error: 'Trace integrity broken', at: integrity.firstViolation };
-
-  // Check 2: Same inputs => Same outputs (if present in trace)
-  // We scan for duplicate inputs (same 'in' direction + same payload)
-  // And verify the subsequent 'out' transitions are compatible/identical.
-  // Note: timestamps change, so we compare payload content.
-  // This is a heuristic for "replay determinism" on static traces.
-
-  // We can also verify that for every 'in', there is a valid 'out' sequence or state update.
-  // But strict determinism means: Input(S) + State -> Output + State'
-  // Without re-running logic, we just check for obvious contradictions.
-
-  const inputs = new Map<string, any>(); // hash(input_payload) -> output_payload
-
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i];
-    if (entry.direction === 'in') {
-      // Find corresponding outputs until next input
-      const outputs: any[] = [];
-      let j = i + 1;
-      while (j < entries.length && entries[j].direction === 'out') {
-        outputs.push(entries[j].frame);
-        j++;
-      }
-
-      // Canonicalize input to use as key
-      const inputHash = crypto.createHash('sha256').update(canonicalJsonBytes(entry.frame)).digest('hex');
-
-      // We need to be careful: state changes. So same input might produce different output if state changed.
-      // So simply checking input->output mapping across the whole session is WRONG for stateful systems.
-      // However, for "replay determinism" check requested by P1, we might need to actually re-run logic OR
-      // rely on the hash chain as proof of history.
-
-      // If the prompt asks for "Replay determinism: OK", and we can't run the node...
-      // Maybe we just assume "verified hash chain" == "deterministic record".
-      // But P1-4 says "прогоняет trace... confirm identical inputs -> identical admissible transitions".
-      // If we assume the Node logic is deterministic, then a verified trace IS the proof.
-      // The only way it fails is if the trace contains metadata that suggests non-determinism (like random nonces that aren't part of state).
-
-      // Let's stick to Hash Chain validation as the primary signal for "Replay Determinism" in this context (static analysis).
-      // If we could run the node via WASM, we would.
-      // We will perform a "State Consistency Check" instead.
-      // E.g. Check that 'route_response' only follows 'route_request' or 'orientation'.
-    }
-  }
 
   // Basic state machine check
   let hasOrientation = false;
   for (let i = 0; i < entries.length; i++) {
     const frame = entries[i].frame;
     if (frame.type === 'orientation') hasOrientation = true;
-    if (frame.type === 'route_response' && !hasOrientation) {
-      // Allowed if it's a stateless response? No, LTP requires orientation.
-      // But maybe hello -> route_request -> route_response is possible?
-      // Strict LTP implies orientation frame establishes context.
-      // Let's warn but not fail unless strict.
-    }
   }
 
   return { valid: true };
@@ -420,7 +372,10 @@ function loadFrames(
           try {
             return JSON.parse(line);
           } catch (err) {
-            throw new CliError(
+             if (line.match(/}\s*\{/)) {
+                 throw new CliError(`Line ${i+1}: Only one JSON object per line allowed`, 2);
+             }
+             throw new CliError(
               `Invalid JSONL line ${i + 1}: ${(err as Error).message}`,
               2,
             );
@@ -496,8 +451,6 @@ function detectContinuity(frames: LtpFrame[]): { preserved: boolean; notes: stri
   const token = tokens.length ? tokens[tokens.length - 1] : undefined;
   const unique = new Set(tokens);
 
-  // A break is defined as a token change when we expected continuity
-  // Simplistic calc: if > 1 unique tokens, we have breaks.
   const breaks = Math.max(0, unique.size - 1);
 
   if (unique.size <= 1) return { preserved: true, notes: [], token, breaks: 0 };
@@ -746,10 +699,6 @@ function summarize(
   complianceArg?: string,
   replayCheck?: boolean,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
-  // Determine effective compliance profile
-  // profile takes precedence over compliance (deprecated/alias) if we want separation,
-  // but for now we treat them as setting the same "mode".
-  // The user requested: options.compliance = options.profile ?? options.compliance
   const complianceProfile = complianceArg;
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
     normalizeFrameConstraints(frames);
@@ -784,13 +733,9 @@ function summarize(
         ? (integrity.valid ? 'verified' : 'broken')
         : 'unchecked';
 
-    // Identity binding: ensure identity is consistent and present
     const identityStatus = identity !== 'unknown' ? 'ok' : 'violated';
-
-    // Replay determinism
     const determinism = verifyReplayDeterminism(entries);
 
-    // Signature info
     let signatureInfo: ComplianceReport['signatures'] | undefined;
     if (input.type === 'audit_log') {
         const entriesWithSig = entries.filter(e => e.signature);
@@ -800,7 +745,7 @@ function summarize(
 
         signatureInfo = {
             present,
-            valid: present, // Placeholder: assume valid if present and hash chain verified for now (real verification requires public keys)
+            valid: present,
             key_ids: keyIds,
             algorithm: algs.length ? algs.join(',') : undefined
         };
@@ -833,9 +778,6 @@ function summarize(
         LOW: 0
     };
 
-    // Core LTP Checks
-    // Strict integrity enforcement: 'unchecked' is NOT sufficient for compliance passing.
-    // It must be strictly 'verified'.
     if (compliance.trace_integrity !== 'verified') {
         failedChecks.push('trace_integrity');
         violations.push({
@@ -870,29 +812,19 @@ function summarize(
         });
     }
 
-    // Agentic Specific Checks
     if (complianceProfile === 'agentic' || complianceProfile === 'agents') {
-        // Iterate through all frames to find Admissibility Results (route_response)
         frames.forEach((frame, index) => {
             if (frame.type === 'route_response') {
                 const payload = frame.payload || {};
-
-                // Extract relevant fields (adapt to Reference Agent v0.1 schema)
-                // Usually these are in the payload (AdmissibilityResult)
                 const context = (payload as any).context;
-                const targetState = (payload as any).targetState; // Action name
+                const targetState = (payload as any).targetState;
                 const admissible = (payload as any).admissible;
                 const capabilities = (payload as any).capabilities ?? [];
-
-                // Also check if capabilities were required/missing in request?
-                // For simplified trace inspection, we look at the 'AdmissibilityResult' which *should* log the reason if denied.
-                // But we want to catch cases where it was *allowed* incorrectly.
 
                 if (targetState && typeof targetState === 'string') {
                     const isCritical = CRITICAL_ACTIONS.includes(targetState);
 
                     if (isCritical && admissible === true) {
-                        // Rule 1: AGENTS.CRIT.WEB_DIRECT
                         if (context === 'WEB') {
                              failedChecks.push(AGENT_RULES.WEB_DIRECT);
                              compliance!.determinism_details = `Security Violation: WEB context allowed to perform critical action '${targetState}' at frame #${index}`;
@@ -906,19 +838,10 @@ function summarize(
                              });
                         }
 
-                        // Rule 2: AGENTS.CRIT.NO_CAPABILITY
-                        // We check if the capability was present in the admissibility record
-                        // Convention: Critical actions need CAPABILITY_{ACTION_NAME_UPPER}
                         const requiredCap = `CAPABILITY_${targetState.toUpperCase()}`;
                         const hasCap = Array.isArray(capabilities) && capabilities.includes(requiredCap);
 
-                        // Note: If the agent logic allows it without checking capability, we can only detect it
-                        // if the trace *records* capabilities. If capabilities are missing from trace, we might flag as warning or violation.
-                        // Assuming Reference Agent records 'capabilities' in the AdmissibilityResult.
                         if (!hasCap) {
-                            // If capabilities field exists but missing required one -> VIOLATION
-                            // If capabilities field is undefined -> Maybe WARNING or strict VIOLATION?
-                            // Let's assume strict for safety.
                             failedChecks.push(AGENT_RULES.NO_CAPABILITY);
                             violations.push({
                                 rule_id: AGENT_RULES.NO_CAPABILITY,
@@ -935,15 +858,11 @@ function summarize(
         });
     }
 
-    // Count violations
     violations.forEach(v => {
         violationsCountBySeverity[v.severity] = (violationsCountBySeverity[v.severity] || 0) + 1;
     });
 
-    // Verdict Logic
     const verdict = failedChecks.length === 0 ? 'PASS' : 'FAIL';
-
-    // Risk level logic
     let riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
     if (failedChecks.includes('trace_integrity') || violationsCountBySeverity['CRITICAL'] > 0) {
         riskLevel = 'HIGH';
@@ -1218,16 +1137,11 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, strict
     entries,
     { path: inputPath, source: inputSource, type, hash_root },
     inputFormat,
-    profile ?? compliance, // Prioritize profile if set, fallback to compliance
+    profile ?? compliance,
     replayCheck,
   );
 
   if (continuityCheck) {
-      // E-4: Continuity Inspection Logic
-      // 1. Check for State Degradation events (HEALTHY -> FAILED)
-      // 2. Verify "Execution Freeze" (No forbidden actions during FAILED)
-      // 3. Output "System Remained Coherent"
-
       let systemCoherent = true;
       let firstUnsafeIndex = -1;
       let currentState = 'HEALTHY';
@@ -1241,15 +1155,12 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, strict
 
       frames.forEach((frame, idx) => {
           if (frame.type === 'orientation') {
-             // Look for status in payload
              const status = (frame.payload as any)?.status;
              if (status) {
                  currentState = String(status).toUpperCase();
                  stateHistory.push({ ts: frame.ts || idx, state: currentState });
              }
           } else if (frame.type === 'route_request') {
-              // Check if we allowed critical actions in FAILED state
-              // But strictly, we check the RESPONSE (admissibility).
               if ((frame.payload as any)?.replay_context) {
                   replayed++;
               }
@@ -1259,19 +1170,14 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, strict
               const targetAction = payload.targetState || 'unknown';
               const decision = String(payload.decision ?? '').toUpperCase();
 
-              // Count routing decisions
               if (decision === 'EXECUTE') executed++;
               else if (decision === 'DEFER') deferred++;
               else if (decision === 'FREEZE') frozen++;
               else if (!decision && admissible === true) executed++;
-              else if (!decision && admissible === false) deferred++; // Fallback
+              else if (!decision && admissible === false) deferred++;
 
-              // If FAILED, we should mostly see inadmissibility or only specific recovery actions.
-              // NOTE: We treat FAILED and UNSTABLE as equivalent for the purpose of "execution freeze".
-              // While UNSTABLE might allow some read-only handshakes, those are covered by the RECOVERY_ACTIONS list.
               if (currentState === 'FAILED' || currentState === 'UNSTABLE') {
                   if (admissible) {
-                      // Is it a recovery action?
                       const isRecovery = RECOVERY_ACTIONS.some(action => targetAction.includes(action));
                       if (!isRecovery) {
                           systemCoherent = false;
@@ -1289,7 +1195,6 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, strict
           }
       });
 
-      // Inject into summary
       summary.continuity_routing = {
           checked: true,
           system_remained_coherent: systemCoherent,
@@ -1299,7 +1204,6 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, strict
           routing_stats: { executed, deferred, replayed, frozen }
       };
 
-      // Also print to writer if human
       if (format === 'human') {
           writer('');
           writer('CONTINUITY ROUTING INSPECTION');
@@ -1364,7 +1268,6 @@ function handleExplain(file: string, at: string | undefined, branchId: string | 
   const window = frames.slice(0, boundedIndex + 1);
   const prior = frames.slice(0, boundedIndex);
 
-  // We don't support partial audit log verification easily without context, passing empty entries for now as explanation doesn't usually need it
   const { summary, violations } = summarize(window, [], { path: inputPath, source: inputSource, type }, format, undefined, false);
   const previous = prior.length ? summarize(prior, [], { path: inputPath, source: inputSource, type }, format, undefined, false).summary : undefined;
 
@@ -1417,16 +1320,16 @@ function printHelp(writer: Writer): void {
   writer('ltp:inspect — orientation inspector (no decisions, no model execution).');
   writer('');
   writer('Usage:');
-  writer('  pnpm -w ltp:inspect -- [trace] --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
-  writer('  pnpm -w ltp:inspect -- replay --input <frames.jsonl> [--from <frameId>]');
-  writer('  pnpm -w ltp:inspect -- explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
+  writer('  ltp inspect trace --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
+  writer('  ltp inspect replay --input <frames.jsonl> [--from <frameId>]');
+  writer('  ltp inspect explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
   writer('Examples:');
-  writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=human');
-  writer('  pnpm -w ltp:inspect -- --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=json');
-  writer('  pnpm -w ltp:inspect -- --continuity --input examples/traces/outage.json');
-  writer('  pnpm -w ltp:inspect -- --format=json --quiet --input examples/traces/drift-recovery.json | jq .orientation');
-  writer('  pnpm -w ltp:inspect -- explain --input examples/traces/drift-recovery.json --at step-3');
+  writer('  ltp inspect trace --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=human');
+  writer('  ltp inspect trace --input tools/ltp-inspect/fixtures/minimal.frames.jsonl --format=json');
+  writer('  ltp inspect trace --continuity --input examples/traces/continuity-outage.trace.jsonl');
+  writer('  ltp inspect trace --format=json --quiet --input examples/traces/drift-recovery.jsonl | jq .orientation');
+  writer('  ltp inspect explain --input examples/traces/drift-recovery.jsonl --at step-3');
   writer('');
   writer('Output:');
   writer('  JSON (v1 contract) with deterministic ordering for CI. Additional fields remain optional.');
@@ -1455,31 +1358,32 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
   const args = parseArgs(argv);
 
   try {
-    if (args.command === 'help') {
-        // If help was explicitly requested, print help and exit 0.
-        // If it defaulted to help because command was missing, print concise error and exit 2.
+    if (!args.command || args.command === 'help') {
         if (args.explicitHelp) {
             printHelp(writer);
             if (!args.quiet) buffer.forEach((line) => logger.log(line));
             return 0;
         } else {
+            // Implicit default is removed. Must exit 2 with help.
             errorWriter('ERROR: Missing command (trace | replay | explain)');
             errorWriter('hint: ltp inspect trace --input <file.jsonl>');
-            errorWriter('hint: pnpm -w ltp:inspect -- trace --input <file.jsonl>');
             errorWriter('hint: ltp inspect --help');
 
-            // Ensure errors are actually visible to the caller/CI.
             if (!args.quiet) buffer.forEach((line) => logger.error(line));
-
             process.exitCode = 2;
             return 2;
         }
     }
 
     if (!args.input) {
-      // Should handle help above, but safety check
-      printHelp(writer);
-      throw new CliError('Missing --input <frames.jsonl>', 2);
+      // Check strict input requirement
+      // Some commands like replay/explain might theoretically work without input if they had defaults, but currently we require it.
+      errorWriter('ERROR: Missing --input <frames.jsonl>');
+      // printHelp(writer);
+
+      if (!args.quiet) buffer.forEach((line) => logger.error(line));
+      process.exitCode = 2;
+      return 2;
     }
 
     const colorEnabled =
@@ -1503,9 +1407,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
             );
           }
 
-          // Compliance failures are strict errors
           if (summary.compliance) {
-             // Strict enforcement: if not verified, it's a breach.
              if (summary.compliance.trace_integrity !== 'verified') {
                  contractBreaches.push(`TRACE INTEGRITY ERROR: ${summary.compliance.trace_integrity} (must be 'verified')`);
              }
@@ -1516,7 +1418,6 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
                  contractBreaches.push(`REPLAY DETERMINISM FAILED`);
              }
 
-             // Check for audit summary violations (e.g. Critical Actions)
              if (summary.audit_summary && summary.audit_summary.violations.length > 0) {
                  const criticalViolations = summary.audit_summary.violations.filter(v => v.severity === 'CRITICAL');
                  if (criticalViolations.length > 0) {
@@ -1570,7 +1471,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
         }
         break;
       default:
-        // Should be covered by initial check, but for safety
+        // Should not happen due to check above, but:
         if (!args.quiet) buffer.forEach((line) => logger.log(line));
         return 2;
     }
@@ -1581,7 +1482,7 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
         err.exitCode === 2
           ? 'hint: pass a JSON file or pipe JSON/JSONL via stdin (use - for stdin)'
           : 'hint: re-run with --format=json to inspect the contract payload';
-      const example = 'example: pnpm -w ltp:inspect --format=json --input tools/ltp-inspect/fixtures/minimal.frames.jsonl';
+      const example = 'example: ltp inspect trace --format=json --input tools/ltp-inspect/fixtures/minimal.frames.jsonl';
       errorWriter(`ERROR: ${err.message}`);
       errorWriter(hint);
       errorWriter(example);
@@ -1599,17 +1500,12 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
   process.exit(exitCode);
 }
 
-// Check if running directly (CJS)
 if (typeof require !== 'undefined' && typeof module !== 'undefined' && require.main === module) {
   main().catch((err) => {
     console.error(err);
     process.exit(1);
   });
 } else if (typeof process !== 'undefined' && process.env.LTP_INSPECT_TEST_RUN === '1') {
-    // ESM Test Runner Hook
-    // The test runner sets LTP_INSPECT_TEST_RUN=1 and executes the file via `node`.
-    // In ESM, `require.main` is not available.
-    // We assume that if this env var is set, we should execute main.
     main(process.argv.slice(2)).catch((err) => {
         console.error(err);
         process.exit(1);

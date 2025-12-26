@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Cross-language SDK comparison benchmarks
 - Production-ready TOON codec implementations
 
+## [0.2.0] - 2025-12-26
+
+### Breaking Changes
+- **LTP Inspector CLI Refactor:** The `ltp inspect` command now strictly requires subcommands (`trace`, `replay`, `explain`). Implicit default behavior is removed.
+  - Old: `ltp inspect file.trace.json`
+  - New: `ltp inspect trace --input file.trace.jsonl`
+- **Format:** Input traces MUST be strictly newline-delimited JSON (JSONL). Legacy JSON arrays `[...]` are rejected with exit code 2.
+- **Artifacts:** Canonical traces renamed to `*.trace.jsonl` to reflect their format. `canonical-clean.json` is now `canonical-linear.jsonl`.
+- **Tooling:** Deprecated `ltp-inspect` binary references should be replaced with `ltp inspect`.
+
 ## [0.1.0] - 2025-02-20
 
 ### Added

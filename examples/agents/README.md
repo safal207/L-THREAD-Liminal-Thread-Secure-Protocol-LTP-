@@ -13,7 +13,7 @@ These files are in **JSONL** format (Newline Delimited JSON), where each line is
 
 ## Usage
 
-To verify the compliance of these traces using `ltp-inspect`:
+To verify the compliance of these traces using `ltp inspect`:
 
 ```bash
 # Verify the Safe Agent (Expect PASS)
