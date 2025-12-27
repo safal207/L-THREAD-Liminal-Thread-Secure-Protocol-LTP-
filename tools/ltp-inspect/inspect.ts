@@ -168,9 +168,6 @@ function parseArgs(argv: string[]): ParsedArgs {
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
           options.exportFormat.push(exportFmt);
       }
-    } else if (!options.input && !token.startsWith('-')) {
-      // Treat first bare token as input (legacy positional input support)
-      options.input = token;
     }
   }
 
