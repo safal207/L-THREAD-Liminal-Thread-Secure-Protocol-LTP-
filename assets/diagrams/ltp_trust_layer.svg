@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="360" viewBox="0 0 1000 360" role="img" aria-label="LTP trust layer diagram">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="10" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,3 L0,6 Z" fill="#333" />
+    </marker>
+    <style>
+      .box { fill: #f7f9fb; stroke: #2d3a4a; stroke-width: 1.5; rx: 10; }
+      .label { font: 14px Arial, sans-serif; fill: #1f2a33; }
+      .title { font: 16px Arial, sans-serif; font-weight: bold; fill: #1f2a33; }
+      .arrow { stroke: #333; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+    </style>
+  </defs>
+
+  <rect x="20" y="40" width="240" height="240" class="box" />
+  <text x="40" y="70" class="title">Agent Frameworks</text>
+  <text x="40" y="105" class="label">LangChain</text>
+  <text x="40" y="130" class="label">CrewAI</text>
+  <text x="40" y="155" class="label">AutoGPT</text>
+  <text x="40" y="180" class="label">MCP</text>
+
+  <rect x="300" y="100" width="240" height="120" class="box" />
+  <text x="320" y="150" class="title">LTP Trace Layer</text>
+  <text x="320" y="175" class="label">Deterministic State Transitions</text>
+
+  <rect x="580" y="90" width="240" height="140" class="box" />
+  <text x="600" y="130" class="title">Audit / Replay</text>
+  <text x="600" y="155" class="title">Drift Analytics</text>
+
+  <rect x="860" y="110" width="120" height="100" class="box" />
+  <text x="872" y="150" class="title">Regulator</text>
+  <text x="872" y="175" class="title">Enterprise</text>
+  <text x="872" y="200" class="title">Controls</text>
+
+  <path d="M260,160 L300,160" class="arrow" />
+  <path d="M540,160 L580,160" class="arrow" />
+  <path d="M820,160 L860,160" class="arrow" />
+</svg>

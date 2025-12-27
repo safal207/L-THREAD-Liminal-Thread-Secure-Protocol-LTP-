@@ -1,0 +1,17 @@
+flowchart LR
+  subgraph AgentFrameworks[Agent Frameworks]
+    LC[LangChain]
+    CA[CrewAI]
+    AG[AutoGPT]
+    MCP[MCP]
+  end
+
+  LTP[LTP Trace Layer<br/>Deterministic State Transitions]
+  ARA[Audit / Replay / Drift Analytics]
+  REC[Regulator & Enterprise Controls]
+
+  LC --> LTP
+  CA --> LTP
+  AG --> LTP
+  MCP --> LTP
+  LTP --> ARA --> REC
