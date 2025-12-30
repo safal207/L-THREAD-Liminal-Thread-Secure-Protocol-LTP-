@@ -2,7 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ltp-inspect contract v1.0",
   "type": "object",
-  "additionalProperties": false,
+  "x-canonRefs": [
+    "LTP-REQ-ORIENT-IDENTITY-1",
+    "LTP-REQ-ORIENT-DRIFT-1",
+    "LTP-REQ-ORIENT-ADMISSIBLE-FUTURES-1",
+    "LTP-REQ-TRACE-JSONL-1",
+    "LTP-REQ-TRACE-VERSION-1"
+  ],
+  "$comment": "Canon refs: LTP-REQ-ORIENT-IDENTITY-1, LTP-REQ-ORIENT-DRIFT-1, LTP-REQ-ORIENT-ADMISSIBLE-FUTURES-1, LTP-REQ-TRACE-JSONL-1, LTP-REQ-TRACE-VERSION-1",
+  "additionalProperties": true,
   "required": [
     "contract",
     "generated_at",

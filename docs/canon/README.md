@@ -8,3 +8,6 @@ They are not implementation details.
 
 If an interpretation of LTP contradicts this canon,
 the interpretation is wrong.
+
+Canonical requirements live in [docs/contracts/REQUIREMENTS.md](../contracts/REQUIREMENTS.md).
+Canon ↔ Contract mapping: [docs/contracts/CANON_MAP.md](../contracts/CANON_MAP.md).
