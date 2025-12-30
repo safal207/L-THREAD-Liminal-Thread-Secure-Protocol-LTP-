@@ -1,0 +1,386 @@
+{
+  "cases": [
+    {
+      "id": "A01",
+      "args": ["--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl"],
+      "expectExit": 2,
+      "stderr": { "includes": ["ERROR: Missing command"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "A02",
+      "args": ["--help"],
+      "expectExit": 0,
+      "stdout": { "includes": ["Usage:", "trace", "replay", "explain"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "A03",
+      "args": ["help"],
+      "expectExit": 0,
+      "stdout": { "includes": ["Usage:"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "A04",
+      "args": ["trace"],
+      "expectExit": 2,
+      "stderr": { "includes": ["ERROR: Missing --input"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "A05",
+      "args": ["trace", "--input"],
+      "expectExit": 2,
+      "stderr": { "includes": ["ERROR: Missing value for --input"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "A06",
+      "args": ["trace", "-h"],
+      "expectExit": 0,
+      "stdout": { "includes": ["Usage:"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "A07",
+      "args": ["replay", "--help"],
+      "expectExit": 0,
+      "stdout": { "includes": ["Usage:", "replay"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "A08",
+      "args": ["explain", "--help"],
+      "expectExit": 0,
+      "stdout": { "includes": ["Usage:", "explain"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "B01",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/legacy-array.json"],
+      "expectExit": 2,
+      "stderr": { "includes": ["Legacy JSON array format is not supported"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "B02",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/invalid-line.jsonl"],
+      "expectExit": 2,
+      "stderr": { "includes": ["Invalid JSONL line 1"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "B03",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/bad-multiobj.jsonl"],
+      "expectExit": 2,
+      "stderr": { "includes": ["Only one JSON object per line allowed"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "B04",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/whitespace-only.jsonl"],
+      "expectExit": 2,
+      "stderr": { "includes": ["Frame log is empty"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "B05",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/bom-spaces.jsonl", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "contract.name": "ltp-inspect",
+          "orientation.identity": "test"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "B06",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "contract.name": "ltp-inspect",
+          "input.type": "raw"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "B07",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--format=human", "--color=never"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "includes": ["LTP INSPECTOR", "identity: ct-1"],
+        "notMatches": ["\\u001b\\["]
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "B08",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--format=json", "--pretty", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "contract.version": "1.0"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "B09",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "notMatches": ["RESULT:"]
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "C01",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/canonical-linear.jsonl", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "orientation.identity": "canonical"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "C02",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/canonical-linear.jsonl", "--format=human", "--color=never"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "includes": ["identity:", "RESULT:"],
+        "notMatches": ["\\u001b\\["]
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "C03",
+      "args": ["replay", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl"],
+      "expectExit": 0,
+      "stdout": { "includes": ["Replaying", "frames"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "C04",
+      "args": ["explain", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--at", "step-t1"],
+      "expectExit": 0,
+      "stdout": { "includes": ["Explain @ step-t1", "identity:"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "C05",
+      "args": ["trace", "--input", "-", "--format=json", "--quiet"],
+      "stdin": "{\"v\":\"0.1\",\"type\":\"orientation\",\"id\":\"s0\",\"continuity_token\":\"ct-stdin\"}\n{\"v\":\"0.1\",\"type\":\"focus_snapshot\",\"id\":\"s1\",\"payload\":{\"drift\":0.2},\"continuity_token\":\"ct-stdin\"}\n",
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "orientation.identity": "ct-stdin"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "C06",
+      "args": ["trace", "--input", "-", "--format=json", "--quiet"],
+      "stdin": "{\"v\":\"0.1\"\n",
+      "expectExit": 2,
+      "stderr": { "includes": ["Invalid JSONL line 1"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "D01",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--compliance", "fintech", "--format=json", "--quiet"],
+      "expectExit": 2,
+      "stderr": { "includes": ["TRACE INTEGRITY ERROR: unchecked"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "D02",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.audit.trace.jsonl", "--compliance", "fintech", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "compliance.trace_integrity": "verified",
+          "audit_summary.verdict": "PASS"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "D03",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/bad-integrity.audit.trace.jsonl", "--compliance", "fintech", "--format=json", "--quiet"],
+      "expectExit": 2,
+      "stdout": {
+        "json": {
+          "compliance.trace_integrity": "broken",
+          "audit_summary.verdict": "FAIL"
+        }
+      },
+      "stderr": { "includes": ["TRACE INTEGRITY ERROR: broken"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "D04",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.audit.trace.jsonl", "--profile", "fintech", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "compliance.profile": "fintech",
+          "audit_summary.verdict": "PASS"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "D05",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.audit.trace.jsonl", "--replay-check", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "compliance.replay_determinism": "ok"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "D06",
+      "args": ["trace", "--input", "examples/agents/allowed-critical.trace.jsonl", "--compliance", "agentic", "--format=json", "--quiet"],
+      "expectExit": 2,
+      "stdout": {
+        "json": {
+          "audit_summary.verdict": "FAIL",
+          "compliance.trace_integrity": "verified"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "D07",
+      "args": ["trace", "--input", "examples/agents/blocked-critical.trace.jsonl", "--compliance", "agentic", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "audit_summary.verdict": "PASS",
+          "compliance.trace_integrity": "verified"
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "E01",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/continuity-outage.trace.jsonl", "--continuity", "--format=human", "--color=never"],
+      "expectExit": [0, 1],
+      "stdout": { "includes": ["CONTINUITY ROUTING INSPECTION", "System Remained Coherent"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E02",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/continuity-outage.trace.jsonl", "--continuity", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": {
+        "json": {
+          "continuity_routing.checked": true,
+          "continuity_routing.routing_stats.executed": { "__type": "number" }
+        }
+      },
+      "tags": ["must"]
+    },
+    {
+      "id": "E03",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/continuity-failure.trace.jsonl", "--continuity", "--strict", "--format=human", "--color=never"],
+      "expectExit": 2,
+      "stdout": { "includes": ["System Remained Coherent: NO", "Continuity Violation"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E04",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/unsorted-branches.jsonl", "--format=human", "--color=never"],
+      "expectExit": 1,
+      "stderr": { "includes": ["normalized output"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E05",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/unsorted-branches.jsonl", "--strict", "--format=human", "--color=never"],
+      "expectExit": 2,
+      "stderr": { "includes": ["non-canonical input"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E06",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/missing-version.jsonl", "--format=human", "--color=never"],
+      "expectExit": 2,
+      "stderr": { "includes": ["missing trace version"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E07",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/mixed-versions.jsonl", "--format=human", "--color=never"],
+      "expectExit": 2,
+      "stderr": { "includes": ["mixed trace versions detected"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E08",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/unsupported-version.jsonl", "--format=human", "--color=never"],
+      "expectExit": 2,
+      "stderr": { "includes": ["unsupported trace version"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E09",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--format=json", "--quiet", "--color=never"],
+      "expectExit": [0, 1],
+      "stdout": { "json": { "contract.schema": { "__type": "string" } } },
+      "tags": ["must"]
+    },
+    {
+      "id": "E10",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--format=json", "--quiet", "--continuity"],
+      "expectExit": [0, 1],
+      "stdout": { "json": { "continuity_routing.checked": true } },
+      "tags": ["must"]
+    },
+    {
+      "id": "E11",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.audit.trace.jsonl", "--strict", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": { "json": { "compliance.trace_integrity": "verified" } },
+      "tags": ["must"]
+    },
+    {
+      "id": "E12",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/bad-integrity.audit.trace.jsonl", "--strict", "--format=json", "--quiet"],
+      "expectExit": 2,
+      "stderr": { "includes": ["TRACE INTEGRITY ERROR: broken"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E13",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.audit.trace.jsonl", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": { "json": { "input.type": "audit_log" } },
+      "tags": ["must"]
+    },
+    {
+      "id": "E14",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--format=human", "--color=never", "--continuity"],
+      "expectExit": [0, 1],
+      "stdout": { "includes": ["CONTINUITY ROUTING INSPECTION"] },
+      "tags": ["must"]
+    },
+    {
+      "id": "E15",
+      "args": ["trace", "--input", "tools/ltp-inspect/fixtures/continuity-outage.trace.jsonl", "--format=json", "--quiet"],
+      "expectExit": [0, 1],
+      "stdout": { "json": { "continuity.preserved": { "__type": "boolean" } } },
+      "tags": ["must"]
+    }
+  ]
+}
