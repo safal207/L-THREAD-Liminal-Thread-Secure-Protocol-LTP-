@@ -1,0 +1,56 @@
+{
+  "contract": {
+    "name": "ltp-inspect",
+    "version": "1.0",
+    "schema": "docs/contracts/ltp-inspect.v1.schema.json"
+  },
+  "generated_at": "2024-01-01T00:00:00.000Z",
+  "tool": {
+    "name": "ltp:inspect",
+    "build": "dev"
+  },
+  "input": {
+    "source": "file",
+    "path": "tools/ltp-inspect/fixtures/minimal.frames.jsonl",
+    "frames": 3,
+    "format": "jsonl",
+    "type": "raw"
+  },
+  "orientation": {
+    "identity": "ct-1",
+    "stable": true,
+    "drift_level": "medium",
+    "drift_history": [
+      {
+        "id": "t1",
+        "value": 0.55
+      }
+    ]
+  },
+  "continuity": {
+    "preserved": true,
+    "notes": [],
+    "token": "ct-1"
+  },
+  "branches": [
+    {
+      "id": "A",
+      "confidence": 0.62,
+      "status": "admissible"
+    }
+  ],
+  "futures": {
+    "admissible": [
+      {
+        "id": "A",
+        "confidence": 0.62,
+        "status": "admissible"
+      }
+    ],
+    "degraded": [],
+    "blocked": []
+  },
+  "notes": [
+    "retry updated drift"
+  ]
+}

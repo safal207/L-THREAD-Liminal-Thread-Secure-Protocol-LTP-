@@ -57,6 +57,16 @@ class CliError extends Error {
   }
 }
 
+let readStdinOverride: string | undefined;
+
+function requireValue(argv: string[], index: number, flag: string): string {
+  const value = argv[index + 1];
+  if (!value || (value.startsWith('-') && value !== '-')) {
+    throw new CliError(`Missing value for ${flag}`, 2);
+  }
+  return value;
+}
+
 function parseArgs(argv: string[]): ParsedArgs {
   const commands: Command[] = ['trace', 'replay', 'explain', 'help'];
   let positionalCommand: Command | undefined;
@@ -105,13 +115,15 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (token.startsWith('--input=')) {
       options.input = token.split('=').slice(1).join('=');
     } else if (token === '--input' || token === '-i') {
-      options.input = argv[++i];
+      options.input = requireValue(argv, i, '--input');
+      i += 1;
     } else if (token.startsWith('--format=')) {
       const format = token.split('=').slice(1).join('=') as OutputFormat;
       options.format = format === 'human' || format === 'json' ? format : 'human';
     } else if (token === '--format') {
-      const format = argv[++i] as OutputFormat;
+      const format = requireValue(argv, i, '--format') as OutputFormat;
       options.format = format === 'human' || format === 'json' ? format : 'human';
+      i += 1;
     } else if (token === '--json') {
       options.format = 'json';
     } else if (token === '--text' || token === '--human') {
@@ -121,23 +133,27 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (token.startsWith('--from=')) {
       options.from = token.split('=').slice(1).join('=');
     } else if (token === '--from') {
-      options.from = argv[++i];
+      options.from = requireValue(argv, i, '--from');
+      i += 1;
     } else if (token.startsWith('--branch=')) {
       options.branch = token.split('=').slice(1).join('=');
     } else if (token === '--branch') {
-      options.branch = argv[++i];
+      options.branch = requireValue(argv, i, '--branch');
+      i += 1;
     } else if (token === '--strict') {
       options.strict = true;
     } else if (token.startsWith('--at=')) {
       options.at = token.split('=').slice(1).join('=');
     } else if (token === '--at') {
-      options.at = argv[++i];
+      options.at = requireValue(argv, i, '--at');
+      i += 1;
     } else if (token.startsWith('--color=')) {
       const mode = token.split('=').slice(1).join('=') as ColorMode;
       options.color = ['auto', 'always', 'never'].includes(mode) ? mode : 'auto';
     } else if (token === '--color') {
-      const mode = argv[++i] as ColorMode;
+      const mode = requireValue(argv, i, '--color') as ColorMode;
       options.color = ['auto', 'always', 'never'].includes(mode) ? mode : 'auto';
+      i += 1;
     } else if (token === '--quiet' || token === '-q') {
       options.quiet = true;
     } else if (token === '--verbose' || token === '-v') {
@@ -145,15 +161,18 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (token.startsWith('--output=')) {
       options.output = token.split('=').slice(1).join('=');
     } else if (token === '--output' || token === '-o') {
-      options.output = argv[++i];
+      options.output = requireValue(argv, i, '--output');
+      i += 1;
     } else if (token.startsWith('--compliance=')) {
       options.compliance = token.split('=').slice(1).join('=');
     } else if (token === '--compliance') {
-      options.compliance = argv[++i];
+      options.compliance = requireValue(argv, i, '--compliance');
+      i += 1;
     } else if (token.startsWith('--profile=')) {
       options.profile = token.split('=').slice(1).join('=');
     } else if (token === '--profile') {
-      options.profile = argv[++i];
+      options.profile = requireValue(argv, i, '--profile');
+      i += 1;
     } else if (token === '--replay-check') {
       options.replayCheck = true;
     } else if (token === '--continuity') {
@@ -162,22 +181,33 @@ function parseArgs(argv: string[]): ParsedArgs {
       const exportFmt = token.split('=').slice(1).join('=') as ExportFormat;
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
           options.exportFormat.push(exportFmt);
+      } else {
+          throw new CliError(`Unsupported export format: ${exportFmt}`, 2);
       }
     } else if (token === '--export') {
-      const exportFmt = argv[++i] as ExportFormat;
+      const exportFmt = requireValue(argv, i, '--export') as ExportFormat;
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
           options.exportFormat.push(exportFmt);
+      } else {
+          throw new CliError(`Unsupported export format: ${exportFmt}`, 2);
       }
+      i += 1;
     }
   }
 
   // Deduplicate export formats
   options.exportFormat = Array.from(new Set(options.exportFormat));
+  if (options.profile && !options.compliance) {
+    options.compliance = options.profile;
+  }
 
   return options;
 }
 
 function readStdin(): string {
+  if (readStdinOverride !== undefined) {
+    return readStdinOverride;
+  }
   return fs.readFileSync(0, 'utf-8');
 }
 
@@ -1339,28 +1369,36 @@ function printHuman(summary: InspectSummary, writer: Writer): void {
   writer(formatHuman(summary));
 }
 
-export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> = console): number {
+export function execute(
+  argv: string[],
+  logger: Pick<Console, 'log' | 'error'> = console,
+  io?: { stdin?: string },
+): number {
   const buffer: string[] = [];
   const writer = (message: string) => buffer.push(message);
   const errorWriter = (message: string) => logger.error(message);
-  const args = parseArgs(argv);
+  const previousStdin = readStdinOverride;
+
+  if (io?.stdin !== undefined) {
+    readStdinOverride = io.stdin;
+  }
 
   try {
+    const args = parseArgs(argv);
+    if (args.explicitHelp) {
+      printHelp(writer);
+      if (!args.quiet) buffer.forEach((line) => logger.log(line));
+      return 0;
+    }
     if (!args.command || args.command === 'help') {
-        if (args.explicitHelp) {
-            printHelp(writer);
-            if (!args.quiet) buffer.forEach((line) => logger.log(line));
-            return 0;
-        } else {
-            // Implicit default is removed. Must exit 2 with help.
-            errorWriter('ERROR: Missing command (trace | replay | explain)');
-            errorWriter('hint: ltp inspect trace --input <file.jsonl>');
-            errorWriter('hint: ltp inspect --help');
+        // Implicit default is removed. Must exit 2 with help.
+        errorWriter('ERROR: Missing command (trace | replay | explain)');
+        errorWriter('hint: ltp inspect trace --input <file.jsonl>');
+        errorWriter('hint: ltp inspect --help');
 
-            if (!args.quiet) buffer.forEach((line) => logger.error(line));
-            process.exitCode = 2;
-            return 2;
-        }
+        if (!args.quiet) buffer.forEach((line) => logger.error(line));
+        process.exitCode = 2;
+        return 2;
     }
 
     if (!args.input) {
@@ -1430,17 +1468,13 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
           } else if (hasCanonicalGaps) {
             errorWriter(`WARN: normalized output (non-canonical input): ${normalizations.join('; ')}`);
           }
-          if (args.format === 'human') {
+          if (args.format === 'human' && !args.quiet) {
             writer('');
             writer(`RESULT: ${statusText}  exit: ${exitCode}`);
           }
 
           if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
-          if (!args.quiet) {
-            buffer.forEach((line) => logger.log(line));
-          } else {
-            logger.log(`RESULT: ${statusText}  exit: ${exitCode}`);
-          }
+          buffer.forEach((line) => logger.log(line));
           return exitCode;
         }
       case 'replay':
@@ -1480,6 +1514,8 @@ export function execute(argv: string[], logger: Pick<Console, 'log' | 'error'> =
     errorWriter(`Runtime failure: ${(err as Error).message}`);
     process.exitCode = 3;
     return 3;
+  } finally {
+    readStdinOverride = previousStdin;
   }
 }
 
