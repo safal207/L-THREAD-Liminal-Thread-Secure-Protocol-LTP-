@@ -1524,7 +1524,9 @@ export function execute(
       case 'replay':
         handleReplay(args.input as string, args.from, writer);
         if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
-        buffer.forEach((line) => logger.log(line));
+        if (!args.quiet) {
+          buffer.forEach((line) => logger.log(line));
+        }
         break;
       case 'explain':
         {
@@ -1533,7 +1535,9 @@ export function execute(
             throw new CliError(`Contract violation: ${violations.join('; ')}`, 2);
           }
           if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
-          buffer.forEach((line) => logger.log(line));
+          if (!args.quiet) {
+            buffer.forEach((line) => logger.log(line));
+          }
         }
         break;
       default:
@@ -1546,7 +1550,7 @@ export function execute(
     if (err instanceof CliError) {
       const hint =
         err.exitCode === 2
-          ? 'hint: pass a JSON file or pipe JSON/JSONL via stdin (use - for stdin)'
+          ? 'hint: pass a JSONL file or pipe JSONL via stdin (use - for stdin)'
           : 'hint: re-run with --format=json to inspect the contract payload';
       const example = 'example: ltp inspect trace --format=json --input tools/ltp-inspect/fixtures/minimal.frames.jsonl';
       errorWriter(`ERROR: ${err.message}`);

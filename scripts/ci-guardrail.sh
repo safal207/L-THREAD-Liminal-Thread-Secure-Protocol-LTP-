@@ -38,7 +38,7 @@ fi
 # We only scan places where humans copy/paste commands: docs/, examples/, scripts/, workflows
 # We exclude schema files and common JSON configs.
 LEGACY_INPUT_JSON_HITS=$(
-  grep -R --line-number --extended-regexp --fixed-strings -- "--input" \
+  grep -R --line-number --extended-regexp -- "--input" \
     .github/workflows docs examples scripts \
     --exclude-dir=.git \
     --exclude-dir=node_modules \
@@ -63,16 +63,19 @@ if [ -n "$LEGACY_INPUT_JSON_HITS" ]; then
 fi
 
 # 3. Check for deprecated `ltp-inspect` usage in docs, examples, scripts, workflows
-if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows --exclude-dir=.git --exclude-dir=node_modules > /dev/null; then
+if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
+  --exclude-dir=.git --exclude-dir=node_modules --exclude="ci-guardrail.sh" > /dev/null; then
   # Filter out schema/contract references and file paths (tools/ltp-inspect)
-  if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows --exclude-dir=node_modules \
+  if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
+    --exclude-dir=node_modules --exclude="ci-guardrail.sh" \
     | grep -v "schema.json" \
     | grep -v "contract" \
     | grep -v "ltp-inspect.v1.md" \
     | grep -v "tools/ltp-inspect" \
     > /dev/null; then
     echo "FAIL: Found references to legacy 'ltp-inspect'. Please use 'ltp inspect'."
-    grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows --exclude-dir=node_modules \
+    grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
+      --exclude-dir=node_modules --exclude="ci-guardrail.sh" \
       | grep -v "schema.json" \
       | grep -v "contract" \
       | grep -v "ltp-inspect.v1.md" \
@@ -90,6 +93,8 @@ INSPECT_NO_SUBCOMMAND_HITS=$(
     --exclude-dir=build \
     --exclude-dir=.turbo \
   | grep -vE "ltp inspect[[:space:]]+(trace|replay|explain|help)\\b" \
+  | grep -vE "ltp inspect[[:space:]]+--help\\b" \
+  | grep -vE "ltp inspect[[:space:]]+-h\\b" \
   || true
 )
 
