@@ -99,7 +99,9 @@ INSPECT_NO_SUBCOMMAND_HITS=$(
     --exclude-dir=build \
     --exclude-dir=.turbo \
     "^[[:space:]]*(pnpm[[:space:]]+)?ltp inspect" docs examples scripts .github/workflows \
+  | grep -vE "ltp inspect-report\\b" \
   | grep -vE "ltp inspect[[:space:]]+(trace|replay|explain|help)\\b" \
+  | grep -vE "ltp inspect[[:space:]]+help\\b" \
   | grep -vE "ltp inspect[[:space:]]+--help\\b" \
   | grep -vE "ltp inspect[[:space:]]+-h\\b" \
   || true

@@ -17,7 +17,11 @@ const TOOL = {
 } as const;
 
 const SUPPORTED_TRACE_VERSIONS = ['0.1'] as const;
-const JSONL_HINT = "hint: Try: jq -c '.[]' input.json > output.jsonl";
+const JSONL_HINT =
+  "hint: Convert JSON array → JSONL:\n" +
+  "  jq -c '.[]' input.json > output.jsonl\n" +
+  "  # Windows PowerShell:\n" +
+  "  (Get-Content input.json | ConvertFrom-Json) | % { $_ | ConvertTo-Json -Compress } | Set-Content output.jsonl";
 
 type OutputFormat = 'json' | 'human';
 type ExportFormat = 'json' | 'jsonld' | 'pdf';
@@ -1524,9 +1528,7 @@ export function execute(
       case 'replay':
         handleReplay(args.input as string, args.from, writer);
         if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
-        if (!args.quiet) {
-          buffer.forEach((line) => logger.log(line));
-        }
+        buffer.forEach((line) => logger.log(line));
         break;
       case 'explain':
         {
@@ -1535,9 +1537,7 @@ export function execute(
             throw new CliError(`Contract violation: ${violations.join('; ')}`, 2);
           }
           if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
-          if (!args.quiet) {
-            buffer.forEach((line) => logger.log(line));
-          }
+          buffer.forEach((line) => logger.log(line));
         }
         break;
       default:
