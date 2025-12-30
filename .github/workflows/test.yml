@@ -52,6 +52,16 @@ jobs:
           set -euxo pipefail
           pnpm fetch || echo "pnpm fetch skipped (offline)"
           pnpm -w install --prefer-offline --frozen-lockfile
+      - name: Run inspector contract tests (fast)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pnpm -w vitest run tools/ltp-inspect/inspect.test.ts
+      - name: Run inspector matrix tests (must-have)
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pnpm -w vitest run tools/ltp-inspect/inspect.matrix.test.ts
       - name: Build packaged inspector CLI
         shell: bash
         run: |

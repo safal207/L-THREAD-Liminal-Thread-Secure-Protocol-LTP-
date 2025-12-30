@@ -1,0 +1,34 @@
+
+CONTINUITY ROUTING INSPECTION
+System Remained Coherent: YES
+State Transitions Observed: HEALTHY -> FAILED -> HEALTHY
+Routing Decisions: Executed=2 Deferred=1 Replayed=0 Frozen=0
+LTP INSPECTOR  v1.0
+input: tools/ltp-inspect/fixtures/continuity-outage.trace.jsonl  time: 2024-01-01T00:00:00.000Z
+
+IDENTITY
+identity: unknown
+continuity: preserved
+
+ORIENTATION
+stable: yes
+focus_momentum: unknown
+drift: unknown
+drift_history: (none)
+
+FUTURES (admissible / degraded / blocked)
+degraded:
+- admissible score=NA status=degraded
+- decision score=NA status=degraded
+- reason score=NA status=degraded
+- targetState score=NA status=degraded
+
+NOTES / WARNINGS
+- branch targetState missing confidence (tooling MAY normalize)
+- branch admissible missing confidence (tooling MAY normalize)
+- branch decision missing confidence (tooling MAY normalize)
+- branch reason missing confidence (tooling MAY normalize)
+- branches reordered to deterministic confidence order
+- no drift snapshots observed (focus_snapshot missing)
+
+RESULT: WARN  exit: 1

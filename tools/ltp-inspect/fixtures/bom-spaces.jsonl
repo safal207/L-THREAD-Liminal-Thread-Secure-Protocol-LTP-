@@ -1,0 +1,2 @@
+﻿  {"v":"0.1","type":"orientation","id":"bom-1","continuity_token":"test"}
+  {"v":"0.1","type":"focus_snapshot","id":"bom-2","payload":{"drift":0.1},"continuity_token":"test"}

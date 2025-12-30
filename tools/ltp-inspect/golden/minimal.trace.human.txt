@@ -1,0 +1,19 @@
+LTP INSPECTOR  v1.0
+input: tools/ltp-inspect/fixtures/minimal.frames.jsonl  time: 2024-01-01T00:00:00.000Z
+
+IDENTITY
+identity: ct-1
+continuity: preserved (ct-1)
+
+ORIENTATION
+stable: yes
+focus_momentum: unknown
+drift: medium
+drift_history: t1:0.55
+
+FUTURES (admissible / degraded / blocked)
+admissible:
+- A score=0.62 status=admissible
+
+NOTES / WARNINGS
+- retry updated drift
