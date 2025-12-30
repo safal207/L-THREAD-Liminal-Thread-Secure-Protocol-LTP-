@@ -28,7 +28,7 @@ const whitespaceOnlyFixture = path.join(__dirname, 'fixtures', 'whitespace-only.
 const minimalAuditFixture = path.join(__dirname, 'fixtures', 'minimal.audit.trace.jsonl');
 const badIntegrityAuditFixture = path.join(__dirname, 'fixtures', 'bad-integrity.audit.trace.jsonl');
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.jsonl');
-const goldenMinimalJson = path.join(__dirname, 'golden', 'minimal.trace.json');
+const goldenMinimalJson = path.join(__dirname, 'golden', 'minimal.trace.golden.json');
 const goldenMinimalHuman = path.join(__dirname, 'golden', 'minimal.trace.human.txt');
 const goldenFintechPass = path.join(__dirname, 'golden', 'fintech.pass.json');
 const goldenFintechFail = path.join(__dirname, 'golden', 'fintech.fail.json');
@@ -512,9 +512,17 @@ describe('ltp-inspect golden summary', () => {
 });
 
 describe('ltp inspect cli', () => {
-  it('boots without crashing', async () => {
+  it('boots: missing command errors, minimal args succeed', async () => {
     const distPath = await buildInspectCli();
-    const result = await runCommand('node', [distPath, 'trace', sampleTrace], {
+    const noArgs = await runCommand('node', [distPath], {
+      env: { ...process.env, LTP_INSPECT_TEST_RUN: '1' },
+    });
+
+    expect(noArgs.exitCode).toBe(2);
+    expect((noArgs.stderr + noArgs.stdout).toLowerCase()).toContain('missing command');
+    expect((noArgs.stderr + noArgs.stdout).toLowerCase()).toContain('hint');
+
+    const result = await runCommand('node', [distPath, 'trace', '--input', minimalFixture, '--format=json', '--quiet'], {
       env: { ...process.env, LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z', LTP_INSPECT_TEST_RUN: '1' },
     });
 
