@@ -1395,7 +1395,7 @@ export function execute(
     const args = parseArgs(argv);
     if (args.explicitHelp) {
       printHelp(writer);
-      if (!args.quiet) buffer.forEach((line) => logger.log(line));
+      buffer.forEach((line) => logger.log(line));
       return 0;
     }
     if (!args.command || args.command === 'help') {
