@@ -577,16 +577,29 @@ describe('ltp inspect cli', () => {
     const logs: string[] = [];
     const errors: string[] = [];
 
-    const exitCode = execute(['trace', '--input', bomSpacesFixture, '--format=json'], {
-      log: (m) => logs.push(m),
-      error: (m) => errors.push(m),
-    });
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
+    const bomFixture = path.join(tmpDir, 'bom-spaces.jsonl');
 
-    expect([0, 1]).toContain(exitCode);
-    expectNoFatal(errors);
+    try {
+      fs.writeFileSync(
+        bomFixture,
+        '\uFEFF  {"v":"0.1","type":"orientation","id":"bom-1","continuity_token":"test"}\n  {"v":"0.1","type":"focus_snapshot","id":"bom-2","payload":{"drift":0.1},"continuity_token":"test"}\n',
+        'utf8',
+      );
 
-    const output = JSON.parse(logs.join('\n')) as any;
-    expect(output.orientation.identity).toBe('test');
+      const exitCode = execute(['trace', '--input', bomFixture, '--format=json'], {
+        log: (m) => logs.push(m),
+        error: (m) => errors.push(m),
+      });
+
+      expect([0, 1]).toContain(exitCode);
+      expectNoFatal(errors);
+
+      const output = JSON.parse(logs.join('\n')) as any;
+      expect(output.orientation.identity).toBe('test');
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it('rejects whitespace-only traces', () => {

@@ -94,6 +94,7 @@
           "orientation.identity": "test"
         }
       },
+      "notes": "leading spaces (BOM handled in dedicated test)",
       "tags": ["must"]
     },
     {
