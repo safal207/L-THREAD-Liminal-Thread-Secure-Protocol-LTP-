@@ -1385,6 +1385,7 @@ function printHelp(writer: Writer): void {
   writer('  JSON (v1 contract) with deterministic ordering for CI. Additional fields remain optional.');
   writer('  Human format shows identity, focus momentum, drift history, continuity, and future branches with rationale.');
   writer('  --strict treats canonicalization needs as contract violations (exit 2).');
+  writer('  --quiet suppresses banners/RESULT lines (primary report output remains).');
   writer('');
   writer('Exit codes:');
   writer('  0 OK — contract produced');
