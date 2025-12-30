@@ -36,6 +36,13 @@
       "tags": ["must"]
     },
     {
+      "id": "A05b",
+      "args": ["trace", "--input="],
+      "expectExit": 2,
+      "stderr": { "includes": ["ERROR: Missing value for --input"] },
+      "tags": ["must"]
+    },
+    {
       "id": "A06",
       "args": ["trace", "-h"],
       "expectExit": 0,

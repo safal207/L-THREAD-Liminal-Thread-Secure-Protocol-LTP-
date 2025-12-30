@@ -1,5 +1,9 @@
 name: Inspector Deep Reliability Suite
 
+concurrency:
+  group: inspect-deep-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   schedule:

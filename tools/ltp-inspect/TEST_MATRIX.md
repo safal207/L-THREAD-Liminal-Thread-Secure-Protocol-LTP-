@@ -28,6 +28,7 @@ These are the **must**-tagged cases in `TEST_MATRIX.json`. (The automated suite 
 | A03 | inspect help | — | — | 0 | stdout includes `Usage:` |
 | A04 | trace | — | — | 2 | stderr includes `ERROR: Missing --input` |
 | A05 | trace | — | `--input` | 2 | stderr indicates missing input value |
+| A05b | trace | — | `--input=` | 2 | stderr indicates missing input value |
 | A06 | trace -h | — | — | 0 | help shown |
 | A07 | replay --help | — | — | 0 | help shows replay usage |
 | A08 | explain --help | — | — | 0 | help shows explain usage |

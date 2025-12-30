@@ -67,6 +67,14 @@ function requireValue(argv: string[], index: number, flag: string): string {
   return value;
 }
 
+function requireInlineValue(token: string, flag: string): string {
+  const value = token.split('=').slice(1).join('=');
+  if (!value) {
+    throw new CliError(`Missing value for ${flag}`, 2);
+  }
+  return value;
+}
+
 function parseArgs(argv: string[]): ParsedArgs {
   const commands: Command[] = ['trace', 'replay', 'explain', 'help'];
   let positionalCommand: Command | undefined;
@@ -113,12 +121,12 @@ function parseArgs(argv: string[]): ParsedArgs {
     if (token === '--help' || token === '-h') {
       // already handled
     } else if (token.startsWith('--input=')) {
-      options.input = token.split('=').slice(1).join('=');
+      options.input = requireInlineValue(token, '--input');
     } else if (token === '--input' || token === '-i') {
       options.input = requireValue(argv, i, '--input');
       i += 1;
     } else if (token.startsWith('--format=')) {
-      const format = token.split('=').slice(1).join('=') as OutputFormat;
+      const format = requireInlineValue(token, '--format') as OutputFormat;
       options.format = format === 'human' || format === 'json' ? format : 'human';
     } else if (token === '--format') {
       const format = requireValue(argv, i, '--format') as OutputFormat;
@@ -131,24 +139,24 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (token === '--pretty') {
       options.pretty = true;
     } else if (token.startsWith('--from=')) {
-      options.from = token.split('=').slice(1).join('=');
+      options.from = requireInlineValue(token, '--from');
     } else if (token === '--from') {
       options.from = requireValue(argv, i, '--from');
       i += 1;
     } else if (token.startsWith('--branch=')) {
-      options.branch = token.split('=').slice(1).join('=');
+      options.branch = requireInlineValue(token, '--branch');
     } else if (token === '--branch') {
       options.branch = requireValue(argv, i, '--branch');
       i += 1;
     } else if (token === '--strict') {
       options.strict = true;
     } else if (token.startsWith('--at=')) {
-      options.at = token.split('=').slice(1).join('=');
+      options.at = requireInlineValue(token, '--at');
     } else if (token === '--at') {
       options.at = requireValue(argv, i, '--at');
       i += 1;
     } else if (token.startsWith('--color=')) {
-      const mode = token.split('=').slice(1).join('=') as ColorMode;
+      const mode = requireInlineValue(token, '--color') as ColorMode;
       options.color = ['auto', 'always', 'never'].includes(mode) ? mode : 'auto';
     } else if (token === '--color') {
       const mode = requireValue(argv, i, '--color') as ColorMode;
@@ -159,17 +167,17 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (token === '--verbose' || token === '-v') {
       options.verbose = true;
     } else if (token.startsWith('--output=')) {
-      options.output = token.split('=').slice(1).join('=');
+      options.output = requireInlineValue(token, '--output');
     } else if (token === '--output' || token === '-o') {
       options.output = requireValue(argv, i, '--output');
       i += 1;
     } else if (token.startsWith('--compliance=')) {
-      options.compliance = token.split('=').slice(1).join('=');
+      options.compliance = requireInlineValue(token, '--compliance');
     } else if (token === '--compliance') {
       options.compliance = requireValue(argv, i, '--compliance');
       i += 1;
     } else if (token.startsWith('--profile=')) {
-      options.profile = token.split('=').slice(1).join('=');
+      options.profile = requireInlineValue(token, '--profile');
     } else if (token === '--profile') {
       options.profile = requireValue(argv, i, '--profile');
       i += 1;
@@ -178,7 +186,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (token === '--continuity') {
       options.continuity = true;
     } else if (token.startsWith('--export=')) {
-      const exportFmt = token.split('=').slice(1).join('=') as ExportFormat;
+      const exportFmt = requireInlineValue(token, '--export') as ExportFormat;
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
           options.exportFormat.push(exportFmt);
       } else {
