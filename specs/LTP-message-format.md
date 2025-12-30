@@ -55,6 +55,20 @@ The `meta` object is optional but recommended for production systems:
     "trace_id": "string",
     "parent_span_id": "string",
     "user_agent": "string",
+    "causality": {
+      "cause": {
+        "kind": "string",
+        "ref": "string"
+      },
+      "context": {
+        "state_ref": "string",
+        "inputs": ["string"]
+      },
+      "horizon": {
+        "window": "string",
+        "constraints": ["string"]
+      }
+    },
     "affect": {
       "valence": 0.3,
       "arousal": -0.2
@@ -70,6 +84,10 @@ The `meta` object is optional but recommended for production systems:
 | `trace_id` | string | No | Distributed tracing ID |
 | `parent_span_id` | string | No | Parent span for distributed tracing |
 | `user_agent` | string | No | Client user agent string |
+| `causality` | object | Conditional | Required for any value transfer, state transition, agent decision, or autonomous action involving value/risk |
+| `causality.cause` | object | Conditional | Machine-readable cause (see 2.3.1) |
+| `causality.context` | object | Conditional | Context snapshot or references (see 2.3.1) |
+| `causality.horizon` | object | Conditional | Consequence/risk bounds (see 2.3.1) |
 | `affect` | object | No | Emotional state metadata (for LRI and semantic layers) |
 | `affect.valence` | number | No | Emotional valence: -1 (negative) to 1 (positive) |
 | `affect.arousal` | number | No | Arousal level: -1 (calm) to 1 (excited) |
@@ -79,6 +97,41 @@ The `meta` object is optional but recommended for production systems:
 - `affect` and `context_tag` are optional fields designed for higher-level semantic protocols like LRI
 - LTP implementations MUST support these fields but MUST NOT interpret their meaning
 - These fields provide hooks for future semantic layers without imposing specific requirements
+
+#### 2.3.1 Causality Axiom Schema (Non-Optional for Qualifying Operations)
+
+For any LTP-traced operation involving value transfer, state transition, AI agent decision, or autonomous action with value/risk implications, `meta.causality` is **required**. Missing `cause`, `context`, or `horizon` makes the operation protocol-invalid and MUST be rejected **pre-commit**.
+
+Minimal schema:
+
+```json
+{
+  "causality": {
+    "cause": {
+      "kind": "string",
+      "ref": "string"
+    },
+    "context": {
+      "state_ref": "string",
+      "inputs": ["string"]
+    },
+    "horizon": {
+      "window": "string",
+      "constraints": ["string"]
+    }
+  }
+}
+```
+
+Field intent:
+- `cause.kind`: machine-readable category (e.g., `policy`, `event`, `request`, `agent_rule`)
+- `cause.ref`: identifier for the originating cause (event ID, rule ID, or trace reference)
+- `context.state_ref`: pointer to the relevant state snapshot (hash, URI, or trace pointer)
+- `context.inputs`: list of input references used to form the decision
+- `horizon.window`: explicit consequence window (e.g., `1h`, `30d`, `bounded`)
+- `horizon.constraints`: explicit bounds or limits on acceptable consequences/risk
+
+LTP implementations MUST preserve `meta.causality` intact as part of the immutable trace and make it queryable for audit tooling.
 
 ### 2.4 Content Encoding (v0.3+)
 
