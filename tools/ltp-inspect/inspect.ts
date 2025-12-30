@@ -1385,21 +1385,20 @@ export function execute(
 
   try {
     const args = parseArgs(argv);
+    if (args.explicitHelp) {
+      printHelp(writer);
+      if (!args.quiet) buffer.forEach((line) => logger.log(line));
+      return 0;
+    }
     if (!args.command || args.command === 'help') {
-        if (args.explicitHelp) {
-            printHelp(writer);
-            if (!args.quiet) buffer.forEach((line) => logger.log(line));
-            return 0;
-        } else {
-            // Implicit default is removed. Must exit 2 with help.
-            errorWriter('ERROR: Missing command (trace | replay | explain)');
-            errorWriter('hint: ltp inspect trace --input <file.jsonl>');
-            errorWriter('hint: ltp inspect --help');
+        // Implicit default is removed. Must exit 2 with help.
+        errorWriter('ERROR: Missing command (trace | replay | explain)');
+        errorWriter('hint: ltp inspect trace --input <file.jsonl>');
+        errorWriter('hint: ltp inspect --help');
 
-            if (!args.quiet) buffer.forEach((line) => logger.error(line));
-            process.exitCode = 2;
-            return 2;
-        }
+        if (!args.quiet) buffer.forEach((line) => logger.error(line));
+        process.exitCode = 2;
+        return 2;
     }
 
     if (!args.input) {
