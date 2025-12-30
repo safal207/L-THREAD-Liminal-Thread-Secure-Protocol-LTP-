@@ -21,7 +21,18 @@ const missingVersionFixture = path.join(__dirname, 'fixtures', 'missing-version.
 const unsupportedVersionFixture = path.join(__dirname, 'fixtures', 'unsupported-version.jsonl');
 const mixedVersionsFixture = path.join(__dirname, 'fixtures', 'mixed-versions.jsonl');
 const unsortedBranchesFixture = path.join(__dirname, 'fixtures', 'unsorted-branches.jsonl');
+const multiObjectFixture = path.join(__dirname, 'fixtures', 'bad-multiobj.jsonl');
+const invalidLineFixture = path.join(__dirname, 'fixtures', 'invalid-line.jsonl');
+const bomSpacesFixture = path.join(__dirname, 'fixtures', 'bom-spaces.jsonl');
+const whitespaceOnlyFixture = path.join(__dirname, 'fixtures', 'whitespace-only.jsonl');
+const minimalAuditFixture = path.join(__dirname, 'fixtures', 'minimal.audit.trace.jsonl');
+const badIntegrityAuditFixture = path.join(__dirname, 'fixtures', 'bad-integrity.audit.trace.jsonl');
 const sampleTrace = path.join(__dirname, '..', '..', 'samples', 'golden.trace.jsonl');
+const goldenMinimalJson = path.join(__dirname, 'golden', 'minimal.trace.golden.json');
+const goldenMinimalHuman = path.join(__dirname, 'golden', 'minimal.trace.human.txt');
+const goldenFintechPass = path.join(__dirname, 'golden', 'fintech.pass.json');
+const goldenFintechFail = path.join(__dirname, 'golden', 'fintech.fail.json');
+const goldenContinuityHuman = path.join(__dirname, 'golden', 'continuity.human.txt');
 
 // Canonical agent traces
 const allowedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'agents', 'allowed-critical.trace.jsonl');
@@ -125,6 +136,28 @@ describe('ltp-inspect golden summary', () => {
     vi.useRealTimers();
   });
 
+  it('matches the golden minimal JSON snapshot', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+    const summary = runInspect(minimalFixture);
+    const expected = JSON.parse(fs.readFileSync(goldenMinimalJson, 'utf-8'));
+    const actual = JSON.parse(formatJson(summary, true));
+
+    expect(actual).toEqual(expected);
+    vi.useRealTimers();
+  });
+
+  it('matches the golden minimal human snapshot', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
+    const summary = runInspect(minimalFixture);
+    const human = formatHuman(summary).trim();
+    const expected = fs.readFileSync(goldenMinimalHuman, 'utf-8').trim();
+
+    expect(human).toEqual(expected);
+    vi.useRealTimers();
+  });
+
   it('matches the canonical human snapshot output', () => {
     const logs: string[] = [];
     const errors: string[] = [];
@@ -161,6 +194,83 @@ describe('ltp-inspect golden summary', () => {
       let actual = normalizeOutput(logs.join('\n'));
       expected = normalizeInputLine(expected);
       actual = normalizeInputLine(actual);
+      expect(actual).toEqual(expected);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('renders fintech compliance (audit log) JSON deterministically', () => {
+    if (!fs.existsSync(minimalAuditFixture)) {
+      throw new Error(`Audit fixture missing at ${minimalAuditFixture}`);
+    }
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.stubEnv('LTP_INSPECT_FROZEN_TIME', '2024-01-01T00:00:00.000Z');
+
+    try {
+      const exitCode = execute(['trace', '--input', minimalAuditFixture, '--profile', 'fintech', '--format=json'], {
+        log: (message) => logs.push(message),
+        error: (message) => errors.push(message),
+      });
+
+      expect([0, 1]).toContain(exitCode);
+      expectNoFatal(errors);
+
+      const expected = JSON.parse(fs.readFileSync(goldenFintechPass, 'utf-8'));
+      const actual = JSON.parse(logs.join('\n'));
+      expect(actual).toEqual(expected);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('renders fintech compliance failure JSON deterministically', () => {
+    if (!fs.existsSync(badIntegrityAuditFixture)) {
+      throw new Error(`Audit fixture missing at ${badIntegrityAuditFixture}`);
+    }
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.stubEnv('LTP_INSPECT_FROZEN_TIME', '2024-01-01T00:00:00.000Z');
+
+    try {
+      const exitCode = execute(['trace', '--input', badIntegrityAuditFixture, '--profile', 'fintech', '--format=json'], {
+        log: (message) => logs.push(message),
+        error: (message) => errors.push(message),
+      });
+
+      expect(exitCode).toBe(2);
+      const expected = JSON.parse(fs.readFileSync(goldenFintechFail, 'utf-8'));
+      const actual = JSON.parse(logs.join('\n'));
+      expect(actual).toEqual(expected);
+      expect(errors.join('\n')).toContain('TRACE INTEGRITY ERROR');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('renders continuity outage human snapshot deterministically', () => {
+    if (!fs.existsSync(continuityOutageFixture)) {
+      throw new Error(`Continuity outage fixture missing at ${continuityOutageFixture}`);
+    }
+
+    const logs: string[] = [];
+    const errors: string[] = [];
+    vi.stubEnv('LTP_INSPECT_FROZEN_TIME', '2024-01-01T00:00:00.000Z');
+
+    try {
+      const exitCode = execute(['trace', '--input', continuityOutageFixture, '--format=human', '--color=never', '--continuity'], {
+        log: (message) => logs.push(message),
+        error: (message) => errors.push(message),
+      });
+
+      expect([0, 1]).toContain(exitCode);
+      expectNoFatal(errors);
+
+      const expected = normalizeOutput(fs.readFileSync(goldenContinuityHuman, 'utf-8'));
+      const actual = normalizeOutput(logs.join('\n'));
       expect(actual).toEqual(expected);
     } finally {
       vi.unstubAllEnvs();
@@ -402,9 +512,17 @@ describe('ltp-inspect golden summary', () => {
 });
 
 describe('ltp inspect cli', () => {
-  it('boots without crashing', async () => {
+  it('boots: missing command errors, minimal args succeed', async () => {
     const distPath = await buildInspectCli();
-    const result = await runCommand('node', [distPath, 'trace', sampleTrace], {
+    const noArgs = await runCommand('node', [distPath], {
+      env: { ...process.env, LTP_INSPECT_TEST_RUN: '1' },
+    });
+
+    expect(noArgs.exitCode).toBe(2);
+    expect((noArgs.stderr + noArgs.stdout).toLowerCase()).toContain('missing command');
+    expect((noArgs.stderr + noArgs.stdout).toLowerCase()).toContain('hint');
+
+    const result = await runCommand('node', [distPath, 'trace', '--input', minimalFixture, '--format=json', '--quiet'], {
       env: { ...process.env, LTP_INSPECT_FROZEN_TIME: '2024-01-01T00:00:00.000Z', LTP_INSPECT_TEST_RUN: '1' },
     });
 
@@ -437,26 +555,72 @@ describe('ltp inspect cli', () => {
   });
 
   it('rejects invalid JSONL where multiple JSON objects appear on the same line', () => {
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
-    const badJsonl = path.join(tmpDir, 'two-objects-one-line.jsonl');
     const logs: string[] = [];
     const errors: string[] = [];
 
-    try {
-      // This looks like "JSONL", but it is NOT: two objects on one line.
-      fs.writeFileSync(badJsonl, '{"v":"0.1"} {"v":"0.1"}\n');
+    const exitCode = execute(['trace', '--input', multiObjectFixture], {
+      log: (m) => logs.push(m),
+      error: (m) => errors.push(m)
+    });
 
-      const exitCode = execute(['trace', '--input', badJsonl], {
+    expect(exitCode).toBe(2);
+    // We expect the specific error message for multiple objects, not generic invalid JSONL
+    expect(errors.join('\n')).toContain('Only one JSON object per line allowed');
+  });
+
+  it('rejects invalid JSONL lines with a structured error', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    const exitCode = execute(['trace', '--input', invalidLineFixture], {
+      log: (m) => logs.push(m),
+      error: (m) => errors.push(m),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('Invalid JSONL line 1');
+  });
+
+  it('parses BOM + spaced JSONL input', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ltp-inspect-test-'));
+    const bomFixture = path.join(tmpDir, 'bom-spaces.jsonl');
+
+    try {
+      fs.writeFileSync(
+        bomFixture,
+        '\uFEFF  {"v":"0.1","type":"orientation","id":"bom-1","continuity_token":"test"}\n  {"v":"0.1","type":"focus_snapshot","id":"bom-2","payload":{"drift":0.1},"continuity_token":"test"}\n',
+        'utf8',
+      );
+
+      const exitCode = execute(['trace', '--input', bomFixture, '--format=json'], {
         log: (m) => logs.push(m),
-        error: (m) => errors.push(m)
+        error: (m) => errors.push(m),
       });
 
-      expect(exitCode).toBe(2);
-      // We expect the specific error message for multiple objects, not generic invalid JSONL
-      expect(errors.join('\n')).toContain('Only one JSON object per line allowed');
+      expect([0, 1]).toContain(exitCode);
+      expectNoFatal(errors);
+
+      const output = JSON.parse(logs.join('\n')) as any;
+      expect(output.orientation.identity).toBe('test');
     } finally {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it('rejects whitespace-only traces', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    const exitCode = execute(['trace', '--input', whitespaceOnlyFixture, '--format=json'], {
+      log: (m) => logs.push(m),
+      error: (m) => errors.push(m),
+    });
+
+    expect(exitCode).toBe(2);
+    expect(errors.join('\n')).toContain('Frame log is empty');
   });
 
   it('requires a subcommand (trace/replay/explain) or fails with exit 2', () => {

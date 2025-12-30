@@ -1,0 +1,41 @@
+name: Inspector Deep Reliability Suite
+
+concurrency:
+  group: inspect-deep-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'
+
+jobs:
+  inspect-deep:
+    name: Inspector deep tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - name: Enable Corepack + pnpm
+        shell: bash
+        run: |
+          set -euxo pipefail
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+          pnpm -v
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          pnpm fetch || echo "pnpm fetch skipped (offline)"
+          pnpm -w install --prefer-offline --frozen-lockfile
+      - name: Run deep inspector tests
+        shell: bash
+        env:
+          LTP_INSPECT_DEEP: '1'
+        run: |
+          set -euxo pipefail
+          LTP_INSPECT_NICE=1 pnpm -w vitest run tools/ltp-inspect/inspect.matrix.test.ts
+          pnpm -w vitest run tools/ltp-inspect/inspect.deep.test.ts
