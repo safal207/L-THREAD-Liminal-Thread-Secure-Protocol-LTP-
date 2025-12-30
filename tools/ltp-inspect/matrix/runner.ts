@@ -85,10 +85,21 @@ export function runMatrixCase(testCase: MatrixCase): void {
   const logs: string[] = [];
   const errors: string[] = [];
 
-  const exitCode = execute(testCase.args, {
-    log: (message) => logs.push(message),
-    error: (message) => errors.push(message),
-  }, testCase.stdin !== undefined ? { stdin: testCase.stdin } : undefined);
+  let exitCode = 3;
+  try {
+    exitCode = execute(
+      testCase.args,
+      {
+        log: (message) => logs.push(message),
+        error: (message) => errors.push(message),
+      },
+      testCase.stdin !== undefined ? { stdin: testCase.stdin } : undefined,
+    );
+  } catch (err) {
+    const candidate = (err as { exitCode?: number }).exitCode;
+    exitCode = typeof candidate === 'number' ? candidate : 3;
+    errors.push(String((err as Error)?.message ?? err));
+  }
 
   const expectedExit = Array.isArray(testCase.expectExit) ? testCase.expectExit : [testCase.expectExit];
   expect(expectedExit).toContain(exitCode);

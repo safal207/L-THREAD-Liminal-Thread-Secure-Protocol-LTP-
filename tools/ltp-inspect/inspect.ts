@@ -1377,7 +1377,6 @@ export function execute(
   const buffer: string[] = [];
   const writer = (message: string) => buffer.push(message);
   const errorWriter = (message: string) => logger.error(message);
-  const args = parseArgs(argv);
   const previousStdin = readStdinOverride;
 
   if (io?.stdin !== undefined) {
@@ -1385,6 +1384,7 @@ export function execute(
   }
 
   try {
+    const args = parseArgs(argv);
     if (!args.command || args.command === 'help') {
         if (args.explicitHelp) {
             printHelp(writer);
