@@ -38,13 +38,14 @@ fi
 # We only scan places where humans copy/paste commands: docs/, examples/, scripts/, workflows
 # We exclude schema files and common JSON configs.
 LEGACY_INPUT_JSON_HITS=$(
-  grep -R --line-number --extended-regexp -- "--input" \
-    .github/workflows docs examples scripts \
+  grep -R --line-number --extended-regexp \
     --exclude-dir=.git \
     --exclude-dir=node_modules \
     --exclude-dir=dist \
     --exclude-dir=build \
     --exclude-dir=.turbo \
+    -- "--input" \
+    .github/workflows docs examples scripts \
   | grep -E -- "--input(=|[[:space:]]+)[^[:space:]]+\.json([[:space:]]|$)" \
   | grep -vE "\.schema\.json([[:space:]]|$)" \
   | grep -vE "package\.json([[:space:]]|$)" \
@@ -63,19 +64,22 @@ if [ -n "$LEGACY_INPUT_JSON_HITS" ]; then
 fi
 
 # 3. Check for deprecated `ltp-inspect` usage in docs, examples, scripts, workflows
-if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
-  --exclude-dir=.git --exclude-dir=node_modules --exclude="ci-guardrail.sh" > /dev/null; then
+if grep -R --line-number \
+  --exclude-dir=.git --exclude-dir=node_modules --exclude="ci-guardrail.sh" \
+  "ltp-inspect" docs examples scripts .github/workflows > /dev/null; then
   # Filter out schema/contract references and file paths (tools/ltp-inspect)
-  if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
+  if grep -R --line-number \
     --exclude-dir=node_modules --exclude="ci-guardrail.sh" \
+    "ltp-inspect" docs examples scripts .github/workflows \
     | grep -v "schema.json" \
     | grep -v "contract" \
     | grep -v "ltp-inspect.v1.md" \
     | grep -v "tools/ltp-inspect" \
     > /dev/null; then
     echo "FAIL: Found references to legacy 'ltp-inspect'. Please use 'ltp inspect'."
-    grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
+    grep -R --line-number \
       --exclude-dir=node_modules --exclude="ci-guardrail.sh" \
+      "ltp-inspect" docs examples scripts .github/workflows \
       | grep -v "schema.json" \
       | grep -v "contract" \
       | grep -v "ltp-inspect.v1.md" \
@@ -86,12 +90,13 @@ fi
 
 # 4. Check for `ltp inspect` calls without a subcommand (trace|replay|explain|help)
 INSPECT_NO_SUBCOMMAND_HITS=$(
-  grep -R --line-number -E "^[[:space:]]*(pnpm[[:space:]]+)?ltp inspect" docs examples scripts .github/workflows \
+  grep -R --line-number -E \
     --exclude-dir=.git \
     --exclude-dir=node_modules \
     --exclude-dir=dist \
     --exclude-dir=build \
     --exclude-dir=.turbo \
+    "^[[:space:]]*(pnpm[[:space:]]+)?ltp inspect" docs examples scripts .github/workflows \
   | grep -vE "ltp inspect[[:space:]]+(trace|replay|explain|help)\\b" \
   | grep -vE "ltp inspect[[:space:]]+--help\\b" \
   | grep -vE "ltp inspect[[:space:]]+-h\\b" \
