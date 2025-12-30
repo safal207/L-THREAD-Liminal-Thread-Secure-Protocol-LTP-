@@ -62,23 +62,41 @@ if [ -n "$LEGACY_INPUT_JSON_HITS" ]; then
   exit 1
 fi
 
-# 3. Check for deprecated `ltp-inspect` usage in docs and examples
-if grep -R --line-number "ltp-inspect" docs examples --exclude-dir=.git --exclude-dir=node_modules > /dev/null; then
+# 3. Check for deprecated `ltp-inspect` usage in docs, examples, scripts, workflows
+if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows --exclude-dir=.git --exclude-dir=node_modules > /dev/null; then
   # Filter out schema/contract references and file paths (tools/ltp-inspect)
-  if grep -R --line-number "ltp-inspect" docs examples --exclude-dir=node_modules \
+  if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows --exclude-dir=node_modules \
     | grep -v "schema.json" \
     | grep -v "contract" \
     | grep -v "ltp-inspect.v1.md" \
     | grep -v "tools/ltp-inspect" \
     > /dev/null; then
-    echo "FAIL: Found references to legacy 'ltp-inspect' in docs/examples. Please use 'ltp inspect'."
-    grep -R --line-number "ltp-inspect" docs examples --exclude-dir=node_modules \
+    echo "FAIL: Found references to legacy 'ltp-inspect'. Please use 'ltp inspect'."
+    grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows --exclude-dir=node_modules \
       | grep -v "schema.json" \
       | grep -v "contract" \
       | grep -v "ltp-inspect.v1.md" \
       | grep -v "tools/ltp-inspect"
     exit 1
   fi
+fi
+
+# 4. Check for `ltp inspect` calls without a subcommand (trace|replay|explain|help)
+INSPECT_NO_SUBCOMMAND_HITS=$(
+  grep -R --line-number -E "^[[:space:]]*(pnpm[[:space:]]+)?ltp inspect" docs examples scripts .github/workflows \
+    --exclude-dir=.git \
+    --exclude-dir=node_modules \
+    --exclude-dir=dist \
+    --exclude-dir=build \
+    --exclude-dir=.turbo \
+  | grep -vE "ltp inspect[[:space:]]+(trace|replay|explain|help)\\b" \
+  || true
+)
+
+if [ -n "$INSPECT_NO_SUBCOMMAND_HITS" ]; then
+  echo "FAIL: Found 'ltp inspect' calls without a subcommand. Use: ltp inspect trace|replay|explain|help"
+  echo "$INSPECT_NO_SUBCOMMAND_HITS"
+  exit 1
 fi
 
 echo "Guardrail checks passed!"

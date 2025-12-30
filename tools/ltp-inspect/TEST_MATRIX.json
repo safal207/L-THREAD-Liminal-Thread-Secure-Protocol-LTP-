@@ -74,14 +74,14 @@
       "id": "B02",
       "args": ["trace", "--input", "tools/ltp-inspect/fixtures/invalid-line.jsonl"],
       "expectExit": 2,
-      "stderr": { "includes": ["Invalid JSONL line 1"] },
+      "stderr": { "includes": ["Invalid JSONL line 1", "jq -c"] },
       "tags": ["must"]
     },
     {
       "id": "B03",
       "args": ["trace", "--input", "tools/ltp-inspect/fixtures/bad-multiobj.jsonl"],
       "expectExit": 2,
-      "stderr": { "includes": ["Only one JSON object per line allowed"] },
+      "stderr": { "includes": ["Only one JSON object per line allowed", "jq -c"] },
       "tags": ["must"]
     },
     {
@@ -131,8 +131,8 @@
       "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.frames.jsonl", "--format=human", "--color=never", "--quiet"],
       "expectExit": [0, 1],
       "stdout": {
-        "includes": ["LTP INSPECTOR", "identity: ct-1"],
-        "notMatches": ["RESULT:"]
+        "includes": ["input:", "identity: ct-1"],
+        "notMatches": ["RESULT:", "LTP INSPECTOR"]
       },
       "tags": ["must"]
     },
@@ -208,7 +208,7 @@
       "args": ["trace", "--input", "-", "--format=json", "--quiet"],
       "stdin": "{\"v\":\"0.1\"\n",
       "expectExit": 2,
-      "stderr": { "includes": ["Invalid JSONL line 1"] },
+      "stderr": { "includes": ["Invalid JSONL line 1", "jq -c"] },
       "tags": ["must"]
     },
     {

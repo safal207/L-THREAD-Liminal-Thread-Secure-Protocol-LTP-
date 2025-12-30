@@ -33,13 +33,13 @@ These are the **must**-tagged cases in `TEST_MATRIX.json`. (The automated suite 
 | A07 | replay --help | — | — | 0 | help shows replay usage |
 | A08 | explain --help | — | — | 0 | help shows explain usage |
 | B01 | trace | fixtures/legacy-array.json | — | 2 | `Legacy JSON array format is not supported` |
-| B02 | trace | fixtures/invalid-line.jsonl | — | 2 | `Invalid JSONL line 1` |
-| B03 | trace | fixtures/bad-multiobj.jsonl | — | 2 | `Only one JSON object per line allowed` |
+| B02 | trace | fixtures/invalid-line.jsonl | — | 2 | `Invalid JSONL line 1` + jq hint |
+| B03 | trace | fixtures/bad-multiobj.jsonl | — | 2 | `Only one JSON object per line allowed` + jq hint |
 | B04 | trace | fixtures/whitespace-only.jsonl | — | 2 | `Frame log is empty` |
 | B05 | trace | fixtures/bom-spaces.jsonl | fmt=json --quiet | 0/1 | JSON parses; `orientation.identity=test` |
 | B06 | trace | fixtures/minimal.frames.jsonl | fmt=json --quiet | 0/1 | JSON parses; `input.type=raw` |
 | B07 | trace | fixtures/minimal.frames.jsonl | fmt=human --color=never | 0/1 | human has header + identity; no ANSI |
-| B08 | trace | fixtures/minimal.frames.jsonl | fmt=human --quiet --color=never | 0/1 | human report without `RESULT:` |
+| B08 | trace | fixtures/minimal.frames.jsonl | fmt=human --quiet --color=never | 0/1 | human report without banner/`RESULT:` |
 | B09 | trace | fixtures/minimal.frames.jsonl | fmt=json --pretty --quiet | 0/1 | `contract.version=1.0` |
 | B10 | trace | fixtures/minimal.frames.jsonl | fmt=json --quiet | 0/1 | stdout does not contain `RESULT:` |
 | C01 | trace | fixtures/canonical-linear.jsonl | fmt=json --quiet | 0/1 | `orientation.identity=canonical` |
@@ -47,7 +47,7 @@ These are the **must**-tagged cases in `TEST_MATRIX.json`. (The automated suite 
 | C03 | replay | fixtures/minimal.frames.jsonl | — | 0 | stdout includes `Replaying` |
 | C04 | explain | fixtures/minimal.frames.jsonl | `--at step-t1` | 0 | stdout includes `Explain @ step-t1` |
 | C05 | trace | stdin | `--input -` fmt=json --quiet | 0/1 | stdin supported; `orientation.identity=ct-stdin` |
-| C06 | trace | stdin invalid | `--input -` | 2 | `Invalid JSONL line 1` |
+| C06 | trace | stdin invalid | `--input -` | 2 | `Invalid JSONL line 1` + jq hint |
 | D01 | trace | fixtures/minimal.frames.jsonl | `--compliance fintech` | 2 | `TRACE INTEGRITY ERROR: unchecked` |
 | D02 | trace | fixtures/minimal.audit.trace.jsonl | `--compliance fintech` | 0/1 | `trace_integrity=verified`, verdict PASS |
 | D03 | trace | fixtures/bad-integrity.audit.trace.jsonl | `--compliance fintech` | 2 | `trace_integrity=broken`, verdict FAIL |

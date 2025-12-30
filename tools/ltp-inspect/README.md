@@ -29,7 +29,7 @@ Flags:
 - `--input <path>` to point at a JSONL frame log
 - `--color auto|always|never` for human output (default: `auto`)
 - `--strict` to treat canonicalization needs as contract violations (exit 2)
-- `--quiet` to emit only the final status line
+- `--quiet` to suppress banners/RESULT lines while still emitting the report body (JSON or human)
 - `--output <file>` to write the formatted output to disk
 
 Frames must be JSONL with one frame per line. Existing conformance fixtures work as input.

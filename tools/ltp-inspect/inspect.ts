@@ -17,6 +17,7 @@ const TOOL = {
 } as const;
 
 const SUPPORTED_TRACE_VERSIONS = ['0.1'] as const;
+const JSONL_HINT = "hint: Try: jq -c '.[]' input.json > output.jsonl";
 
 type OutputFormat = 'json' | 'human';
 type ExportFormat = 'json' | 'jsonld' | 'pdf';
@@ -364,7 +365,15 @@ function normalizeFrameConstraints(frames: LtpFrame[]): {
 
 function loadFrames(
   filePath: string,
-): { frames: LtpFrame[]; entries: TraceEntry[]; format: InspectSummary['input']['format']; inputPath?: string; inputSource: InspectSummary['input']['source']; type: 'raw' | 'audit_log'; hash_root?: string } {
+): {
+  frames: LtpFrame[];
+  entries: TraceEntry[];
+  format: InspectSummary['input']['format'];
+  inputPath?: string;
+  inputSource: InspectSummary['input']['source'];
+  type: 'raw' | 'audit_log';
+  hash_root?: string;
+} {
   const isStdin = filePath === '-' || filePath === undefined;
   const resolved = isStdin ? 'stdin' : path.resolve(filePath);
 
@@ -372,8 +381,8 @@ function loadFrames(
     throw new CliError(`Frame log not found: ${resolved}`, 2);
   }
 
-  const raw = (isStdin ? readStdin() : fs.readFileSync(resolved, 'utf-8')).trim();
-  if (!raw) throw new CliError(`Frame log is empty: ${resolved}`, 2);
+  const raw = isStdin ? readStdin() : fs.readFileSync(resolved, 'utf-8');
+  if (!raw.trim()) throw new CliError(`Frame log is empty: ${resolved}`, 2);
 
   let parsed: any[] = [];
   let format: 'json' | 'jsonl' = 'json';
@@ -384,25 +393,25 @@ function loadFrames(
 
   if (rawTrimStart.startsWith('[')) {
     throw new CliError(
-      'Legacy JSON array format is not supported. Use JSONL (newline-delimited).\n' +
-        "hint: Try: jq -c '.[]' input.json > output.jsonl",
+      'Legacy JSON array format is not supported. Use JSONL (newline-delimited).\n' + JSONL_HINT,
       2,
     );
   } else {
     try {
-      parsed = raw
+      parsed = rawNoBom
         .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0)
-        .map((line, i) => {
+        .map((line, index) => ({ line, index }))
+        .filter(({ line }) => line.trim().length > 0)
+        .map(({ line, index }) => {
+          const trimmed = line.trim();
           try {
-            return JSON.parse(line);
+            return JSON.parse(trimmed);
           } catch (err) {
-             if (line.match(/}\s*\{/)) {
-                 throw new CliError(`Line ${i+1}: Only one JSON object per line allowed`, 2);
-             }
-             throw new CliError(
-              `Invalid JSONL line ${i + 1}: ${(err as Error).message}`,
+            if (trimmed.match(/}\s*\{/)) {
+              throw new CliError(`Line ${index + 1}: Only one JSON object per line allowed\n${JSONL_HINT}`, 2);
+            }
+            throw new CliError(
+              `Invalid JSONL line ${index + 1}: ${(err as Error).message}\n${JSONL_HINT}`,
               2,
             );
           }
@@ -1054,9 +1063,12 @@ function formatDriftHistory(history: DriftSnapshot[]): string {
     .join(' -> ');
 }
 
-export function formatHuman(summary: InspectSummary): string {
+export function formatHuman(summary: InspectSummary, options: { includeBanner?: boolean } = {}): string {
   const lines: string[] = [];
-  lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
+  const includeBanner = options.includeBanner !== false;
+  if (includeBanner) {
+    lines.push(`LTP INSPECTOR  v${summary.contract.version}`);
+  }
   const inputLabel = summary.input.path ?? summary.input.source;
   lines.push(`input: ${inputLabel}  time: ${summary.generated_at}`);
 
@@ -1156,7 +1168,19 @@ function canonicalizeSummary(summary: InspectSummary): InspectSummary {
   return JSON.parse(JSON.stringify(summary)) as InspectSummary;
 }
 
-function handleTrace(file: string, format: OutputFormat, pretty: boolean, strict: boolean, compliance: string | undefined, replayCheck: boolean, writer: Writer, exportFormats: ExportFormat[], continuityCheck?: boolean, profile?: string): InspectionResult {
+function handleTrace(
+  file: string,
+  format: OutputFormat,
+  pretty: boolean,
+  strict: boolean,
+  compliance: string | undefined,
+  replayCheck: boolean,
+  writer: Writer,
+  exportFormats: ExportFormat[],
+  continuityCheck?: boolean,
+  profile?: string,
+  includeBanner = true,
+): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
@@ -1244,7 +1268,7 @@ function handleTrace(file: string, format: OutputFormat, pretty: boolean, strict
   }
 
   if (format === 'json') printJson(summary, pretty, writer);
-  else printHuman(summary, writer);
+  else printHuman(summary, writer, { includeBanner });
 
   if (exportFormats && exportFormats.length > 0) {
      const outputDir = process.cwd();
@@ -1365,16 +1389,15 @@ function printHelp(writer: Writer): void {
   writer('Exit codes:');
   writer('  0 OK — contract produced');
   writer('  1 warnings only (normalized output or degraded signals)');
-  writer('  2 contract violation (invalid input or non-canonical in --strict)');
-  writer('  3 runtime failure — unexpected error');
+  writer('  2 error (invalid input, contract violation, or runtime failure)');
 }
 
 function printJson(summary: InspectSummary, pretty = false, writer: Writer): void {
   writer(formatJson(summary, pretty));
 }
 
-function printHuman(summary: InspectSummary, writer: Writer): void {
-  writer(formatHuman(summary));
+function printHuman(summary: InspectSummary, writer: Writer, options?: { includeBanner?: boolean }): void {
+  writer(formatHuman(summary, options));
 }
 
 export function execute(
@@ -1430,7 +1453,19 @@ export function execute(
     switch (args.command) {
       case 'trace':
         {
-          const { violations, warnings, normalizations, summary } = handleTrace(args.input as string, args.format, args.pretty, args.strict, args.compliance, args.replayCheck, writer, args.exportFormat, args.continuity, args.profile);
+          const { violations, warnings, normalizations, summary } = handleTrace(
+            args.input as string,
+            args.format,
+            args.pretty,
+            args.strict,
+            args.compliance,
+            args.replayCheck,
+            writer,
+            args.exportFormat,
+            args.continuity,
+            args.profile,
+            !args.quiet,
+          );
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;
           const hasWarnings = warnings.length > 0 || normalizations.length > 0;
@@ -1488,7 +1523,7 @@ export function execute(
       case 'replay':
         handleReplay(args.input as string, args.from, writer);
         if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
-        if (!args.quiet) buffer.forEach((line) => logger.log(line));
+        buffer.forEach((line) => logger.log(line));
         break;
       case 'explain':
         {
@@ -1497,7 +1532,7 @@ export function execute(
             throw new CliError(`Contract violation: ${violations.join('; ')}`, 2);
           }
           if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
-          if (!args.quiet) buffer.forEach((line) => logger.log(line));
+          buffer.forEach((line) => logger.log(line));
         }
         break;
       default:
@@ -1520,8 +1555,8 @@ export function execute(
       return err.exitCode;
     }
     errorWriter(`Runtime failure: ${(err as Error).message}`);
-    process.exitCode = 3;
-    return 3;
+    process.exitCode = 2;
+    return 2;
   } finally {
     readStdinOverride = previousStdin;
   }
