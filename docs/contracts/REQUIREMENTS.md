@@ -25,7 +25,7 @@ Profiles:
 ## Orientation (Core)
 
 ### LTP-REQ-ORIENT-IDENTITY-1 (MUST)
-An Orientation frame MUST carry a stable `identity` for the living thread.
+An Orientation frame MUST carry a stable `identity` for the principal (the actor / on whose behalf), not the executing model.
 
 **Rationale:** orientation continuity is impossible without identity binding.
 

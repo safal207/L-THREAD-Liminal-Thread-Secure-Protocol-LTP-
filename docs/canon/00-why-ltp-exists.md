@@ -7,7 +7,7 @@ After: Continuity → orientation → resilient intelligence
 
 ## Opening
 AI systems did not fail because they were weak.
-They failed because they forgot who they were.
+They failed because they lost orientation — they forgot who they were.
 
 At scale, prediction becomes noise.
 At speed, optimization becomes drift.

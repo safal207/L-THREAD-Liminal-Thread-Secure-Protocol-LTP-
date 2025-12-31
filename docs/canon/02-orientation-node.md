@@ -4,7 +4,7 @@
 ```
 Orientation Node
 - identity (кто я сейчас)
-- focus momentum (куда я иду)
+- focus momentum (вектор внимания / инерция фокуса)
 - drift history (как меня качало)
 - constraints (что нельзя)
 - admissible futures (что возможно)
