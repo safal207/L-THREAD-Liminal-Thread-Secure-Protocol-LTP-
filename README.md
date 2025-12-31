@@ -38,6 +38,9 @@ Repository content is sanitized to avoid hidden or bidirectional Unicode charact
 
 [Canonical LTP Index](canonical/README.md)
 
+Canon → [docs/canon/README.md](docs/canon/README.md)  
+Requirements → [docs/contracts/REQUIREMENTS.md](docs/contracts/REQUIREMENTS.md)
+
 > Every pull request produces reproducible DevTools artifacts
 > (Inspector output and golden traces) that make orientation,
 > drift, and continuity auditable in CI.

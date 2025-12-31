@@ -81,5 +81,45 @@ if grep -R --line-number "ltp-inspect" docs examples --exclude-dir=.git --exclud
   fi
 fi
 
+# 4. Canon guardrail checks
+CANON_MAP="docs/contracts/CANON_MAP.md"
+REQUIREMENTS="docs/contracts/REQUIREMENTS.md"
+
+if [ ! -f "$CANON_MAP" ]; then
+  echo "FAIL: Missing $CANON_MAP for canon guardrail."
+  exit 1
+fi
+
+if [ ! -f "$REQUIREMENTS" ]; then
+  echo "FAIL: Missing $REQUIREMENTS for canon guardrail."
+  exit 1
+fi
+
+CANON_FILES=$(ls docs/canon/0*-*.md 2>/dev/null || true)
+if [ -z "$CANON_FILES" ]; then
+  echo "FAIL: No canon act files found in docs/canon."
+  exit 1
+fi
+
+for CANON_FILE in $CANON_FILES; do
+  if ! grep -F "$CANON_FILE" "$CANON_MAP" > /dev/null; then
+    echo "FAIL: Canon act missing from CANON_MAP: $CANON_FILE"
+    exit 1
+  fi
+done
+
+REQ_IDS=$(grep -Eo "LTP-REQ-[A-Z0-9-]+" "$REQUIREMENTS" | sort -u)
+if [ -z "$REQ_IDS" ]; then
+  echo "FAIL: No requirement IDs found in $REQUIREMENTS."
+  exit 1
+fi
+
+for REQ_ID in $REQ_IDS; do
+  if ! grep -F "$REQ_ID" "$CANON_MAP" > /dev/null; then
+    echo "FAIL: Requirement ID missing from CANON_MAP: $REQ_ID"
+    exit 1
+  fi
+done
+
 echo "Guardrail checks passed!"
 exit 0
