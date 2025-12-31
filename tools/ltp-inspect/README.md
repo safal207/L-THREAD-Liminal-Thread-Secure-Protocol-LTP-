@@ -53,7 +53,7 @@ Logs | Trajectories
 ## CLI help (kubectl-style)
 
 ```bash
-pnpm -w ltp:inspect -- --help
+pnpm -w ltp:inspect -- help
 ```
 
 Sections included: Usage, Examples, Output, Exit codes.
