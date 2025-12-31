@@ -81,7 +81,7 @@
       "id": "B03",
       "args": ["trace", "--input", "tools/ltp-inspect/fixtures/bad-multiobj.jsonl"],
       "expectExit": 2,
-      "stderr": { "includes": ["Only one JSON object per line allowed", "jq -c"] },
+      "stderr": { "includes": ["Invalid JSONL line 1: Only one JSON object per line allowed", "jq -c"] },
       "tags": ["must"]
     },
     {

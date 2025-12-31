@@ -565,7 +565,7 @@ describe('ltp inspect cli', () => {
 
     expect(exitCode).toBe(2);
     // We expect the specific error message for multiple objects, not generic invalid JSONL
-    expect(errors.join('\n')).toContain('Only one JSON object per line allowed');
+    expect(errors.join('\n')).toContain('Invalid JSONL line 1: Only one JSON object per line allowed');
     expect(errors.join('\n')).toContain('jq -c');
   });
 

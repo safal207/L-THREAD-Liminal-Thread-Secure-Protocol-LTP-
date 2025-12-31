@@ -34,7 +34,7 @@ These are the **must**-tagged cases in `TEST_MATRIX.json`. (The automated suite 
 | A08 | explain --help | — | — | 0 | help shows explain usage |
 | B01 | trace | fixtures/legacy-array.json | — | 2 | `Legacy JSON array format is not supported` |
 | B02 | trace | fixtures/invalid-line.jsonl | — | 2 | `Invalid JSONL line 1` + jq hint |
-| B03 | trace | fixtures/bad-multiobj.jsonl | — | 2 | `Only one JSON object per line allowed` + jq hint |
+| B03 | trace | fixtures/bad-multiobj.jsonl | — | 2 | `Invalid JSONL line 1: Only one JSON object per line allowed` + jq hint |
 | B04 | trace | fixtures/whitespace-only.jsonl | — | 2 | `Frame log is empty` |
 | B05 | trace | fixtures/bom-spaces.jsonl | fmt=json --quiet | 0/1 | JSON parses; `orientation.identity=test` |
 | B06 | trace | fixtures/minimal.frames.jsonl | fmt=json --quiet | 0/1 | JSON parses; `input.type=raw` |

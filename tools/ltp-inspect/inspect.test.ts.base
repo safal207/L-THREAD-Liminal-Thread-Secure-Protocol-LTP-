@@ -79,8 +79,8 @@ describe('ltp-inspect golden summary', () => {
 
         const result = runInspectFail(`trace --input ${fixturePath}`);
         expect(result.exitCode).toBe(2);
-        // "Line 1: Only one JSON object per line allowed"
-        expect(result.output).toContain('Only one JSON object per line allowed');
+        // "Invalid JSONL line 1: Only one JSON object per line allowed"
+        expect(result.output).toContain('Invalid JSONL line 1: Only one JSON object per line allowed');
     });
 
     it('passes with BOM and leading spaces', () => {

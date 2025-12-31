@@ -98,7 +98,7 @@ INSPECT_NO_SUBCOMMAND_HITS=$(
     --exclude-dir=dist \
     --exclude-dir=build \
     --exclude-dir=.turbo \
-    "^[[:space:]]*(pnpm[[:space:]]+)?ltp inspect" docs examples scripts .github/workflows \
+    "^[[:space:]]*(pnpm[[:space:]]+)?ltp[[:space:]]+inspect\\b" docs examples scripts .github/workflows \
   | grep -vE "ltp inspect-report\\b" \
   | grep -vE "ltp inspect[[:space:]]+(trace|replay|explain|help)\\b" \
   | grep -vE "ltp inspect[[:space:]]+help\\b" \
@@ -107,9 +107,28 @@ INSPECT_NO_SUBCOMMAND_HITS=$(
   || true
 )
 
+INSPECT_PNPM_WRAPPER_NO_SUBCOMMAND_HITS=$(
+  grep -R --line-number -E \
+    --exclude-dir=.git \
+    --exclude-dir=node_modules \
+    --exclude-dir=dist \
+    --exclude-dir=build \
+    --exclude-dir=.turbo \
+    "^[[:space:]]*pnpm[[:space:]]+-w[[:space:]]+ltp:inspect[[:space:]]+--\\b" docs examples scripts .github/workflows \
+  | grep -vE "pnpm[[:space:]]+-w[[:space:]]+ltp:inspect[[:space:]]+--[[:space:]]+(trace|replay|explain|help)\\b" \
+  | grep -vE "pnpm[[:space:]]+-w[[:space:]]+ltp:inspect[[:space:]]+--[[:space:]]+(--help|-h)\\b" \
+  || true
+)
+
 if [ -n "$INSPECT_NO_SUBCOMMAND_HITS" ]; then
   echo "FAIL: Found 'ltp inspect' calls without a subcommand. Use: ltp inspect trace|replay|explain|help"
   echo "$INSPECT_NO_SUBCOMMAND_HITS"
+  exit 1
+fi
+
+if [ -n "$INSPECT_PNPM_WRAPPER_NO_SUBCOMMAND_HITS" ]; then
+  echo "FAIL: Found 'pnpm -w ltp:inspect --' calls without a subcommand. Use: pnpm -w ltp:inspect -- trace|replay|explain|help"
+  echo "$INSPECT_PNPM_WRAPPER_NO_SUBCOMMAND_HITS"
   exit 1
 fi
 
