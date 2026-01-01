@@ -38,6 +38,10 @@ LTP binds continuity.
 It does not store “everything”.
 Memory systems may exist around it — but not inside it.
 
+**Clarification (Trace ≠ Memory):**
+LTP may rely on *trace logs* (e.g., T-Trace) as a tamper-evident record of transitions.
+A trace is not a memory store: it is an auditable *history of what happened*, not a system that stores and retrieves knowledge to act on.
+
 ### 4) LTP will never become a reward system
 LTP will not:
 - optimize reward

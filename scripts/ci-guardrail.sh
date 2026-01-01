@@ -81,5 +81,23 @@ if grep -R --line-number "ltp-inspect" docs examples --exclude-dir=.git --exclud
   fi
 fi
 
+# 4. Check for canon acts using non-two-digit numbering.
+NON_TWO_DIGIT_ACTS=$(
+  find docs/canon -maxdepth 1 -type f -name "[0-9]-*.md" -print 2>/dev/null || true
+)
+if [ -n "$NON_TWO_DIGIT_ACTS" ]; then
+  echo "FAIL: Canon acts must use two-digit numbering (e.g., 00-, 07-, 10-)."
+  echo "$NON_TWO_DIGIT_ACTS"
+  exit 1
+fi
+
+CANON_ACTS=$(
+  find docs/canon -maxdepth 1 -type f -name "[0-9][0-9]-*.md" -print 2>/dev/null || true
+)
+if [ -z "$CANON_ACTS" ]; then
+  echo "FAIL: No canon act files found (expected docs/canon/[0-9][0-9]-*.md)."
+  exit 1
+fi
+
 echo "Guardrail checks passed!"
 exit 0
