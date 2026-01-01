@@ -39,7 +39,7 @@ fi
 # We only scan places where humans copy/paste commands: docs/, examples/, scripts/, workflows
 # We exclude schema files and common JSON configs.
 LEGACY_INPUT_JSON_HITS=$(
-  grep -R --line-number --extended-regexp --fixed-strings -- "--input" \
+  grep -R --line-number --fixed-strings -- "--input" \
     .github/workflows docs examples scripts \
     --exclude-dir=.git \
     --exclude-dir=node_modules \
