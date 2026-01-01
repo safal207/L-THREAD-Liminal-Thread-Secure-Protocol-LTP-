@@ -82,7 +82,17 @@ if grep -R --line-number "ltp-inspect" docs examples --exclude-dir=.git --exclud
   fi
 fi
 
-# 4. Canon guardrail checks
+# 4. Enforce two-digit canon numbering (00-, 07-, 10-, ...)
+NON_TWO_DIGIT_ACTS=$(
+  find docs/canon -maxdepth 1 -type f -name "[0-9]-*.md" -print 2>/dev/null || true
+)
+if [ -n "$NON_TWO_DIGIT_ACTS" ]; then
+  echo "FAIL: Canon acts must use two-digit numbering (e.g., 00-, 07-, 10-)."
+  echo "$NON_TWO_DIGIT_ACTS"
+  exit 1
+fi
+
+# 5. Canon guardrail checks
 CANON_MAP="docs/contracts/CANON_MAP.md"
 REQUIREMENTS="docs/contracts/REQUIREMENTS.md"
 INSPECT_SCHEMA="docs/contracts/ltp-inspect.v1.schema.json"
@@ -102,7 +112,9 @@ if [ ! -f "$INSPECT_SCHEMA" ]; then
   exit 1
 fi
 
-CANON_FILES=$(ls docs/canon/0*-*.md 2>/dev/null || true)
+CANON_FILES=$(
+  find docs/canon -maxdepth 1 -type f -name "[0-9][0-9]-*.md" -print 2>/dev/null || true
+)
 if [ -z "$CANON_FILES" ]; then
   echo "FAIL: No canon act files found in docs/canon."
   exit 1

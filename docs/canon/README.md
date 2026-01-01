@@ -15,3 +15,12 @@ Canon is above tutorials, README, and marketing.
 
 Canonical requirements live in [docs/contracts/REQUIREMENTS.md](../contracts/REQUIREMENTS.md).
 Canon ↔ Contract mapping: [docs/contracts/CANON_MAP.md](../contracts/CANON_MAP.md).
+
+## Acts
+- [Act 0 — Why LTP Exists](./00-why-ltp-exists.md)
+- [Act I — Orientation over Prediction](./01-orientation-over-prediction.md)
+- [Act II — Orientation as a Living Structure](./02-orientation-node.md)
+- [Act III — Branches Without Choice](./03-admissible-futures.md)
+- [Act IV — Inspector as Mirror](./04-inspector.md)
+- [Act V — The Living Thread in Time](./05-living-thread.md)
+- [Act VI — Orientation Is the New Scale](./06-orientation-is-scale.md)
