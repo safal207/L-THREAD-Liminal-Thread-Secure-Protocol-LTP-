@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -u
 
 # Fail if forbidden patterns exist
 echo "Checking for forbidden patterns..."
@@ -84,6 +85,7 @@ fi
 # 4. Canon guardrail checks
 CANON_MAP="docs/contracts/CANON_MAP.md"
 REQUIREMENTS="docs/contracts/REQUIREMENTS.md"
+INSPECT_SCHEMA="docs/contracts/ltp-inspect.v1.schema.json"
 
 if [ ! -f "$CANON_MAP" ]; then
   echo "FAIL: Missing $CANON_MAP for canon guardrail."
@@ -92,6 +94,11 @@ fi
 
 if [ ! -f "$REQUIREMENTS" ]; then
   echo "FAIL: Missing $REQUIREMENTS for canon guardrail."
+  exit 1
+fi
+
+if [ ! -f "$INSPECT_SCHEMA" ]; then
+  echo "FAIL: Missing $INSPECT_SCHEMA for canon guardrail."
   exit 1
 fi
 
@@ -108,15 +115,37 @@ for CANON_FILE in $CANON_FILES; do
   fi
 done
 
-REQ_IDS=$(grep -Eo "LTP-REQ-[A-Z0-9-]+" "$REQUIREMENTS" | sort -u)
-if [ -z "$REQ_IDS" ]; then
-  echo "FAIL: No requirement IDs found in $REQUIREMENTS."
+# Only canon-bound requirements must appear in CANON_MAP.
+# Source of truth: x-canonRefs in the Inspector contract schema.
+# This keeps CANON_MAP focused and prevents CI from forcing tool-only / enterprise-only reqs into canon mapping.
+
+CANON_REQ_IDS=$(
+  node -e "
+    const fs = require('fs');
+    const p = process.argv[1];
+    const s = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const refs = Array.isArray(s['x-canonRefs']) ? s['x-canonRefs'] : [];
+    for (const r of refs) console.log(String(r));
+  " "$INSPECT_SCHEMA" 2>/dev/null | sort -u || true
+)
+
+if [ -z "$CANON_REQ_IDS" ]; then
+  echo "FAIL: No x-canonRefs found in $INSPECT_SCHEMA (canon-bound requirements unknown)."
   exit 1
 fi
 
-for REQ_ID in $REQ_IDS; do
+# Ensure each canon-bound requirement exists in REQUIREMENTS.md
+for REQ_ID in $CANON_REQ_IDS; do
+  if ! grep -F "$REQ_ID" "$REQUIREMENTS" > /dev/null; then
+    echo "FAIL: Canon requirement referenced by schema but missing from REQUIREMENTS: $REQ_ID"
+    exit 1
+  fi
+done
+
+# Ensure each canon-bound requirement is mapped in CANON_MAP.md
+for REQ_ID in $CANON_REQ_IDS; do
   if ! grep -F "$REQ_ID" "$CANON_MAP" > /dev/null; then
-    echo "FAIL: Requirement ID missing from CANON_MAP: $REQ_ID"
+    echo "FAIL: Canon requirement missing from CANON_MAP: $REQ_ID"
     exit 1
   fi
 done
