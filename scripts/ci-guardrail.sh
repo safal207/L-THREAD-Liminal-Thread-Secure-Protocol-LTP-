@@ -99,5 +99,20 @@ if [ -z "$CANON_ACTS" ]; then
   exit 1
 fi
 
+# 5. Ensure every canon act is mapped in CANON_MAP
+CANON_MAP="docs/contracts/CANON_MAP.md"
+
+if [ ! -f "$CANON_MAP" ]; then
+  echo "FAIL: Missing $CANON_MAP for canon guardrail."
+  exit 1
+fi
+
+for CANON_FILE in $CANON_ACTS; do
+  if ! grep -F "$CANON_FILE" "$CANON_MAP" > /dev/null; then
+    echo "FAIL: Canon act missing from CANON_MAP: $CANON_FILE"
+    exit 1
+  fi
+done
+
 echo "Guardrail checks passed!"
 exit 0
