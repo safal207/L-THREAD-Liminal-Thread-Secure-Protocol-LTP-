@@ -34,9 +34,9 @@ Replay: deterministic
 
 Repository content is sanitized to avoid hidden or bidirectional Unicode characters for supply-chain hygiene.
 
-## Start here → Canonical Index
+## Start here → Project Index
 
-[Canonical LTP Index](canonical/README.md)
+[Project Index](canonical/README.md)
 
 Canon → [docs/canon/README.md](docs/canon/README.md)  
 Requirements → [docs/contracts/REQUIREMENTS.md](docs/contracts/REQUIREMENTS.md)

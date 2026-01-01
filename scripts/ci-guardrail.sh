@@ -25,13 +25,11 @@ fi
 
 # 2. Check for canonical-clean.json references (should be canonical-linear.jsonl)
 # Excluding the script itself, git, and CHANGELOG.md (for historical reference)
-if grep -RFn "canonical-clean.json" . \
-  --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.turbo \
-  --exclude="ci-guardrail.sh" --exclude="CHANGELOG.md" > /dev/null; then
+if grep -RFn --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.turbo \
+  --exclude="ci-guardrail.sh" --exclude="CHANGELOG.md" "canonical-clean.json" . > /dev/null; then
   echo "FAIL: Found references to canonical-clean.json. Please update to canonical-linear.jsonl"
-  grep -RFn "canonical-clean.json" . \
-    --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.turbo \
-    --exclude="ci-guardrail.sh" --exclude="CHANGELOG.md"
+  grep -RFn --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.turbo \
+    --exclude="ci-guardrail.sh" --exclude="CHANGELOG.md" "canonical-clean.json" .
   exit 1
 fi
 
