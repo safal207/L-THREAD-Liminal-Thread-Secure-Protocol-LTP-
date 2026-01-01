@@ -2,6 +2,23 @@
 
 This map ties the LTP canon (conceptual foundation) to enforceable requirements.
 
+## Legacy Act — Inspector as Mirror (filename alias)
+Source: `docs/canon/03-inspector.md`
+
+> NOTE: Legacy filename alias kept only for CI hygiene.
+> Prefer `docs/canon/04-inspector.md` everywhere. Remove once 03-inspector.md is deleted.
+
+- **Clause:** "Inspector reveals… does not optimize / does not command"
+  - Requirements: LTP-REQ-NONGOAL-NO-HEURISTIC-ADAPT-1, LTP-REQ-NONGOAL-NO-DECISION-1, LTP-REQ-NONGOAL-NO-MODEL-EXEC-1
+
+- **Clause:** "measures drift / continuity"
+  - Requirements: LTP-REQ-ORIENT-DRIFT-1
+
+- **Clause:** "explains degraded paths"
+  - Requirements: LTP-REQ-INSPECT-EXPLAIN-1
+
+---
+
 ## Act 0 — Why LTP Exists
 Source: `docs/canon/00-why-ltp-exists.md`
 
