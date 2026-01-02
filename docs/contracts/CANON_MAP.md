@@ -102,7 +102,7 @@ Source: `docs/canon/07-what-ltp-will-never-become.md`
   - Requirements: LTP-REQ-NONGOAL-NO-DECISION-1
 
 - **Clause:** "LTP will never accept non-determinism / hide normalization"
-  - Requirements: LTP-REQ-NONGOAL-NO-HEURISTIC-ADAPT-1, LTP-REQ-TRACE-ORDER-DETERMINISM-1, LTP-REQ-INSPECT-EXIT-CODES-1
+  - Requirements: LTP-REQ-NONGOAL-NO-HEURISTIC-ADAPT-1, LTP-REQ-TRACE-ORDER-DETERMINISM-1
 
 - **Clause:** "Trace ≠ Memory (T-Trace clarification)"
   - Requirements: LTP-REQ-NONGOAL-TRACE-NOT-MEMORY-1

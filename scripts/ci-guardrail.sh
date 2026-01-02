@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -u
 
 # Fail if forbidden patterns exist
 echo "Checking for forbidden patterns..."
@@ -129,19 +130,13 @@ if [ ! -f "$REQUIREMENTS" ]; then
 fi
 
 CANON_REFS=$(
-  python - <<'PY'
-import json
-from pathlib import Path
-
-schema_path = Path("docs/contracts/ltp-inspect.v1.schema.json")
-data = json.loads(schema_path.read_text(encoding="utf-8"))
-refs = data.get("x-canonRefs", [])
-if not isinstance(refs, list):
-    refs = []
-for ref in refs:
-    if isinstance(ref, str):
-        print(ref)
-PY
+  node -e "
+    const fs = require('fs');
+    const p = 'docs/contracts/ltp-inspect.v1.schema.json';
+    const s = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const refs = Array.isArray(s['x-canonRefs']) ? s['x-canonRefs'] : [];
+    for (const r of refs) if (typeof r === 'string') console.log(r);
+  " 2>/dev/null || true
 )
 
 if [ -z "$CANON_REFS" ]; then
