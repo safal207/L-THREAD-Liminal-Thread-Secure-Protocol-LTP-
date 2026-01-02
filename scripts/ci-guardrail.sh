@@ -46,6 +46,7 @@ LEGACY_INPUT_JSON_HITS=$(
     --exclude-dir=dist \
     --exclude-dir=build \
     --exclude-dir=.turbo \
+    --exclude="ci-guardrail.sh" \
     -- "--input" \
     .github/workflows docs examples scripts \
   | grep -E -- "--input(=|[[:space:]]+)[^[:space:]]+\.json([[:space:]]|$)" \
