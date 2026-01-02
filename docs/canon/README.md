@@ -1,13 +1,26 @@
-# Canon Documents
+# LTP Canon
 
-Canonical references for LTP constraints, limits, misuse patterns, and security boundaries.
+These texts define the non-negotiable conceptual foundation of LTP.
 
-- [LTP Threat Model & Impossible Attack Classes (by Design)](./LTP-Threat-Model-and-Impossible-Classes.md)
-- [LTP Allowed Failure Modes](./LTP-Allowed-Failure-Modes.md)
-- [LTP Limits of LTP](./LTP-Limits-of-LTP.md)
-- [LTP Misuse Patterns](./LTP-Misuse-Patterns.md)
-- [LTP Non-Goals as Design Constraints](./LTP-Non-Goals-as-Design-Constraints.md)
-- [How to Build Products on LTP Without Violating the Core](./How-to-Build-Products-on-LTP-Without-Violating-the-Core.md)
-- [LTP Products on LTP Without Violating Core](./LTP-Products-on-LTP-Without-Violating-Core.md)
-- [LTP Prompt Injection Resistance](./LTP-Prompt-Injection-Resistance.md)
-- [ORIENTATION](./ORIENTATION.md)
+They are not tutorials.
+They are not marketing.
+They are not implementation details.
+
+If an interpretation of LTP contradicts this canon,
+the interpretation is wrong.
+
+Canon status: STABLE.
+Changes to canon must go through the LCP/RFC process.
+Canon is above tutorials, README, and marketing.
+
+Canonical requirements live in [docs/contracts/REQUIREMENTS.md](../contracts/REQUIREMENTS.md).
+Canon ↔ Contract mapping: [docs/contracts/CANON_MAP.md](../contracts/CANON_MAP.md).
+
+## Acts
+- [Act 0 — Why LTP Exists](./00-why-ltp-exists.md)
+- [Act I — Orientation over Prediction](./01-orientation-over-prediction.md)
+- [Act II — Orientation as a Living Structure](./02-orientation-node.md)
+- [Act III — Branches Without Choice](./03-admissible-futures.md)
+- [Act IV — Inspector as Mirror](./04-inspector.md)
+- [Act V — The Living Thread in Time](./05-living-thread.md)
+- [Act VI — Orientation Is the New Scale](./06-orientation-is-scale.md)
