@@ -86,3 +86,23 @@ Source: `docs/canon/06-orientation-is-scale.md`
 
 - **Clause:** "As system complexity ↑, prediction reliability ↓; orientation continuity preserves coherence."
   - Requirements: LTP-REQ-ORIENT-DRIFT-1, LTP-REQ-TRACE-ORDER-DETERMINISM-1
+
+---
+
+## Act VII — What LTP Will Never Become
+Source: `docs/canon/07-what-ltp-will-never-become.md`
+
+- **Clause:** "LTP will never become a decision-maker"
+  - Requirements: LTP-REQ-NONGOAL-NO-DECISION-1
+
+- **Clause:** "LTP will never become a model runtime / must be inspectable from traces alone"
+  - Requirements: LTP-REQ-NONGOAL-NO-MODEL-EXEC-1, LTP-REQ-TRACE-JSONL-1
+
+- **Clause:** "LTP will never become a reward system / goal tuner"
+  - Requirements: LTP-REQ-NONGOAL-NO-DECISION-1
+
+- **Clause:** "LTP will never accept non-determinism / hide normalization"
+  - Requirements: LTP-REQ-NONGOAL-NO-HEURISTIC-ADAPT-1, LTP-REQ-TRACE-ORDER-DETERMINISM-1
+
+- **Clause:** "Trace ≠ Memory (T-Trace clarification)"
+  - Requirements: LTP-REQ-NONGOAL-TRACE-NOT-MEMORY-1
