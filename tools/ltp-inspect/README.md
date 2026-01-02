@@ -29,7 +29,7 @@ Flags:
 - `--input <path>` to point at a JSONL frame log
 - `--color auto|always|never` for human output (default: `auto`)
 - `--strict` to treat canonicalization needs as contract violations (exit 2)
-- `--quiet` to emit only the final status line
+- `--quiet` suppresses banners/RESULT lines (primary report output remains; useful with `--format=json`)
 - `--output <file>` to write the formatted output to disk
 
 Frames must be JSONL with one frame per line. Existing conformance fixtures work as input.
@@ -53,7 +53,7 @@ Logs | Trajectories
 ## CLI help (kubectl-style)
 
 ```bash
-pnpm -w ltp:inspect -- --help
+pnpm -w ltp:inspect -- help
 ```
 
 Sections included: Usage, Examples, Output, Exit codes.
@@ -64,7 +64,7 @@ Sections included: Usage, Examples, Output, Exit codes.
 
 This README defers to the canonical table to avoid drift. Practical shorthand:
 - `0` when the contract is satisfied without warnings.
-- `2` when the contract is violated (`--strict` escalates normalization to `2`).
+ - `2` when an error occurs (contract violation **or** runtime/IO/parse failure). (`--strict` escalates normalization to `2`.)
 
 Suggested workflow integration:
 - Pull requests: run `pnpm -w ltp:inspect -- trace --input <trace>` (non-strict) to surface warnings without blocking.
