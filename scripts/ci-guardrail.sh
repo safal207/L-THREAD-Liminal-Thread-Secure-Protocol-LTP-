@@ -1,5 +1,6 @@
 #!/bin/bash
 set -e
+set -u
 
 # Fail if forbidden patterns exist
 echo "Checking for forbidden patterns..."
@@ -24,13 +25,11 @@ fi
 
 # 2. Check for canonical-clean.json references (should be canonical-linear.jsonl)
 # Excluding the script itself, git, and CHANGELOG.md (for historical reference)
-if grep -R --line-number --fixed-strings "canonical-clean.json" . \
-  --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.turbo \
-  --exclude="ci-guardrail.sh" --exclude="CHANGELOG.md" > /dev/null; then
+if grep -RFn --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.turbo \
+  --exclude="ci-guardrail.sh" --exclude="CHANGELOG.md" "canonical-clean.json" . > /dev/null; then
   echo "FAIL: Found references to canonical-clean.json. Please update to canonical-linear.jsonl"
-  grep -R --line-number --fixed-strings "canonical-clean.json" . \
-    --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.turbo \
-    --exclude="ci-guardrail.sh" --exclude="CHANGELOG.md"
+  grep -RFn --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=build --exclude-dir=.turbo \
+    --exclude="ci-guardrail.sh" --exclude="CHANGELOG.md" "canonical-clean.json" .
   exit 1
 fi
 
@@ -38,7 +37,7 @@ fi
 # We only scan places where humans copy/paste commands: docs/, examples/, scripts/, workflows
 # We exclude schema files and common JSON configs.
 LEGACY_INPUT_JSON_HITS=$(
-  grep -R --line-number --extended-regexp --fixed-strings -- "--input" \
+  grep -R --line-number --fixed-strings -- "--input" \
     .github/workflows docs examples scripts \
     --exclude-dir=.git \
     --exclude-dir=node_modules \
@@ -63,16 +62,19 @@ if [ -n "$LEGACY_INPUT_JSON_HITS" ]; then
 fi
 
 # 3. Check for deprecated `ltp-inspect` usage in docs and examples
-if grep -R --line-number "ltp-inspect" docs examples --exclude-dir=.git --exclude-dir=node_modules > /dev/null; then
+if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
+  --exclude-dir=.git --exclude-dir=node_modules --exclude="ci-guardrail.sh" > /dev/null; then
   # Filter out schema/contract references and file paths (tools/ltp-inspect)
-  if grep -R --line-number "ltp-inspect" docs examples --exclude-dir=node_modules \
+  if grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
+    --exclude-dir=node_modules --exclude="ci-guardrail.sh" \
     | grep -v "schema.json" \
     | grep -v "contract" \
     | grep -v "ltp-inspect.v1.md" \
     | grep -v "tools/ltp-inspect" \
     > /dev/null; then
     echo "FAIL: Found references to legacy 'ltp-inspect' in docs/examples. Please use 'ltp inspect'."
-    grep -R --line-number "ltp-inspect" docs examples --exclude-dir=node_modules \
+    grep -R --line-number "ltp-inspect" docs examples scripts .github/workflows \
+      --exclude-dir=node_modules --exclude="ci-guardrail.sh" \
       | grep -v "schema.json" \
       | grep -v "contract" \
       | grep -v "ltp-inspect.v1.md" \
@@ -80,6 +82,126 @@ if grep -R --line-number "ltp-inspect" docs examples --exclude-dir=.git --exclud
     exit 1
   fi
 fi
+
+# 3.5 Check for `ltp inspect` without a subcommand in docs/examples/scripts/workflows
+INVALID_INSPECT_USAGE=$(
+  grep -R --line-number --fixed-strings "ltp inspect" docs examples scripts .github/workflows \
+    --exclude-dir=.git \
+    --exclude-dir=node_modules \
+    --exclude="ci-guardrail.sh" \
+  | grep -vE "ltp inspect (trace|replay|explain|help)" \
+  || true
+)
+
+if [ -n "$INVALID_INSPECT_USAGE" ]; then
+  echo "FAIL: Found 'ltp inspect' usage without a subcommand. Use: ltp inspect trace|replay|explain|help"
+  echo ""
+  echo "$INVALID_INSPECT_USAGE"
+  exit 1
+fi
+
+# 3.75 Enforce that docs/canon contains ONLY Acts + README
+# Allowed:
+# - docs/canon/README.md
+# - docs/canon/[0-9][0-9]-*.md
+CANON_EXTRA_MD=$(
+  find docs/canon -maxdepth 1 -type f -name "*.md" \
+    ! -name "README.md" \
+    ! -name "[0-9][0-9]-*.md" \
+    -print 2>/dev/null || true
+)
+if [ -n "$CANON_EXTRA_MD" ]; then
+  echo "FAIL: docs/canon/ must contain only README.md and two-digit Act files ([0-9][0-9]-*.md)."
+  echo "Move non-Act documents to docs/guardrails/ (or elsewhere). Found:"
+  echo ""
+  echo "$CANON_EXTRA_MD"
+  exit 1
+fi
+
+# 4. Enforce two-digit canon numbering (00-, 07-, 10-, ...)
+NON_TWO_DIGIT_ACTS=$(
+  find docs/canon -maxdepth 1 -type f -name "[0-9]-*.md" -print 2>/dev/null || true
+)
+if [ -n "$NON_TWO_DIGIT_ACTS" ]; then
+  echo "FAIL: Canon acts must use two-digit numbering (e.g., 00-, 07-, 10-)."
+  echo "$NON_TWO_DIGIT_ACTS"
+  exit 1
+fi
+
+# 5. Canon guardrail checks
+CANON_MAP="docs/contracts/CANON_MAP.md"
+REQUIREMENTS="docs/contracts/REQUIREMENTS.md"
+INSPECT_SCHEMA="docs/contracts/ltp-inspect.v1.schema.json"
+
+if [ ! -f "$CANON_MAP" ]; then
+  echo "FAIL: Missing $CANON_MAP for canon guardrail."
+  exit 1
+fi
+
+if [ ! -f "$REQUIREMENTS" ]; then
+  echo "FAIL: Missing $REQUIREMENTS for canon guardrail."
+  exit 1
+fi
+
+if [ ! -f "$INSPECT_SCHEMA" ]; then
+  echo "FAIL: Missing $INSPECT_SCHEMA for canon guardrail."
+  exit 1
+fi
+
+CANON_FILES=$(
+  find docs/canon -maxdepth 1 -type f -name "[0-9][0-9]-*.md" -print 2>/dev/null || true
+)
+if [ -z "$CANON_FILES" ]; then
+  echo "FAIL: No canon act files found in docs/canon."
+  exit 1
+fi
+
+for CANON_FILE in $CANON_FILES; do
+  if ! grep -F "$CANON_FILE" "$CANON_MAP" > /dev/null; then
+    echo "FAIL: Canon act missing from CANON_MAP: $CANON_FILE"
+    exit 1
+  fi
+done
+
+# Only canon-bound requirements must appear in CANON_MAP.
+# Source of truth: x-canonRefs in the Inspector contract schema.
+# This keeps CANON_MAP focused and prevents CI from forcing tool-only / enterprise-only reqs into canon mapping.
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "FAIL: 'node' is required for canon guardrail (parsing x-canonRefs)."
+  exit 1
+fi
+
+CANON_REQ_IDS=$(
+  node -e "
+    const fs = require('fs');
+    const p = process.argv[1];
+    const s = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const refs = Array.isArray(s['x-canonRefs']) ? s['x-canonRefs'] : [];
+    for (const r of refs) console.log(String(r));
+  " "$INSPECT_SCHEMA" 2>/dev/null | sort -u || true
+)
+
+if [ -z "$CANON_REQ_IDS" ]; then
+  echo "FAIL: No x-canonRefs found in $INSPECT_SCHEMA (canon-bound requirements unknown)."
+  exit 1
+fi
+
+# Ensure each canon-bound requirement exists in REQUIREMENTS.md
+for REQ_ID in $CANON_REQ_IDS; do
+  if ! grep -F "$REQ_ID" "$REQUIREMENTS" > /dev/null; then
+    echo "FAIL: Canon requirement referenced by schema but missing from REQUIREMENTS: $REQ_ID"
+    exit 1
+  fi
+done
+
+# Ensure each canon-bound requirement is mapped in CANON_MAP.md
+for REQ_ID in $CANON_REQ_IDS; do
+  if ! grep -F "$REQ_ID" "$CANON_MAP" > /dev/null; then
+    echo "FAIL: Canon requirement missing from CANON_MAP: $REQ_ID"
+    exit 1
+  fi
+done
 
 echo "Guardrail checks passed!"
 exit 0

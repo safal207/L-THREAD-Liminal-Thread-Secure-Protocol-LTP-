@@ -144,6 +144,7 @@ LTP MAY support signed roots (e.g., Ed25519) for non-repudiation.
 ---
 
 ## Inspector Semantics (Tool Contract)
+These requirements apply to the Inspector tool contract, not to the LTP protocol semantics.
 
 ### LTP-REQ-INSPECT-EXPLAIN-1 (MAY, DRAFT)
 Inspector MAY provide human-readable explanations for a specific step (`explain --at ...`) without prescribing actions.
