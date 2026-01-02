@@ -129,6 +129,11 @@ done
 # Source of truth: x-canonRefs in the Inspector contract schema.
 # This keeps CANON_MAP focused and prevents CI from forcing tool-only / enterprise-only reqs into canon mapping.
 
+if ! command -v node >/dev/null 2>&1; then
+  echo "FAIL: 'node' is required for canon guardrail (parsing x-canonRefs)."
+  exit 1
+fi
+
 CANON_REQ_IDS=$(
   node -e "
     const fs = require('fs');
