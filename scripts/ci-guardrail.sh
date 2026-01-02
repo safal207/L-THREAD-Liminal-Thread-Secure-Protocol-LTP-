@@ -114,5 +114,51 @@ for CANON_FILE in $CANON_ACTS; do
   fi
 done
 
+# 6. Ensure x-canonRefs exist and map to REQUIREMENTS and CANON_MAP
+CANON_SCHEMA="docs/contracts/ltp-inspect.v1.schema.json"
+REQUIREMENTS="docs/contracts/REQUIREMENTS.md"
+
+if [ ! -f "$CANON_SCHEMA" ]; then
+  echo "FAIL: Missing $CANON_SCHEMA for canon guardrail."
+  exit 1
+fi
+
+if [ ! -f "$REQUIREMENTS" ]; then
+  echo "FAIL: Missing $REQUIREMENTS for canon guardrail."
+  exit 1
+fi
+
+CANON_REFS=$(
+  python - <<'PY'
+import json
+from pathlib import Path
+
+schema_path = Path("docs/contracts/ltp-inspect.v1.schema.json")
+data = json.loads(schema_path.read_text(encoding="utf-8"))
+refs = data.get("x-canonRefs", [])
+if not isinstance(refs, list):
+    refs = []
+for ref in refs:
+    if isinstance(ref, str):
+        print(ref)
+PY
+)
+
+if [ -z "$CANON_REFS" ]; then
+  echo "FAIL: Missing or empty x-canonRefs in $CANON_SCHEMA."
+  exit 1
+fi
+
+for CANON_REF in $CANON_REFS; do
+  if ! grep -F "$CANON_REF" "$REQUIREMENTS" > /dev/null; then
+    echo "FAIL: Canon ref missing from REQUIREMENTS: $CANON_REF"
+    exit 1
+  fi
+  if ! grep -F "$CANON_REF" "$CANON_MAP" > /dev/null; then
+    echo "FAIL: Canon ref missing from CANON_MAP: $CANON_REF"
+    exit 1
+  fi
+done
+
 echo "Guardrail checks passed!"
 exit 0
