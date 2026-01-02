@@ -128,6 +128,55 @@ All LTP messages (except raw handshake) use a unified JSON envelope structure:
 
 See `LTP-message-format.md` for detailed specification.
 
+### 3.4 Causality Axiom (Core Constraint)
+
+**Canonical Axiom (Non-Optional):**
+
+> No value transfer is valid unless its cause, context, and acceptable consequence horizon are explicitly recorded and verifiable.
+
+Formal expression:
+
+```
+ValueTransfer := { value, cause, context, horizon }
+
+Valid(ValueTransfer) ⇔
+  cause ≠ null
+  ∧ context ≠ null
+  ∧ horizon ≠ null
+```
+
+Any transfer without these components is **protocol-invalid** and MUST be rejected **pre-commit**.
+
+**Scope of Application (MUST apply to):**
+- Financial transactions
+- State transitions
+- AI agent decisions
+- Autonomous system actions
+- Any LTP-traced operation involving value or risk
+
+**Minimal Causality Schema (see message format for details):**
+- `cause`: machine-readable cause object
+- `context`: state snapshot or references needed to reconstruct the decision context
+- `horizon`: explicit bounds on acceptable consequences/risk
+
+**Validation & Rejection Behavior:**
+- Implementations MUST refuse to serialize or accept any qualifying operation missing `cause`, `context`, or `horizon`.
+- Validation is **pre-commit**, not post-hoc audit.
+- Rejections MUST be explicit and traceable.
+
+**Trace Semantics:**
+- Causality data MUST be part of the immutable trace for any qualifying operation.
+- `cause`, `context`, and `horizon` MUST be queryable and auditable via trace tooling.
+
+**Non-Goals (Explicit):**
+- No moral judgement of causes
+- No centralized enforcement or authority layer
+- No blocking of economic activity beyond structural invalidity
+- No human-only cause requirement (autonomous agents supported)
+
+**Cross-Layer References:**
+- This axiom is foundational and MUST be honored by trace layers (t-Trace), capacity/risk layers (CapU), and AI agent decision tooling.
+
 ## 4. Relation to LRI (Liminal Resonance Interface)
 
 ### 4.1 Layer Separation
