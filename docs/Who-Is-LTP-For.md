@@ -76,7 +76,7 @@ Example (JavaScript):
 ```
 pnpm install
 pnpm demo:canonical-v0.1
-pnpm ltp inspect ./artifacts/trace.json
+pnpm -w ltp:inspect -- trace --input ./artifacts/trace.jsonl
 pnpm ltp verify
 ```
 
