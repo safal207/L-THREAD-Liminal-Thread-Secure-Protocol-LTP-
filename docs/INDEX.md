@@ -11,18 +11,18 @@ This repository defines **LTP (Liminal Thread Protocol)** — a continuity layer
 ## Start here
 
 - **Canon (read first)**
-  - `docs/vision/LTP-vs-Blockchain-Crypto-Agents.md` (Market Positioning)
-  - `docs/canon/LTP-Limits-of-LTP.md`
-  - `docs/canon/LTP-Non-Goals-as-Design-Constraints.md`
-  - `docs/canon/How-to-Build-Products-on-LTP-Without-Violating-the-Core.md`
-  - `docs/canon/LTP-Critical-Actions-v0.1.md`
+  - **[LTP vs Blockchain/Crypto Agents](./vision/LTP-vs-Blockchain-Crypto-Agents.md)** (Market Positioning)
+  - **[Limits of LTP](./guardrails/LTP-Limits-of-LTP.md)**
+  - **[Non-Goals as Design Constraints](./guardrails/LTP-Non-Goals-as-Design-Constraints.md)**
+  - **[Build Products on LTP Without Violating the Core](./guardrails/How-to-Build-Products-on-LTP-Without-Violating-the-Core.md)**
+  - **[Critical Actions Standard](./guardrails/LTP-Critical-Actions-v0.1.md)**
 - **Core references**
-  - `docs/invariants.md`
-  - `docs/glossary.md`
+  - **[Invariants](./invariants.md)**
+  - **[Glossary](./glossary.md)**
   - **[Security Posture](./security/posture.md)** (New)
   - **[Compatibility Matrix](./compat/matrix.md)** (New)
 - **Specs**
-  - `specs/LTP-Conformance-v0.1.md`
+  - **[LTP Conformance v0.1](../specs/LTP-Conformance-v0.1.md)**
 
 ## Market-Specific Documentation
 

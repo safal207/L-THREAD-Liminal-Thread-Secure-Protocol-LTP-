@@ -29,5 +29,5 @@ LTP separates these concerns.
 ## Start Here
 
 If this resonates, read:
-- docs/canon/ORIENTATION.md
+- docs/guardrails/ORIENTATION.md
 - docs/contracts/ltp-inspect.v1.md

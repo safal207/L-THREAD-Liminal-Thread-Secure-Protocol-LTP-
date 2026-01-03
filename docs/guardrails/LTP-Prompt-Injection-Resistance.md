@@ -182,7 +182,7 @@ This is a protocol invariant.
 
 ✅ Acceptance Criteria
 
-[ ] File added exactly at docs/canon/LTP-Prompt-Injection-Resistance.md
+[ ] File added exactly at docs/guardrails/LTP-Prompt-Injection-Resistance.md
 
 [ ] No code changes
 

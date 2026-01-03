@@ -3,7 +3,7 @@
     "name": "LTP Critical Actions Registry",
     "version": "v0.1",
     "status": "frozen",
-    "canonical_doc": "docs/canon/LTP-Critical-Actions-v0.1.md"
+    "canonical_doc": "docs/guardrails/LTP-Critical-Actions-v0.1.md"
   },
   "actions": {
     "transfer_money": {

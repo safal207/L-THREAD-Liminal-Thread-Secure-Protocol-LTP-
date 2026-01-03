@@ -4,7 +4,8 @@ This document describes how to use the `@ltp/inspect` tool for compliance verifi
 
 ## Overview
 
-The `ltp inspect` tool now supports a specific compliance profile for Fintech (`--compliance fintech`). This profile runs a set of strict checks on the LTP Trace logs to ensure:
+The `ltp` tool's inspect command now supports a specific compliance profile for Fintech. Use it with a subcommand; for example:
+`ltp inspect trace --compliance fintech`. This profile runs a set of strict checks on the LTP Trace logs to ensure:
 
 1.  **Trace Integrity**: The hash chain of the audit log is unbroken and cryptographically valid.
 2.  **Identity Binding**: All sessions have a stable identity.
