@@ -19,3 +19,4 @@ It preserves coherence.
 - [Act IV — Inspector as Mirror](../docs/canon/04-inspector.md)
 - [Act V — The Living Thread in Time](../docs/canon/05-living-thread.md)
 - [Act VI — Orientation Is the New Scale](../docs/canon/06-orientation-is-scale.md)
+- [Act VII — What LTP Will Never Become](../docs/canon/07-what-ltp-will-never-become.md)
