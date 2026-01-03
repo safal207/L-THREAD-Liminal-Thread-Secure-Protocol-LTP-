@@ -50,10 +50,9 @@ The Inspector is the foundation for future DevTools and enterprise integrations.
 Inspector follows the canonical exit codes (see [`docs/devtools/exit-codes.md`](./exit-codes.md)). Quick reference:
 - `0`: Valid, no warnings.
 - `1`: Warnings only (normalized output or degraded signals).
-- `2`: Contract violations (missing/unsupported versions, invalid payloads, or non-canonical input in `--strict`).
-- `3`: Runtime or IO errors.
+- `2`: Contract violations or runtime errors (invalid input, invalid payloads, or non-canonical input in `--strict`).
 
 ## CI usage
 
-- Pull requests: run `pnpm -w ltp:inspect -- --input <trace>` (non-strict) to surface warnings without blocking contributions.
-- Protected branches or conformance folders: run `pnpm -w ltp:inspect -- --strict --input <trace>` to gate on canonical traces.
+- Pull requests: run `pnpm -w ltp:inspect -- trace --input <trace>.jsonl` (non-strict) to surface warnings without blocking contributions.
+- Protected branches or conformance folders: run `pnpm -w ltp:inspect -- trace --strict --input <trace>.jsonl` to gate on canonical traces.

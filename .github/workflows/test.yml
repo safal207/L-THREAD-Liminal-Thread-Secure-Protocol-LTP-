@@ -31,7 +31,7 @@ jobs:
           chmod +x scripts/ci-guardrail.sh
           ./scripts/ci-guardrail.sh
 
-  ltp-inspect:
+  ltp_inspect:
     name: Inspector contract check
     runs-on: ubuntu-latest
     steps:

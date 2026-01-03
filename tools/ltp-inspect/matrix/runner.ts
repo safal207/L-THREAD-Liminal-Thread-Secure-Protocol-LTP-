@@ -85,7 +85,7 @@ export function runMatrixCase(testCase: MatrixCase): void {
   const logs: string[] = [];
   const errors: string[] = [];
 
-  let exitCode = 3;
+  let exitCode = 2;
   try {
     exitCode = execute(
       testCase.args,
@@ -97,7 +97,7 @@ export function runMatrixCase(testCase: MatrixCase): void {
     );
   } catch (err) {
     const candidate = (err as { exitCode?: number }).exitCode;
-    exitCode = typeof candidate === 'number' ? candidate : 3;
+    exitCode = typeof candidate === 'number' ? candidate : 2;
     errors.push(String((err as Error)?.message ?? err));
   }
 
