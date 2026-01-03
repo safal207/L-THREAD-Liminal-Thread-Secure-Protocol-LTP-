@@ -39,6 +39,7 @@ Repository content is sanitized to avoid hidden or bidirectional Unicode charact
 [Project Index](canonical/README.md)
 
 Canon → [docs/canon/README.md](docs/canon/README.md)  
+Canon version → [docs/canon/VERSION.md](docs/canon/VERSION.md)  
 Requirements → [docs/contracts/REQUIREMENTS.md](docs/contracts/REQUIREMENTS.md)
 
 > Every pull request produces reproducible DevTools artifacts

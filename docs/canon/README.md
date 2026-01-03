@@ -12,6 +12,7 @@ the interpretation is wrong.
 Canon status: STABLE.
 Changes to canon must go through the LCP/RFC process.
 Canon is above tutorials, README, and marketing.
+**Canon version:** see `docs/canon/VERSION.md`.
 
 Canonical requirements live in [docs/contracts/REQUIREMENTS.md](../contracts/REQUIREMENTS.md).
 Canon ↔ Contract mapping: [docs/contracts/CANON_MAP.md](../contracts/CANON_MAP.md).
