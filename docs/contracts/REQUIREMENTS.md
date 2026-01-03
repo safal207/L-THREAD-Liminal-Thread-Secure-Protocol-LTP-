@@ -2,6 +2,7 @@
 
 This document defines stable, testable requirements for LTP.
 Requirement IDs MUST NOT change once published.
+Requirements version: see [docs/contracts/REQUIREMENTS_VERSION.md](./REQUIREMENTS_VERSION.md).
 
 Legend:
 - MUST: required for conformance
