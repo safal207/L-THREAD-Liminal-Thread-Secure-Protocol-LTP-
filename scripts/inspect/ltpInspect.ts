@@ -71,7 +71,7 @@ function printWarnings(r: Report): void {
 
 function main(): void {
   const file = process.argv[2];
-  if (!file) die('Usage: ltp inspect <conformance-report.json>');
+  if (!file) die('Usage: ltp inspect-report <conformance-report.json>');
 
   const report = loadReport(file);
 
