@@ -25,7 +25,7 @@ When deploying LTP in regulated markets (Fintech, Health, Insurance), auditors a
 **Question**: "If I replay this input, will I get the same output?"
 
 **LTP Answer**:
-*   **Replay Check**: `ltp inspect --replay-check` verifies that the trace structure is valid for deterministic replay.
+*   **Replay Check**: `ltp inspect trace --replay-check --input <trace.jsonl>` verifies that the trace structure is valid for deterministic replay.
 *   **State Explicit**: All relevant context is captured in `orientation` frames. There is no "hidden state" (like unlogged DB queries) that influences the protocol flow.
 
 ## 4. Non-Repudiation
