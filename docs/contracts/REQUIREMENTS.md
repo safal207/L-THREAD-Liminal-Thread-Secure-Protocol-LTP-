@@ -95,6 +95,28 @@ Inspector/verification tooling MUST NOT adapt heuristically to “fix” meaning
 
 ---
 
+### LTP-REQ-NONGOAL-TRACE-NOT-MEMORY-1 (MUST)
+Trace logs (including T-Trace) MUST be treated as an auditable history of transitions,
+not as a memory store.
+
+Conformance MUST NOT require:
+- semantic retrieval
+- similarity search
+- recall to influence decisions
+- storage or retrieval of “knowledge” for action
+
+Trace systems MAY provide tamper-evident properties (hash chains, signatures),
+but MUST NOT imply consensus, inference, or memory semantics.
+
+**Rationale:** Trace ≠ Memory. Orientation depends on continuity, not recall.
+
+**Enforcement:**
+- Canon constraints (Act VII)
+- Tooling: Inspector operates on traces read-only
+- CI: no dependency on retrieval engines
+
+---
+
 ## Trace Format & Versioning
 
 ### LTP-REQ-TRACE-JSONL-1 (MUST)

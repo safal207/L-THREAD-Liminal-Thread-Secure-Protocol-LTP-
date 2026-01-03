@@ -29,5 +29,5 @@ LTP is designed to be a "Brakes & Steering" layer for distributed systems, ensur
 
 ## Links to Secure Deployment
 
-- `docs/canon/LTP-Critical-Actions-v0.1.md`
+- [LTP Critical Actions Standard](../guardrails/LTP-Critical-Actions-v0.1.md)
 - [Agent Safety Rules](../agents/Agent-Safety-Rules-v0.1.md)

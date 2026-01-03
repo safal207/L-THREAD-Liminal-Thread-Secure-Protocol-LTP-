@@ -24,9 +24,4 @@ Canon ↔ Contract mapping: [docs/contracts/CANON_MAP.md](../contracts/CANON_MAP
 - [Act IV — Inspector as Mirror](./04-inspector.md)
 - [Act V — The Living Thread in Time](./05-living-thread.md)
 - [Act VI — Orientation Is the New Scale](./06-orientation-is-scale.md)
-
-## Guardrails (non-canon)
-Engineering guardrails live in: [docs/guardrails/README.md](../guardrails/README.md)
-
-Guardrails are strict, but they are not canon.
-If a guardrail contradicts the canon, the guardrail is wrong.
+- [Act VII — What LTP Will Never Become](./07-what-ltp-will-never-become.md)
