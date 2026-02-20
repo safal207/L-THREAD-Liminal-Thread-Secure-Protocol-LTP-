@@ -23,6 +23,7 @@ This repository defines **LTP (Liminal Thread Protocol)** — a continuity layer
   - **[Compatibility Matrix](./compat/matrix.md)** (New)
 - **Specs**
   - **[LTP Conformance v0.1](../specs/LTP-Conformance-v0.1.md)**
+  - **[ТЗ-3.0: Shadow Layer v2 + Merit Ledger Consensus](./TZ-3.0-Shadow-Layer-v2-Merit-Ledger-Consensus.md)**
 
 ## Market-Specific Documentation
 
