@@ -5,5 +5,13 @@
     "rootDir": ".",
     "noEmit": false
   },
-  "include": ["./inspect.ts", "./types.ts", "./critical_actions.ts", "./semantic.ts", "./semantic/**/*.ts"]
+  "include": [
+    "./inspect.ts",
+    "./types.ts",
+    "./critical_actions.ts",
+    "./semantic.ts",
+    "./semantic/**/*.ts",
+    "./replay/index.ts",
+    "./replay/**/*.ts"
+  ]
 }

@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import PDFDocument from 'pdfkit';
 import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
 import { CRITICAL_ACTIONS, AGENT_RULES, RECOVERY_ACTIONS } from './critical_actions';
 
@@ -71,6 +70,7 @@ type ParsedArgs = {
   outputFile?: string;
   traceFile?: string;
   configFile?: string;
+  replay?: boolean;
 };
 
 const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
@@ -146,6 +146,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     outputFile: undefined,
     traceFile: undefined,
     configFile: undefined,
+    replay: false,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -244,6 +245,8 @@ function parseArgs(argv: string[]): ParsedArgs {
     } else if (token === '--config') {
       options.configFile = requireValue(argv, i, '--config');
       i += 1;
+    } else if (token === '--replay') {
+      options.replay = true;
     } else if (token.startsWith('--export=')) {
       const exportFmt = requireInlineValue(token, '--export') as ExportFormat;
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
@@ -1046,6 +1049,7 @@ function exportJsonLd(summary: InspectSummary, path: string): void {
 }
 
 function exportPdf(summary: InspectSummary, outputPath: string): void {
+    const PDFDocument = require('pdfkit') as new () => any;
     const doc = new PDFDocument();
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);
@@ -1472,12 +1476,28 @@ function runSemanticTrace(args: ParsedArgs, writer: Writer, errorWriter: Writer)
   return 2;
 }
 
+function runReplayTrace(traceFile: string, colorEnabled: boolean, writer: Writer): number {
+  try {
+    const replay = require('./replay') as {
+      replayTrace: (file: string) => Array<Record<string, unknown>>;
+      formatReplay: (steps: Array<Record<string, unknown>>, colorEnabled: boolean) => string;
+    };
+    const steps = replay.replayTrace(traceFile);
+    const output = replay.formatReplay(steps, colorEnabled);
+    writer(output);
+    return 0;
+  } catch {
+    return 1;
+  }
+}
+
 function printHelp(writer: Writer): void {
   writer('ltp:inspect — orientation inspector (no decisions, no model execution).');
   writer('');
   writer('Usage:');
   writer('  ltp inspect trace --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
   writer('  ltp inspect trace --phase <pre|post|two_phase|audit_only> --trace <trace.jsonl> [--anchors-file <anchors.json>] [--output-file <response.md>] [--config <config.json>]');
+  writer('  ltp inspect trace --trace <trace.jsonl> --replay');
   writer('  ltp inspect replay --input <frames.jsonl> [--from <frameId>]');
   writer('  ltp inspect explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
@@ -1487,6 +1507,7 @@ function printHelp(writer: Writer): void {
   writer('  ltp inspect trace --continuity --input examples/traces/continuity-outage.trace.jsonl');
   writer('  ltp inspect trace --format=json --quiet --input examples/traces/drift-recovery.jsonl | jq .orientation');
   writer('  ltp inspect explain --input examples/traces/drift-recovery.jsonl --at step-3');
+  writer('  ltp inspect trace --trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay');
   writer('');
   writer('Output:');
   writer('  JSON (v1 contract) with deterministic ordering for CI. Additional fields remain optional.');
@@ -1541,7 +1562,8 @@ export function execute(
     }
 
     const semanticTraceMode = args.command === 'trace' && Boolean(args.phase);
-    if (!args.input && !semanticTraceMode) {
+    const replayTraceMode = args.command === 'trace' && Boolean(args.replay && args.traceFile);
+    if (!args.input && !semanticTraceMode && !replayTraceMode) {
       // Check strict input requirement
       // Some commands like replay/explain might theoretically work without input if they had defaults, but currently we require it.
       errorWriter('ERROR: Missing --input <frames.jsonl>');
@@ -1563,7 +1585,20 @@ export function execute(
       case 'trace':
         {
           if (args.phase) {
-            const exitCode = runSemanticTrace(args, writer, errorWriter);
+            const semanticExitCode = runSemanticTrace(args, writer, errorWriter);
+            let replayExitCode = 0;
+            if (args.replay && args.traceFile) {
+              replayExitCode = runReplayTrace(args.traceFile, colorEnabled, writer);
+            }
+            const exitCode = semanticExitCode !== 0 ? semanticExitCode : replayExitCode;
+            if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
+            buffer.forEach((line) => logger.log(line));
+            process.exitCode = exitCode;
+            return exitCode;
+          }
+
+          if (args.replay && args.traceFile && !args.input) {
+            const exitCode = runReplayTrace(args.traceFile, colorEnabled, writer);
             if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
             buffer.forEach((line) => logger.log(line));
             process.exitCode = exitCode;
@@ -1634,6 +1669,14 @@ export function execute(
           }
 
           if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
+          if (args.replay && args.traceFile) {
+            const replayExitCode = runReplayTrace(args.traceFile, colorEnabled, writer);
+            if (replayExitCode !== 0) {
+              process.exitCode = replayExitCode;
+              buffer.forEach((line) => logger.log(line));
+              return replayExitCode;
+            }
+          }
           buffer.forEach((line) => logger.log(line));
           return exitCode;
         }
