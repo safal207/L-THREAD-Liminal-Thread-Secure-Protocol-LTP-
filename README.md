@@ -28,11 +28,30 @@ It does not predict, decide, or optimize outcomes.
 | Preparing compliance evidence | [docs/operational-notes/conformance.md](docs/operational-notes/conformance.md) |
 | Exploring end-to-end examples | [examples/README.canonical-flow.md](examples/README.canonical-flow.md) |
 
+## 30-second pitch (for teams and stakeholders)
+
+LTP is the **protocol layer for AI continuity**: it makes agent transitions reproducible, auditable, and policy-checkable without depending on one model vendor or one agent framework.
+
+If your system ever needs to answer:
+- *"Why did the agent do this?"*
+- *"Can we replay this exact path?"*
+- *"Can we prove policy compliance to auditors or security?"*
+
+LTP gives you a deterministic, inspectable trail.
+
 ## What this gives you (practically)
 
 - **Deterministic replay:** investigate any transition path without model re-execution.
 - **Auditable handoffs:** preserve identity, constraints, and continuity across agent/system boundaries.
 - **Policy enforcement by trace:** verify critical actions from signed, inspectable protocol events.
+
+## Why LTP instead of "just logs" or framework tracing
+
+| Approach | Good for | Typical gap | What LTP adds |
+|---|---|---|---|
+| App logs | Runtime debugging | Weak continuity semantics across agent handoffs | Protocol-native orientation and deterministic replay |
+| Framework-specific traces | Single-stack observability | Vendor/framework lock-in and inconsistent handoff semantics | Neutral protocol surface across stacks |
+| Prompt/version snapshots | Artifact retention | Hard to verify transition admissibility over time | Verifiable transitions with conformance-oriented structure |
 
 ## Start in 5 minutes
 
@@ -52,6 +71,12 @@ It does not predict, decide, or optimize outcomes.
 
 For maintainers: GitHub visibility execution checklist → [docs/GITHUB_DISCOVERABILITY_CHECKLIST.md](docs/GITHUB_DISCOVERABILITY_CHECKLIST.md)
 
+## Quick next actions
+
+1. Run a demo: `pnpm -w demo:canonical`
+2. Validate traces in your pipeline: `pnpm -w ltp:verify`
+3. Share the one-pager with product/security stakeholders: [docs/positioning/ONE_PAGER.md](docs/positioning/ONE_PAGER.md)
+
 **Fintech-Ready (Controlled Environments)**
 
 LTP Node v0.1 provides audit-grade continuity, identity binding, and deterministic replay for regulated environments.
@@ -67,6 +92,14 @@ ltp inspect trace --input artifacts/traces/sample.trace.jsonl
 If your shell cannot find the `ltp` command, restart the session or ensure the PNPM global bin directory is on your `PATH`.  
 Prefer a workspace local run? Use: `pnpm -w ltp:inspect -- trace --input artifacts/traces/sample.trace.jsonl`.
 
+
+## Adoption menu (pick your depth)
+
+- **Pilot (1 day):** run canonical/demo flows and inspect traces locally.
+- **Team rollout (1–2 weeks):** integrate conformance checks in CI and standardize handoff events.
+- **Regulated path (ongoing):** produce deterministic evidence streams for controls and audits.
+
+Start with [docs/positioning/ONE_PAGER.md](docs/positioning/ONE_PAGER.md) for stakeholder alignment.
 
 ## Popular demos
 
