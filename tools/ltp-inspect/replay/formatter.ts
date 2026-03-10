@@ -25,7 +25,7 @@ export function formatReplay(steps: ReplayStep[], colorEnabled: boolean): string
 
   for (const step of steps) {
     const statusText = colorize(step.status, step.status, colorEnabled);
-    lines.push(`[${step.index}] ${step.id} (${statusText})`);
+    lines.push(`[${step.index}] ${step.id} (${statusText})${step.chunk_id ? ` [chunk:${step.chunk_id}]` : ''}`);
     if (step.text) {
       lines.push(`    ${truncateText(step.text)}`);
     }

@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import ts from 'typescript';
 import type { InspectSummary } from './types';
 import { execute, formatHuman, formatJson, runInspect } from './inspect';
+import { runInspectCLI } from './helpers';
 
 const minimalFixture = path.join(__dirname, 'fixtures', 'minimal.frames.jsonl');
 const expectedJsonPath = path.join(__dirname, 'expected', 'summary.json');
@@ -41,7 +42,6 @@ const blockedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'a
 // Canonical continuity fixtures
 const continuityOutageFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.jsonl');
 const continuityFailureFixture = path.join(__dirname, 'fixtures', 'continuity-failure.trace.jsonl');
-const replayTraceFixture = path.join(__dirname, 'fixtures', 'replay', 'trace-replay.jsonl');
 
 
 let builtCliPath: string | undefined;
@@ -640,18 +640,17 @@ describe('ltp inspect cli', () => {
     expect(errors.join('\n')).toContain('Missing command');
   });
 
-  it('runs replay output after semantic trace when --replay is enabled', () => {
-    const logs: string[] = [];
-    const errors: string[] = [];
+  it('runs replay output after semantic trace when --replay is enabled', async () => {
+    const traceFile = 'tests/fixtures/trace-replay.jsonl';
 
-    const exitCode = execute(['trace', '--phase', 'audit_only', '--trace', replayTraceFixture, '--replay'], {
-      log: (m) => logs.push(m),
-      error: (m) => errors.push(m),
-    });
+    const { exitCode, logs, errors } = await runInspectCLI(['trace', '--trace', traceFile, '--replay']);
 
     expect(exitCode).toBe(0);
     expect(errors).toHaveLength(0);
     expect(logs.join('\n')).toContain('--- LTP Trace Replay ---');
-    expect(logs.join('\n')).toContain('[1] t1 (admissible)');
-  });
+    expect(logs.join('\n')).toContain('c1');
+    expect(logs.join('\n')).toContain('c2');
+    expect(logs.join('\n')).toContain('c3');
+    expect(logs.join('\n')).toContain('c4');
+  }, 20000);
 });

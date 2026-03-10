@@ -1,7 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import PDFDocument from 'pdfkit';
 import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
 import { CRITICAL_ACTIONS, AGENT_RULES, RECOVERY_ACTIONS } from './critical_actions';
 
@@ -1050,6 +1049,7 @@ function exportJsonLd(summary: InspectSummary, path: string): void {
 }
 
 function exportPdf(summary: InspectSummary, outputPath: string): void {
+    const PDFDocument = require('pdfkit') as new () => any;
     const doc = new PDFDocument();
     const stream = fs.createWriteStream(outputPath);
     doc.pipe(stream);

@@ -1,0 +1,4 @@
+{"id":"t1","status":"admissible","chunk_id":"c1","payload":{"text":"Paris is the capital of France in 2024."}}
+{"id":"t2","status":"admissible","chunk_id":"c2","payload":{"text":"France is located in Western Europe."}}
+{"id":"t3","status":"drift","chunk_id":"c3","payload":{"text":"An unanchored claim about the moon."}}
+{"id":"t4","status":"rejected","chunk_id":"c4","payload":{"text":"This transition was rejected."}}
