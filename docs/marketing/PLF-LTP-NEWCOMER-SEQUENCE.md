@@ -171,3 +171,61 @@ This is the minimum habit loop that turns passive readers into active adopters.
 - Conformance: [docs/operational-notes/conformance.md](../operational-notes/conformance.md)
 - Positioning: [docs/positioning/ONE_PAGER.md](../positioning/ONE_PAGER.md)
 
+
+---
+
+## 8) What Jeff Walker would likely strengthen further
+
+If you want this sequence to convert better, add these PLF levers:
+
+1. **Future pacing in every touchpoint**
+   - Explicitly show the user where they will be in 24h / 7 days / 30 days.
+   - Example line: "By Friday, you will have one replayable trace your security lead can review in 3 minutes."
+
+2. **Ownership stories (small wins, fast)**
+   - Showcase 1–2 tiny "before/after" cases from the same repo workflow.
+   - Keep stories operational, not abstract: command run → artifact produced → decision improved.
+
+3. **Visible social proof loop**
+   - Add a rolling section in updates/issues with: team, use-case, artifact screenshot/link, takeaway.
+   - This reduces perceived implementation risk for new evaluators.
+
+4. **Ethical urgency (not hype)**
+   - Use time-boxed language around pilot windows and decision checkpoints.
+   - Avoid fake scarcity; use real planning constraints (e.g., quarterly control review).
+
+5. **Single next step per message**
+   - Each email/post should ask for one action only: read, run, verify, or share.
+   - Multi-CTA messages consistently lower completion.
+
+---
+
+## 9) Launch assets checklist (minimum viable PLF stack)
+
+- **One-page strategic brief** → [docs/positioning/ONE_PAGER.md](../positioning/ONE_PAGER.md)
+- **Primary demo path** → `pnpm -w demo:canonical`
+- **Verification command** → `pnpm -w ltp:verify`
+- **Technical trust anchor** → [specs/LTP-Spec-v0.1.md](../../specs/LTP-Spec-v0.1.md)
+- **Operational trust anchor** → [docs/devtools/ci-artifacts.md](../devtools/ci-artifacts.md)
+- **Compliance conversation starter** → [docs/fintech/Compliance-Inspection.md](../fintech/Compliance-Inspection.md)
+
+If any of these are missing in communications, conversion from interest → action usually drops.
+
+---
+
+## 10) 7-day conversion scorecard (quick read)
+
+Track daily during launch week:
+
+- **Reach:** how many newcomers opened/visited the message touchpoint
+- **Activation:** how many ran one command (`demo:canonical` or `ltp:verify`)
+- **Evidence:** how many produced and shared one artifact internally
+- **Expansion intent:** how many teams selected a second workflow for rollout
+
+Simple benchmark targets for a healthy first cycle:
+
+- Activation >= 25% of engaged viewers
+- Evidence >= 40% of activated users
+- Expansion intent >= 30% of evidence-producing users
+
+Use these numbers to refine sequence copy, not to pressure teams.
