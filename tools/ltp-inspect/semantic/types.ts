@@ -34,3 +34,11 @@ export interface TraceTransition {
   status?: string;
   textBlob: string;
 }
+
+
+export interface AnchorError {
+  claim: string;
+  transition_id?: string;
+  reason: 'NOT_FOUND' | 'HASH_MISMATCH' | 'IN_REJECTED_BRANCH' | 'INADMISSIBLE' | 'NO_ANCHORS_DECLARED';
+}
+

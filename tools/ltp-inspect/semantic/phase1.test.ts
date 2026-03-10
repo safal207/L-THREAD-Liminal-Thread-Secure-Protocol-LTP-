@@ -35,6 +35,8 @@ describe('Phase 1 - Anchor Validation', () => {
   it('rejects empty anchors when require_explicit_provenance=true', () => {
     const result = validateAnchors([], traceFile, { require_explicit_provenance: true, strict_anchor_validation: false });
     expect(result.valid).toBe(false);
+    expect(result.errors[0].reason).toBe('NO_ANCHORS_DECLARED');
+    expect(result.errors[0].transition_id).toBeUndefined();
   });
 
   it('passes empty anchors when require_explicit_provenance=false', () => {

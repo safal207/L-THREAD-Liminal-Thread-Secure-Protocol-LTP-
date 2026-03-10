@@ -1,4 +1,4 @@
-import type { Anchor, ProvenanceConfig } from './types';
+import type { Anchor, AnchorError, ProvenanceConfig } from './types';
 import { loadTraceTransitions } from './trace';
 
 export interface AnchorWarning {
@@ -7,11 +7,6 @@ export interface AnchorWarning {
   reason: 'MISSING_HASH_SNIPPET';
 }
 
-export interface AnchorError {
-  claim: string;
-  transition_id: string;
-  reason: 'NOT_FOUND' | 'HASH_MISMATCH' | 'IN_REJECTED_BRANCH' | 'INADMISSIBLE';
-}
 
 export interface AnchorValidationResult {
   valid: boolean;
@@ -28,7 +23,7 @@ export function validateAnchors(
   const warnings: AnchorWarning[] = [];
 
   if (config.require_explicit_provenance && anchors.length === 0) {
-    errors.push({ claim: 'MISSING_PROVENANCE', transition_id: 'N/A', reason: 'INADMISSIBLE' });
+    errors.push({ claim: 'NO_ANCHORS_DECLARED', reason: 'NO_ANCHORS_DECLARED' });
   }
 
   const transitions = loadTraceTransitions(traceFile);
