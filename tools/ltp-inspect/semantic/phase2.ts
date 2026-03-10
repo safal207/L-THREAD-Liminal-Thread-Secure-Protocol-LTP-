@@ -23,7 +23,11 @@ function extractClaims(output: string): string[] {
       const hasNumber = /\b\d{1,4}\b/.test(sentence);
       const hasDate = /\b\d{4}-\d{2}-\d{2}\b|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\b/i.test(sentence);
       const properNouns = sentence.match(/\b[A-Z][a-z]{2,}\b/g) ?? [];
-      return hasNumber || hasDate || properNouns.length >= 2;
+      const factualVerb = /\b(is|are|was|were|has|have|had|failed|succeeded|contains|includes|occurred|happened)\b/i.test(
+        sentence,
+      );
+      const wordCount = sentence.split(/\s+/).filter(Boolean).length;
+      return hasNumber || hasDate || properNouns.length >= 2 || (factualVerb && wordCount >= 3);
     });
 }
 
@@ -31,8 +35,9 @@ function claimMatchesAnchor(claim: string, anchor: Anchor): boolean {
   const a = anchor.claim.toLowerCase();
   const c = claim.toLowerCase();
   if (a.includes(c) || c.includes(a)) return true;
-  const claimTokens = new Set(c.split(/[^a-z0-9]+/).filter((token) => token.length > 3));
-  const anchorTokens = new Set(a.split(/[^a-z0-9]+/).filter((token) => token.length > 3));
+  const tokenFilter = (token: string) => token.length > 4 || /^\d{4,}$/.test(token);
+  const claimTokens = new Set(c.split(/[^a-z0-9]+/).filter(tokenFilter));
+  const anchorTokens = new Set(a.split(/[^a-z0-9]+/).filter(tokenFilter));
   let overlap = 0;
   claimTokens.forEach((token) => {
     if (anchorTokens.has(token)) overlap += 1;

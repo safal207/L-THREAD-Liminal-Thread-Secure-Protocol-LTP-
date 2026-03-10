@@ -33,6 +33,20 @@ describe('Phase 2 - Semantic Coherence', () => {
     expect(result.violations.some((violation) => violation.reason === 'DRIFT_DETECTED')).toBe(true);
   });
 
+
+  it('extracts lowercase factual claims and flags them when unanchored', () => {
+    const output = 'the system failed in production.';
+    const result = checkSemanticCoherence(output, anchors, traceFile, { enabled: true, check_novel_facts: true });
+    expect(result.unanchored_claims.length).toBe(1);
+    expect(result.unanchored_claims[0].toLowerCase()).toContain('system failed');
+  });
+
+  it('avoids false positive anchor match on short-overlap sentiment claim', () => {
+    const output = 'Paris is bad.';
+    const result = checkSemanticCoherence(output, anchors, traceFile, { enabled: true, check_novel_facts: true });
+    expect(result.unanchored_claims.length).toBe(1);
+  });
+
   it('passes when all claims map to phase1-validated anchors', () => {
     const output = 'Paris is the capital of France in 2024. Paris remained stable in 2024.';
     const result = checkSemanticCoherence(output, anchors, traceFile, { enabled: true, check_novel_facts: true });
