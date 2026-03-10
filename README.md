@@ -92,6 +92,7 @@ For maintainers: GitHub visibility execution checklist → [docs/GITHUB_DISCOVER
 2. Validate traces in your pipeline: `pnpm -w ltp:verify`
 3. Share the one-pager with product/security stakeholders: [docs/positioning/ONE_PAGER.md](docs/positioning/ONE_PAGER.md)
 4. Run the newcomer launch sequence (PLF/LTP): [docs/marketing/PLF-LTP-NEWCOMER-SEQUENCE.md](docs/marketing/PLF-LTP-NEWCOMER-SEQUENCE.md)
+5. Generate ready-to-send PLF assets: `npm run -s marketing:plf:generate -- --project "LTP Pilot" --owner "Platform Team"`
 
 > **Share internally:** "LTP is a vendor-neutral protocol for auditable AI continuity. We can replay decisions deterministically and prove handoff-policy compliance from trace evidence."  
 > One-pager: [docs/positioning/ONE_PAGER.md](docs/positioning/ONE_PAGER.md)

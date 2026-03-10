@@ -229,3 +229,11 @@ Simple benchmark targets for a healthy first cycle:
 - Expansion intent >= 30% of evidence-producing users
 
 Use these numbers to refine sequence copy, not to pressure teams.
+
+
+## 11) Implementation in this repo
+
+This sequence is now operationalized as a runnable kit:
+- [docs/marketing/plf-kit/README.md](plf-kit/README.md)
+- Generator script: `npm run -s marketing:plf:generate -- --project "LTP Pilot" --owner "Platform Team"`
+
