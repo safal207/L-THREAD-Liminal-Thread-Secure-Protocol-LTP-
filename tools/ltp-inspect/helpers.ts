@@ -21,9 +21,14 @@ function collect(command: string, args: string[]) {
 }
 
 export async function runInspectCLI(args: string[]) {
-  const pnpmAttempt = await collect('pnpm', ['-w', 'ltp:inspect', '--', ...args]);
-  if (pnpmAttempt.exitCode === 0) return pnpmAttempt;
-  if (!pnpmAttempt.errors.join('\n').includes('ts-node: not found')) return pnpmAttempt;
+  const scriptAttempt = await collect('pnpm', ['-w', 'run', 'ltp:inspect', '--', ...args]);
+  if (scriptAttempt.exitCode === 0) return scriptAttempt;
 
-  return collect('npx', ['ts-node', 'tools/ltp-inspect/inspect.ts', ...args]);
+  const execAttempt = await collect('pnpm', ['-w', 'exec', 'ts-node', 'tools/ltp-inspect/inspect.ts', ...args]);
+  if (execAttempt.exitCode === 0) return execAttempt;
+
+  const npxAttempt = await collect('npx', ['ts-node', 'tools/ltp-inspect/inspect.ts', ...args]);
+  if (npxAttempt.exitCode === 0) return npxAttempt;
+
+  return scriptAttempt;
 }
