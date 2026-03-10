@@ -32,6 +32,21 @@ type Writer = (message: string) => void;
 
 type Command = 'trace' | 'replay' | 'explain' | 'help';
 
+type InspectionMode = 'audit_only' | 'post' | 'pre' | 'two_phase';
+type Anchor = { claim: string; transition_id: string; chunk_id?: string; hash_snippet?: string };
+type LTPProvenanceConfig = {
+  provenance_enforcement: {
+    mode: InspectionMode;
+    require_explicit_provenance: boolean;
+    block_on_missing: 'pre' | 'post' | 'audit_only';
+    strict_anchor_validation: boolean;
+  };
+  semantic_admissibility: {
+    enabled: boolean;
+    check_novel_facts: boolean;
+  };
+};
+
 type ParsedArgs = {
   command?: Command;
   explicitHelp: boolean;
@@ -51,6 +66,11 @@ type ParsedArgs = {
   profile?: string;
   replayCheck?: boolean;
   continuity?: boolean;
+  phase?: InspectionMode;
+  anchorsFile?: string;
+  outputFile?: string;
+  traceFile?: string;
+  configFile?: string;
 };
 
 const DETERMINISTIC_TIMESTAMP = '1970-01-01T00:00:00.000Z';
@@ -121,6 +141,11 @@ function parseArgs(argv: string[]): ParsedArgs {
     compliance: undefined,
     profile: undefined,
     replayCheck: false,
+    phase: undefined,
+    anchorsFile: undefined,
+    outputFile: undefined,
+    traceFile: undefined,
+    configFile: undefined,
   };
 
   for (let i = 0; i < argv.length; i += 1) {
@@ -192,6 +217,33 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.replayCheck = true;
     } else if (token === '--continuity') {
       options.continuity = true;
+    } else if (token.startsWith('--phase=')) {
+      const mode = requireInlineValue(token, '--phase') as InspectionMode;
+      options.phase = ['audit_only', 'post', 'pre', 'two_phase'].includes(mode) ? mode : undefined;
+    } else if (token === '--phase') {
+      const mode = requireValue(argv, i, '--phase') as InspectionMode;
+      options.phase = ['audit_only', 'post', 'pre', 'two_phase'].includes(mode) ? mode : undefined;
+      i += 1;
+    } else if (token.startsWith('--anchors-file=')) {
+      options.anchorsFile = requireInlineValue(token, '--anchors-file');
+    } else if (token === '--anchors-file') {
+      options.anchorsFile = requireValue(argv, i, '--anchors-file');
+      i += 1;
+    } else if (token.startsWith('--output-file=')) {
+      options.outputFile = requireInlineValue(token, '--output-file');
+    } else if (token === '--output-file') {
+      options.outputFile = requireValue(argv, i, '--output-file');
+      i += 1;
+    } else if (token.startsWith('--trace=')) {
+      options.traceFile = requireInlineValue(token, '--trace');
+    } else if (token === '--trace') {
+      options.traceFile = requireValue(argv, i, '--trace');
+      i += 1;
+    } else if (token.startsWith('--config=')) {
+      options.configFile = requireInlineValue(token, '--config');
+    } else if (token === '--config') {
+      options.configFile = requireValue(argv, i, '--config');
+      i += 1;
     } else if (token.startsWith('--export=')) {
       const exportFmt = requireInlineValue(token, '--export') as ExportFormat;
       if (['json', 'jsonld', 'pdf'].includes(exportFmt)) {
@@ -1375,11 +1427,57 @@ function handleExplain(file: string, at: string | undefined, branchId: string | 
   return { violations };
 }
 
+
+
+function defaultSemanticConfig(mode?: InspectionMode): LTPProvenanceConfig {
+  return {
+    provenance_enforcement: {
+      mode: mode ?? 'post',
+      require_explicit_provenance: false,
+      block_on_missing: 'post',
+      strict_anchor_validation: false,
+    },
+    semantic_admissibility: {
+      enabled: true,
+      check_novel_facts: false,
+    },
+  };
+}
+
+function loadAnchorsFromFile(file: string): Anchor[] {
+  const raw = fs.readFileSync(file, 'utf-8');
+  const parsed = JSON.parse(raw) as { anchors?: Anchor[] };
+  return Array.isArray(parsed.anchors) ? parsed.anchors : [];
+}
+
+function runSemanticTrace(args: ParsedArgs, writer: Writer, errorWriter: Writer): number {
+  const traceFile = args.traceFile;
+  if (!traceFile) {
+    throw new CliError('Missing --trace <trace.jsonl> for semantic inspection', 1);
+  }
+
+  const anchors = args.anchorsFile ? loadAnchorsFromFile(args.anchorsFile) : [];
+  const output = args.outputFile ? fs.readFileSync(args.outputFile, 'utf-8') : null;
+  const config: LTPProvenanceConfig = args.configFile
+    ? { ...defaultSemanticConfig(args.phase), ...JSON.parse(fs.readFileSync(args.configFile, 'utf-8')) }
+    : defaultSemanticConfig(args.phase);
+  if (args.phase) config.provenance_enforcement.mode = args.phase;
+
+  const semantic = require('./semantic') as { runTwoPhaseInspection: (anchors: Anchor[], output: string | null, traceFile: string, config: LTPProvenanceConfig) => any };
+  const result = semantic.runTwoPhaseInspection(anchors, output, traceFile, config);
+  writer(JSON.stringify(result, null, args.pretty ? 2 : 0));
+
+  if (result.decision === 'PROCEED' || result.decision === 'AUDIT') return 0;
+  errorWriter(`Semantic inspection ${result.decision}: ${result.reason ?? 'policy violation'}`);
+  return 2;
+}
+
 function printHelp(writer: Writer): void {
   writer('ltp:inspect — orientation inspector (no decisions, no model execution).');
   writer('');
   writer('Usage:');
   writer('  ltp inspect trace --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
+  writer('  ltp inspect trace --phase <pre|post|two_phase|audit_only> --trace <trace.jsonl> [--anchors-file <anchors.json>] [--output-file <response.md>] [--config <config.json>]');
   writer('  ltp inspect replay --input <frames.jsonl> [--from <frameId>]');
   writer('  ltp inspect explain --input <frames.jsonl> [--at <frameId|ts>] [--branch <id>]');
   writer('');
@@ -1442,7 +1540,8 @@ export function execute(
         return 2;
     }
 
-    if (!args.input) {
+    const semanticTraceMode = args.command === 'trace' && Boolean(args.phase);
+    if (!args.input && !semanticTraceMode) {
       // Check strict input requirement
       // Some commands like replay/explain might theoretically work without input if they had defaults, but currently we require it.
       errorWriter('ERROR: Missing --input <frames.jsonl>');
@@ -1463,6 +1562,14 @@ export function execute(
     switch (args.command) {
       case 'trace':
         {
+          if (args.phase) {
+            const exitCode = runSemanticTrace(args, writer, errorWriter);
+            if (args.output) fs.writeFileSync(args.output, buffer.join('\n'), 'utf-8');
+            buffer.forEach((line) => logger.log(line));
+            process.exitCode = exitCode;
+            return exitCode;
+          }
+
           const { violations, warnings, normalizations, summary } = handleTrace(
             args.input as string,
             args.format,

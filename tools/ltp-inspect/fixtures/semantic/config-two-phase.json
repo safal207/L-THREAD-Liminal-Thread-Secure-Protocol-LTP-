@@ -1,0 +1,12 @@
+{
+  "provenance_enforcement": {
+    "mode": "two_phase",
+    "require_explicit_provenance": true,
+    "block_on_missing": "post",
+    "strict_anchor_validation": true
+  },
+  "semantic_admissibility": {
+    "enabled": true,
+    "check_novel_facts": true
+  }
+}
