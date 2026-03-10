@@ -1,6 +1,6 @@
-# PLF (Jeff Walker style) for LOT/LTP — Newcomer Sequence
+# PLF (Jeff Walker style) for LTP — Newcomer Sequence
 
-> Goal: convert a cold newcomer into a confident first-time LTP/LOT practitioner in 7–10 days.
+> Goal: convert a cold newcomer into a confident first-time LTP practitioner in 7–10 days.
 
 ## 0) Audience and promise
 
@@ -14,7 +14,7 @@
 
 ---
 
-## 1) PLF structure adapted for LTP/LOT
+## 1) PLF structure adapted for LTP
 
 Classic PLF blocks mapped to repo reality:
 
@@ -35,7 +35,7 @@ Classic PLF blocks mapped to repo reality:
 **Message:**
 - Most teams can log outputs, but cannot replay continuity decisions deterministically.
 - As systems scale, handoff ambiguity becomes operational and compliance risk.
-- LTP/LOT addresses continuity semantics, not model quality.
+- LTP addresses continuity semantics, not model quality.
 
 **CTA:** read the short context page:
 - [docs/readme/WHY_ORIENTATION.md](../readme/WHY_ORIENTATION.md)
@@ -115,9 +115,9 @@ Reference:
 
 ---
 
-## 3) LOT onboarding ladder (micro-commit sequence)
+## 3) LTP onboarding ladder (micro-commit sequence)
 
-Use this if you need a concise LOT sequence for beginners:
+Use this if you need a concise LTP sequence for beginners:
 
 1. **Learn** — "Why orientation matters"
 2. **Observe** — run canonical demo
@@ -152,7 +152,7 @@ This is the minimum habit loop that turns passive readers into active adopters.
 
 ## 6) Ready-to-use internal post template
 
-**Title:** "We tested LTP/LOT in one workflow — here’s what changed"
+**Title:** "We tested LTP in one workflow — here’s what changed"
 
 **Body skeleton:**
 1. Problem we had (handoff ambiguity, replay difficulty, audit pressure)
