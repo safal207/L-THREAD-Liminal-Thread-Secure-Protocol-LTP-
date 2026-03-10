@@ -41,6 +41,7 @@ const blockedCriticalTracePath = path.join(__dirname, '..', '..', 'examples', 'a
 // Canonical continuity fixtures
 const continuityOutageFixture = path.join(__dirname, 'fixtures', 'continuity-outage.trace.jsonl');
 const continuityFailureFixture = path.join(__dirname, 'fixtures', 'continuity-failure.trace.jsonl');
+const replayTraceFixture = path.join(__dirname, 'fixtures', 'replay', 'trace-replay.jsonl');
 
 
 let builtCliPath: string | undefined;
@@ -637,5 +638,20 @@ describe('ltp inspect cli', () => {
 
     expect(exitCode).toBe(2);
     expect(errors.join('\n')).toContain('Missing command');
+  });
+
+  it('runs replay output after semantic trace when --replay is enabled', () => {
+    const logs: string[] = [];
+    const errors: string[] = [];
+
+    const exitCode = execute(['trace', '--phase', 'audit_only', '--trace', replayTraceFixture, '--replay'], {
+      log: (m) => logs.push(m),
+      error: (m) => errors.push(m),
+    });
+
+    expect(exitCode).toBe(0);
+    expect(errors).toHaveLength(0);
+    expect(logs.join('\n')).toContain('--- LTP Trace Replay ---');
+    expect(logs.join('\n')).toContain('[1] t1 (admissible)');
   });
 });

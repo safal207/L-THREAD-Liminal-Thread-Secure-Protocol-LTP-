@@ -19,6 +19,7 @@ Run from the repo root (requires `trace` subcommand):
 ```bash
 pnpm -w ltp:inspect -- trace --input examples/traces/canonical-linear.jsonl
 pnpm -w ltp:inspect -- trace --format human --input examples/traces/drift-recovery.jsonl
+pnpm -w ltp:inspect -- trace --phase two_phase --trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay
 pnpm -w ltp:inspect -- replay --input examples/traces/canonical-linear.jsonl --from step-2
 pnpm -w ltp:inspect -- explain --input examples/traces/constraint-blocked.jsonl --at step-3
 ```
@@ -31,6 +32,7 @@ Flags:
 - `--strict` to treat canonicalization needs as contract violations (exit 2)
 - `--quiet` suppresses banners/RESULT lines (primary report output remains; useful with `--format=json`)
 - `--output <file>` to write the formatted output to disk
+- `--replay` to append trace replay output in `trace --phase ... --trace <file>` mode
 
 Frames must be JSONL with one frame per line. Existing conformance fixtures work as input.
 
