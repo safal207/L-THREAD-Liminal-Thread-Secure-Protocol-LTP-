@@ -1,7 +1,38 @@
 # LTP — Liminal Thread Protocol
 
+[![Protocol](https://img.shields.io/badge/protocol-v0.1-0A7?style=flat-square)](specs/LTP-Spec-v0.1.md)
+[![Conformance](https://img.shields.io/badge/conformance-report%20schema-v0.1-blue?style=flat-square)](schemas/ltp-conformance-report.v0.1.json)
+[![Security](https://img.shields.io/badge/security-signed%20traces-informational?style=flat-square)](docs/security/Signed-Traces.md)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+
 LTP preserves orientation over time.
 It does not predict, decide, or optimize outcomes.
+
+**LTP is an open protocol for verifiable AI-agent continuity, deterministic replay, and auditable handoffs in regulated systems.**
+
+## What this gives you (practically)
+
+- **Deterministic replay:** investigate any transition path without model re-execution.
+- **Auditable handoffs:** preserve identity, constraints, and continuity across agent/system boundaries.
+- **Policy enforcement by trace:** verify critical actions from signed, inspectable protocol events.
+
+## Start in 5 minutes
+
+1. Read the protocol north star: [WHITEPAPER.md](WHITEPAPER.md)
+2. Open the canonical protocol surface: [specs/LTP-Spec-v0.1.md](specs/LTP-Spec-v0.1.md)
+3. Validate a sample trace locally: [Try it in 60 seconds](#try-it-in-60-seconds)
+4. Choose your integration path:
+   - **Agents:** [docs/quickstart/agents.md](docs/quickstart/agents.md)
+   - **Fintech / compliance:** [docs/quickstart/fintech.md](docs/quickstart/fintech.md)
+   - **DevTools / CI:** [docs/quickstart/devtools.md](docs/quickstart/devtools.md)
+
+## Who should use LTP
+
+- Teams building AI agents that must remain explainable over long-running sessions.
+- Regulated products requiring deterministic replay and compliance evidence.
+- Platform teams standardizing multi-agent routing and safe tool/action boundaries.
+
+For maintainers: GitHub visibility execution checklist → [docs/GITHUB_DISCOVERABILITY_CHECKLIST.md](docs/GITHUB_DISCOVERABILITY_CHECKLIST.md)
 
 **Fintech-Ready (Controlled Environments)**
 
