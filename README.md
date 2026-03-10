@@ -10,6 +10,24 @@ It does not predict, decide, or optimize outcomes.
 
 **LTP is an open protocol for verifiable AI-agent continuity, deterministic replay, and auditable handoffs in regulated systems.**
 
+
+## Why developers pick LTP
+
+- **Trustworthy by design:** protocol-level continuity and replay, not framework-specific magic.
+- **Fast incident analysis:** reconstruct transition history from traces, without model re-runs.
+- **Compliance-friendly:** deterministic evidence for audits, controls, and critical action reviews.
+- **Works with your stack:** adapters, examples, and conformance tooling for progressive adoption.
+
+## Choose your entry point
+
+| If you are... | Start here |
+|---|---|
+| Evaluating the protocol in 10 minutes | [specs/README.md](specs/README.md) |
+| Integrating in CI / DevTools | [docs/devtools/quickstart.md](docs/devtools/quickstart.md) |
+| Building agent workflows | [adapters/README.md](adapters/README.md) |
+| Preparing compliance evidence | [docs/operational-notes/conformance.md](docs/operational-notes/conformance.md) |
+| Exploring end-to-end examples | [examples/README.canonical-flow.md](examples/README.canonical-flow.md) |
+
 ## What this gives you (practically)
 
 - **Deterministic replay:** investigate any transition path without model re-execution.
@@ -48,6 +66,15 @@ ltp inspect trace --input artifacts/traces/sample.trace.jsonl
 
 If your shell cannot find the `ltp` command, restart the session or ensure the PNPM global bin directory is on your `PATH`.  
 Prefer a workspace local run? Use: `pnpm -w ltp:inspect -- trace --input artifacts/traces/sample.trace.jsonl`.
+
+
+## Popular demos
+
+- Canonical flow walkthrough: `pnpm -w demo:canonical`
+- Story/multipath visualization: `pnpm -w demo:future-weave`
+- Conformance self-test demo: `pnpm -w demo:conformance:self-test`
+
+See additional runnable scenarios in [examples/scenarios](examples/scenarios).
 
 No model. No agent framework. Just orientation, drift, and replay.
 
