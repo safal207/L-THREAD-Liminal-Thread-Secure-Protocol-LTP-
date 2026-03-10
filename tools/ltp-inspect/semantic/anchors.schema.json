@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ltp.dev/schemas/anchors.schema.json",
+  "title": "LTP Semantic Anchors",
+  "type": "object",
+  "required": ["anchors"],
+  "additionalProperties": false,
+  "properties": {
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["claim", "transition_id"],
+        "additionalProperties": false,
+        "properties": {
+          "claim": { "type": "string", "description": "the factual claim being made" },
+          "transition_id": { "type": "string", "description": "must exist in current thread state" },
+          "chunk_id": { "type": "string", "description": "optional, must exist if provided" },
+          "hash_snippet": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{8}$",
+            "description": "optional, first 8 chars of content hash"
+          }
+        }
+      }
+    }
+  }
+}
