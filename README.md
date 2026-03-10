@@ -10,23 +10,29 @@ It does not predict, decide, or optimize outcomes.
 
 **LTP is an open protocol for verifiable AI-agent continuity, deterministic replay, and auditable handoffs in regulated systems.**
 
-## Why this repository is worth watching
+## What this gives you (practically)
 
-- **Category creation:** LTP defines a new infrastructure layer between AI agents and production systems.
-- **Audit-first architecture:** every transition can be inspected, replayed, and validated offline.
-- **Implementation-ready:** protocol spec + SDKs + conformance schema + CI-ready inspection tooling.
+- **Deterministic replay:** investigate any transition path without model re-execution.
+- **Auditable handoffs:** preserve identity, constraints, and continuity across agent/system boundaries.
+- **Policy enforcement by trace:** verify critical actions from signed, inspectable protocol events.
 
 ## Start in 5 minutes
 
 1. Read the protocol north star: [WHITEPAPER.md](WHITEPAPER.md)
 2. Open the canonical protocol surface: [specs/LTP-Spec-v0.1.md](specs/LTP-Spec-v0.1.md)
-3. Run inspector on a trace: [Try it in 60 seconds](#try-it-in-60-seconds)
-4. Pick your track:
+3. Validate a sample trace locally: [Try it in 60 seconds](#try-it-in-60-seconds)
+4. Choose your integration path:
    - **Agents:** [docs/quickstart/agents.md](docs/quickstart/agents.md)
    - **Fintech / compliance:** [docs/quickstart/fintech.md](docs/quickstart/fintech.md)
    - **DevTools / CI:** [docs/quickstart/devtools.md](docs/quickstart/devtools.md)
 
-For maintainers: practical GitHub visibility checklist → [docs/GITHUB_DISCOVERABILITY_CHECKLIST.md](docs/GITHUB_DISCOVERABILITY_CHECKLIST.md)
+## Who should use LTP
+
+- Teams building AI agents that must remain explainable over long-running sessions.
+- Regulated products requiring deterministic replay and compliance evidence.
+- Platform teams standardizing multi-agent routing and safe tool/action boundaries.
+
+For maintainers: GitHub visibility execution checklist → [docs/GITHUB_DISCOVERABILITY_CHECKLIST.md](docs/GITHUB_DISCOVERABILITY_CHECKLIST.md)
 
 **Fintech-Ready (Controlled Environments)**
 
