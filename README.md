@@ -45,6 +45,14 @@ LTP gives you a deterministic, inspectable trail.
 - **Auditable handoffs:** preserve identity, constraints, and continuity across agent/system boundaries.
 - **Policy enforcement by trace:** verify critical actions from signed, inspectable protocol events.
 
+## Proof points you can verify in this repo
+
+- **Formal spec surface:** [specs/LTP-Spec-v0.1.md](specs/LTP-Spec-v0.1.md)
+- **Conformance fixtures:** [fixtures/conformance/v0.1](fixtures/conformance/v0.1)
+- **Cross-SDK compatibility checks:** [tests/cross-sdk/README.md](tests/cross-sdk/README.md)
+- **Security hardening guidance:** [SECURITY_HARDENING.md](SECURITY_HARDENING.md)
+- **Release/change history:** [CHANGELOG.md](CHANGELOG.md)
+
 ## Why LTP instead of "just logs" or framework tracing
 
 | Approach | Good for | Typical gap | What LTP adds |
@@ -52,6 +60,13 @@ LTP gives you a deterministic, inspectable trail.
 | App logs | Runtime debugging | Weak continuity semantics across agent handoffs | Protocol-native orientation and deterministic replay |
 | Framework-specific traces | Single-stack observability | Vendor/framework lock-in and inconsistent handoff semantics | Neutral protocol surface across stacks |
 | Prompt/version snapshots | Artifact retention | Hard to verify transition admissibility over time | Verifiable transitions with conformance-oriented structure |
+
+## High-impact use-case packs
+
+- **Agent safety boundaries:** [examples/agent-boundary](examples/agent-boundary)
+- **Fintech continuity patterns:** [examples/fintech/README.md](examples/fintech/README.md)
+- **Infrastructure observability:** [examples/infra-observer/README.md](examples/infra-observer/README.md)
+- **Protocol conformance scenarios:** [examples/scenarios](examples/scenarios)
 
 ## Start in 5 minutes
 
@@ -76,6 +91,9 @@ For maintainers: GitHub visibility execution checklist → [docs/GITHUB_DISCOVER
 1. Run a demo: `pnpm -w demo:canonical`
 2. Validate traces in your pipeline: `pnpm -w ltp:verify`
 3. Share the one-pager with product/security stakeholders: [docs/positioning/ONE_PAGER.md](docs/positioning/ONE_PAGER.md)
+
+> **Share internally:** "LTP is a vendor-neutral protocol for auditable AI continuity. We can replay decisions deterministically and prove handoff-policy compliance from trace evidence."  
+> One-pager: [docs/positioning/ONE_PAGER.md](docs/positioning/ONE_PAGER.md)
 
 **Fintech-Ready (Controlled Environments)**
 
