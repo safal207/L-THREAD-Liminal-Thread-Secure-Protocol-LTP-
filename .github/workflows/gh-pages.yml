@@ -1,4 +1,4 @@
-name: Deploy Presentation to GitHub Pages
+name: Deploy Landing to GitHub Pages
 
 on:
   push:
@@ -31,12 +31,15 @@ jobs:
 
       - name: Prepare static site
         run: |
-          cp examples/presentation.html examples/index.html
+          rm -rf .site
+          mkdir -p .site/assets
+          cp index.html .site/index.html
+          cp assets/replay-demo.svg .site/assets/replay-demo.svg
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: examples
+          path: .site
 
       - name: Deploy to GitHub Pages
         id: deployment
