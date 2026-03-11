@@ -228,6 +228,13 @@ This demo shows how the reasoning path can be replayed and inspected after a rew
 
 AI debugging often requires comparing a working reasoning path with a failed reasoning path. Reasoning Diff highlights the divergence point so teams can identify where drift, incorrect assumptions, or hallucinations first appear.
 
+In practice, this extends the same observability surface:
+
+- trace reasoning
+- replay reasoning
+- rewind reasoning
+- diff reasoning
+
 ### Visual example
 
 Trace A (success):
@@ -250,6 +257,17 @@ verify vs assumption
 
 The system highlights the first conflicting transition, making the initial divergence easy to inspect.
 
+### How divergence is detected
+
+Reasoning Diff compares transitions step by step:
+
+1. Reconstruct ordered paths from two traces.
+2. Find the longest shared prefix.
+3. Mark the first non-matching transition as the divergence point.
+4. Return both downstream branches for inspection.
+
+This makes debugging deterministic: teams focus on the **first disagreement**, not only on the final error symptom.
+
 ### CLI-style usage
 
 ```bash
@@ -267,6 +285,12 @@ Divergence point:
 Possible hallucination path detected.
 ```
 
+You can use this output directly in incident workflows:
+
+- pin the first conflicting transition in reports
+- attach both branch tails to postmortems
+- replay each branch to verify whether policy or confidence checks should have blocked earlier
+
 ### Developer usage example
 
 ```ts
@@ -276,6 +300,17 @@ console.log(diff.sharedPath);
 console.log(diff.divergencePoint);
 console.log(diff.branchA);
 console.log(diff.branchB);
+```
+
+Expected diff shape:
+
+```ts
+type ReasoningDiffResult = {
+  sharedPath: string[];
+  divergencePoint: { traceA: string; traceB: string };
+  branchA: string[];
+  branchB: string[];
+};
 ```
 
 This helps developers quickly inspect reasoning differences between runs and prioritize debugging at the first branch point.
@@ -296,6 +331,17 @@ Reasoning Diff operates on the Reasoning State Graph representation. Because rea
 - compare paths
 - detect divergence
 - visualize alternate reasoning routes
+
+Because it is graph-native, Reasoning Diff can compare not only linear runs, but also paths that were rewound and re-planned before completion.
+
+### Why this matters for reasoning observability
+
+With Trace + Replay + Rewind + Diff together, LTP provides a full reasoning observability loop:
+
+1. **Trace** what happened.
+2. **Replay** it deterministically.
+3. **Rewind** when contradictions appear.
+4. **Diff** successful and failed runs to isolate where reasoning changed.
 
 ## What makes LTP different
 
