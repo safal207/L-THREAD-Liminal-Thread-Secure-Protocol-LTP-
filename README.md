@@ -8,13 +8,12 @@
 [![GitHub Stars](https://img.shields.io/github/stars/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-?style=flat-square)](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/stargazers)
 [![Last Commit](https://img.shields.io/github/last-commit/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-?style=flat-square)](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/commits)
 
-*A protocol and toolkit for tracing, replaying, and rewinding AI reasoning processes to detect hallucinations and failures.*
+_A protocol and toolkit for tracing, replaying, and rewinding AI reasoning processes to detect hallucinations and failures._
 
 LTP preserves orientation over time.
 It does not predict, decide, or optimize outcomes.
 
 **LTP is an open protocol for verifiable AI-agent continuity, deterministic replay, and auditable handoffs in regulated systems.**
-
 
 ## 🚀 Key Feature: Reasoning State Graph
 
@@ -26,6 +25,7 @@ Benefits:
 - Detect hallucination paths
 - Replay reasoning traces
 - Rewind failed reasoning
+- Compare successful and failed reasoning traces with divergence detection
 - Inspect confidence transitions
 
 ## Why AI Needs Debuggable Reasoning
@@ -64,7 +64,6 @@ The system records each reasoning transition so developers can audit where failu
 >
 > Suggested caption: **"See your AI agent transition path in seconds — safe, drifted, blocked."**
 
-
 ## Why developers pick LTP
 
 - **Trustworthy by design:** protocol-level continuity and replay, not framework-specific magic.
@@ -74,22 +73,23 @@ The system records each reasoning transition so developers can audit where failu
 
 ## Choose your entry point
 
-| If you are... | Start here |
-|---|---|
-| Evaluating the protocol in 10 minutes | [specs/README.md](specs/README.md) |
-| Integrating in CI / DevTools | [docs/devtools/quickstart.md](docs/devtools/quickstart.md) |
-| Building agent workflows | [adapters/README.md](adapters/README.md) |
-| Preparing compliance evidence | [docs/operational-notes/conformance.md](docs/operational-notes/conformance.md) |
-| Exploring end-to-end examples | [examples/README.canonical-flow.md](examples/README.canonical-flow.md) |
+| If you are...                         | Start here                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------ |
+| Evaluating the protocol in 10 minutes | [specs/README.md](specs/README.md)                                             |
+| Integrating in CI / DevTools          | [docs/devtools/quickstart.md](docs/devtools/quickstart.md)                     |
+| Building agent workflows              | [adapters/README.md](adapters/README.md)                                       |
+| Preparing compliance evidence         | [docs/operational-notes/conformance.md](docs/operational-notes/conformance.md) |
+| Exploring end-to-end examples         | [examples/README.canonical-flow.md](examples/README.canonical-flow.md)         |
 
 ## 30-second pitch (for teams and stakeholders)
 
 LTP is the **protocol layer for AI continuity**: it makes agent transitions reproducible, auditable, and policy-checkable without depending on one model vendor or one agent framework.
 
 If your system ever needs to answer:
-- *"Why did the agent do this?"*
-- *"Can we replay this exact path?"*
-- *"Can we prove policy compliance to auditors or security?"*
+
+- _"Why did the agent do this?"_
+- _"Can we replay this exact path?"_
+- _"Can we prove policy compliance to auditors or security?"_
 
 LTP gives you a deterministic, inspectable trail.
 
@@ -195,14 +195,14 @@ This makes it possible to:
 ### Developer Usage Example
 
 ```ts
-const stateGraph = new ReasoningStateGraph()
+const stateGraph = new ReasoningStateGraph();
 
-stateGraph.transition("start", "planA", { confidence: 0.92 })
-stateGraph.transition("planA", "execute", { confidence: 0.88 })
+stateGraph.transition("start", "planA", { confidence: 0.92 });
+stateGraph.transition("planA", "execute", { confidence: 0.88 });
 
-stateGraph.feedback("execute", "execution_blocked")
+stateGraph.feedback("execute", "execution_blocked");
 
-stateGraph.rewind()
+stateGraph.rewind();
 ```
 
 This pattern enables automatic backtracking of reasoning paths when runtime signals indicate that the current trajectory is unreliable.
@@ -210,26 +210,102 @@ This pattern enables automatic backtracking of reasoning paths when runtime sign
 ## Demo
 
 ```ts
-const graph = new ReasoningStateGraph()
+const graph = new ReasoningStateGraph();
 
-graph.transition("start", "plan", { confidence: 0.92 })
-graph.transition("plan", "execute", { confidence: 0.81 })
+graph.transition("start", "plan", { confidence: 0.92 });
+graph.transition("plan", "execute", { confidence: 0.81 });
 
-graph.feedback("execute", "execution_blocked")
+graph.feedback("execute", "execution_blocked");
 
-graph.rewind()
+graph.rewind();
 ```
 
 This demo shows how the reasoning path can be replayed and inspected after a rewind trigger.
 
+## Reasoning Diff
+
+> Reasoning Diff allows developers to compare two reasoning traces and detect where agent decisions diverged.
+
+AI debugging often requires comparing a working reasoning path with a failed reasoning path. Reasoning Diff highlights the divergence point so teams can identify where drift, incorrect assumptions, or hallucinations first appear.
+
+### Visual example
+
+Trace A (success):
+
+`start → plan → execute → verify → finish`
+
+Trace B (failure):
+
+`start → plan → execute → assumption → hallucination → contradiction`
+
+Diff output:
+
+```text
+start
+plan
+execute
+--- divergence detected ---
+verify vs assumption
+```
+
+The system highlights the first conflicting transition, making the initial divergence easy to inspect.
+
+### CLI-style usage
+
+```bash
+ltp diff trace-success.json trace-failure.json
+```
+
+Example output:
+
+```text
+Comparing reasoning traces...
+Shared path: start → plan → execute
+Divergence point:
+  Trace A: verify
+  Trace B: assumption
+Possible hallucination path detected.
+```
+
+### Developer usage example
+
+```ts
+const diff = ReasoningDiff.compare(traceA, traceB);
+
+console.log(diff.sharedPath);
+console.log(diff.divergencePoint);
+console.log(diff.branchA);
+console.log(diff.branchB);
+```
+
+This helps developers quickly inspect reasoning differences between runs and prioritize debugging at the first branch point.
+
+### Comparing successful vs failed reasoning
+
+Common debugging scenario:
+
+1. Agent run succeeds.
+2. Another run fails.
+3. Developer compares both traces.
+4. Reasoning Diff highlights the divergence point.
+
+### Relation to the Reasoning State Graph
+
+Reasoning Diff operates on the Reasoning State Graph representation. Because reasoning is modeled as a graph of transitions, the system can:
+
+- compare paths
+- detect divergence
+- visualize alternate reasoning routes
+
 ## What makes LTP different
 
-| Feature | Typical agent frameworks | LTP |
-|---|---|---|
-| Reasoning trace | Partial | Full |
-| Replay reasoning | No | Yes |
-| Rewind reasoning | No | Yes |
-| Debug hallucinations | Manual | Built-in |
+| Feature                               | Typical agent frameworks | LTP      |
+| ------------------------------------- | ------------------------ | -------- |
+| Reasoning trace                       | Partial                  | Full     |
+| Replay reasoning                      | No                       | Yes      |
+| Rewind reasoning                      | No                       | Yes      |
+| Reasoning Diff (divergence detection) | No                       | Yes      |
+| Debug hallucinations                  | Manual                   | Built-in |
 
 ## Use Cases
 
@@ -249,22 +325,22 @@ This demo shows how the reasoning path can be replayed and inspected after a rew
 
 ## Why LTP instead of "just logs" or framework tracing
 
-| Approach | Good for | Typical gap | What LTP adds |
-|---|---|---|---|
-| App logs | Runtime debugging | Weak continuity semantics across agent handoffs | Protocol-native orientation and deterministic replay |
-| Framework-specific traces | Single-stack observability | Vendor/framework lock-in and inconsistent handoff semantics | Neutral protocol surface across stacks |
-| Prompt/version snapshots | Artifact retention | Hard to verify transition admissibility over time | Verifiable transitions with conformance-oriented structure |
+| Approach                  | Good for                   | Typical gap                                                 | What LTP adds                                              |
+| ------------------------- | -------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
+| App logs                  | Runtime debugging          | Weak continuity semantics across agent handoffs             | Protocol-native orientation and deterministic replay       |
+| Framework-specific traces | Single-stack observability | Vendor/framework lock-in and inconsistent handoff semantics | Neutral protocol surface across stacks                     |
+| Prompt/version snapshots  | Artifact retention         | Hard to verify transition admissibility over time           | Verifiable transitions with conformance-oriented structure |
 
 ## LTP vs alternatives
 
-| Feature | Traditional Logs | Framework Tracing | LTP Inspect |
-|---|---|---|---|
-| Deterministic replay | No | Partial | Yes |
-| Protocol-level provenance | No | No | Yes |
-| Early block on fake anchor patterns | No | No | Yes |
-| Final block on novel fact injection | No | Partial | Yes |
-| Model/framework agnostic | Partial | No | Yes |
-| Regulated audit-ready traces | No | Partial | Yes |
+| Feature                             | Traditional Logs | Framework Tracing | LTP Inspect |
+| ----------------------------------- | ---------------- | ----------------- | ----------- |
+| Deterministic replay                | No               | Partial           | Yes         |
+| Protocol-level provenance           | No               | No                | Yes         |
+| Early block on fake anchor patterns | No               | No                | Yes         |
+| Final block on novel fact injection | No               | Partial           | Yes         |
+| Model/framework agnostic            | Partial          | No                | Yes         |
+| Regulated audit-ready traces        | No               | Partial           | Yes         |
 
 ## High-impact use-case packs
 
@@ -332,7 +408,6 @@ ltp inspect trace --input artifacts/traces/sample.trace.jsonl
 
 If your shell cannot find the `ltp` command, restart the session or ensure the PNPM global bin directory is on your `PATH`.  
 Prefer a workspace local run? Use: `pnpm -w ltp:inspect -- trace --input artifacts/traces/sample.trace.jsonl`.
-
 
 ## Who wins most with LTP
 
@@ -413,7 +488,7 @@ without running a model.
 
 **Deterministic routing protocol for context continuity, explainable transitions, and multi-path futures.**
 
-LTP defines *how decisions, transitions, and agent handoffs are represented, verified, and replayed* — without black boxes, recommendations, or hidden state.
+LTP defines _how decisions, transitions, and agent handoffs are represented, verified, and replayed_ — without black boxes, recommendations, or hidden state.
 
 ---
 
@@ -425,21 +500,25 @@ LTP defines *how decisions, transitions, and agent handoffs are represented, ver
 The LTP Protocol Core is considered **stable and frozen**.
 
 This means:
+
 - Core concepts, terms, and guarantees are fixed
 - No semantic changes are allowed without an RFC
 - Implementations may evolve, but must preserve core invariants
 
 Further development happens through:
+
 - RFC proposals
 - Non-normative extensions
 - Tooling, SDKs, and visualizations
 
 Canonical reference:
+
 - `docs/canonical/INDEX.md`
 
 The canonical index defines the authoritative description of the LTP Core.
 
 See also:
+
 - [docs/glossary.md](docs/glossary.md)
 - [docs/invariants.md](docs/invariants.md)
 
@@ -467,6 +546,7 @@ LTP ships with built-in tooling for deterministic inspection and regression veri
   - One-click reproducibility = CI publishes the exact traces and inspector outputs needed to reproduce locally without model execution.
 
 See:
+
 - DevTools & CI artifacts: [docs/devtools/ci-artifacts.md](docs/devtools/ci-artifacts.md) — download artifacts → inspect → compare to golden traces
 
 ---
@@ -474,11 +554,13 @@ See:
 ## Roadmap snapshot
 
 **Near-term (v1.2–v1.3)**
+
 - LangChain / CrewAI integration examples
 - Web-based trace visualizer
 - Automated CI continuity badge
 
 **Longer-term**
+
 - Distributed thread registry
 - Multi-node continuity enforcement
 
@@ -499,13 +581,15 @@ Track stability by surface:
 ### What LTP is (and is not)
 
 **LTP is:**
+
 - A protocol for deterministic decision routing
 - A standard you can verify, audit, and replay
 - A neutral layer for continuity across systems and agents
 
 **LTP is not:**
-- ❌ A recommendation system  
-- ❌ A machine learning model  
+
+- ❌ A recommendation system
+- ❌ A machine learning model
 - ❌ A black-box intelligence layer
 
 ## Production hardening checklist (Rust node)
