@@ -1,0 +1,46 @@
+name: "Showcase: LTP debugging an agent"
+description: Share how LTP helped debug an AI agent reasoning path
+title: "Showcase: LTP debugging an agent"
+labels:
+  - showcase
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share your debugging story so others can learn from your reasoning workflow.
+  - type: input
+    id: stack
+    attributes:
+      label: Agent stack
+      description: Which model/framework/tool stack did you use?
+      placeholder: e.g., OpenAI + LangGraph + custom tools
+    validations:
+      required: true
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Scenario
+      description: What were you trying to do?
+      placeholder: Describe the task and where reasoning failure appeared.
+    validations:
+      required: true
+  - type: textarea
+    id: reasoning-path
+    attributes:
+      label: Reasoning path
+      description: Which transitions did you inspect?
+      placeholder: e.g., start → plan → execute → contradiction → rewind → alternative plan
+    validations:
+      required: true
+  - type: textarea
+    id: rewind-outcome
+    attributes:
+      label: Rewind outcome
+      description: What changed after rewind?
+      placeholder: Explain the recovered plan and final result.
+  - type: textarea
+    id: artifacts
+    attributes:
+      label: Trace or artifact links
+      description: Include trace snippets, screenshots, or logs.
+      placeholder: Paste links or code blocks.

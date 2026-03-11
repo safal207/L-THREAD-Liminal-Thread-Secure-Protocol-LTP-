@@ -1,14 +1,62 @@
-# LTP — Liminal Thread Protocol
+# LTP — Debugging and Observability for AI Reasoning
 
 [![Protocol](https://img.shields.io/badge/protocol-v0.1-0A7?style=flat-square)](specs/LTP-Spec-v0.1.md)
 [![Conformance](https://img.shields.io/badge/conformance-report%20schema-v0.1-blue?style=flat-square)](schemas/ltp-conformance-report.v0.1.json)
 [![Security](https://img.shields.io/badge/security-signed%20traces-informational?style=flat-square)](docs/security/Signed-Traces.md)
 [![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](./.github/pull_request_template.md)
+[![GitHub Stars](https://img.shields.io/github/stars/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-?style=flat-square)](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/stargazers)
+[![Last Commit](https://img.shields.io/github/last-commit/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-?style=flat-square)](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/commits)
+
+*A protocol and toolkit for tracing, replaying, and rewinding AI reasoning processes to detect hallucinations and failures.*
 
 LTP preserves orientation over time.
 It does not predict, decide, or optimize outcomes.
 
 **LTP is an open protocol for verifiable AI-agent continuity, deterministic replay, and auditable handoffs in regulated systems.**
+
+
+## 🚀 Key Feature: Reasoning State Graph
+
+AI agents do not reason in a perfectly linear chain. To debug failures, reasoning must be observable.
+LTP turns reasoning into a state graph so teams can inspect transitions and recover from bad paths.
+
+Benefits:
+
+- Detect hallucination paths
+- Replay reasoning traces
+- Rewind failed reasoning
+- Inspect confidence transitions
+
+## Why AI Needs Debuggable Reasoning
+
+AI agents often fail silently because reasoning chains are opaque and hard to inspect under real workload pressure.
+
+LTP introduces reasoning state graphs, trace replay, and rewind mechanisms so teams can analyze and correct reasoning behavior in production-like conditions.
+
+Think of LTP as **"Git for AI reasoning traces"**: inspect history, replay state transitions, and backtrack when contradictions appear.
+
+```text
+start
+  │
+  ▼
+plan
+  │
+  ▼
+execute
+  │
+  ├── success
+  │
+  └── contradiction
+        │
+        ▼
+      rewind
+        │
+        ▼
+       plan
+```
+
+The system records each reasoning transition so developers can audit where failure begins and why recovery happened.
 
 ## Hero demo (drop-in slot)
 
@@ -158,6 +206,38 @@ stateGraph.rewind()
 ```
 
 This pattern enables automatic backtracking of reasoning paths when runtime signals indicate that the current trajectory is unreliable.
+
+## Demo
+
+```ts
+const graph = new ReasoningStateGraph()
+
+graph.transition("start", "plan", { confidence: 0.92 })
+graph.transition("plan", "execute", { confidence: 0.81 })
+
+graph.feedback("execute", "execution_blocked")
+
+graph.rewind()
+```
+
+This demo shows how the reasoning path can be replayed and inspected after a rewind trigger.
+
+## What makes LTP different
+
+| Feature | Typical agent frameworks | LTP |
+|---|---|---|
+| Reasoning trace | Partial | Full |
+| Replay reasoning | No | Yes |
+| Rewind reasoning | No | Yes |
+| Debug hallucinations | Manual | Built-in |
+
+## Use Cases
+
+- debugging LLM agents
+- testing reasoning chains
+- AI safety research
+- agent development frameworks
+- hallucination detection
 
 ## Proof points you can verify in this repo
 

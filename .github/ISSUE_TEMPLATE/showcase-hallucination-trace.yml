@@ -1,0 +1,47 @@
+name: "Showcase: hallucination trace"
+description: Share a hallucination case detected and analyzed with LTP
+title: "Showcase: hallucination trace"
+labels:
+  - showcase
+  - hallucination
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template to document hallucination traces and how they were investigated.
+  - type: textarea
+    id: failure-signal
+    attributes:
+      label: Failure signal
+      description: Which signal triggered investigation?
+      placeholder: Low confidence, contradiction, external feedback, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: transition-sequence
+    attributes:
+      label: Transition sequence
+      description: Show the critical reasoning transitions.
+      placeholder: e.g., plan → execute → contradiction → rewind
+    validations:
+      required: true
+  - type: textarea
+    id: hallucination-point
+    attributes:
+      label: Hallucination point
+      description: Where did the hallucination first become visible?
+      placeholder: Describe state and metadata around the failure.
+    validations:
+      required: true
+  - type: textarea
+    id: replay-findings
+    attributes:
+      label: Replay findings
+      description: What did replay reveal about root cause?
+      placeholder: Summarize insights from replayed traces.
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Mitigation or fix
+      description: What changed after analysis?
+      placeholder: Prompt/tool/policy updates, threshold tuning, etc.
