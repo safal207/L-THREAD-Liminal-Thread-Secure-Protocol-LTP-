@@ -1,4 +1,3 @@
-{"id":"t1","status":"admissible","chunk_id":"c1","payload":{"text":"Paris is the capital of France in 2024."}}
-{"id":"t2","status":"admissible","chunk_id":"c2","payload":{"text":"France is located in Western Europe."}}
-{"id":"t3","status":"drifted","chunk_id":"c3","payload":{"text":"An unanchored claim about the moon."}}
-{"id":"t4","status":"rejected","payload":{"text":"This transition was rejected."}}
+{"timestamp":"2026-03-11T12:00:00Z","input":"Retrieve KYC status for account A-55","output":"KYC status is verified under policy KYC-4.","anchors":["kyc_db:A-55","policy:KYC-4"],"decision":"admissible"}
+{"timestamp":"2026-03-11T12:00:03Z","input":"Initiate transfer of 10000 USD","output":"Transfer can proceed, awaiting second-factor approval.","anchors":["ledger:TX-001","policy:FIN-2FA"],"decision":"admissible"}
+{"timestamp":"2026-03-11T12:00:06Z","input":"Summarize unusual exposure","output":"Unverified guess: exposure likely from offshore shell entities.","anchors":["risk-engine:R-77"],"decision":"drift"}

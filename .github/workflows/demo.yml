@@ -1,0 +1,33 @@
+name: LTP Live Demo
+
+on:
+  workflow_dispatch:
+
+jobs:
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install LTP
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Run replay demo
+        run: |
+          ltp inspect trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay --phase two_phase --color --log replay.log --gif replay.gif
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ltp-replay-artifacts
+          path: |
+            replay.log
+            replay.gif

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-label="LTP replay demo placeholder">
+  <rect width="960" height="540" fill="#0b1020"/>
+  <rect x="40" y="40" width="880" height="460" rx="14" fill="#111a33" stroke="#2c3b66"/>
+  <text x="70" y="105" fill="#9cc9ff" font-family="monospace" font-size="30">LTP Replay Demo (preview)</text>
+  <text x="70" y="155" fill="#e5eeff" font-family="monospace" font-size="24">$ ltp inspect trace ... --replay --phase two_phase --color</text>
+  <text x="70" y="225" fill="#62d26f" font-family="monospace" font-size="24">[1] ADMISSIBLE  anchored</text>
+  <text x="70" y="265" fill="#62d26f" font-family="monospace" font-size="24">[2] ADMISSIBLE  anchored</text>
+  <text x="70" y="305" fill="#ff6b6b" font-family="monospace" font-size="24">[3] REJECTED    post_hoc_unsupported_claim</text>
+  <text x="70" y="390" fill="#9cc9ff" font-family="monospace" font-size="20">Note: real replay.gif is generated at runtime by CLI/CI,</text>
+  <text x="70" y="420" fill="#9cc9ff" font-family="monospace" font-size="20">not committed as a binary artifact.</text>
+</svg>

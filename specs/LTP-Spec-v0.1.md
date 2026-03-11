@@ -75,3 +75,22 @@ Snapshot of focus state: history window, momentum, HUD-derived mode (`calm / sto
 ## 6. Status
 
 Status: Draft, v0.1. Not stable; subject to change as we refine the protocol.
+
+## Replay Inspection Profile (CLI v0.1)
+
+The reference CLI command is:
+
+```bash
+ltp inspect trace <trace.jsonl> --replay --phase two_phase --color
+```
+
+Decision semantics:
+
+- `admissible`: anchored and policy-safe.
+- `drift`: degraded context requiring review.
+- `rejected`: missing anchor or unsupported claim.
+
+Two-phase enforcement:
+
+1. **Phase 1 (pre-generation):** block responses when no reliable anchor context exists.
+2. **Phase 2 (post-hoc):** reject generated output that contains unsupported or fabricated claims.
