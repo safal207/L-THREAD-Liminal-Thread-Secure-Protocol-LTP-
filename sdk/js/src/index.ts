@@ -186,3 +186,15 @@ export type {
   RoutingResult,
   StringMode,
 } from './routing/fuzzyRoutingEngine';
+
+// Reasoning state graph (rewind-aware state transitions)
+export { StateGraph, simulateFeedbackLoop } from './reasoning/stateGraph';
+export type {
+  AgentStateNode,
+  FeedbackEvent,
+  RewindReason,
+  StateNodeType,
+  RewindResult,
+  StateGraphEvent,
+  VisualizeOptions,
+} from './reasoning/stateGraph';
