@@ -1,7 +1,9 @@
 export type RewindReason = 'low_confidence' | 'feedback_contradiction' | 'manual';
+export type StateNodeType = 'state' | 'revisited_state';
 
 export interface AgentStateNode {
   state_id: string;
+  node_type: StateNodeType;
   context_snapshot: unknown;
   decision: string;
   confidence_score: number;
@@ -70,9 +72,12 @@ export class StateGraph {
   }
 
   addNode(input: AddStateInput): AgentStateNode {
+    this.assertConfidence(input.confidence_score);
+
     const state_id = `state_${this.sequence++}`;
     const node: AgentStateNode = {
       state_id,
+      node_type: 'state',
       context_snapshot: input.context_snapshot ?? null,
       decision: input.decision,
       confidence_score: input.confidence_score,
@@ -82,23 +87,23 @@ export class StateGraph {
     };
 
     this.nodes.set(state_id, node);
-    this.logEvent('state_added', { state_id, decision: node.decision, confidence_score: node.confidence_score });
+    this.logEvent('state_added', {
+      state_id,
+      decision: node.decision,
+      confidence_score: node.confidence_score,
+      node_type: node.node_type,
+    });
 
-    if (node.confidence_score < this.confidenceThreshold) {
-      this.logEvent('rewind_triggered', {
-        state_id,
-        reason: 'low_confidence',
-        confidence_score: node.confidence_score,
-        threshold: this.confidenceThreshold,
-      });
-    }
-
-    return { ...node, next_state_ids: [...node.next_state_ids] };
+    return this.cloneNode(node);
   }
 
   addEdge(fromStateId: string, toStateId: string): void {
+    if (fromStateId === toStateId) {
+      throw new Error('Self-edge is not allowed for StateGraph transitions');
+    }
+
     const from = this.getNodeRef(fromStateId);
-    this.getNodeRef(toStateId);
+    const to = this.getNodeRef(toStateId);
 
     if (!from.next_state_ids.includes(toStateId)) {
       from.next_state_ids.push(toStateId);
@@ -110,6 +115,10 @@ export class StateGraph {
     }
 
     this.logEvent('transition_added', { from_state_id: fromStateId, to_state_id: toStateId });
+
+    if (to.confidence_score < this.confidenceThreshold && !to.revisited) {
+      this.rewindToState(toStateId, fromStateId, 'low_confidence');
+    }
   }
 
   triggerFeedback(stateId: string, feedback: string): FeedbackEvent {
@@ -132,11 +141,13 @@ export class StateGraph {
       contradicts_decision: contradictsDecision,
     });
 
-    if (contradictsDecision) {
-      const lastValid = this.findLastValidState(stateId);
-      if (lastValid && lastValid.state_id !== stateId) {
-        this.rewindToState(stateId, lastValid.state_id, 'feedback_contradiction');
-      }
+    if (!contradictsDecision) {
+      return feedbackEvent;
+    }
+
+    const lastValid = this.findLastValidState(stateId);
+    if (lastValid && lastValid.state_id !== stateId) {
+      this.rewindToState(stateId, lastValid.state_id, 'feedback_contradiction');
     }
 
     return feedbackEvent;
@@ -159,8 +170,9 @@ export class StateGraph {
 
     for (const node of this.getNodes()) {
       const rewindTag = highlightRewinds && node.revisited ? ' [REVISITED]' : '';
+      const nodeTypeTag = node.node_type === 'revisited_state' ? ' (revisited_state)' : '';
       lines.push(
-        `- ${node.state_id}: ${node.decision} (confidence=${node.confidence_score.toFixed(2)})${rewindTag}`,
+        `- ${node.state_id}: ${node.decision} (confidence=${node.confidence_score.toFixed(2)})${nodeTypeTag}${rewindTag}`,
       );
 
       for (const nextId of node.next_state_ids) {
@@ -198,6 +210,7 @@ export class StateGraph {
   }
 
   setConfidenceThreshold(value: number): void {
+    this.assertConfidence(value);
     this.confidenceThreshold = value;
   }
 
@@ -209,14 +222,28 @@ export class StateGraph {
     const fromNode = this.getNodeRef(fromStateId);
     this.getNodeRef(toStateId);
 
+    if (fromNode.revisited && fromNode.rewind_reason === reason) {
+      return {
+        rewound: false,
+        from_state_id: fromStateId,
+        to_state_id: toStateId,
+        reason,
+      };
+    }
+
     fromNode.revisited = true;
+    fromNode.node_type = 'revisited_state';
     fromNode.rewind_reason = reason;
 
     const timestamp = this.now();
     this.rewindChain.push({ from: fromStateId, to: toStateId, reason, timestamp });
 
     this.logEvent('rewind_triggered', { from_state_id: fromStateId, to_state_id: toStateId, reason });
-    this.logEvent('state_revisited', { state_id: fromStateId, rewind_reason: reason });
+    this.logEvent('state_revisited', {
+      state_id: fromStateId,
+      node_type: 'revisited_state',
+      rewind_reason: reason,
+    });
 
     return {
       rewound: true,
@@ -235,7 +262,17 @@ export class StateGraph {
     const normalizedFeedback = feedback.toLowerCase();
     const normalizedDecision = node.decision.toLowerCase();
 
-    const contradictionKeywords = ['contradiction', 'conflict', 'invalid', 'reject', 'blocked', 'fails'];
+    const contradictionKeywords = [
+      'contradiction',
+      'conflict',
+      'invalid',
+      'reject',
+      'blocked',
+      'fails',
+      'violation',
+      'mismatch',
+    ];
+
     const feedbackSignalsContradiction = contradictionKeywords.some((keyword) =>
       normalizedFeedback.includes(keyword),
     );
@@ -283,10 +320,20 @@ export class StateGraph {
   }
 
   private getNodes(): AgentStateNode[] {
-    return Array.from(this.nodes.values()).map((node) => ({
+    return Array.from(this.nodes.values()).map((node) => this.cloneNode(node));
+  }
+
+  private cloneNode(node: AgentStateNode): AgentStateNode {
+    return {
       ...node,
       next_state_ids: [...node.next_state_ids],
-    }));
+    };
+  }
+
+  private assertConfidence(value: number): void {
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      throw new Error(`confidence_score should be in [0, 1], received: ${value}`);
+    }
   }
 
   private logEvent(type: StateGraphEvent['event_type'], payload: Record<string, unknown>): void {
@@ -316,7 +363,6 @@ export function simulateFeedbackLoop(): {
 
   graph.addEdge(state0.state_id, state1.state_id);
   graph.addEdge(state1.state_id, state2.state_id);
-
   graph.triggerFeedback(state2.state_id, 'contradiction with env: execution blocked');
 
   return {

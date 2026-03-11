@@ -193,6 +193,7 @@ export type {
   AgentStateNode,
   FeedbackEvent,
   RewindReason,
+  StateNodeType,
   RewindResult,
   StateGraphEvent,
   VisualizeOptions,

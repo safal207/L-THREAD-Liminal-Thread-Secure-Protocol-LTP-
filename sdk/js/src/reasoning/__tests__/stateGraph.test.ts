@@ -12,6 +12,24 @@ function runTest(name: string, fn: () => void): void {
     });
 }
 
+runTest('rewinds to previous state when confidence is below threshold after transition', () => {
+  const graph = new StateGraph({ confidenceThreshold: 0.7, now: () => '2026-01-01T00:00:00.000Z' });
+
+  const state0 = graph.addNode({ decision: 'start', confidence_score: 1 });
+  const state1 = graph.addNode({ decision: 'plan A', confidence_score: 0.8 });
+  const state2 = graph.addNode({ decision: 'execute plan A', confidence_score: 0.69 });
+
+  graph.addEdge(state0.state_id, state1.state_id);
+  graph.addEdge(state1.state_id, state2.state_id);
+
+  const trace = graph.exportTrace();
+  const rewind = trace.rewind_chain[0];
+  assert.ok(rewind);
+  assert.strictEqual(rewind?.reason, 'low_confidence');
+  assert.strictEqual(rewind?.from, state2.state_id);
+  assert.strictEqual(rewind?.to, state1.state_id);
+});
+
 runTest('rewinds to previous valid state on contradictory feedback', () => {
   const graph = new StateGraph({ confidenceThreshold: 0.7, now: () => '2026-01-01T00:00:00.000Z' });
 
@@ -31,14 +49,27 @@ runTest('rewinds to previous valid state on contradictory feedback', () => {
   assert.strictEqual(rewind?.from, state2.state_id);
   assert.strictEqual(rewind?.to, state1.state_id);
 
+  const revisited = trace.nodes.find((node) => node.state_id === state2.state_id);
+  assert.strictEqual(revisited?.node_type, 'revisited_state');
+
   const revisitedEvent = trace.events.find((event) => event.event_type === 'state_revisited');
   assert.ok(revisitedEvent);
+});
+
+runTest('rejects invalid confidence values', () => {
+  const graph = new StateGraph({ confidenceThreshold: 0.7 });
+
+  assert.throws(
+    () => graph.addNode({ decision: 'bad', confidence_score: 1.2 }),
+    /confidence_score should be in \[0, 1\]/,
+  );
 });
 
 runTest('visualization highlights rewinds and feedback markers', () => {
   const { visualization } = simulateFeedbackLoop();
 
   assert.match(visualization, /REVISITED/);
+  assert.match(visualization, /revisited_state/);
   assert.match(visualization, /⚠ feedback/);
   assert.match(visualization, /rewind_paths:/);
 });
