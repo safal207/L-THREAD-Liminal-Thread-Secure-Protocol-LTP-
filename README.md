@@ -26,7 +26,7 @@ ltp inspect trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay 
 
 ## Live demo (GitHub Actions)
 
-[![Run LTP Demo](https://img.shields.io/badge/Live%20Demo-Run%20Workflow-blue?style=for-the-badge)](../../actions/workflows/demo.yml)
+[![Run LTP Demo](https://img.shields.io/badge/Live%20Demo-Run%20Workflow-blue?style=for-the-badge)](.github/workflows/demo.yml)
 
 Run `LTP Live Demo` via **workflow_dispatch** to produce:
 
