@@ -49,8 +49,9 @@
         padding: 14px 0;
       }
 
-      .brand { font-weight: 700; letter-spacing: 0.3px; font-size: 1.1rem; }
-      .brand span { color: var(--brand-2); }
+      .brand { display: flex; flex-direction: column; line-height: 1.1; }
+      .brand strong { font-weight: 700; letter-spacing: 0.3px; font-size: 1.05rem; }
+      .brand span { color: var(--brand-2); font-size: 0.78rem; letter-spacing: 0.2px; }
 
       .nav-links { display: flex; flex-wrap: wrap; gap: 14px; }
       .nav-links a {
@@ -107,6 +108,25 @@
       .demo-media img { width: 100%; display: block; }
 
       .row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+
+      .micro-copy {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 0.9rem;
+      }
+
+      .trust-bar {
+        margin-top: 28px;
+        padding: 10px 16px;
+        border: 1px solid rgba(165, 177, 216, 0.2);
+        border-radius: 999px;
+        color: #c4cff3;
+        background: rgba(12, 18, 48, 0.65);
+        display: inline-flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        font-size: 0.9rem;
+      }
 
       .grid { display: grid; gap: 18px; }
       .feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -181,7 +201,7 @@
   <body>
     <header>
       <div class="container nav">
-        <div class="brand">LTP<span> Protocol</span></div>
+        <div class="brand"><strong>LTP Protocol</strong><span>AI Decision Replay Layer</span></div>
         <nav class="nav-links">
           <a href="#features">Features</a>
           <a href="#use-cases">Use Cases</a>
@@ -196,15 +216,17 @@
       <section class="section container hero">
         <div>
           <span class="pill">AI Safety + Auditability Layer</span>
-          <h1>Make Your AI Decisions Safe, Traceable, and Auditable in Seconds</h1>
+          <h1>Control Your AI Decisions — Before They Become Incidents</h1>
           <p class="lead">
-            LTP (Liminal Thread Protocol) gives your team deterministic replay, hallucination blocking,
-            and compliance-ready evidence—without locking you into one model or framework.
+            Run deterministic replay on your AI workflows, block hallucinations, and generate audit-ready
+            evidence — all without locking your stack to a single model.
           </p>
           <div class="row">
-            <a class="btn btn-primary" href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/actions/workflows/demo.yml">Run Live Demo</a>
-            <a class="btn btn-secondary" href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-">View GitHub Repo</a>
+            <a class="btn btn-primary" href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/actions/workflows/demo.yml">Run Interactive Demo</a>
+            <a class="btn btn-secondary" href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-">Explore the Protocol</a>
           </div>
+          <p class="micro-copy">Trusted by teams building safety-critical AI systems.</p>
+          <div class="trust-bar">Deterministic • Auditable • Model-Agnostic • Open Protocol</div>
         </div>
         <div class="hero-media reveal">
           <img src="assets/replay-demo.svg" alt="AI reasoning and replay animation placeholder" />
@@ -215,38 +237,39 @@
         <h2>Built for teams that can’t afford silent AI failure</h2>
         <p class="lead">Every decision is traceable, replayable, and enforceable across multi-agent workflows.</p>
         <div class="grid feature-grid">
-          <article class="card reveal"><div class="icon">⏪</div><h3>Deterministic Replay</h3><p class="muted">Re-run historical traces and inspect exact decision paths before shipping agent updates.</p></article>
-          <article class="card reveal"><div class="icon">🛡️</div><h3>Hallucination Blocking</h3><p class="muted">Catch unsupported claims in both pre-action and post-action phases.</p></article>
+          <article class="card reveal"><div class="icon">⏪</div><h3>Deterministic Replay</h3><p class="muted">Replay any AI decision path exactly as it happened — inspect reasoning, test changes, and ship with confidence.</p></article>
+          <article class="card reveal"><div class="icon">🛡️</div><h3>Hallucination Guard</h3><p class="muted">Stop unsupported claims before they reach production. LTP checks reasoning before and after actions.</p></article>
           <article class="card reveal"><div class="icon">📋</div><h3>Compliance-Ready Traces</h3><p class="muted">Generate evidence streams designed for audits, incident reviews, and regulated workflows.</p></article>
           <article class="card reveal"><div class="icon">🧵</div><h3>Multi-Agent Continuity</h3><p class="muted">Preserve intent and context across handoffs so agents act coherently over time.</p></article>
-          <article class="card reveal"><div class="icon">🕸️</div><h3>Reasoning State Graph</h3><p class="muted">Visualize branch logic and confidence anchors to understand why each output happened.</p></article>
-          <article class="card reveal"><div class="icon">🚨</div><h3>Divergence Detection</h3><p class="muted">Spot drift between expected and observed behavior before it becomes a production incident.</p></article>
+          <article class="card reveal"><div class="icon">🕸️</div><h3>Reasoning State Graph</h3><p class="muted">Visualize decision branches and understand why every output occurred.</p></article>
+          <article class="card reveal"><div class="icon">🚨</div><h3>Divergence Detection</h3><p class="muted">Detect behavioral drift before it becomes a production failure.</p></article>
         </div>
       </section>
 
       <section id="use-cases" class="section container">
         <h2>Use cases where trust and continuity matter most</h2>
         <div class="grid usecase-grid">
-          <article class="card reveal"><h3>Fintech</h3><p class="muted"><strong>Pain:</strong> Risky autonomous approvals.</p><p class="muted"><strong>Solution:</strong> Policy-anchored replay trails.</p><p class="muted"><strong>Benefit:</strong> Faster audits and safer transaction flows.</p></article>
-          <article class="card reveal"><h3>OSINT</h3><p class="muted"><strong>Pain:</strong> Weak source attribution.</p><p class="muted"><strong>Solution:</strong> Evidence-linked reasoning traces.</p><p class="muted"><strong>Benefit:</strong> Stronger chain-of-custody for investigations.</p></article>
-          <article class="card reveal"><h3>Legal</h3><p class="muted"><strong>Pain:</strong> Unsupported legal conclusions.</p><p class="muted"><strong>Solution:</strong> Citation-gated synthesis.</p><p class="muted"><strong>Benefit:</strong> Lower review risk and clearer defensibility.</p></article>
-          <article class="card reveal"><h3>Infra / SRE</h3><p class="muted"><strong>Pain:</strong> Unpredictable automation during incidents.</p><p class="muted"><strong>Solution:</strong> Drift checks before critical actions.</p><p class="muted"><strong>Benefit:</strong> More reliable runbooks and postmortems.</p></article>
+          <article class="card reveal"><h3>Fintech</h3><p class="muted">AI can’t approve transactions blindly.</p><p class="muted">LTP creates replayable decision trails for risk review and compliance.</p></article>
+          <article class="card reveal"><h3>OSINT / Intelligence</h3><p class="muted">Every conclusion must link to evidence.</p><p class="muted">LTP attaches reasoning traces to sources and preserves investigative integrity.</p></article>
+          <article class="card reveal"><h3>Legal AI</h3><p class="muted">Legal outputs must be defensible.</p><p class="muted">LTP enforces citation-gated reasoning before conclusions.</p></article>
+          <article class="card reveal"><h3>Infrastructure / SRE</h3><p class="muted">Automation must stay predictable during incidents.</p><p class="muted">LTP detects drift before autonomous systems execute critical actions.</p></article>
         </div>
       </section>
 
       <section id="demo" class="section container">
-        <h2>Watch LTP trace → replay → decision in one loop</h2>
+        <h2>Watch AI Decisions Become Replayable</h2>
+        <p class="lead">Run the LTP demo to see how a reasoning trace becomes a deterministic replay loop — enabling debugging, auditing, and safety verification.</p>
         <div class="demo-media reveal">
           <img src="assets/replay-demo.svg" alt="LTP workflow trace to replay to results" />
         </div>
         <div class="row">
-          <a class="btn btn-primary" href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/actions/workflows/demo.yml">Run Demo</a>
+          <a class="btn btn-primary" href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/actions/workflows/demo.yml">Run Live Demo on GitHub</a>
         </div>
       </section>
 
       <section id="community" class="section container">
-        <h2>Early community momentum</h2>
-        <p class="lead">Teams building regulated AI systems are already experimenting with LTP as their trust layer.</p>
+        <h2>Building the Trust Layer for AI</h2>
+        <p class="lead">Developers working on safety-critical AI systems are experimenting with LTP as a reliability and auditability layer.</p>
         <div class="proof">
           <div class="quote"><strong>GitHub stars:</strong> <a href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/stargazers">Show support on GitHub</a></div>
           <div class="quote">“LTP gives us replay confidence we didn’t have with normal logs.” — Early adopter, Fintech</div>
@@ -255,11 +278,11 @@
       </section>
 
       <section id="cta" class="section container">
-        <h2>Try LTP Today</h2>
-        <p class="lead">Run the demo, integrate adapters, or talk to us about production rollout for your AI stack.</p>
+        <h2>Add a Safety Layer to Your AI Stack</h2>
+        <p class="lead">Run the demo, explore the protocol, and start building AI systems that can be inspected, replayed, and trusted.</p>
         <div class="row">
-          <a class="btn btn-primary" href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/actions/workflows/demo.yml">Join Early Access</a>
-          <a class="btn btn-secondary" href="mailto:founders@ltp-protocol.dev">Contact Sales</a>
+          <a class="btn btn-primary" href="https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/actions/workflows/demo.yml">Try LTP Now</a>
+          <a class="btn btn-secondary" href="mailto:founders@ltp-protocol.dev">Contact the Team</a>
         </div>
       </section>
     </main>
