@@ -190,11 +190,50 @@
       }
 
       @media (max-width: 980px) {
+        .section { padding: 64px 0; }
+
         .hero,
         .feature-grid,
         .usecase-grid {
           grid-template-columns: 1fr;
         }
+
+        .hero { gap: 22px; padding-top: 40px; }
+
+        .nav {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 10px;
+        }
+
+        .nav-links {
+          width: 100%;
+          gap: 10px 14px;
+        }
+
+        .trust-bar {
+          width: 100%;
+          border-radius: 14px;
+          justify-content: center;
+          text-align: center;
+        }
+
+        .row .btn {
+          width: 100%;
+          text-align: center;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .container { width: min(1120px, 94%); }
+        .section { padding: 52px 0; }
+        h1 { font-size: 1.95rem; }
+        h2 { font-size: 1.55rem; }
+        p.lead { font-size: 1rem; }
+        .card { padding: 16px; }
+        .hero-media,
+        .demo-media { border-radius: 14px; }
+        .quote { flex-basis: 100%; }
       }
     </style>
   </head>
