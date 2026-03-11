@@ -39,7 +39,8 @@
     "ltp:verify": "ts-node --project scripts/tsconfig.verify.json scripts/verify/ltpVerify.ts --out artifacts/conformance-report.json",
     "ltp:badge": "ts-node scripts/conformance/ltpBadge.ts",
     "ltp:report:validate": "ts-node --project scripts/tsconfig.verify.json scripts/verify/validateConformanceReport.ts",
-    "ltp:inspect": "ts-node tools/ltp-inspect/inspect.ts"
+    "ltp:inspect": "ts-node tools/ltp-inspect/inspect.ts",
+    "marketing:plf:generate": "node scripts/marketing/generatePlfCampaign.js"
   },
   "devDependencies": {
     "@types/chai": "^5.2.3",
