@@ -50,6 +50,114 @@ LTP gives you a deterministic, inspectable trail.
 - **Deterministic replay:** investigate any transition path without model re-execution.
 - **Auditable handoffs:** preserve identity, constraints, and continuity across agent/system boundaries.
 - **Policy enforcement by trace:** verify critical actions from signed, inspectable protocol events.
+- **Reasoning State Graph:** model agent decision states as navigable transitions for inspection and replay.
+- **Automatic rewind mechanism:** self-correct reasoning paths when contradictions, low confidence, or failure feedback appears.
+
+## Reasoning State Graph
+
+The Reasoning State Graph module models agent reasoning as a stateful graph instead of a single linear chain.
+It captures transitions across stages like `start`, `plan`, `execution`, `evaluation`, and `feedback`, making reasoning paths inspectable and debuggable.
+
+Each transition stores operational metadata, including:
+
+- confidence score
+- execution status
+- environmental feedback
+
+> The Reasoning State Graph turns the agent's reasoning process into a navigable structure.
+> Instead of a linear chain of thoughts, the system maintains a graph of reasoning states that can be inspected, replayed, and rewound when contradictions appear.
+
+### Rewind Mechanism
+
+The rewind mechanism automatically backtracks reasoning when a failure signal is detected.
+
+Triggers for rewind:
+
+1. Low confidence threshold
+2. Execution contradiction
+3. External feedback indicating failure
+
+Example:
+
+```text
+start
+  ↓
+plan A
+  ↓
+execute plan A
+confidence = 0.68
+threshold = 0.7
+
+Result:
+
+execute plan A
+      ↓
+    REWIND
+      ↓
+    plan A
+```
+
+This allows the agent to reconsider prior reasoning steps before committing downstream actions.
+
+## LTP Reasoning Architecture
+
+The Reasoning State Graph integrates with the broader LTP stack as a reasoning control layer:
+
+1. Message Protocol
+2. Semantic Inspector
+3. Trace Replay
+4. Reasoning State Graph
+
+In this architecture, Trace Replay and the Reasoning State Graph work together: replay reconstructs what happened, while the state graph explains why reasoning shifted, failed, or rewound.
+
+```text
+start
+  │
+  ▼
+plan
+  │
+  ▼
+execute
+  │
+  ├── success → finish
+  │
+  └── contradiction
+        │
+        ▼
+      rewind
+        │
+        ▼
+       plan
+```
+
+### Debugging Hallucinations
+
+Developers can use the state graph to inspect reasoning failures and identify hallucination points.
+
+Example flow:
+
+`plan → execute → contradiction → rewind → alternative plan`
+
+This makes it possible to:
+
+- identify hallucination points
+- inspect reasoning confidence
+- replay reasoning traces
+
+### Developer Usage Example
+
+```ts
+const stateGraph = new ReasoningStateGraph()
+
+stateGraph.transition("start", "planA", { confidence: 0.92 })
+stateGraph.transition("planA", "execute", { confidence: 0.88 })
+
+stateGraph.feedback("execute", "execution_blocked")
+
+stateGraph.rewind()
+```
+
+This pattern enables automatic backtracking of reasoning paths when runtime signals indicate that the current trajectory is unreliable.
 
 ## Proof points you can verify in this repo
 
