@@ -1,14 +1,21 @@
-# LTP Adapters
+# LTP Adapters (Model-Agnostic)
 
-This directory contains minimal, thin adapters to integrate LTP with popular agent frameworks.
-The goal is to demonstrate LTP as an external "backbone" of safety, not a replacement framework.
+LTP is model-agnostic by design and can sit in front of GPT, Claude, LLaMA, Grok, and future models.
 
-## Adapters
+## Current adapter targets
 
-*   `langchain/`: Wraps tools to enforce admissibility before execution.
-*   `autogpt/`: Intercepts commands in the AutoGPT loop.
-*   `crewai/`: Supervises task assignment and execution.
+- LangChain
+- CrewAI
+- AutoGen (roadmap toward v1.2 reference adapter)
 
-## Usage
+## Adapter contract
 
-These are reference implementations. Copy the pattern into your specific agent setup.
+Each adapter should map framework messages into LTP trace events containing:
+
+- timestamp
+- input
+- output
+- anchors
+- decision
+
+This keeps replay, phase checks, and audit evidence consistent across frameworks.

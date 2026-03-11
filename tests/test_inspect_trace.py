@@ -1,0 +1,20 @@
+from pathlib import Path
+
+from ltp.inspect_trace import inspect_trace_file
+
+
+def test_two_phase_rejects_unsupported_claim(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"timestamp":"t1","input":"valid input","output":"Unverified guess","anchors":["a1"]}\n',
+        encoding="utf-8",
+    )
+    results = inspect_trace_file(str(trace), phase="two_phase")
+    assert results[0].decision == "rejected"
+
+
+def test_missing_anchor_is_rejected(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text('{"timestamp":"t1","input":"valid","output":"safe","anchors":[]}\n', encoding="utf-8")
+    results = inspect_trace_file(str(trace), phase="one_phase")
+    assert results[0].decision == "rejected"
