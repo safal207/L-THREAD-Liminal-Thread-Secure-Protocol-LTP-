@@ -8,4 +8,4 @@ CTA (single):
 pnpm -w ltp:verify
 ```
 
-Reference: [docs/operational-notes/conformance.md](../../operational-notes/conformance.md)
+Reference: [docs/operational-notes/conformance.md](../../../operational-notes/conformance.md)

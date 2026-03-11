@@ -6,4 +6,4 @@ Message:
 - LTP complements logs with protocol-level continuity semantics.
 - LTP stays neutral across stacks/adapters.
 
-CTA (single): Review [docs/invariants.md](../../invariants.md)
+CTA (single): Review [docs/invariants.md](../../../invariants.md)
