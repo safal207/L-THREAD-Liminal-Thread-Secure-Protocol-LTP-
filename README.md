@@ -9,7 +9,7 @@ Deterministic replay + hallucination blocking for agent traces, with audit-ready
 
 ![Stars](https://img.shields.io/github/stars/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-?style=for-the-badge)
 
-> Current interest: 0 stars → 🌱 New signal 🚀  
+> Current interest: 1 stars → 🌱 New signal 🚀  
 > Want to join? [Click here](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/stargazers) to show support!
 <!-- community-interest:end -->
 
