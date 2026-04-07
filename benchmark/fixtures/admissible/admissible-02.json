@@ -1,0 +1,12 @@
+{
+  "case_id": "admissible-02",
+  "expected_label": "admissible",
+  "phase": "one_phase",
+  "note": "One-phase admissible classification with anchors.",
+  "record": {
+    "timestamp": "2026-04-01T10:05:00Z",
+    "input": "Provide operator-safe next steps for rollback.",
+    "output": "Rollback plan references approved procedure anchors.",
+    "anchors": ["PROC-17"]
+  }
+}

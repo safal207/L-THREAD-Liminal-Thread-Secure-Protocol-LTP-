@@ -1,0 +1,12 @@
+{
+  "case_id": "drift-01",
+  "expected_label": "drift",
+  "phase": "one_phase",
+  "note": "Input too short triggers insufficient context drift.",
+  "record": {
+    "timestamp": "2026-04-01T11:00:00Z",
+    "input": "ok",
+    "output": "Response remains anchored but context is too thin.",
+    "anchors": ["A9"]
+  }
+}

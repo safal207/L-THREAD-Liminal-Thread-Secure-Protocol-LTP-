@@ -1,0 +1,12 @@
+{
+  "case_id": "drift-03",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Whitespace-trimmed short input is still drift.",
+  "record": {
+    "timestamp": "2026-04-01T11:08:00Z",
+    "input": "  n ",
+    "output": "Output cannot be trusted due to sparse prompt signal.",
+    "anchors": ["B2", "B3"]
+  }
+}

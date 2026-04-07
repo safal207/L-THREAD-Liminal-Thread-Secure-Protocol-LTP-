@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-03",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Guessing language in two-phase mode.",
+  "record": {
+    "timestamp": "2026-04-01T12:08:00Z",
+    "input": "Assess whether transition is safe under policy.",
+    "output": "I guess the transition is safe.",
+    "anchors": ["C2", "C3"]
+  }
+}

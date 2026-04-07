@@ -1,0 +1,12 @@
+{
+  "case_id": "drift-02",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Two-phase drift from minimal prompt context.",
+  "record": {
+    "timestamp": "2026-04-01T11:04:00Z",
+    "input": "x",
+    "output": "Anchored but context is incomplete.",
+    "anchors": ["B1"]
+  }
+}

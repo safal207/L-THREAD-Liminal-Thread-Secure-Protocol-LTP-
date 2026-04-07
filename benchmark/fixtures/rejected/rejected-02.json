@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-02",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Unsupported claim token in output.",
+  "record": {
+    "timestamp": "2026-04-01T12:04:00Z",
+    "input": "Summarize anchored state transition for operator.",
+    "output": "This includes an unverified conclusion.",
+    "anchors": ["C1"]
+  }
+}
