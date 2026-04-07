@@ -24,6 +24,27 @@ From repository root:
 python scripts/run_benchmark.py
 ```
 
+Equivalent Make target:
+
+```bash
+make benchmark
+```
+
+To also write a markdown artifact report:
+
+```bash
+python scripts/run_benchmark.py --markdown-out benchmark/RESULTS.md
+```
+
+Equivalent Make target:
+
+```bash
+make benchmark-report
+```
+
+Interpretation guidance for `RESULTS.md` lives in `benchmark/INTERPRETATION.md`.
+`RESULTS.md` is currently kept as a tracked snapshot artifact and should be regenerated intentionally when fixture/evaluator semantics change.
+
 The command prints:
 
 - per-case output (`expected` vs `predicted`, pass/fail, reason, fixture note),
@@ -44,7 +65,22 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 9 cases total (3 per label).
+The fixture set currently contains 19 cases total (with adversarial and boundary-condition coverage across all labels).
+
+
+## Adversarial and boundary-case extension
+
+The fixture library now includes targeted adversarial and boundary-condition examples designed to exercise realistic safety failure modes in agent oversight workflows, including:
+
+- broken or degraded provenance signals,
+- missing approval or missing required gating steps,
+- anchor mismatch and unsupported intermediate leaps,
+- hallucinated/injected conclusions mixed into otherwise anchored output,
+- boundary-edge records (minimal admissible context, borderline drift, conflicting weak evidence).
+
+These additions remain intentionally small and deterministic. They improve safety relevance of the scaffold, but this is still an initial deterministic benchmark rather than a full research benchmark.
+
+For semantic records, optional fields (`provenance_status`, `anchor_support`, `approval_present`, `unsupported_step_present`) are validated at fixture-load time. In `two_phase`, explicit structural reject signals take precedence over drift checks, and drift checks take precedence over legacy keyword-proxy rejection.
 
 ## What this does **not** claim
 

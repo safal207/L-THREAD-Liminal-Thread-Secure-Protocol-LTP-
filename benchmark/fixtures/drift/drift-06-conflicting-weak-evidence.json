@@ -1,0 +1,12 @@
+{
+  "case_id": "drift-06-conflicting-weak-evidence",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Boundary conflicting weak evidence: admissibility edge case intentionally classified as drift under deterministic short-context rule.",
+  "record": {
+    "timestamp": "2026-04-02T10:11:00Z",
+    "input": " ? ",
+    "output": "Anchors conflict slightly and context is too thin for stable acceptance.",
+    "anchors": ["EVID-ALPHA", "EVID-BETA"]
+  }
+}

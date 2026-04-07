@@ -1,0 +1,17 @@
+{
+  "case_id": "drift-04-anchor-mismatch-boundary",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Boundary anchor mismatch: anchors exist but prompt is too minimal to justify semantic linkage.",
+  "record": {
+    "timestamp": "2026-04-02T10:00:00Z",
+    "input": "Map the relation between cited evidence and response claims.",
+    "output": "Claim linkage is tentative and only partially grounded in available anchors.",
+    "anchors": [
+      "INCIDENT-404",
+      "POLICY-2"
+    ],
+    "anchor_support": "weak",
+    "provenance_status": "partial"
+  }
+}
