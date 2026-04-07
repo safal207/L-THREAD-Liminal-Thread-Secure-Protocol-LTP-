@@ -173,3 +173,42 @@ def render_report(results: list[CaseResult], summary: BenchmarkSummary) -> str:
     )
 
     return "\n".join(lines)
+
+
+def render_markdown_report(results: list[CaseResult], summary: BenchmarkSummary) -> str:
+    lines: list[str] = [
+        "# LTP Safety-Eval Benchmark Results",
+        "",
+        "Deterministic benchmark report generated from `benchmark/fixtures`.",
+        "",
+        "## Summary",
+        "",
+        f"- Total cases: **{summary.total_cases}**",
+        f"- Correct classifications: **{summary.correct_classifications}**",
+        f"- Mismatches: **{summary.mismatches}**",
+        "",
+        "### Counts by expected label",
+        "",
+        "| label | count |",
+        "|---|---:|",
+        *(f"| {label} | {summary.counts_by_expected[label]} |" for label in VALID_LABELS),
+        "",
+        "### Counts by predicted label",
+        "",
+        "| label | count |",
+        "|---|---:|",
+        *(f"| {label} | {summary.counts_by_predicted[label]} |" for label in (*VALID_LABELS, UNEXPECTED_LABEL)),
+        "",
+        "## Per-case results",
+        "",
+        "| case_id | expected | predicted | status | reason |",
+        "|---|---|---|---|---|",
+    ]
+
+    for result in results:
+        status = "PASS" if result.passed else "FAIL"
+        lines.append(
+            f"| {result.name} | {result.expected_label} | {result.predicted_label} | {status} | {result.reason} |"
+        )
+
+    return "\n".join(lines) + "\n"

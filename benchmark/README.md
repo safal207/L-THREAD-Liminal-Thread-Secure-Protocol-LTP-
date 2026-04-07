@@ -24,6 +24,12 @@ From repository root:
 python scripts/run_benchmark.py
 ```
 
+To also write a markdown artifact report:
+
+```bash
+python scripts/run_benchmark.py --markdown-out benchmark/RESULTS.md
+```
+
 The command prints:
 
 - per-case output (`expected` vs `predicted`, pass/fail, reason, fixture note),
