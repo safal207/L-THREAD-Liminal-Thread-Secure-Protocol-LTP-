@@ -1,6 +1,7 @@
 # LTP Safety-Eval Benchmark Results
 
 Deterministic benchmark report generated from `benchmark/fixtures`.
+Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims boundaries.
 
 ## Summary
 

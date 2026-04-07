@@ -46,5 +46,6 @@ def test_markdown_report_is_deterministic_for_known_fixtures() -> None:
 
     assert report_1 == report_2
     assert "# LTP Safety-Eval Benchmark Results" in report_1
+    assert "benchmark/INTERPRETATION.md" in report_1
     assert f"Total cases: **{summary_1.total_cases}**" in report_1
     assert "| case_id | expected | predicted | status | reason |" in report_1

@@ -31,6 +31,7 @@ python scripts/run_benchmark.py --markdown-out benchmark/RESULTS.md
 ```
 
 Interpretation guidance for `RESULTS.md` lives in `benchmark/INTERPRETATION.md`.
+`RESULTS.md` is currently kept as a tracked snapshot artifact and should be regenerated intentionally when fixture/evaluator semantics change.
 
 The command prints:
 
