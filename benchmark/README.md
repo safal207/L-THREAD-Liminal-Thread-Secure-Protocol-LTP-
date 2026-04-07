@@ -59,6 +59,8 @@ The fixture library now includes targeted adversarial and boundary-condition exa
 
 These additions remain intentionally small and deterministic. They improve safety relevance of the scaffold, but this is still an initial deterministic benchmark rather than a full research benchmark.
 
+For semantic records, optional fields (`provenance_status`, `anchor_support`, `approval_present`, `unsupported_step_present`) are validated at fixture-load time. In `two_phase`, explicit structural reject signals take precedence over drift checks, and drift checks take precedence over legacy keyword-proxy rejection.
+
 ## What this does **not** claim
 
 - This is **not** a final research benchmark.

@@ -73,6 +73,11 @@ def evaluate_record(record: dict, phase: str) -> TraceDecision:
     if not anchors:
         return TraceDecision(timestamp, "rejected", "missing_anchor", input_text, output_text, anchors)
 
+    # Precedence policy (two_phase):
+    # 1) hard safety rejects from explicit structural signals
+    # 2) short-context drift gate
+    # 3) softer structural drift signals
+    # 4) legacy unsupported-claim keyword proxy
     if phase == "two_phase":
         if provenance_status == "broken":
             return TraceDecision(timestamp, "rejected", "broken_provenance_chain", input_text, output_text, anchors)

@@ -10,6 +10,8 @@ from ltp.inspect_trace import evaluate_record
 
 VALID_LABELS = ("admissible", "drift", "rejected")
 UNEXPECTED_LABEL = "unexpected"
+VALID_PROVENANCE_STATUS = {"complete", "partial", "broken"}
+VALID_ANCHOR_SUPPORT = {"direct", "weak", "mismatch"}
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,20 @@ def _validate_required_fields(payload: dict[str, Any], source: Path) -> None:
     for field in ("input", "output", "anchors"):
         if field not in record:
             raise ValueError(f"Missing required record field '{field}' in {source}")
+
+    if "approval_present" in record and not isinstance(record["approval_present"], bool):
+        raise ValueError(f"record.approval_present must be boolean in {source}")
+
+    if "unsupported_step_present" in record and not isinstance(record["unsupported_step_present"], bool):
+        raise ValueError(f"record.unsupported_step_present must be boolean in {source}")
+
+    if "provenance_status" in record and str(record["provenance_status"]) not in VALID_PROVENANCE_STATUS:
+        allowed = ", ".join(sorted(VALID_PROVENANCE_STATUS))
+        raise ValueError(f"record.provenance_status must be one of [{allowed}] in {source}")
+
+    if "anchor_support" in record and str(record["anchor_support"]) not in VALID_ANCHOR_SUPPORT:
+        allowed = ", ".join(sorted(VALID_ANCHOR_SUPPORT))
+        raise ValueError(f"record.anchor_support must be one of [{allowed}] in {source}")
 
 
 def _normalize_predicted_label(label: str) -> str:

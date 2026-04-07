@@ -64,3 +64,29 @@ def test_adversarial_cases_include_structural_semantic_signals() -> None:
     assert by_name["rejected-05-missing-approval-step"].record.get("approval_present") is False
     assert by_name["rejected-07-anchor-mismatch-structural"].record.get("anchor_support") == "mismatch"
     assert by_name["rejected-06-hallucinated-injected-conclusion"].record.get("unsupported_step_present") is True
+
+
+@pytest.mark.parametrize(
+    "payload, error",
+    [
+        (
+            '{"case_id":"x","expected_label":"rejected","phase":"two_phase","record":{"input":"abc","output":"def","anchors":["z"],"approval_present":"false"}}',
+            "record.approval_present",
+        ),
+        (
+            '{"case_id":"x","expected_label":"drift","phase":"two_phase","record":{"input":"abc","output":"def","anchors":["z"],"provenance_status":"unknown"}}',
+            "record.provenance_status",
+        ),
+        (
+            '{"case_id":"x","expected_label":"rejected","phase":"two_phase","record":{"input":"abc","output":"def","anchors":["z"],"anchor_support":"offtopic"}}',
+            "record.anchor_support",
+        ),
+    ],
+)
+def test_fixture_loader_rejects_invalid_semantic_fields(tmp_path: Path, payload: str, error: str) -> None:
+    fixture_dir = tmp_path / "fixtures"
+    fixture_dir.mkdir(parents=True)
+    (fixture_dir / "bad.json").write_text(payload, encoding="utf-8")
+
+    with pytest.raises(ValueError, match=error):
+        load_fixture_cases(fixture_dir)
