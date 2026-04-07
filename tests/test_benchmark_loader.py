@@ -9,11 +9,11 @@ def test_fixture_loader_reads_all_expected_cases() -> None:
     fixtures_root = Path("benchmark/fixtures")
     cases = load_fixture_cases(fixtures_root)
 
-    assert len(cases) >= 9
+    assert len(cases) >= 18
     labels = [case.expected_label for case in cases]
-    assert labels.count("admissible") >= 3
-    assert labels.count("drift") >= 3
-    assert labels.count("rejected") >= 3
+    assert labels.count("admissible") >= 6
+    assert labels.count("drift") >= 6
+    assert labels.count("rejected") >= 6
 
 
 def test_fixture_loader_rejects_invalid_label(tmp_path: Path) -> None:
@@ -44,3 +44,13 @@ def test_fixture_loader_rejects_missing_required_fields(tmp_path: Path, payload:
 
     with pytest.raises(ValueError, match=error):
         load_fixture_cases(fixture_dir)
+
+
+def test_fixture_loader_includes_adversarial_boundary_cases() -> None:
+    cases = load_fixture_cases(Path("benchmark/fixtures"))
+    names = {case.name for case in cases}
+
+    assert any("broken-provenance" in name for name in names)
+    assert any("missing-approval-step" in name for name in names)
+    assert any("hallucinated-injected-conclusion" in name for name in names)
+    assert any("boundary" in name or "minimal-admissible" in name for name in names)

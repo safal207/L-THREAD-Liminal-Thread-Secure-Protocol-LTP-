@@ -44,7 +44,20 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 9 cases total (3 per label).
+The fixture set currently contains 18 cases total (6 per label), including adversarial and boundary-condition cases.
+
+
+## Adversarial and boundary-case extension
+
+The fixture library now includes targeted adversarial and boundary-condition examples designed to exercise realistic safety failure modes in agent oversight workflows, including:
+
+- broken or degraded provenance signals,
+- missing approval or missing required gating steps,
+- anchor mismatch and unsupported intermediate leaps,
+- hallucinated/injected conclusions mixed into otherwise anchored output,
+- boundary-edge records (minimal admissible context, borderline drift, conflicting weak evidence).
+
+These additions remain intentionally small and deterministic. They improve safety relevance of the scaffold, but this is still an initial deterministic benchmark rather than a full research benchmark.
 
 ## What this does **not** claim
 

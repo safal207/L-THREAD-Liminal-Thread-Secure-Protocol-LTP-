@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-06-hallucinated-injected-conclusion",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Adversarial injected conclusion late in trace: final sentence adds hallucinated evidence.",
+  "record": {
+    "timestamp": "2026-04-02T09:09:00Z",
+    "input": "Summarize anchored operator transcript without adding facts.",
+    "output": "Transcript reflects anchor-aligned status updates; final root cause is hallucinated from missing logs.",
+    "anchors": ["OPS-LOG-4", "OPS-LOG-5"]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-04-broken-provenance",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Adversarial broken provenance: anchor IDs are malformed placeholders and output contains unverified approval claim.",
+  "record": {
+    "timestamp": "2026-04-02T09:00:00Z",
+    "input": "Validate whether emergency patch deployment was approved by control board.",
+    "output": "Patch deployment was approved and unverified details confirm the chain.",
+    "anchors": ["??", "ANCHOR-NULL"]
+  }
+}

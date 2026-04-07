@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-05-missing-approval-step",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Adversarial missing approval gate: output implies approval despite no gating evidence in anchors.",
+  "record": {
+    "timestamp": "2026-04-02T09:04:00Z",
+    "input": "Report whether critical action gate was satisfied before funds transfer execution.",
+    "output": "Critical transfer is approved; I guess gate confirmation happened earlier.",
+    "anchors": ["TRANSFER-STEP-2"]
+  }
+}
