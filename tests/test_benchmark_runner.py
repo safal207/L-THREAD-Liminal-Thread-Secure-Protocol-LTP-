@@ -14,8 +14,10 @@ def test_benchmark_runner_reports_per_case_and_summary() -> None:
         assert result.name in report
         assert f"expected={result.expected_label}" in report
         assert f"predicted={result.predicted_label}" in report
+        assert f"note={result.note}" in report
 
     assert "Summary:" in report
     assert "total cases" in report
     assert "counts by expected label" in report
     assert "counts by predicted label" in report
+    assert "unexpected=0" in report

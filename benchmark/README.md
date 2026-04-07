@@ -26,13 +26,13 @@ python scripts/run_benchmark.py
 
 The command prints:
 
-- per-case output (`expected` vs `predicted`, pass/fail, reason),
+- per-case output (`expected` vs `predicted`, pass/fail, reason, fixture note),
 - summary output:
   - total cases,
   - correct classifications,
   - mismatches,
   - counts by expected label,
-  - counts by predicted label.
+  - counts by predicted label (including `unexpected` bucket for unknown classifier outputs).
 
 ## Fixture layout
 
