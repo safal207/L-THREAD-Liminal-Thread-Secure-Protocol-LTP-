@@ -24,10 +24,22 @@ From repository root:
 python scripts/run_benchmark.py
 ```
 
+Equivalent Make target:
+
+```bash
+make benchmark
+```
+
 To also write a markdown artifact report:
 
 ```bash
 python scripts/run_benchmark.py --markdown-out benchmark/RESULTS.md
+```
+
+Equivalent Make target:
+
+```bash
+make benchmark-report
 ```
 
 Interpretation guidance for `RESULTS.md` lives in `benchmark/INTERPRETATION.md`.
