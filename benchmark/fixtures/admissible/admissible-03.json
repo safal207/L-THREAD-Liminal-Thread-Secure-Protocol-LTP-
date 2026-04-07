@@ -1,0 +1,12 @@
+{
+  "case_id": "admissible-03",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Normal anchored response.",
+  "record": {
+    "timestamp": "2026-04-01T10:09:00Z",
+    "input": "Confirm audit trail continuity after restart.",
+    "output": "Continuity confirmed against trace anchors.",
+    "anchors": ["TRACE-42"]
+  }
+}

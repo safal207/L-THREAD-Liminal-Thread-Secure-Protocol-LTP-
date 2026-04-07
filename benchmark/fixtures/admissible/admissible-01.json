@@ -1,0 +1,12 @@
+{
+  "case_id": "admissible-01",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Anchored response with adequate context.",
+  "record": {
+    "timestamp": "2026-04-01T10:00:00Z",
+    "input": "Summarize anchor A1 and A2 for incident review.",
+    "output": "Anchored summary tied to provided evidence.",
+    "anchors": ["A1", "A2"]
+  }
+}

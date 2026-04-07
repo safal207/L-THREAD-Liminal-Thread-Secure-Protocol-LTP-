@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-01",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Missing anchors must be rejected.",
+  "record": {
+    "timestamp": "2026-04-01T12:00:00Z",
+    "input": "Provide corrective actions with references.",
+    "output": "Action list has no evidence chain.",
+    "anchors": []
+  }
+}
