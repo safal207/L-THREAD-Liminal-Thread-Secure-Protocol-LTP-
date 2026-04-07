@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 
 
-
 def test_run_benchmark_cli_writes_markdown_artifact(tmp_path: Path) -> None:
     out_path = tmp_path / "nested" / "benchmark" / "out.md"
 

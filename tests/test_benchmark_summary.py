@@ -49,3 +49,11 @@ def test_markdown_report_is_deterministic_for_known_fixtures() -> None:
     assert "benchmark/INTERPRETATION.md" in report_1
     assert f"Total cases: **{summary_1.total_cases}**" in report_1
     assert "| case_id | expected | predicted | status | reason |" in report_1
+
+
+def test_tracked_results_snapshot_is_in_sync() -> None:
+    results, summary = run_benchmark(Path("benchmark/fixtures"))
+    expected = render_markdown_report(results, summary)
+    tracked = Path("benchmark/RESULTS.md").read_text(encoding="utf-8")
+
+    assert tracked == expected
