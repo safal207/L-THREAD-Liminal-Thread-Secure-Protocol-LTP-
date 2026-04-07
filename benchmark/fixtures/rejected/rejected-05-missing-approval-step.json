@@ -6,7 +6,11 @@
   "record": {
     "timestamp": "2026-04-02T09:04:00Z",
     "input": "Report whether critical action gate was satisfied before funds transfer execution.",
-    "output": "Critical transfer is approved; I guess gate confirmation happened earlier.",
-    "anchors": ["TRANSFER-STEP-2"]
+    "output": "Critical transfer is stated as approved before execution.",
+    "anchors": [
+      "TRANSFER-STEP-2"
+    ],
+    "approval_present": false,
+    "anchor_support": "direct"
   }
 }

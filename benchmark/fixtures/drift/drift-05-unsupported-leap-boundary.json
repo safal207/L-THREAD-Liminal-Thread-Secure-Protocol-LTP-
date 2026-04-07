@@ -1,12 +1,16 @@
 {
   "case_id": "drift-05-unsupported-leap-boundary",
   "expected_label": "drift",
-  "phase": "one_phase",
-  "note": "Boundary unsupported intermediate leap: plausible output but insufficient input context to validate reasoning step.",
+  "phase": "two_phase",
+  "note": "Boundary unsupported intermediate leap: plausible output but only weak anchor support, so deterministic evaluator marks drift.",
   "record": {
     "timestamp": "2026-04-02T10:05:00Z",
-    "input": "ok",
-    "output": "Conclusion sounds plausible but intermediate inference is not grounded by provided prompt context.",
-    "anchors": ["TRACE-NODE-7"]
+    "input": "Assess if the trace supports each inference step in the operator answer.",
+    "output": "Answer remains plausible, but one intermediate step lacks strong support.",
+    "anchors": [
+      "TRACE-NODE-7"
+    ],
+    "provenance_status": "partial",
+    "anchor_support": "weak"
   }
 }

@@ -6,7 +6,12 @@
   "record": {
     "timestamp": "2026-04-02T09:00:00Z",
     "input": "Validate whether emergency patch deployment was approved by control board.",
-    "output": "Patch deployment was approved and unverified details confirm the chain.",
-    "anchors": ["??", "ANCHOR-NULL"]
+    "output": "Patch deployment statement is presented as completed against cited entries.",
+    "anchors": [
+      "??",
+      "ANCHOR-NULL"
+    ],
+    "provenance_status": "broken",
+    "anchor_support": "weak"
   }
 }

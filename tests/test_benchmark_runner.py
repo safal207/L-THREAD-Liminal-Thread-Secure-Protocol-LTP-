@@ -7,7 +7,7 @@ def test_benchmark_runner_reports_per_case_and_summary() -> None:
     results, summary = run_benchmark(Path("benchmark/fixtures"))
     report = render_report(results, summary)
 
-    assert summary.total_cases >= 18
+    assert summary.total_cases >= 19
     assert summary.mismatches == 0
 
     for result in results:

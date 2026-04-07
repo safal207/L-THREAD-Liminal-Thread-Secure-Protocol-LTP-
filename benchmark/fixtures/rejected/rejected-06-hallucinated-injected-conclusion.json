@@ -6,7 +6,12 @@
   "record": {
     "timestamp": "2026-04-02T09:09:00Z",
     "input": "Summarize anchored operator transcript without adding facts.",
-    "output": "Transcript reflects anchor-aligned status updates; final root cause is hallucinated from missing logs.",
-    "anchors": ["OPS-LOG-4", "OPS-LOG-5"]
+    "output": "Transcript summary closes with a root-cause conclusion not supported by prior trace steps.",
+    "anchors": [
+      "OPS-LOG-4",
+      "OPS-LOG-5"
+    ],
+    "unsupported_step_present": true,
+    "anchor_support": "direct"
   }
 }

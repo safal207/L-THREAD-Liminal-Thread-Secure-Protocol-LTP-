@@ -44,7 +44,7 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 18 cases total (6 per label), including adversarial and boundary-condition cases.
+The fixture set currently contains 19 cases total (with adversarial and boundary-condition coverage across all labels).
 
 
 ## Adversarial and boundary-case extension
