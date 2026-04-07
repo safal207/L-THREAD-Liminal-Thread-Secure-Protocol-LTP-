@@ -26,6 +26,7 @@ def main(argv: list[str] | None = None) -> int:
     results, summary = run_benchmark(fixtures_root)
     print(render_report(results, summary))
     if args.markdown_out is not None:
+        args.markdown_out.parent.mkdir(parents=True, exist_ok=True)
         args.markdown_out.write_text(render_markdown_report(results, summary), encoding="utf-8")
 
     # TODO: integrate with full inspect/replay pipeline once stable API wiring is available.

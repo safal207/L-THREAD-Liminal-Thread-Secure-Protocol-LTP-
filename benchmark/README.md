@@ -30,6 +30,8 @@ To also write a markdown artifact report:
 python scripts/run_benchmark.py --markdown-out benchmark/RESULTS.md
 ```
 
+Interpretation guidance for `RESULTS.md` lives in `benchmark/INTERPRETATION.md`.
+
 The command prints:
 
 - per-case output (`expected` vs `predicted`, pass/fail, reason, fixture note),
