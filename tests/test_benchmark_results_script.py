@@ -32,3 +32,27 @@ def test_generate_benchmark_results_renders_summary_and_security_cases() -> None
     assert "`rejected-09-provenance-tampering`" in output
     assert "`rejected-10-unsafe-critical-action-without-gate`" in output
     assert "`rejected-11-hidden-hallucinated-security-conclusion`" in output
+
+
+def test_generate_benchmark_results_main_writes_results_file(tmp_path: Path) -> None:
+    module = _load_generator_module()
+    module.REPO_ROOT = tmp_path
+
+    fixtures_dir = tmp_path / "benchmark" / "fixtures" / "admissible"
+    fixtures_dir.mkdir(parents=True)
+    (fixtures_dir / "admissible-01.json").write_text(
+        (
+            '{"case_id":"admissible-01","expected_label":"admissible","phase":"two_phase",'
+            '"record":{"input":"valid input","output":"safe","anchors":["A1"]}}'
+        ),
+        encoding="utf-8",
+    )
+
+    rc = module.main()
+    assert rc == 0
+
+    output_path = tmp_path / "benchmark" / "RESULTS.md"
+    assert output_path.exists()
+    contents = output_path.read_text(encoding="utf-8")
+    assert "Generated Snapshot" in contents
+    assert "Total cases: **1**" in contents
