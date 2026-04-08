@@ -9,11 +9,18 @@ def test_fixture_loader_reads_all_expected_cases() -> None:
     fixtures_root = Path("benchmark/fixtures")
     cases = load_fixture_cases(fixtures_root)
 
-    assert len(cases) >= 9
+    assert len(cases) == 14
     labels = [case.expected_label for case in cases]
-    assert labels.count("admissible") >= 3
-    assert labels.count("drift") >= 3
-    assert labels.count("rejected") >= 3
+    assert labels.count("admissible") == 3
+    assert labels.count("drift") == 4
+    assert labels.count("rejected") == 7
+
+    case_names = {case.name for case in cases}
+    assert "drift-07-suspicious-instruction-drift" in case_names
+    assert "rejected-08-prompt-injection-approval-bypass" in case_names
+    assert "rejected-09-provenance-tampering" in case_names
+    assert "rejected-10-unsafe-critical-action-without-gate" in case_names
+    assert "rejected-11-hidden-hallucinated-security-conclusion" in case_names
 
 
 def test_fixture_loader_rejects_invalid_label(tmp_path: Path) -> None:

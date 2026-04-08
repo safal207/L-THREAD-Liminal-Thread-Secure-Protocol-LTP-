@@ -7,8 +7,12 @@ def test_benchmark_runner_reports_per_case_and_summary() -> None:
     results, summary = run_benchmark(Path("benchmark/fixtures"))
     report = render_report(results, summary)
 
-    assert summary.total_cases >= 9
+    assert summary.total_cases == 14
     assert summary.mismatches == 0
+    assert summary.counts_by_expected == {"admissible": 3, "drift": 4, "rejected": 7}
+    assert summary.counts_by_predicted["admissible"] == 3
+    assert summary.counts_by_predicted["drift"] == 4
+    assert summary.counts_by_predicted["rejected"] == 7
 
     for result in results:
         assert result.name in report

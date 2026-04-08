@@ -34,6 +34,11 @@ The command prints:
   - counts by expected label,
   - counts by predicted label (including `unexpected` bucket for unknown classifier outputs).
 
+See also:
+
+- `benchmark/RESULTS.md` for the current deterministic fixture snapshot.
+- `benchmark/INTERPRETATION.md` for concise interpretation guidance.
+
 ## Fixture layout
 
 ```text
