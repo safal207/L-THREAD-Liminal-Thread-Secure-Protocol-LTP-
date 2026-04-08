@@ -38,26 +38,28 @@ def _as_anchor_list(raw: object) -> list[str]:
     return [str(raw)]
 
 
-def _as_optional_bool(raw: object) -> bool | None:
+def _as_optional_bool(raw: object) -> tuple[bool | None, bool]:
     if raw is None:
-        return None
+        return None, False
     if isinstance(raw, bool):
-        return raw
+        return raw, False
     if isinstance(raw, (int, float)):
-        return bool(raw)
+        return bool(raw), False
     text = str(raw).strip().lower()
     if text in {"true", "1", "yes", "y"}:
-        return True
+        return True, False
     if text in {"false", "0", "no", "n"}:
-        return False
-    return None
+        return False, False
+    return None, True
 
 
-def _as_normalized_enum(raw: object, allowed: set[str]) -> str | None:
+def _as_normalized_enum(raw: object, allowed: set[str]) -> tuple[str | None, bool]:
     if raw is None:
-        return None
+        return None, False
     value = str(raw).strip().lower()
-    return value if value in allowed else None
+    if value in allowed:
+        return value, False
+    return None, True
 
 
 def _is_placeholder_anchor(anchor: str) -> bool:
@@ -71,10 +73,15 @@ def evaluate_record(record: dict, phase: str) -> TraceDecision:
     output_text = str(record.get("output", ""))
     anchors = _as_anchor_list(record.get("anchors"))
 
-    approval_present = _as_optional_bool(record.get("approval_present"))
-    unsupported_step_present = _as_optional_bool(record.get("unsupported_step_present")) is True
-    provenance_status = _as_normalized_enum(record.get("provenance_status"), {"broken", "partial"})
-    anchor_support = _as_normalized_enum(record.get("anchor_support"), {"direct", "weak", "mismatch"})
+    approval_present, approval_invalid = _as_optional_bool(record.get("approval_present"))
+    unsupported_step_raw, unsupported_step_invalid = _as_optional_bool(record.get("unsupported_step_present"))
+    unsupported_step_present = unsupported_step_raw is True
+    provenance_status, provenance_invalid = _as_normalized_enum(
+        record.get("provenance_status"), {"broken", "partial"}
+    )
+    anchor_support, anchor_support_invalid = _as_normalized_enum(
+        record.get("anchor_support"), {"direct", "weak", "mismatch"}
+    )
 
     if not anchors:
         return TraceDecision(timestamp, "rejected", "missing_anchor", input_text, output_text, anchors)
@@ -93,6 +100,8 @@ def evaluate_record(record: dict, phase: str) -> TraceDecision:
         # 10) post_hoc_unsupported_claim
         if any(_is_placeholder_anchor(anchor) for anchor in anchors):
             return TraceDecision(timestamp, "rejected", "malformed_anchor", input_text, output_text, anchors)
+        if approval_invalid or unsupported_step_invalid or provenance_invalid or anchor_support_invalid:
+            return TraceDecision(timestamp, "rejected", "invalid_semantic_signal", input_text, output_text, anchors)
         if provenance_status == "broken":
             return TraceDecision(
                 timestamp, "rejected", "broken_provenance_chain", input_text, output_text, anchors
