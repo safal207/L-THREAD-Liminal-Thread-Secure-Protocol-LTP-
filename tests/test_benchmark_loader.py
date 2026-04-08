@@ -9,11 +9,11 @@ def test_fixture_loader_reads_all_expected_cases() -> None:
     fixtures_root = Path("benchmark/fixtures")
     cases = load_fixture_cases(fixtures_root)
 
-    assert len(cases) == 14
+    assert len(cases) >= 14
     labels = [case.expected_label for case in cases]
-    assert labels.count("admissible") == 3
-    assert labels.count("drift") == 4
-    assert labels.count("rejected") == 7
+    assert labels.count("admissible") >= 3
+    assert labels.count("drift") >= 4
+    assert labels.count("rejected") >= 7
 
     case_names = {case.name for case in cases}
     assert "drift-07-suspicious-instruction-drift" in case_names

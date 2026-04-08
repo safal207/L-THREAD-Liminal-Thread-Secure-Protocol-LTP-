@@ -49,7 +49,7 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 14 cases total, including security-relevant unsafe/tampered behavior cases (approval bypass, provenance tampering, unsafe critical action gating failures, suspicious instruction drift, and hidden unsupported conclusions).
+The fixture set includes security-relevant unsafe/tampered behavior cases (approval bypass, provenance tampering, unsafe critical action gating failures, suspicious instruction drift, and hidden unsupported conclusions).
 
 ## What this does **not** claim
 
