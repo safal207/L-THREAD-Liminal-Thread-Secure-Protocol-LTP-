@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 from ltp.inspect_trace import inspect_trace_file
 

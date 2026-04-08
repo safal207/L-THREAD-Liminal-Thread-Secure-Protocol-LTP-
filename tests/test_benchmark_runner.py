@@ -1,4 +1,4 @@
-﻿from pathlib import Path
+from pathlib import Path
 
 from ltp.benchmark_scaffold import render_report, run_benchmark
 

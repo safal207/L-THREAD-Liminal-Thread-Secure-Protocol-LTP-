@@ -1,4 +1,4 @@
-﻿.PHONY: demo benchmark benchmark-report
+.PHONY: demo benchmark benchmark-report
 
 demo:
 	pnpm -w demo:all

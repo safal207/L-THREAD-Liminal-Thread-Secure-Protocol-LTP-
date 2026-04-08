@@ -1,4 +1,4 @@
-﻿# Benchmark Interpretation Notes
+# Benchmark Interpretation Notes
 
 This benchmark report is an **initial deterministic safety-eval artifact** for the current LTP scaffold.
 

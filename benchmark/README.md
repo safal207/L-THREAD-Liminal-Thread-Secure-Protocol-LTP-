@@ -1,4 +1,4 @@
-﻿# LTP Safety-Eval Benchmark Scaffold (Initial)
+# LTP Safety-Eval Benchmark Scaffold (Initial)
 
 This directory contains an **initial benchmark scaffold** for deterministic safety-evaluation checks over small, labeled LTP-like traces.
 
