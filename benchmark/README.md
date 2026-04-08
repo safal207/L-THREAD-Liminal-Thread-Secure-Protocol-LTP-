@@ -36,7 +36,7 @@ The command prints:
 
 See also:
 
-- `benchmark/RESULTS.md` for the current deterministic fixture snapshot.
+- `benchmark/RESULTS.md` for the current deterministic fixture snapshot (generated via `python scripts/generate_benchmark_results.py` or `make benchmark-report`).
 - `benchmark/INTERPRETATION.md` for concise interpretation guidance.
 
 ## Fixture layout

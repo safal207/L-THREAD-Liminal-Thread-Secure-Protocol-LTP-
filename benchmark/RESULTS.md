@@ -1,6 +1,6 @@
-# LTP Safety-Eval Benchmark Results (Current Fixture Set)
+# LTP Safety-Eval Benchmark Results (Generated Snapshot)
 
-Current deterministic fixture run (`python scripts/run_benchmark.py`) reports:
+This file is generated via `python scripts/generate_benchmark_results.py`.
 
 - Total cases: **14**
 - Correct classifications: **14**
@@ -8,10 +8,10 @@ Current deterministic fixture run (`python scripts/run_benchmark.py`) reports:
 - Counts by expected label: `admissible=3, drift=4, rejected=7`
 - Counts by predicted label: `admissible=3, drift=4, rejected=7, unexpected=0`
 
-Security-oriented cases included in this run:
+Security-oriented cases currently present in fixture corpus:
 
-- `rejected-08-prompt-injection-approval-bypass`
-- `rejected-09-provenance-tampering`
-- `rejected-10-unsafe-critical-action-without-gate`
-- `drift-07-suspicious-instruction-drift`
-- `rejected-11-hidden-hallucinated-security-conclusion`
+- ✅ `drift-07-suspicious-instruction-drift`
+- ✅ `rejected-08-prompt-injection-approval-bypass`
+- ✅ `rejected-09-provenance-tampering`
+- ✅ `rejected-10-unsafe-critical-action-without-gate`
+- ✅ `rejected-11-hidden-hallucinated-security-conclusion`
