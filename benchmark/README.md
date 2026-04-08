@@ -44,7 +44,7 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 9 cases total (3 per label).
+The fixture set currently contains 14 cases total, including security-relevant unsafe/tampered behavior cases (approval bypass, provenance tampering, unsafe critical action gating failures, suspicious instruction drift, and hidden unsupported conclusions).
 
 ## What this does **not** claim
 
@@ -53,6 +53,8 @@ The fixture set currently contains 9 cases total (3 per label).
 - This is **not** a model-evaluation suite.
 
 It is only a small deterministic scaffold intended to support honest iteration.
+
+These security-oriented fixtures evaluate unsafe/tampered **agent behavior signals in trace semantics**, not general network/infrastructure security coverage.
 
 ## Evolution path (TODO)
 

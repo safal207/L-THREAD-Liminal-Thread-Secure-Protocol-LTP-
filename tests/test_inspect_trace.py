@@ -18,3 +18,23 @@ def test_missing_anchor_is_rejected(tmp_path: Path) -> None:
     trace.write_text('{"timestamp":"t1","input":"valid","output":"safe","anchors":[]}\n', encoding="utf-8")
     results = inspect_trace_file(str(trace), phase="one_phase")
     assert results[0].decision == "rejected"
+
+
+def test_broken_provenance_is_rejected(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"timestamp":"t1","input":"valid input","output":"safe","anchors":["a1"],"provenance_status":"broken"}\n',
+        encoding="utf-8",
+    )
+    results = inspect_trace_file(str(trace), phase="two_phase")
+    assert results[0].decision == "rejected"
+
+
+def test_partial_provenance_and_weak_anchor_support_is_drift(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"timestamp":"t1","input":"this has enough context","output":"safe","anchors":["a1"],"provenance_status":"partial","anchor_support":"weak"}\n',
+        encoding="utf-8",
+    )
+    results = inspect_trace_file(str(trace), phase="two_phase")
+    assert results[0].decision == "drift"

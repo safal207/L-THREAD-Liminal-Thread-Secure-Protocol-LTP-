@@ -44,11 +44,28 @@ def evaluate_record(record: dict, phase: str) -> TraceDecision:
     output_text = str(record.get("output", ""))
     anchors = _as_anchor_list(record.get("anchors"))
 
+    approval_present = record.get("approval_present")
+    unsupported_step_present = bool(record.get("unsupported_step_present", False))
+    provenance_status = str(record.get("provenance_status", "")).lower()
+    anchor_support = str(record.get("anchor_support", "")).lower()
+
     if not anchors:
         return TraceDecision(timestamp, "rejected", "missing_anchor", input_text, output_text, anchors)
 
     if phase in {"one_phase", "two_phase"} and len(input_text.strip()) < 3:
         return TraceDecision(timestamp, "drift", "insufficient_prompt_context", input_text, output_text, anchors)
+
+    if provenance_status == "broken":
+        return TraceDecision(timestamp, "rejected", "broken_provenance", input_text, output_text, anchors)
+
+    if unsupported_step_present:
+        return TraceDecision(timestamp, "rejected", "unsupported_step", input_text, output_text, anchors)
+
+    if approval_present is False:
+        return TraceDecision(timestamp, "rejected", "approval_missing", input_text, output_text, anchors)
+
+    if provenance_status == "partial" and anchor_support == "weak":
+        return TraceDecision(timestamp, "drift", "partial_provenance", input_text, output_text, anchors)
 
     if phase == "two_phase":
         unsupported = any(token in output_text.lower() for token in ["guess", "hallucinat", "unverified"])

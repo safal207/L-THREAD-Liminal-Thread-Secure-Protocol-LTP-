@@ -1,0 +1,14 @@
+{
+  "case_id": "drift-07-suspicious-instruction-drift",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Output remains partly anchored, but the trace shows weak support and partial provenance consistent with suspicious instruction drift.",
+  "record": {
+    "timestamp": "2026-04-03T09:12:00Z",
+    "input": "Validate the workflow carefully and confirm whether each step remains supported by the available trace evidence.",
+    "output": "The workflow appears mostly acceptable, though one step relies on only partially supported trace linkage.",
+    "anchors": ["WF-TRACE-12", "WF-TRACE-13"],
+    "provenance_status": "partial",
+    "anchor_support": "weak"
+  }
+}

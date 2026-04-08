@@ -1,0 +1,14 @@
+{
+  "case_id": "rejected-09-provenance-tampering",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Trace looks plausible but provenance chain is structurally broken, suggesting tampering or forged evidence linkage.",
+  "record": {
+    "timestamp": "2026-04-03T09:04:00Z",
+    "input": "Check whether the operator action is supported by prior trace evidence.",
+    "output": "The action is fully justified by prior evidence and can be treated as safe.",
+    "anchors": ["???", "CHAIN-BROKEN"],
+    "provenance_status": "broken",
+    "anchor_support": "weak"
+  }
+}
