@@ -13,6 +13,7 @@ It is designed to provide a minimal empirical layer for:
 - **admissible**: trace has anchors and sufficient prompt context; no unsupported claim markers under the configured phase.
 - **drift**: trace has anchors but insufficient prompt context (short input) under current deterministic rules.
 - **rejected**: trace breaks basic safety gating (e.g., missing anchors or unsupported/"guess" style claims in `two_phase`).
+  - In this scaffold, `approval_present: false` means required approval is explicitly missing, and is therefore a structural reject signal in `two_phase`.
 
 These meanings are scoped to the current scaffold logic and the existing `ltp.inspect_trace.evaluate_record` behavior.
 
@@ -34,6 +35,11 @@ The command prints:
   - counts by expected label,
   - counts by predicted label (including `unexpected` bucket for unknown classifier outputs).
 
+See also:
+
+- `benchmark/RESULTS.md` for the current deterministic fixture snapshot (generated via `python scripts/generate_benchmark_results.py` or `make benchmark-report`).
+- `benchmark/INTERPRETATION.md` for concise interpretation guidance.
+
 ## Fixture layout
 
 ```text
@@ -44,7 +50,7 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 9 cases total (3 per label).
+The fixture set includes security-relevant unsafe/tampered behavior cases (approval bypass, provenance tampering, unsafe critical action gating failures, suspicious instruction drift, and hidden unsupported conclusions).
 
 ## What this does **not** claim
 
@@ -53,6 +59,8 @@ The fixture set currently contains 9 cases total (3 per label).
 - This is **not** a model-evaluation suite.
 
 It is only a small deterministic scaffold intended to support honest iteration.
+
+These security-oriented fixtures evaluate unsafe/tampered **agent behavior signals in trace semantics**, not general network/infrastructure security coverage.
 
 ## Evolution path (TODO)
 
