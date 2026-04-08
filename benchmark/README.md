@@ -13,6 +13,7 @@ It is designed to provide a minimal empirical layer for:
 - **admissible**: trace has anchors and sufficient prompt context; no unsupported claim markers under the configured phase.
 - **drift**: trace has anchors but insufficient prompt context (short input) under current deterministic rules.
 - **rejected**: trace breaks basic safety gating (e.g., missing anchors or unsupported/"guess" style claims in `two_phase`).
+  - In this scaffold, `approval_present: false` means required approval is explicitly missing, and is therefore a structural reject signal in `two_phase`.
 
 These meanings are scoped to the current scaffold logic and the existing `ltp.inspect_trace.evaluate_record` behavior.
 
@@ -55,6 +56,11 @@ The command prints:
   - counts by expected label,
   - counts by predicted label (including `unexpected` bucket for unknown classifier outputs).
 
+See also:
+
+- `benchmark/RESULTS.md` for the current deterministic fixture snapshot (generated via `python scripts/generate_benchmark_results.py` or `make benchmark-report`).
+- `benchmark/INTERPRETATION.md` for concise interpretation guidance.
+
 ## Fixture layout
 
 ```text
@@ -65,22 +71,21 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 19 cases total (with adversarial and boundary-condition coverage across all labels).
-
+The fixture set currently contains 19 cases total, including adversarial and boundary-condition coverage across all labels.
 
 ## Adversarial and boundary-case extension
 
-The fixture library now includes targeted adversarial and boundary-condition examples designed to exercise realistic safety failure modes in agent oversight workflows, including:
+The fixture library includes targeted adversarial and boundary-condition examples designed to exercise realistic safety failure modes in agent oversight workflows, including:
 
 - broken or degraded provenance signals,
 - missing approval or missing required gating steps,
 - anchor mismatch and unsupported intermediate leaps,
-- hallucinated/injected conclusions mixed into otherwise anchored output,
-- boundary-edge records (minimal admissible context, borderline drift, conflicting weak evidence).
+- hallucinated or injected conclusions mixed into otherwise anchored output,
+- suspicious instruction drift and boundary-edge records.
+
+For semantic records, optional fields (`provenance_status`, `anchor_support`, `approval_present`, `unsupported_step_present`) are validated at fixture-load time. In `two_phase`, malformed semantic metadata is rejected explicitly, structural reject signals take precedence over drift checks, and drift checks take precedence over legacy keyword-proxy rejection.
 
 These additions remain intentionally small and deterministic. They improve safety relevance of the scaffold, but this is still an initial deterministic benchmark rather than a full research benchmark.
-
-For semantic records, optional fields (`provenance_status`, `anchor_support`, `approval_present`, `unsupported_step_present`) are validated at fixture-load time. In `two_phase`, explicit structural reject signals take precedence over drift checks, and drift checks take precedence over legacy keyword-proxy rejection.
 
 ## What this does **not** claim
 
@@ -89,6 +94,8 @@ For semantic records, optional fields (`provenance_status`, `anchor_support`, `a
 - This is **not** a model-evaluation suite.
 
 It is only a small deterministic scaffold intended to support honest iteration.
+
+These security-oriented fixtures evaluate unsafe or tampered **agent behavior signals in trace semantics**, not general network or infrastructure security coverage.
 
 ## Evolution path (TODO)
 

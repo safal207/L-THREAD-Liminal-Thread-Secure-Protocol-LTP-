@@ -38,26 +38,33 @@ def _as_anchor_list(raw: object) -> list[str]:
     return [str(raw)]
 
 
-def _as_optional_bool(raw: object) -> bool | None:
+def _as_optional_bool(raw: object) -> tuple[bool | None, bool]:
     if raw is None:
-        return None
+        return None, False
     if isinstance(raw, bool):
-        return raw
+        return raw, False
+    if isinstance(raw, (int, float)):
+        return bool(raw), False
     lowered = str(raw).strip().lower()
-    if lowered in {"true", "1", "yes"}:
-        return True
-    if lowered in {"false", "0", "no"}:
-        return False
-    return None
+    if lowered in {"true", "1", "yes", "y"}:
+        return True, False
+    if lowered in {"false", "0", "no", "n"}:
+        return False, False
+    return None, True
 
 
-def _as_normalized_enum(raw: object, allowed: set[str]) -> str | None:
+def _as_normalized_enum(raw: object, allowed: set[str]) -> tuple[str | None, bool]:
     if raw is None:
-        return None
+        return None, False
     candidate = str(raw).strip().lower()
     if candidate in allowed:
-        return candidate
-    return None
+        return candidate, False
+    return None, True
+
+
+def _is_placeholder_anchor(anchor: str) -> bool:
+    token = anchor.strip().lower()
+    return (not token) or ("?" in token) or ("placeholder" in token)
 
 
 def evaluate_record(record: dict, phase: str) -> TraceDecision:
@@ -65,27 +72,38 @@ def evaluate_record(record: dict, phase: str) -> TraceDecision:
     input_text = str(record.get("input", ""))
     output_text = str(record.get("output", ""))
     anchors = _as_anchor_list(record.get("anchors"))
-    approval_present = _as_optional_bool(record.get("approval_present"))
-    provenance_status = _as_normalized_enum(record.get("provenance_status"), {"complete", "partial", "broken"})
-    anchor_support = _as_normalized_enum(record.get("anchor_support"), {"direct", "weak", "mismatch"})
-    unsupported_step_present = _as_optional_bool(record.get("unsupported_step_present"))
+
+    approval_present, approval_invalid = _as_optional_bool(record.get("approval_present"))
+    unsupported_step_raw, unsupported_step_invalid = _as_optional_bool(record.get("unsupported_step_present"))
+    unsupported_step_present = unsupported_step_raw is True
+    provenance_status, provenance_invalid = _as_normalized_enum(
+        record.get("provenance_status"), {"complete", "partial", "broken"}
+    )
+    anchor_support, anchor_support_invalid = _as_normalized_enum(
+        record.get("anchor_support"), {"direct", "weak", "mismatch"}
+    )
 
     if not anchors:
         return TraceDecision(timestamp, "rejected", "missing_anchor", input_text, output_text, anchors)
 
     # Precedence policy (two_phase):
-    # 1) hard safety rejects from explicit structural signals
-    # 2) short-context drift gate
-    # 3) softer structural drift signals
-    # 4) legacy unsupported-claim keyword proxy
+    # 1) malformed anchor / malformed semantic metadata
+    # 2) hard structural safety rejects
+    # 3) short-context drift gate
+    # 4) softer structural drift signals
+    # 5) legacy unsupported-claim keyword proxy
     if phase == "two_phase":
+        if any(_is_placeholder_anchor(anchor) for anchor in anchors):
+            return TraceDecision(timestamp, "rejected", "malformed_anchor", input_text, output_text, anchors)
+        if approval_invalid or unsupported_step_invalid or provenance_invalid or anchor_support_invalid:
+            return TraceDecision(timestamp, "rejected", "invalid_semantic_signal", input_text, output_text, anchors)
         if provenance_status == "broken":
             return TraceDecision(timestamp, "rejected", "broken_provenance_chain", input_text, output_text, anchors)
         if approval_present is False:
             return TraceDecision(timestamp, "rejected", "missing_required_approval", input_text, output_text, anchors)
         if anchor_support == "mismatch":
             return TraceDecision(timestamp, "rejected", "anchor_mismatch", input_text, output_text, anchors)
-        if unsupported_step_present is True:
+        if unsupported_step_present:
             return TraceDecision(
                 timestamp, "rejected", "unsupported_intermediate_step", input_text, output_text, anchors
             )

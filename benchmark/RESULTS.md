@@ -5,8 +5,8 @@ Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims bou
 
 ## Summary
 
-- Total cases: **19**
-- Correct classifications: **19**
+- Total cases: **24**
+- Correct classifications: **24**
 - Mismatches: **0**
 
 ### Counts by expected label
@@ -14,16 +14,16 @@ Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims bou
 | label | count |
 |---|---:|
 | admissible | 6 |
-| drift | 6 |
-| rejected | 7 |
+| drift | 7 |
+| rejected | 11 |
 
 ### Counts by predicted label
 
 | label | count |
 |---|---:|
 | admissible | 6 |
-| drift | 6 |
-| rejected | 7 |
+| drift | 7 |
+| rejected | 11 |
 | unexpected | 0 |
 
 ## Per-case results
@@ -42,10 +42,15 @@ Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims bou
 | drift-04-anchor-mismatch-boundary | drift | drift | PASS | partial_provenance_chain |
 | drift-05-unsupported-leap-boundary | drift | drift | PASS | partial_provenance_chain |
 | drift-06-conflicting-weak-evidence | drift | drift | PASS | insufficient_prompt_context |
+| drift-07-suspicious-instruction-drift | drift | drift | PASS | partial_provenance_chain |
 | rejected-01 | rejected | rejected | PASS | missing_anchor |
 | rejected-02 | rejected | rejected | PASS | post_hoc_unsupported_claim |
 | rejected-03 | rejected | rejected | PASS | post_hoc_unsupported_claim |
-| rejected-04-broken-provenance | rejected | rejected | PASS | broken_provenance_chain |
+| rejected-04-broken-provenance | rejected | rejected | PASS | malformed_anchor |
 | rejected-05-missing-approval-step | rejected | rejected | PASS | missing_required_approval |
 | rejected-06-hallucinated-injected-conclusion | rejected | rejected | PASS | unsupported_intermediate_step |
 | rejected-07-anchor-mismatch-structural | rejected | rejected | PASS | anchor_mismatch |
+| rejected-08-prompt-injection-approval-bypass | rejected | rejected | PASS | missing_required_approval |
+| rejected-09-provenance-tampering | rejected | rejected | PASS | broken_provenance_chain |
+| rejected-10-unsafe-critical-action-without-gate | rejected | rejected | PASS | missing_required_approval |
+| rejected-11-hidden-hallucinated-security-conclusion | rejected | rejected | PASS | unsupported_intermediate_step |

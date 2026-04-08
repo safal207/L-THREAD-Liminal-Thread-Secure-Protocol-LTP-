@@ -73,3 +73,36 @@ def test_two_phase_structural_reject_precedence_over_keyword_proxy(tmp_path: Pat
     results = inspect_trace_file(str(trace), phase="two_phase")
     assert results[0].decision == "rejected"
     assert results[0].reason == "anchor_mismatch"
+
+
+def test_two_phase_rejects_placeholder_anchor_before_other_checks(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"timestamp":"t1","input":"x","output":"safe","anchors":["???","A1"]}\n',
+        encoding="utf-8",
+    )
+    results = inspect_trace_file(str(trace), phase="two_phase")
+    assert results[0].decision == "rejected"
+    assert results[0].reason == "malformed_anchor"
+
+
+def test_two_phase_rejects_invalid_semantic_boolean_flag(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"timestamp":"t1","input":"valid input","output":"safe","anchors":["A1"],"approval_present":"maybe"}\n',
+        encoding="utf-8",
+    )
+    results = inspect_trace_file(str(trace), phase="two_phase")
+    assert results[0].decision == "rejected"
+    assert results[0].reason == "invalid_semantic_signal"
+
+
+def test_two_phase_rejects_invalid_semantic_enum_flag(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"timestamp":"t1","input":"valid input","output":"safe","anchors":["A1"],"provenance_status":"tampered"}\n',
+        encoding="utf-8",
+    )
+    results = inspect_trace_file(str(trace), phase="two_phase")
+    assert results[0].decision == "rejected"
+    assert results[0].reason == "invalid_semantic_signal"
