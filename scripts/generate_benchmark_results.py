@@ -19,6 +19,7 @@ def render_results_md() -> str:
         "# LTP Safety-Eval Benchmark Results (Generated Snapshot)",
         "",
         "This file is generated via `python scripts/generate_benchmark_results.py`.",
+        "For scope and label interpretation, see `benchmark/INTERPRETATION.md`.",
         "",
         f"- Total cases: **{summary.total_cases}**",
         f"- Correct classifications: **{summary.correct_classifications}**",

@@ -1,6 +1,7 @@
 # LTP Safety-Eval Benchmark Results (Generated Snapshot)
 
 This file is generated via `python scripts/generate_benchmark_results.py`.
+For scope and label interpretation, see `benchmark/INTERPRETATION.md`.
 
 - Total cases: **14**
 - Correct classifications: **14**
