@@ -38,6 +38,17 @@ def _as_anchor_list(raw: object) -> list[str]:
     return [str(raw)]
 
 
+def _is_placeholder_anchor(anchor: str) -> bool:
+    token = anchor.strip().lower()
+    return (not token) or ("?" in token) or ("broken" in token) or ("placeholder" in token)
+
+
+def _looks_like_critical_action(text: str) -> bool:
+    normalized = text.lower()
+    critical_tokens = ("critical", "deploy", "delete", "transfer", "execute", "remediation", "approval")
+    return any(token in normalized for token in critical_tokens)
+
+
 def evaluate_record(record: dict, phase: str) -> TraceDecision:
     timestamp = str(record.get("timestamp", "unknown"))
     input_text = str(record.get("input", ""))
@@ -55,16 +66,23 @@ def evaluate_record(record: dict, phase: str) -> TraceDecision:
     if phase in {"one_phase", "two_phase"} and len(input_text.strip()) < 3:
         return TraceDecision(timestamp, "drift", "insufficient_prompt_context", input_text, output_text, anchors)
 
-    if provenance_status == "broken":
+    if phase == "two_phase" and any(_is_placeholder_anchor(anchor) for anchor in anchors):
+        return TraceDecision(timestamp, "rejected", "malformed_anchor", input_text, output_text, anchors)
+
+    if phase == "two_phase" and provenance_status == "broken":
         return TraceDecision(timestamp, "rejected", "broken_provenance", input_text, output_text, anchors)
 
-    if unsupported_step_present:
+    if phase == "two_phase" and unsupported_step_present:
         return TraceDecision(timestamp, "rejected", "unsupported_step", input_text, output_text, anchors)
 
-    if approval_present is False:
+    if (
+        phase == "two_phase"
+        and approval_present is False
+        and (_looks_like_critical_action(input_text) or _looks_like_critical_action(output_text))
+    ):
         return TraceDecision(timestamp, "rejected", "approval_missing", input_text, output_text, anchors)
 
-    if provenance_status == "partial" and anchor_support == "weak":
+    if phase == "two_phase" and provenance_status == "partial" and anchor_support == "weak":
         return TraceDecision(timestamp, "drift", "partial_provenance", input_text, output_text, anchors)
 
     if phase == "two_phase":
