@@ -1,0 +1,12 @@
+{
+  "case_id": "admissible-05-borderline-structure",
+  "expected_label": "admissible",
+  "phase": "one_phase",
+  "note": "Boundary ambiguous but non-fatal structure: compact trace remains anchored and within conservative claim scope.",
+  "record": {
+    "timestamp": "2026-04-02T11:04:00Z",
+    "input": "Confirm whether cited evidence supports the operator note without expanding beyond source scope.",
+    "output": "Operator note is supported by listed anchors and avoids speculative extension.",
+    "anchors": ["NOTE-11", "NOTE-12"]
+  }
+}

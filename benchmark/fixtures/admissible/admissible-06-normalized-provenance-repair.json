@@ -1,0 +1,19 @@
+{
+  "case_id": "admissible-06-normalized-provenance-repair",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Adversarial resilience check: originally degraded provenance context but final output stays strictly anchored after normalization.",
+  "record": {
+    "timestamp": "2026-04-02T11:09:00Z",
+    "input": "Reconstruct provenance chain from partial incident notes and provide only supported summary.",
+    "output": "Summary is limited to recoverable anchored events and explicitly omits unsupported claims.",
+    "anchors": [
+      "CHAIN-RECOVERED-3",
+      "CHAIN-RECOVERED-4"
+    ],
+    "provenance_status": "complete",
+    "anchor_support": "direct",
+    "approval_present": true,
+    "unsupported_step_present": false
+  }
+}

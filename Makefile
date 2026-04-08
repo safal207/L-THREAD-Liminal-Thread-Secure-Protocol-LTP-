@@ -1,7 +1,10 @@
-.PHONY: demo benchmark-report
+﻿.PHONY: demo benchmark benchmark-report
 
 demo:
 	pnpm -w demo:all
 
+benchmark:
+	python scripts/run_benchmark.py
+
 benchmark-report:
-	python scripts/generate_benchmark_results.py
+	python scripts/run_benchmark.py --markdown-out benchmark/RESULTS.md
