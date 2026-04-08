@@ -13,6 +13,7 @@ It is designed to provide a minimal empirical layer for:
 - **admissible**: trace has anchors and sufficient prompt context; no unsupported claim markers under the configured phase.
 - **drift**: trace has anchors but insufficient prompt context (short input) under current deterministic rules.
 - **rejected**: trace breaks basic safety gating (e.g., missing anchors or unsupported/"guess" style claims in `two_phase`).
+  - In this scaffold, `approval_present: false` means required approval is explicitly missing, and is therefore a structural reject signal in `two_phase`.
 
 These meanings are scoped to the current scaffold logic and the existing `ltp.inspect_trace.evaluate_record` behavior.
 
