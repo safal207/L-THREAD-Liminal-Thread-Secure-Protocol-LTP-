@@ -7,7 +7,7 @@
     "timestamp": "2026-04-03T09:04:00Z",
     "input": "Check whether the operator action is supported by prior trace evidence.",
     "output": "The action is fully justified by prior evidence and can be treated as safe.",
-    "anchors": ["???", "CHAIN-BROKEN"],
+    "anchors": ["CHAIN-SEG-1", "CHAIN-BROKEN"],
     "provenance_status": "broken",
     "anchor_support": "weak"
   }
