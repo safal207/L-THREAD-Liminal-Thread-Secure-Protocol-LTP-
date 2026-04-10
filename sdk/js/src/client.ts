@@ -81,6 +81,37 @@ const DEFAULT_HEARTBEAT: NormalizedHeartbeatOptions = {
   timeoutMs: 45000,
 };
 
+function resolveWebSocketCtor(): typeof WebSocket {
+  const wsGlobal = (globalThis as typeof globalThis & { WebSocket?: typeof WebSocket }).WebSocket;
+  if (wsGlobal) {
+    return wsGlobal;
+  }
+
+  let nodeRequire: ((id: string) => unknown) | undefined;
+  try {
+    // eslint-disable-next-line no-eval
+    nodeRequire = (0, eval)('require') as (id: string) => unknown;
+  } catch {
+    nodeRequire = undefined;
+  }
+
+  if (typeof nodeRequire === 'function') {
+    try {
+      const wsModule = nodeRequire('ws') as { WebSocket?: typeof WebSocket } | typeof WebSocket;
+      if (typeof wsModule === 'function') {
+        return wsModule;
+      }
+      if (wsModule?.WebSocket) {
+        return wsModule.WebSocket;
+      }
+    } catch {
+      // Fall through to a clearer error below.
+    }
+  }
+
+  throw new Error('WebSocket is not available in this environment');
+}
+
 /**
  * Default console-based logger implementation
  */
@@ -441,7 +472,8 @@ export class LtpClient {
 
     this.isConnecting = true;
 
-    this.ws = new WebSocket(this.url, SUBPROTOCOL);
+    const WebSocketCtor = resolveWebSocketCtor();
+    this.ws = new WebSocketCtor(this.url, SUBPROTOCOL);
 
     this.ws.onopen = () => {
       this.logger.info('WebSocket connected, initiating handshake...');
@@ -1011,7 +1043,7 @@ export class LtpClient {
   }
 
   private forceReconnect(reason: string): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && this.ws.readyState === 1) {
       this.forcedReconnectReason = reason;
       this.ws.close();
       return;
@@ -1116,7 +1148,7 @@ export class LtpClient {
   }
 
   private sendRaw(message: unknown): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== 1) {
       this.logger.error('Cannot send message: WebSocket not open');
       return;
     }

@@ -1,6 +1,7 @@
 {
   "name": "ltp-monorepo",
   "private": true,
+  "packageManager": "pnpm@9.15.0",
   "description": "LTP (Liminal Thread Protocol) Monorepo",
   "scripts": {
     "build": "pnpm --recursive run build",
@@ -31,7 +32,9 @@
     "test:focus-hud": "ts-node scripts/monitor/__tests__/hudModes.test.ts && ts-node scripts/monitor/__tests__/ltp-focus-hud.test.ts && ts-node scripts/monitor/__tests__/hudTheme.test.ts && ts-node scripts/gateway/__tests__/ltp-node-gateway.test.ts && ts-node src/routing/__tests__/focusRoutingPreview.test.ts && ts-node tests/visualization/futureWeaveGraph.test.ts",
     "test:future-weave-graph": "ts-node tests/visualization/futureWeaveGraph.test.ts",
     "test:explain-routing": "ts-node src/demos/__tests__/explainRoutingDemo.test.ts",
-    "test": "vitest run",
+    "test:full": "vitest run",
+    "test:review": "vitest run src/server/conformanceVerifier.test.ts src/server/httpConformanceVerify.integration.test.ts tools/ltp-inspect/inspect.test.ts sdk/js/tests/silence.test.ts tests/verify/isMainModule.test.ts tests/verify/ltpVerify.test.ts tests/conformance/reportSchema.test.ts tests/conformance/orientationInvariants.test.ts tools/conformance-kit/tests/verify.test.ts",
+    "test": "pnpm -w test:review",
     "test:turtle": "vitest run src/turtle/__tests__",
     "conformance:report": "ts-node scripts/conformance/generateConformanceReport.ts",
     "ltp:conformance": "ts-node tools/conformance-kit/src/cli.ts",

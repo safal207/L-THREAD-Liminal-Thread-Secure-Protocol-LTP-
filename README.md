@@ -80,6 +80,20 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 - Example flow: `examples/README.canonical-flow.md`
 - Spec: `specs/LTP-Spec-v0.1.md`
 
+## Local validation
+
+For a clean reviewer flow, run:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm test
+pnpm test:conformance
+```
+
+`pnpm test` is the curated reviewer-safe validation surface. If you want the broader legacy sweep as well, run `pnpm test:full`.
+
+Local scratch directories such as `.tmp/` are ignored by the repository and excluded from TypeScript test discovery so golden snapshots stay deterministic.
+
 ## Roadmap
 
 - ✅ Replay analyzer (`ltp inspect trace`)

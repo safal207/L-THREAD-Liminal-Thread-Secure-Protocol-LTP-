@@ -108,6 +108,10 @@ function normalizeOutput(text: string): string {
   return text.replace(/\r\n/g, '\n').trim();
 }
 
+function readNormalizedText(filePath: string): string {
+  return normalizeOutput(fs.readFileSync(filePath, 'utf-8'));
+}
+
 function normalizeInputLine(text: string): string {
   // Removes path differences in "input: ... time:"
   return text.replace(/^input: .* time:/m, 'input: <redacted>  time:');
@@ -122,7 +126,7 @@ describe('ltp-inspect golden summary', () => {
     const summaryJson = JSON.parse(JSON.stringify(summary));
 
     expect(summaryJson).toEqual(expected);
-    expect(formatJson(summary, true)).toEqual(fs.readFileSync(expectedJsonPath, 'utf-8').trim());
+    expect(normalizeOutput(formatJson(summary, true))).toEqual(readNormalizedText(expectedJsonPath));
     vi.useRealTimers();
   });
 
@@ -131,9 +135,9 @@ describe('ltp-inspect golden summary', () => {
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
     const summary = runInspect(minimalFixture);
     const human = formatHuman(summary);
-    const expectedHuman = fs.readFileSync(expectedHumanOkPath, 'utf-8').trim();
+    const expectedHuman = readNormalizedText(expectedHumanOkPath);
 
-    expect(human.trim()).toEqual(expectedHuman);
+    expect(normalizeOutput(human)).toEqual(expectedHuman);
     vi.useRealTimers();
   });
 
@@ -153,9 +157,9 @@ describe('ltp-inspect golden summary', () => {
     vi.setSystemTime(new Date('2024-01-01T00:00:00.000Z'));
     const summary = runInspect(minimalFixture);
     const human = formatHuman(summary).trim();
-    const expected = fs.readFileSync(goldenMinimalHuman, 'utf-8').trim();
+    const expected = readNormalizedText(goldenMinimalHuman);
 
-    expect(human).toEqual(expected);
+    expect(normalizeOutput(human)).toEqual(expected);
     vi.useRealTimers();
   });
 
@@ -171,7 +175,7 @@ describe('ltp-inspect golden summary', () => {
 
       expect(exitCode).toBe(1);
       expectNoFatal(errors);
-      expect(normalizeOutput(logs.join('\n'))).toEqual(fs.readFileSync(canonicalHumanSnapshot, 'utf-8').trim());
+      expect(normalizeOutput(logs.join('\n'))).toEqual(readNormalizedText(canonicalHumanSnapshot));
     } finally {
       vi.unstubAllEnvs();
     }
@@ -303,7 +307,7 @@ describe('ltp-inspect golden summary', () => {
 
     expect(exitCode).toBe(2);
     expect(errors.join('\n')).toContain('Contract violation');
-    expect(normalizeOutput(logs.join('\n'))).toEqual(fs.readFileSync(expectedHumanErrorPath, 'utf-8').trim());
+    expect(normalizeOutput(logs.join('\n'))).toEqual(readNormalizedText(expectedHumanErrorPath));
     vi.useRealTimers();
   });
 
@@ -319,7 +323,7 @@ describe('ltp-inspect golden summary', () => {
 
     expect(exitCode).toBe(1);
     expectNoFatal(errors);
-    expect(normalizeOutput(logs.join('\n'))).toEqual(fs.readFileSync(expectedHumanWarnPath, 'utf-8').trim());
+    expect(normalizeOutput(logs.join('\n'))).toEqual(readNormalizedText(expectedHumanWarnPath));
     vi.useRealTimers();
   });
 

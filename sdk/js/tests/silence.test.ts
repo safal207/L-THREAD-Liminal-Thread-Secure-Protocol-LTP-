@@ -3,6 +3,8 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { WebSocket, WebSocketServer } from 'ws';
 import { LtpClient } from '../src/client';
 
+(globalThis as typeof globalThis & { WebSocket?: typeof WebSocket }).WebSocket = WebSocket;
+
 describe('LTP Silence as Signal', () => {
   let wss: WebSocketServer;
   let client: LtpClient;
