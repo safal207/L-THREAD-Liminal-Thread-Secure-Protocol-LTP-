@@ -1,0 +1,14 @@
+{
+  "case_id": "rejected-07-anchor-mismatch-structural",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Adversarial structural anchor mismatch: trace provides anchors, but declared support mode is mismatch.",
+  "record": {
+    "timestamp": "2026-04-02T09:13:00Z",
+    "input": "Check whether cited anchors directly support the final operator claim.",
+    "output": "Operator claim is presented as final despite non-matching anchor semantics.",
+    "anchors": ["POLICY-7", "METRIC-99"],
+    "anchor_support": "mismatch",
+    "provenance_status": "complete"
+  }
+}

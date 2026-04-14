@@ -8,7 +8,7 @@ def test_benchmark_runner_reports_per_case_and_summary() -> None:
     report = render_report(results, summary)
 
     assert summary.total_cases == len(results)
-    assert summary.total_cases >= 14
+    assert summary.total_cases >= 19
     assert summary.mismatches == 0
     assert summary.counts_by_expected["admissible"] >= 3
     assert summary.counts_by_expected["drift"] >= 4

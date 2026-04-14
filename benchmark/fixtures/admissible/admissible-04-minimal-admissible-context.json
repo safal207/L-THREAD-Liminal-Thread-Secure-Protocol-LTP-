@@ -1,0 +1,12 @@
+{
+  "case_id": "admissible-04-minimal-admissible-context",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Boundary minimal but admissible: shortest context above deterministic drift threshold with coherent anchors.",
+  "record": {
+    "timestamp": "2026-04-02T11:00:00Z",
+    "input": "Map anchor evidence to approved rollback step.",
+    "output": "Rollback mapping stays within cited evidence chain and avoids overclaims.",
+    "anchors": ["ROLLBACK-APPROVAL-1"]
+  }
+}

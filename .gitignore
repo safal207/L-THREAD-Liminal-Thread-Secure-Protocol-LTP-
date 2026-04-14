@@ -52,4 +52,5 @@ packages/inspect/.npm-cache/
 # Misc
 .cache/
 .temp/
+.tmp/
 nodes/ltp-rust-node/*.log

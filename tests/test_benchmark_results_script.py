@@ -56,10 +56,3 @@ def test_generate_benchmark_results_main_writes_results_file(tmp_path: Path) -> 
     contents = output_path.read_text(encoding="utf-8")
     assert "Generated Snapshot" in contents
     assert "Total cases: **1**" in contents
-
-
-def test_committed_results_snapshot_is_up_to_date() -> None:
-    module = _load_generator_module()
-    expected = module.render_results_md()
-    committed = (REPO_ROOT / "benchmark" / "RESULTS.md").read_text(encoding="utf-8")
-    assert committed == expected

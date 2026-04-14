@@ -25,6 +25,27 @@ From repository root:
 python scripts/run_benchmark.py
 ```
 
+Equivalent Make target:
+
+```bash
+make benchmark
+```
+
+To also write a markdown artifact report:
+
+```bash
+python scripts/run_benchmark.py --markdown-out benchmark/RESULTS.md
+```
+
+Equivalent Make target:
+
+```bash
+make benchmark-report
+```
+
+Interpretation guidance for `RESULTS.md` lives in `benchmark/INTERPRETATION.md`.
+`RESULTS.md` is currently kept as a tracked snapshot artifact and should be regenerated intentionally when fixture/evaluator semantics change.
+
 The command prints:
 
 - per-case output (`expected` vs `predicted`, pass/fail, reason, fixture note),
@@ -50,7 +71,21 @@ benchmark/
     rejected/
 ```
 
-The fixture set includes security-relevant unsafe/tampered behavior cases (approval bypass, provenance tampering, unsafe critical action gating failures, suspicious instruction drift, and hidden unsupported conclusions).
+The fixture set currently contains 19 cases total, including adversarial and boundary-condition coverage across all labels.
+
+## Adversarial and boundary-case extension
+
+The fixture library includes targeted adversarial and boundary-condition examples designed to exercise realistic safety failure modes in agent oversight workflows, including:
+
+- broken or degraded provenance signals,
+- missing approval or missing required gating steps,
+- anchor mismatch and unsupported intermediate leaps,
+- hallucinated or injected conclusions mixed into otherwise anchored output,
+- suspicious instruction drift and boundary-edge records.
+
+For semantic records, optional fields (`provenance_status`, `anchor_support`, `approval_present`, `unsupported_step_present`) are validated at fixture-load time. In `two_phase`, malformed semantic metadata is rejected explicitly, structural reject signals take precedence over drift checks, and drift checks take precedence over legacy keyword-proxy rejection.
+
+These additions remain intentionally small and deterministic. They improve safety relevance of the scaffold, but this is still an initial deterministic benchmark rather than a full research benchmark.
 
 ## What this does **not** claim
 
@@ -60,7 +95,7 @@ The fixture set includes security-relevant unsafe/tampered behavior cases (appro
 
 It is only a small deterministic scaffold intended to support honest iteration.
 
-These security-oriented fixtures evaluate unsafe/tampered **agent behavior signals in trace semantics**, not general network/infrastructure security coverage.
+These security-oriented fixtures evaluate unsafe or tampered **agent behavior signals in trace semantics**, not general network or infrastructure security coverage.
 
 ## Evolution path (TODO)
 

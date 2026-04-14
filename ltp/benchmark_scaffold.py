@@ -10,6 +10,8 @@ from ltp.inspect_trace import evaluate_record
 
 VALID_LABELS = ("admissible", "drift", "rejected")
 UNEXPECTED_LABEL = "unexpected"
+VALID_PROVENANCE_STATUS = {"complete", "partial", "broken"}
+VALID_ANCHOR_SUPPORT = {"direct", "weak", "mismatch"}
 
 
 @dataclass(frozen=True)
@@ -59,6 +61,20 @@ def _validate_required_fields(payload: dict[str, Any], source: Path) -> None:
     for field in ("input", "output", "anchors"):
         if field not in record:
             raise ValueError(f"Missing required record field '{field}' in {source}")
+
+    if "approval_present" in record and not isinstance(record["approval_present"], bool):
+        raise ValueError(f"record.approval_present must be boolean in {source}")
+
+    if "unsupported_step_present" in record and not isinstance(record["unsupported_step_present"], bool):
+        raise ValueError(f"record.unsupported_step_present must be boolean in {source}")
+
+    if "provenance_status" in record and str(record["provenance_status"]) not in VALID_PROVENANCE_STATUS:
+        allowed = ", ".join(sorted(VALID_PROVENANCE_STATUS))
+        raise ValueError(f"record.provenance_status must be one of [{allowed}] in {source}")
+
+    if "anchor_support" in record and str(record["anchor_support"]) not in VALID_ANCHOR_SUPPORT:
+        allowed = ", ".join(sorted(VALID_ANCHOR_SUPPORT))
+        raise ValueError(f"record.anchor_support must be one of [{allowed}] in {source}")
 
 
 def _normalize_predicted_label(label: str) -> str:
@@ -157,3 +173,43 @@ def render_report(results: list[CaseResult], summary: BenchmarkSummary) -> str:
     )
 
     return "\n".join(lines)
+
+
+def render_markdown_report(results: list[CaseResult], summary: BenchmarkSummary) -> str:
+    lines: list[str] = [
+        "# LTP Safety-Eval Benchmark Results",
+        "",
+        "Deterministic benchmark report generated from `benchmark/fixtures`.",
+        "Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims boundaries.",
+        "",
+        "## Summary",
+        "",
+        f"- Total cases: **{summary.total_cases}**",
+        f"- Correct classifications: **{summary.correct_classifications}**",
+        f"- Mismatches: **{summary.mismatches}**",
+        "",
+        "### Counts by expected label",
+        "",
+        "| label | count |",
+        "|---|---:|",
+        *(f"| {label} | {summary.counts_by_expected[label]} |" for label in VALID_LABELS),
+        "",
+        "### Counts by predicted label",
+        "",
+        "| label | count |",
+        "|---|---:|",
+        *(f"| {label} | {summary.counts_by_predicted[label]} |" for label in (*VALID_LABELS, UNEXPECTED_LABEL)),
+        "",
+        "## Per-case results",
+        "",
+        "| case_id | expected | predicted | status | reason |",
+        "|---|---|---|---|---|",
+    ]
+
+    for result in results:
+        status = "PASS" if result.passed else "FAIL"
+        lines.append(
+            f"| {result.name} | {result.expected_label} | {result.predicted_label} | {status} | {result.reason} |"
+        )
+
+    return "\n".join(lines) + "\n"

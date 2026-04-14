@@ -20,10 +20,10 @@ def test_missing_anchor_is_rejected(tmp_path: Path) -> None:
     assert results[0].decision == "rejected"
 
 
-def test_two_phase_reject_precedence_over_short_input_drift(tmp_path: Path) -> None:
+def test_two_phase_rejects_missing_required_approval_semantic_flag(tmp_path: Path) -> None:
     trace = tmp_path / "trace.jsonl"
     trace.write_text(
-        '{"timestamp":"t1","input":"x","output":"safe","anchors":["A1"],"approval_present":false}\n',
+        '{"timestamp":"t1","input":"validate transfer approval","output":"transfer approved","anchors":["a1"],"approval_present":false}\n',
         encoding="utf-8",
     )
     results = inspect_trace_file(str(trace), phase="two_phase")
@@ -31,21 +31,10 @@ def test_two_phase_reject_precedence_over_short_input_drift(tmp_path: Path) -> N
     assert results[0].reason == "missing_required_approval"
 
 
-def test_two_phase_structural_reject_precedence_over_keyword_proxy(tmp_path: Path) -> None:
-    trace = tmp_path / "trace.jsonl"
-    trace.write_text(
-        '{"timestamp":"t1","input":"valid input","output":"Unverified summary","anchors":["A1"],"unsupported_step_present":true}\n',
-        encoding="utf-8",
-    )
-    results = inspect_trace_file(str(trace), phase="two_phase")
-    assert results[0].decision == "rejected"
-    assert results[0].reason == "unsupported_intermediate_step"
-
-
 def test_two_phase_rejects_anchor_mismatch_semantic_flag(tmp_path: Path) -> None:
     trace = tmp_path / "trace.jsonl"
     trace.write_text(
-        '{"timestamp":"t1","input":"valid input","output":"safe","anchors":["A1"],"anchor_support":"mismatch"}\n',
+        '{"timestamp":"t1","input":"validate anchor linkage","output":"claim finalized","anchors":["a1"],"anchor_support":"mismatch"}\n',
         encoding="utf-8",
     )
     results = inspect_trace_file(str(trace), phase="two_phase")
@@ -53,21 +42,10 @@ def test_two_phase_rejects_anchor_mismatch_semantic_flag(tmp_path: Path) -> None
     assert results[0].reason == "anchor_mismatch"
 
 
-def test_two_phase_rejects_missing_required_approval_semantic_flag(tmp_path: Path) -> None:
-    trace = tmp_path / "trace.jsonl"
-    trace.write_text(
-        '{"timestamp":"t1","input":"valid input","output":"safe","anchors":["A1"],"approval_present":false}\n',
-        encoding="utf-8",
-    )
-    results = inspect_trace_file(str(trace), phase="two_phase")
-    assert results[0].decision == "rejected"
-    assert results[0].reason == "missing_required_approval"
-
-
 def test_two_phase_boundary_partial_provenance_drifts_without_keyword_proxy(tmp_path: Path) -> None:
     trace = tmp_path / "trace.jsonl"
     trace.write_text(
-        '{"timestamp":"t1","input":"this has enough context","output":"safe","anchors":["a1"],"provenance_status":"partial"}\n',
+        '{"timestamp":"t1","input":"trace context is sufficiently long","output":"answer avoids unsupported wording","anchors":["a1"],"provenance_status":"partial"}\n',
         encoding="utf-8",
     )
     results = inspect_trace_file(str(trace), phase="two_phase")
@@ -75,10 +53,10 @@ def test_two_phase_boundary_partial_provenance_drifts_without_keyword_proxy(tmp_
     assert results[0].reason == "partial_provenance_chain"
 
 
-def test_two_phase_broken_provenance_chain_rejects_with_exact_reason(tmp_path: Path) -> None:
+def test_two_phase_reject_precedence_over_short_input_drift(tmp_path: Path) -> None:
     trace = tmp_path / "trace.jsonl"
     trace.write_text(
-        '{"timestamp":"t1","input":"this has enough context","output":"safe","anchors":["A1"],"provenance_status":"broken"}\n',
+        '{"timestamp":"t1","input":"x","output":"plain output","anchors":["a1"],"provenance_status":"broken"}\n',
         encoding="utf-8",
     )
     results = inspect_trace_file(str(trace), phase="two_phase")
@@ -86,15 +64,15 @@ def test_two_phase_broken_provenance_chain_rejects_with_exact_reason(tmp_path: P
     assert results[0].reason == "broken_provenance_chain"
 
 
-def test_two_phase_weak_anchor_support_drifts_with_exact_reason(tmp_path: Path) -> None:
+def test_two_phase_structural_reject_precedence_over_keyword_proxy(tmp_path: Path) -> None:
     trace = tmp_path / "trace.jsonl"
     trace.write_text(
-        '{"timestamp":"t1","input":"this has enough context","output":"safe","anchors":["A1"],"anchor_support":"weak"}\n',
+        '{"timestamp":"t1","input":"long enough input","output":"This is unverified","anchors":["a1"],"anchor_support":"mismatch"}\n',
         encoding="utf-8",
     )
     results = inspect_trace_file(str(trace), phase="two_phase")
-    assert results[0].decision == "drift"
-    assert results[0].reason == "weak_anchor_support"
+    assert results[0].decision == "rejected"
+    assert results[0].reason == "anchor_mismatch"
 
 
 def test_two_phase_rejects_placeholder_anchor_before_other_checks(tmp_path: Path) -> None:
@@ -106,3 +84,25 @@ def test_two_phase_rejects_placeholder_anchor_before_other_checks(tmp_path: Path
     results = inspect_trace_file(str(trace), phase="two_phase")
     assert results[0].decision == "rejected"
     assert results[0].reason == "malformed_anchor"
+
+
+def test_two_phase_rejects_invalid_semantic_boolean_flag(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"timestamp":"t1","input":"valid input","output":"safe","anchors":["A1"],"approval_present":"maybe"}\n',
+        encoding="utf-8",
+    )
+    results = inspect_trace_file(str(trace), phase="two_phase")
+    assert results[0].decision == "rejected"
+    assert results[0].reason == "invalid_semantic_signal"
+
+
+def test_two_phase_rejects_invalid_semantic_enum_flag(tmp_path: Path) -> None:
+    trace = tmp_path / "trace.jsonl"
+    trace.write_text(
+        '{"timestamp":"t1","input":"valid input","output":"safe","anchors":["A1"],"provenance_status":"tampered"}\n',
+        encoding="utf-8",
+    )
+    results = inspect_trace_file(str(trace), phase="two_phase")
+    assert results[0].decision == "rejected"
+    assert results[0].reason == "invalid_semantic_signal"

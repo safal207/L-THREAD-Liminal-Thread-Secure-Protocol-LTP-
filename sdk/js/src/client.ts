@@ -81,6 +81,37 @@ const DEFAULT_HEARTBEAT: NormalizedHeartbeatOptions = {
   timeoutMs: 45000,
 };
 
+function resolveWebSocketCtor(): typeof WebSocket {
+  const wsGlobal = (globalThis as typeof globalThis & { WebSocket?: typeof WebSocket }).WebSocket;
+  if (wsGlobal) {
+    return wsGlobal;
+  }
+
+  let nodeRequire: ((id: string) => unknown) | undefined;
+  try {
+    // eslint-disable-next-line no-eval
+    nodeRequire = (0, eval)('require') as (id: string) => unknown;
+  } catch {
+    nodeRequire = undefined;
+  }
+
+  if (typeof nodeRequire === 'function') {
+    try {
+      const wsModule = nodeRequire('ws') as { WebSocket?: typeof WebSocket } | typeof WebSocket;
+      if (typeof wsModule === 'function') {
+        return wsModule;
+      }
+      if (wsModule?.WebSocket) {
+        return wsModule.WebSocket;
+      }
+    } catch {
+      // Fall through to a clearer error below.
+    }
+  }
+
+  throw new Error('WebSocket is not available in this environment');
+}
+
 /**
  * Default console-based logger implementation
  */
@@ -441,7 +472,8 @@ export class LtpClient {
 
     this.isConnecting = true;
 
-    this.ws = new WebSocket(this.url, SUBPROTOCOL);
+    const WebSocketCtor = resolveWebSocketCtor();
+    this.ws = new WebSocketCtor(this.url, SUBPROTOCOL);
 
     this.ws.onopen = () => {
       this.logger.info('WebSocket connected, initiating handshake...');
@@ -652,14 +684,21 @@ export class LtpClient {
     envelope: LtpEnvelope,
     macKey?: string
   ): Promise<boolean> {
-    const requiresVerification =
-      this.options.requireSignatureVerification &&
-      macKey &&
-      envelope.type !== 'handshake_ack' &&
-      envelope.type !== 'handshake_reject';
+    const isHandshakeMessage = envelope.type === 'handshake_ack' || envelope.type === 'handshake_reject';
 
-    if (!requiresVerification) {
+    if (!this.options.requireSignatureVerification || isHandshakeMessage) {
       return true;
+    }
+
+    if (!macKey) {
+      this.logger.error('Signature verification required but no MAC key configured - REJECTING', {
+        type: envelope.type,
+      });
+      this.handleError({
+        error_code: 'MISSING_MAC_KEY',
+        error_message: 'Signature verification required but no MAC key configured',
+      });
+      return false;
     }
 
     if (
@@ -718,7 +757,9 @@ export class LtpClient {
 
     if (typeof envelope.timestamp === 'number') {
       const now = Date.now();
-      const messageAge = now - envelope.timestamp;
+      const timestampMs = envelope.timestamp < 1e12 ? envelope.timestamp * 1000 : envelope.timestamp;
+      const unitHint = envelope.timestamp < 1e12 ? ' (timestamp looks like seconds; expected milliseconds)' : '';
+      const messageAge = now - timestampMs;
 
       if (messageAge > (this.options.maxMessageAge || 60000)) {
         this.logger.error('Message too old - possible replay attack', {
@@ -728,7 +769,7 @@ export class LtpClient {
         });
         this.handleError({
           error_code: 'MESSAGE_TOO_OLD',
-          error_message: `Message timestamp too old (age: ${messageAge}ms)`,
+          error_message: `Message timestamp too old (age: ${messageAge}ms)${unitHint}`,
         });
         return false;
       }
@@ -740,7 +781,7 @@ export class LtpClient {
         });
         this.handleError({
           error_code: 'INVALID_TIMESTAMP',
-          error_message: 'Message timestamp is in the future',
+          error_message: `Message timestamp is in the future${unitHint}`,
         });
         return false;
       }
@@ -1002,7 +1043,7 @@ export class LtpClient {
   }
 
   private forceReconnect(reason: string): void {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+    if (this.ws && this.ws.readyState === 1) {
       this.forcedReconnectReason = reason;
       this.ws.close();
       return;
@@ -1107,7 +1148,7 @@ export class LtpClient {
   }
 
   private sendRaw(message: unknown): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.readyState !== 1) {
       this.logger.error('Cannot send message: WebSocket not open');
       return;
     }
@@ -1405,16 +1446,18 @@ export class LtpClient {
 
     // Common timestamp validation for both formats
     const now = Date.now();
-    const nonceAge = now - timestamp;
+    const timestampMs = timestamp < 1e12 ? timestamp * 1000 : timestamp;
+    const unitHint = timestamp < 1e12 ? ' (timestamp looks like seconds; expected milliseconds)' : '';
+    const nonceAge = now - timestampMs;
 
     // Reject if nonce is older than max message age
     if (nonceAge > (this.options.maxMessageAge || 60000)) {
-      return `Nonce too old (age: ${nonceAge}ms)`;
+      return `Nonce too old (age: ${nonceAge}ms)${unitHint}`;
     }
 
     // Reject if nonce is from the future (with 5s clock skew tolerance)
     if (nonceAge < -5000) {
-      return 'Nonce timestamp in future';
+      return `Nonce timestamp in future${unitHint}`;
     }
 
     // Add to seen nonces cache

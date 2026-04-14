@@ -12,13 +12,12 @@ PATTERN="[\x{202A}-\x{202E}\x{2066}-\x{2069}\x{200B}-\x{200F}\x{FEFF}\x{00AD}]"
 echo "Scanning for forbidden hidden/bidi Unicode characters..."
 
 # We use grep with PCRE (-P) to find these characters.
-# We exclude .git directory and node_modules
+# We exclude .git directory and node_modules.
 # We verify if any match is found.
-
 if grep -rP "$PATTERN" . --exclude-dir={.git,node_modules,dist,build,coverage} --exclude=check-bidi.sh; then
-    echo "❌ ERROR: Forbidden Unicode characters found!"
+    echo "ERROR: Forbidden Unicode characters found!"
     exit 1
 else
-    echo "✅ No forbidden Unicode characters found."
+    echo "No forbidden Unicode characters found."
     exit 0
 fi

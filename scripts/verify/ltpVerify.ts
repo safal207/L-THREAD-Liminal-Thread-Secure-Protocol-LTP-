@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { renderCanonicalDemo } from '../../src/demos/canonicalFlowDemo.v0.1';
 import type { ConformanceReportBatch } from '../../tools/conformance-kit/src/types';
 import { verifyDirectoryReports } from '../../tools/conformance-kit/src/verify';
@@ -249,12 +249,34 @@ export function isMainModule(
 ): boolean {
   if (!argvPath) return false;
 
-  const mainHref = pathToFileURL(argvPath).href;
   const currentHref = currentHrefGetter();
-
   if (!currentHref) return false;
 
-  return mainHref === currentHref;
+  const normalizedArgvHref = `file://${argvPath.replace(/\\/g, '/')}`;
+  const normalizedCurrentHref = currentHref.replace(/\\/g, '/');
+  if (normalizedArgvHref === normalizedCurrentHref) {
+    return true;
+  }
+
+  const normalizePath = (value: string): string | undefined => {
+    try {
+      if (value.startsWith('file://')) {
+        return path.resolve(fileURLToPath(value));
+      }
+      return path.resolve(value);
+    } catch {
+      return undefined;
+    }
+  };
+
+  const normalizedArgvPath = normalizePath(argvPath);
+  const normalizedCurrentPath = normalizePath(currentHref);
+
+  if (!normalizedArgvPath || !normalizedCurrentPath) {
+    return pathToFileURL(argvPath).href === currentHref;
+  }
+
+  return normalizedArgvPath === normalizedCurrentPath;
 }
 
 export async function main(argv = process.argv.slice(2)): Promise<void> {

@@ -9,7 +9,7 @@ Deterministic replay + hallucination blocking for agent traces, with audit-ready
 
 ![Stars](https://img.shields.io/github/stars/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-?style=for-the-badge)
 
-> Current interest: 1 stars → 🌱 New signal 🚀  
+> Current interest: 2 stars → 🌱 New signal 🚀  
 > Want to join? [Click here](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/stargazers) to show support!
 <!-- community-interest:end -->
 
@@ -79,6 +79,20 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 - Adapters: `adapters/README.md`
 - Example flow: `examples/README.canonical-flow.md`
 - Spec: `specs/LTP-Spec-v0.1.md`
+
+## Local validation
+
+For a clean reviewer flow, run:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm test
+pnpm test:conformance
+```
+
+`pnpm test` is the curated reviewer-safe validation surface. If you want the broader legacy sweep as well, run `pnpm test:full`.
+
+Local scratch directories such as `.tmp/` are ignored by the repository and excluded from TypeScript test discovery so golden snapshots stay deterministic.
 
 ## Roadmap
 
