@@ -31,7 +31,17 @@ export function enforceActionBoundary(
     };
   }
 
-  // RULE 2: GLOBAL SAFETY
+  // RULE 2: SENSITIVE DATA EXPORT BLOCK (NARROW DEMO RULE)
+  if (targetState === 'export_customer_data') {
+    return {
+      admissible: false,
+      reason: 'Policy Violation: Raw customer data export is forbidden in this execution layer.',
+      reasonCode: ReasonCodes.DATA_EXFIL_ATTEMPT,
+      violationType: 'POLICY'
+    };
+  }
+
+  // RULE 3: GLOBAL SAFETY
   if (globallyBanned.some(action => targetState.includes(action))) {
     return {
       admissible: false,
@@ -41,7 +51,7 @@ export function enforceActionBoundary(
     };
   }
 
-  // RULE 3: CRITICAL ACTIONS (Web != Action)
+  // RULE 4: CRITICAL ACTIONS (Web != Action)
   if (context === 'WEB') {
     if (criticalActions.some(action => targetState.includes(action))) {
       return {
@@ -53,7 +63,7 @@ export function enforceActionBoundary(
     }
   }
 
-  // RULE 4: PROMPT INJECTION HEURISTICS
+  // RULE 5: PROMPT INJECTION HEURISTICS
   if (reason && reason.toLowerCase().includes('ignore previous instructions')) {
     return {
       admissible: false,

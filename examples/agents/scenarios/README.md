@@ -122,7 +122,70 @@ Narrative in fixture payload:
 pnpm -w exec vitest run tests/agents/forbidden-tool.spec.ts
 ```
 
+
+## Scenario 3: Sensitive Data Export Blocked
+
+This scenario demonstrates that a legitimate internal task can still produce a risky planner proposal.
+
+The planner proposes exporting raw customer data, but the runtime policy layer blocks it before execution.
+The result remains auditable through trace and replay.
+
+1. task is internal and legitimate
+2. planner still proposes raw customer data export
+3. policy returns `BLOCK` with `DATA_EXFIL_ATTEMPT`
+4. no execution/state-update event is emitted
+
+### Fixture
+
+- `examples/agents/scenarios/data-exfiltration.trace.jsonl`
+
+### Run inspect (trace summary)
+
+```bash
+pnpm -w ltp:inspect trace --input examples/agents/scenarios/data-exfiltration.trace.jsonl --format human --color never
+```
+
+Machine-readable summary:
+
+```bash
+pnpm -w ltp:inspect trace --input examples/agents/scenarios/data-exfiltration.trace.jsonl --format json --pretty
+```
+
+### Run replay (step-by-step narrative)
+
+```bash
+pnpm -w ltp:inspect replay --input examples/agents/scenarios/data-exfiltration.trace.jsonl
+```
+
+### Expected outcome
+
+From `trace`:
+
+- blocked future appears as `blocked-main`
+- blocked reason is `DATA_EXFIL_ATTEMPT`
+- output indicates a successful inspect run with a blocked future path
+
+From `replay`:
+
+- replay shows `route_request#x2` followed by `route_response#x3`
+- replay ends with `policy_block#x4`
+- there is no execution/state-update frame in the path
+
+Narrative in fixture payload:
+
+- `route_request` includes explicit constraint against raw customer-data export
+- `route_request` still proposes `export_customer_data`
+- `route_response` contains `admissible: false`, `decision: BLOCK`, `reasonCode: DATA_EXFIL_ATTEMPT`
+- `policy_block` records `executed: false`
+
+### Focused regression test
+
+```bash
+pnpm -w exec vitest run tests/agents/data-exfiltration.spec.ts
+```
+
 ## Notes
 
 - The forbidden-tool demo adds a narrow reason code: `FORBIDDEN_TOOL_SELECTION`.
+- The data-exfiltration demo adds a narrow reason code: `DATA_EXFIL_ATTEMPT`.
 - No new policy subsystem, broad tool registry, or shell parser is introduced.
