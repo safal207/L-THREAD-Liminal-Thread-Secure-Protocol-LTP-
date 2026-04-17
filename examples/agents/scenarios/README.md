@@ -61,6 +61,15 @@ Narrative in fixture payload:
 pnpm -w exec vitest run tests/agents/destructive-out-of-scope.spec.ts
 ```
 
+### Business impact if not blocked
+
+- Direct impact: destructive deletion can remove local workspace state, scripts, fixtures, and generated artifacts before review catches it.
+- Operational impact: teams may lose active sprint work, pause CI/CD while recovering repos or environments, and burn engineering hours rebuilding state from backups.
+- Compliance / legal impact: usually low-to-moderate directly, but escalates if deleted records are part of regulated retention or audit evidence.
+- Illustrative loss band: **$5k-$100k+** (scenario-based, not an audited model).
+- Why this band is plausible: small teams may absorb the hit as recovery labor; larger environments can incur multi-team downtime plus delayed releases.
+- Why Liminal Stack matters: runtime policy blocks the destructive step pre-execution, converting a potential restore incident into an auditable denied action.
+
 ## Scenario 2: Forbidden Tool Selection
 
 This scenario demonstrates that prompt-level instructions alone are not a security boundary.
@@ -122,6 +131,14 @@ Narrative in fixture payload:
 pnpm -w exec vitest run tests/agents/forbidden-tool.spec.ts
 ```
 
+### Business impact if not blocked
+
+- Direct impact: a forbidden tool path can execute commands outside the approved control surface, potentially touching code, build agents, infra config, or secrets.
+- Operational impact: responders must triage scope, rotate credentials, inspect CI logs, and verify system integrity before normal delivery resumes.
+- Compliance / legal impact: medium exposure when unauthorized execution affects governed environments, access policies, or contractual controls.
+- Illustrative loss band: **$10k-$250k+** (illustrative order-of-magnitude range, not a precise claim).
+- Why this band is plausible: costs compound from incident triage, engineering interruption, and remediation across multiple systems.
+- Why Liminal Stack matters: policy enforcement blocks forbidden tool selection at runtime and preserves trace evidence for rapid root-cause analysis.
 
 ## Scenario 3: Sensitive Data Export Blocked
 
@@ -183,6 +200,15 @@ Narrative in fixture payload:
 ```bash
 pnpm -w exec vitest run tests/agents/data-exfiltration.spec.ts
 ```
+
+### Business impact if not blocked
+
+- Direct impact: exporting raw customer data can create an immediate confidentiality incident with downstream copying risk.
+- Operational impact: teams must trigger incident response, investigate blast radius, notify stakeholders, and harden controls under time pressure.
+- Compliance / legal impact: high exposure due to breach reporting, legal review, possible penalties, and partner/security questionnaire fallout.
+- Illustrative loss band: **$50k-$1M+** (scenario-based range; exact impact depends on record volume, jurisdiction, and contractual terms).
+- Why this band is plausible: breach handling costs scale quickly with forensics, counsel, notifications, and long-tail trust repair.
+- Why Liminal Stack matters: runtime blocks prevent raw export execution and keep a verifiable audit trail showing the unsafe action was denied.
 
 ## Notes
 
