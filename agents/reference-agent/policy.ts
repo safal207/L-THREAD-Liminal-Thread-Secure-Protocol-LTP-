@@ -20,7 +20,18 @@ export function enforceActionBoundary(
   const criticalActions = config?.criticalActions ?? ConfigLoader.getCriticalActions();
   const globallyBanned = config?.globallyBanned ?? ConfigLoader.getGloballyBannedActions();
 
-  // RULE 1: GLOBAL SAFETY
+
+  // RULE 1: FORBIDDEN TOOL SELECTIONS
+  if (targetState === 'shell.exec') {
+    return {
+      admissible: false,
+      reason: `Policy Violation: Tool selection '${targetState}' is forbidden in this execution layer.`,
+      reasonCode: ReasonCodes.FORBIDDEN_TOOL_SELECTION,
+      violationType: 'POLICY'
+    };
+  }
+
+  // RULE 2: GLOBAL SAFETY
   if (globallyBanned.some(action => targetState.includes(action))) {
     return {
       admissible: false,
@@ -30,7 +41,7 @@ export function enforceActionBoundary(
     };
   }
 
-  // RULE 2: CRITICAL ACTIONS (Web != Action)
+  // RULE 3: CRITICAL ACTIONS (Web != Action)
   if (context === 'WEB') {
     if (criticalActions.some(action => targetState.includes(action))) {
       return {
@@ -42,7 +53,7 @@ export function enforceActionBoundary(
     }
   }
 
-  // RULE 3: PROMPT INJECTION HEURISTICS
+  // RULE 4: PROMPT INJECTION HEURISTICS
   if (reason && reason.toLowerCase().includes('ignore previous instructions')) {
     return {
       admissible: false,
