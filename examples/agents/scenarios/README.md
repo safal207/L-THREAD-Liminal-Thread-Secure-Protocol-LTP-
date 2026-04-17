@@ -1,6 +1,8 @@
 # Destructive Action (Out-of-Scope) Demo
 
-This scenario demonstrates the minimal blocked-action flow for a destructive command attempt (`rm -rf /`) using existing repository primitives:
+This scenario demonstrates the minimal blocked-action flow for a destructive command attempt (`rm -rf /`) using existing repository primitives.
+
+This demo shows that destructive intent is blocked before execution and remains auditable through trace and replay.
 
 1. proposal contains a destructive action
 2. policy returns a blocked verdict
@@ -29,13 +31,13 @@ pnpm -w ltp:inspect trace --input examples/agents/scenarios/destructive-out-of-s
 pnpm -w ltp:inspect replay --input examples/agents/scenarios/destructive-out-of-scope.trace.jsonl
 ```
 
-## Expected output (verified)
+## Expected outcome
 
 From `trace`:
 
 - blocked future appears as `blocked-main`
 - blocked reason is `GLOBAL_SAFETY_VIOLATION`
-- command exits with `RESULT: OK  exit: 0`
+- output indicates a successful inspect run with a blocked future path
 
 From `replay`:
 
