@@ -119,6 +119,8 @@ def evaluate_record(record: dict, phase: str) -> TraceDecision:
         unsupported = any(token in output_text.lower() for token in ["guess", "hallucinat", "unverified"])
         if unsupported:
             return TraceDecision(timestamp, "rejected", "post_hoc_unsupported_claim", input_text, output_text, anchors)
+    elif len(input_text.strip()) < 3:
+        return TraceDecision(timestamp, "drift", "insufficient_prompt_context", input_text, output_text, anchors)
 
     return TraceDecision(timestamp, "admissible", "anchored", input_text, output_text, anchors)
 
