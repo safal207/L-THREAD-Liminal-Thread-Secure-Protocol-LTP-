@@ -76,7 +76,7 @@
 #### Minimal implementation path
 1. Add a narrow rule in policy to map exfil target states (e.g., `export_customer_data`, `upload_dump`) to a dedicated block code.
 2. Add one fixture trace showing blocked exfil with contextual evidence.
-3. Validate with `ltp inspect --profile agents` and replay output.
+3. Validate with `ltp inspect trace --input <fixture.jsonl> --profile agents` and replay output.
 
 ### Case 2: Destructive file or repo action outside allowed scope
 **Status: PARTIAL**
