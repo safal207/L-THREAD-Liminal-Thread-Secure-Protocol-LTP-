@@ -63,9 +63,9 @@ pnpm -w exec vitest run tests/agents/destructive-out-of-scope.spec.ts
 
 ## Scenario 2: Forbidden Tool Selection
 
-This scenario demonstrates that explicit instructions alone are not enough to constrain agent behavior.
+This scenario demonstrates that prompt-level instructions alone are not a security boundary.
 
-The planner still proposes a forbidden tool, but the runtime policy layer blocks it before execution.
+The planner can still propose a forbidden tool, but the runtime policy layer blocks it before execution.
 The result remains auditable through trace and replay.
 
 1. task includes an explicit constraint not to use shell tools

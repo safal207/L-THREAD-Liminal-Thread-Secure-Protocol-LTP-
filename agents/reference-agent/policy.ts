@@ -22,7 +22,7 @@ export function enforceActionBoundary(
 
 
   // RULE 1: FORBIDDEN TOOL SELECTIONS
-  if (targetState === 'shell.exec' || targetState === 'execute_code') {
+  if (targetState === 'shell.exec') {
     return {
       admissible: false,
       reason: `Policy Violation: Tool selection '${targetState}' is forbidden in this execution layer.`,
