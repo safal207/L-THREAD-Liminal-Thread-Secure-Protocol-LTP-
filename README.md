@@ -32,7 +32,7 @@ LTP is not a general-purpose runtime orchestrator. In v0.1, its practical identi
 - Two-phase oversight checks (pre-action/pre-generation and post-generation/post-action).
 - Unsupported-path rejection within the oversight profile, including ungrounded or hallucinated claims.
 - Audit-grade evidence via JSONL traces + generated logs.
-- Model/framework agnostic oversight surface (GPT, Claude, LLaMA, Grok, and future stacks).
+- Model/framework agnostic inspection surface (GPT, Claude, LLaMA, Grok, and future stacks).
 
 ## Oversight decisions and two-phase checks
 
@@ -55,7 +55,7 @@ Two-phase checks:
 | Execution-path admissibility decisions | ❌ | ⚠️ | ✅ |
 | Unsupported-path rejection (two-phase oversight profile) | ❌ | ❌ | ✅ |
 | Audit-grade evidence export | ⚠️ | ⚠️ | ✅ |
-| Model/framework agnostic oversight surface | ✅ | ❌ | ✅ |
+| Model/framework agnostic inspection surface | ✅ | ❌ | ✅ |
 
 ## Live demo (GitHub Actions)
 
