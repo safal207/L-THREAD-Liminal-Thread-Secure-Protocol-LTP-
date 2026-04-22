@@ -30,7 +30,7 @@ LTP is not a general-purpose runtime orchestrator. In v0.1, its practical identi
 - Deterministic replay-based inspection for agent execution traces.
 - Oversight decisions on execution paths: `admissible / drift / rejected`.
 - Two-phase oversight checks (pre-action/pre-generation and post-generation/post-action).
-- Unsupported-path rejection signals, including ungrounded or hallucinated claims.
+- Unsupported-path rejection within the oversight profile, including ungrounded or hallucinated claims.
 - Audit-grade evidence via JSONL traces + generated logs.
 - Model/framework agnostic oversight surface (GPT, Claude, LLaMA, Grok, and future stacks).
 
@@ -72,7 +72,7 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 <summary>💳 Fintech</summary>
 
 - KYC/AML assistant actions with anchored policy checks.
-- Transfer and approvals with immediate reject on unsupported paths.
+- Transfer and approvals with unsupported paths rejected under the oversight profile.
 </details>
 
 <details>
@@ -93,7 +93,7 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 <summary>🛠️ Infra / SRE</summary>
 
 - Incident-agent replay to inspect drift before automated actions.
-- Critical runbook actions gated by anchor-backed context.
+- Critical runbook actions evaluated against anchor-backed context.
 </details>
 
 ## Quick links
