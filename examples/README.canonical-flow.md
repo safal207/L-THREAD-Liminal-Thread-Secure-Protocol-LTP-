@@ -2,7 +2,7 @@
 
 1. Capture the agent trace as JSONL.
 2. Replay the trace deterministically.
-3. Apply two-phase checks (pre-execution + post-generation).
+3. Apply two-phase oversight checks (pre-action/pre-generation + post-generation/post-action).
 4. Classify the execution path as `admissible`, `drift`, or `rejected`.
 5. Export replay logs and evidence artifacts for audit/review.
 

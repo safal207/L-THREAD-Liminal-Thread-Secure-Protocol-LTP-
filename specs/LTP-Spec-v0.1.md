@@ -15,6 +15,8 @@ It is designed to:
 
 LTP is transport-agnostic (HTTP, WebSocket, etc.) and model-agnostic (framework/vendor independent).
 
+LTP is not a general-purpose runtime orchestrator. In v0.1, its practical identity is deterministic replay, execution-path inspection, admissibility judgment, and evidence export.
+
 ## 2. Practical Protocol Model (v0.1)
 
 ### 2.1 Trace capture and replay
@@ -31,12 +33,12 @@ LTP classifies execution paths into:
 - `drift`: degraded or weakly grounded path requiring review.
 - `rejected`: unsupported, ungrounded, or policy-invalid path.
 
-These are oversight/control decisions on traceable execution paths, not only output-quality labels.
+These are oversight/inspection decisions on traceable execution paths, not only output-quality labels.
 
 ### 2.3 Two-phase enforcement profile
 
-1. **Phase 1 (pre-execution / pre-generation):** block progression when required grounding/anchors are missing.
-2. **Phase 2 (post-generation):** inspect generated outputs/actions and reject unsupported or fabricated claims.
+1. **Phase 1 (pre-action / pre-generation):** fail the pre-check when required grounding/anchors are missing.
+2. **Phase 2 (post-generation / post-action):** inspect generated outputs/actions and mark unsupported or fabricated claims/actions as `rejected`.
 
 Hallucination detection/prevention is included in scope as one failure class inside unsupported-path rejection.
 

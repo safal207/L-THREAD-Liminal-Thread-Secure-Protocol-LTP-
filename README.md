@@ -23,14 +23,16 @@ ltp inspect trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay 
 Modern agent systems can produce outputs that look plausible while following unsupported, drifting, or unauditable execution paths.
 LTP exists to make those paths inspectable, replayable, and rejectable, with evidence that can be reviewed by operators, auditors, and compliance teams.
 
+LTP is not a general-purpose runtime orchestrator. In v0.1, its practical identity is deterministic replay, execution-path inspection, admissibility judgment, and evidence export.
+
 ## What you get
 
 - Deterministic replay-based inspection for agent execution traces.
 - Oversight decisions on execution paths: `admissible / drift / rejected`.
-- Two-phase control checks (pre-execution and post-generation).
-- Unsupported path blocking, including ungrounded or hallucinated claims.
+- Two-phase oversight checks (pre-action/pre-generation and post-generation/post-action).
+- Unsupported-path rejection signals, including ungrounded or hallucinated claims.
 - Audit-grade evidence via JSONL traces + generated logs.
-- Model-agnostic adapter surface (GPT, Claude, LLaMA, Grok, and future stacks).
+- Model/framework agnostic oversight surface (GPT, Claude, LLaMA, Grok, and future stacks).
 
 ## Oversight decisions and two-phase checks
 
@@ -42,8 +44,8 @@ LTP classifies **execution paths**, not just output quality:
 
 Two-phase checks:
 
-1. **Phase 1 (pre-execution / pre-generation):** block response or action when reliable anchor context is missing.
-2. **Phase 2 (post-generation):** inspect produced output/action trace and reject unsupported or fabricated claims.
+1. **Phase 1 (pre-action / pre-generation):** fail the pre-check when reliable anchor context is missing.
+2. **Phase 2 (post-generation / post-action):** inspect produced output/action traces and mark unsupported or fabricated claims/actions as `rejected`.
 
 ## LTP vs ordinary logging
 
@@ -51,9 +53,9 @@ Two-phase checks:
 |---|---|---|---|
 | Deterministic replay | ❌ | ⚠️ | ✅ |
 | Execution-path admissibility decisions | ❌ | ⚠️ | ✅ |
-| Unsupported path rejection (pre/post checks) | ❌ | ❌ | ✅ |
+| Unsupported-path rejection (two-phase oversight profile) | ❌ | ❌ | ✅ |
 | Audit-grade evidence export | ⚠️ | ⚠️ | ✅ |
-| Model/framework agnostic control surface | ✅ | ❌ | ✅ |
+| Model/framework agnostic oversight surface | ✅ | ❌ | ✅ |
 
 ## Live demo (GitHub Actions)
 
@@ -76,7 +78,7 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 <details>
 <summary>🕵️ OSINT</summary>
 
-- Evidence graph summaries blocked when source anchors are missing.
+- Evidence graph summaries marked `rejected` when source anchors are missing.
 - Replay divergence analysis for investigative chain-of-custody.
 </details>
 
