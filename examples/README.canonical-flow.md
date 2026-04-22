@@ -1,9 +1,12 @@
-# Canonical LTP Flow
+# Canonical LTP Oversight Flow
 
-1. Capture agent trace as JSONL.
-2. Run replay with phase enforcement.
-3. Review `trace.log` decisions.
-4. Export artifacts for audit.
+1. Capture the agent trace as JSONL.
+2. Replay the trace deterministically.
+3. Apply two-phase checks (pre-execution + post-generation).
+4. Classify the execution path as `admissible`, `drift`, or `rejected`.
+5. Export replay logs and evidence artifacts for audit/review.
+
+These outcomes are execution-path oversight judgments, not only output-quality labels.
 
 ```bash
 ltp inspect trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay --phase two_phase --color
@@ -12,5 +15,5 @@ ltp inspect trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay 
 Expected outcomes:
 
 - Anchored records are `admissible`.
-- Weak context becomes `drift`.
-- Missing/invalid anchors are `rejected`.
+- Weak or degraded grounding becomes `drift`.
+- Missing/invalid anchors or unsupported claims/actions are `rejected`.

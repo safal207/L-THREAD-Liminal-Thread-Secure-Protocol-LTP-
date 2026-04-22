@@ -1,6 +1,7 @@
 # LTP — Liminal Thread Protocol
 
-Deterministic replay + hallucination blocking for agent traces, with audit-ready evidence.
+LTP is a deterministic oversight and replay protocol for agent traces.
+It helps teams inspect whether an AI or agent followed an admissible, grounded execution path, detect drift, reject unsupported outputs or actions, and preserve audit-grade evidence for high-risk workflows.
 
 ![LTP replay demo preview](assets/replay-demo.svg)
 
@@ -17,12 +18,42 @@ Deterministic replay + hallucination blocking for agent traces, with audit-ready
 ltp inspect trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay --phase two_phase --color
 ```
 
+## Why LTP exists
+
+Modern agent systems can produce outputs that look plausible while following unsupported, drifting, or unauditable execution paths.
+LTP exists to make those paths inspectable, replayable, and rejectable, with evidence that can be reviewed by operators, auditors, and compliance teams.
+
 ## What you get
 
-- Phase 1 + Phase 2 guardrails for hallucination prevention/detection.
-- Deterministic trace replay with `admissible / drift / rejected` decisions.
+- Deterministic replay-based inspection for agent execution traces.
+- Oversight decisions on execution paths: `admissible / drift / rejected`.
+- Two-phase control checks (pre-execution and post-generation).
+- Unsupported path blocking, including ungrounded or hallucinated claims.
+- Audit-grade evidence via JSONL traces + generated logs.
 - Model-agnostic adapter surface (GPT, Claude, LLaMA, Grok, and future stacks).
-- Compliance evidence via JSONL traces + generated logs.
+
+## Oversight decisions and two-phase checks
+
+LTP classifies **execution paths**, not just output quality:
+
+- `admissible`: path is grounded/anchored and policy-safe.
+- `drift`: path shows degraded context, weak grounding, or review-required deviation.
+- `rejected`: path contains unsupported claims/actions or missing required anchors.
+
+Two-phase checks:
+
+1. **Phase 1 (pre-execution / pre-generation):** block response or action when reliable anchor context is missing.
+2. **Phase 2 (post-generation):** inspect produced output/action trace and reject unsupported or fabricated claims.
+
+## LTP vs ordinary logging
+
+| Capability | Regular app logs | Framework tracing | LTP |
+|---|---|---|---|
+| Deterministic replay | ❌ | ⚠️ | ✅ |
+| Execution-path admissibility decisions | ❌ | ⚠️ | ✅ |
+| Unsupported path rejection (pre/post checks) | ❌ | ❌ | ✅ |
+| Audit-grade evidence export | ⚠️ | ⚠️ | ✅ |
+| Model/framework agnostic control surface | ✅ | ❌ | ✅ |
 
 ## Live demo (GitHub Actions)
 
@@ -33,22 +64,13 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 - `replay.log`
 - `replay.gif`
 
-## LTP vs ordinary logging
-
-| Capability | Regular app logs | Framework tracing | LTP |
-|---|---|---|---|
-| Deterministic replay | ❌ | ⚠️ | ✅ |
-| Hallucination gating (pre + post) | ❌ | ❌ | ✅ |
-| Audit evidence format | ⚠️ | ⚠️ | ✅ |
-| Model/framework agnostic | ✅ | ❌ | ✅ |
-
 ## Use-case cards
 
 <details>
 <summary>💳 Fintech</summary>
 
 - KYC/AML assistant actions with anchored policy checks.
-- Transfer and approvals with immediate reject on unanchored claims.
+- Transfer and approvals with immediate reject on unsupported paths.
 </details>
 
 <details>

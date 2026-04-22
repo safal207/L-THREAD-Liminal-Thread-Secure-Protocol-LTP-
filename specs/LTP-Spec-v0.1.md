@@ -1,42 +1,44 @@
 # LTP (Liminal Thread Protocol) — Spec v0.1
 
-> Draft / skeleton. This document captures the core concepts and message types of LTP.
+> Draft / skeleton. This document captures the practical protocol profile used for deterministic oversight and replay inspection.
 
 ## 1. Overview
 
-LTP is a protocol for:
-- tracking **threads** (meaningful lines of activity),
-- maintaining **temporal orientation** (where we are in time / phase),
-- exploring **future branches** (Future Weave),
-- and exposing a **Consciousness Web** view over multiple threads.
+LTP is a protocol for deterministic replay and inspection of agent traces.
 
-It is transport-agnostic (can run over HTTP, WebSocket, etc.) and is designed to work both for humans and agents.
+It is designed to:
 
-## 2. Core Concepts
+- assess **admissibility** of execution paths,
+- detect **drift** from anchored/grounded context,
+- reject **unsupported claims or actions**, and
+- emit **audit-grade evidence** for review, governance, and compliance workflows.
 
-### 2.1 Thread
+LTP is transport-agnostic (HTTP, WebSocket, etc.) and model-agnostic (framework/vendor independent).
 
-- **ThreadId**: stable identifier of a line of activity.
-- **ThreadState**: snapshot of where the thread is (sector, phase, depth).
-- Key idea: a thread exists while attention/energy flows through it.
+## 2. Practical Protocol Model (v0.1)
 
-### 2.2 TimeWeave
+### 2.1 Trace capture and replay
 
-- Stores the history of states/events for a thread/focus window.
-- Surfaces metrics such as `focusMomentum`, `volatility`, and `depthScore`.
-- Powers the computation of **temporal orientation** used by routers and HUDs.
+- Agent/system execution is captured as structured trace events (typically JSONL).
+- Replay is deterministic: the same trace produces the same inspection result under the same rules.
+- Replay output is intended for human and machine review.
 
-### 2.3 Future Weave
+### 2.2 Execution-path judgments
 
-- Represents possible future branches.
-- Each branch carries a `label` (primary / recover / explore), a `likelihood`, and sector cues (softening / tension).
-- References: `src/visualization/futureWeaveGraph.ts`, `src/routing/`.
+LTP classifies execution paths into:
 
-### 2.4 Consciousness Web
+- `admissible`: grounded, anchor-consistent, policy-safe path.
+- `drift`: degraded or weakly grounded path requiring review.
+- `rejected`: unsupported, ungrounded, or policy-invalid path.
 
-- Aggregates multiple threads into a grid of `sectors`, `links`, and `intensity`.
-- Provides a system-level view: current focus, overloaded sectors, and potential growth points.
-- Reference: `sdk/js/src/consciousnessWeb.ts`.
+These are oversight/control decisions on traceable execution paths, not only output-quality labels.
+
+### 2.3 Two-phase enforcement profile
+
+1. **Phase 1 (pre-execution / pre-generation):** block progression when required grounding/anchors are missing.
+2. **Phase 2 (post-generation):** inspect generated outputs/actions and reject unsupported or fabricated claims.
+
+Hallucination detection/prevention is included in scope as one failure class inside unsupported-path rejection.
 
 ## 3. Message Types (logical level)
 
@@ -50,16 +52,16 @@ Purpose: keep the channel alive; may include a lightweight status (`ok / warn / 
 
 ### 3.3 `orientation`
 
-Purpose: deliver current **temporal orientation** (sector such as calm / storm / transition), time metrics (momentum, volatility), and anchors.
+Purpose: deliver current runtime orientation and associated metrics/anchors for clients that use orientation semantics.
 
 ### 3.4 `route_request` / `route_suggestion`
 
 - `route_request`: input context (threadId, current point, goals/constraints).
-- `route_suggestion`: output with the chosen path plus alternative branches (Future Weave) and reasoning based on metrics and signals.
+- `route_suggestion`: output with chosen path and alternatives.
 
 ### 3.5 `focus_snapshot`
 
-Snapshot of focus state: history window, momentum, HUD-derived mode (`calm / storm / shift`), usable by HUDs and external clients.
+Snapshot of focus state and history window for HUDs and external clients.
 
 ## 4. Transports
 
@@ -74,9 +76,9 @@ Snapshot of focus state: history window, momentum, HUD-derived mode (`calm / sto
 
 ## 6. Status
 
-Status: Draft, v0.1. Not stable; subject to change as we refine the protocol.
+Status: Draft, v0.1. Not stable; subject to change as the protocol is refined.
 
-## Replay Inspection Profile (CLI v0.1)
+## 7. Replay Inspection Profile (CLI v0.1)
 
 The reference CLI command is:
 
@@ -88,9 +90,15 @@ Decision semantics:
 
 - `admissible`: anchored and policy-safe.
 - `drift`: degraded context requiring review.
-- `rejected`: missing anchor or unsupported claim.
+- `rejected`: missing anchor or unsupported claim/action.
 
-Two-phase enforcement:
+## 8. Optional conceptual framing (legacy/experimental)
 
-1. **Phase 1 (pre-generation):** block responses when no reliable anchor context exists.
-2. **Phase 2 (post-hoc):** reject generated output that contains unsupported or fabricated claims.
+The following concepts exist in parts of the repository and may be useful for specific UX, visualization, or research discussions, but they are **not** the primary practical identity of the protocol:
+
+- threads
+- temporal orientation
+- Future Weave / future branches
+- Consciousness Web
+
+For v0.1 operational usage, the primary framing is deterministic replay, execution-path admissibility, drift detection, unsupported-path rejection, and evidence export.
