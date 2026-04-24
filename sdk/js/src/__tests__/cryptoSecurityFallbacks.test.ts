@@ -43,6 +43,27 @@ async function testNonceFailsClosedWithoutCsprng(): Promise<void> {
   });
 }
 
+async function testNonceUsesGetRandomValuesWhenRandomUuidMissing(): Promise<void> {
+  const fakeCrypto: Pick<Crypto, 'getRandomValues'> = {
+    getRandomValues<T extends ArrayBufferView | null>(array: T): T {
+      if (array && 'byteLength' in array) {
+        const source = array as ArrayBufferView;
+        const view = new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
+        for (let i = 0; i < view.length; i += 1) {
+          view[i] = (i + 1) & 0xff;
+        }
+      }
+      return array;
+    },
+  };
+
+  await withOverriddenGlobalCrypto(fakeCrypto as Crypto, async () => {
+    const nonce = await generateNonce('mac-key', 'client-a', Date.now());
+    assert.equal(typeof nonce, 'string');
+    assert.equal(nonce.length, 64);
+  });
+}
+
 function testClientUuidFailsClosedWithoutCsprng(): void {
   const client = new LtpClient('ws://localhost:8080', { clientId: 'security-test-client' }) as any;
   const originalGetNodeCryptoModule = client.getNodeCryptoModule;
@@ -65,6 +86,7 @@ function testClientUuidFailsClosedWithoutCsprng(): void {
 (async () => {
   const tests: Array<[string, () => void | Promise<void>]> = [
     ['nonce generation fails closed when CSPRNG is unavailable', testNonceFailsClosedWithoutCsprng],
+    ['nonce generation uses getRandomValues when randomUUID is unavailable', testNonceUsesGetRandomValuesWhenRandomUuidMissing],
     ['client UUID/random generation does not silently downgrade to Math.random', testClientUuidFailsClosedWithoutCsprng],
   ];
 

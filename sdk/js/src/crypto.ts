@@ -9,7 +9,9 @@ const textEncoder = new TextEncoder();
 let testNodeCryptoLoader: (() => any) | null = null;
 
 /**
+ * @internal
  * Test-only hook to override Node crypto loading behavior.
+ * Do not use in production code.
  * Pass null to restore default runtime detection.
  */
 export function __setNodeCryptoLoaderForTests(loader: (() => any) | null): void {
@@ -138,14 +140,17 @@ export async function generateNonce(
     random = randomComponent;
   } else {
     // Generate 16 random bytes (32 hex chars)
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-      // Use crypto.randomUUID() and convert to hex-like string
-      const uuid = crypto.randomUUID().replace(/-/g, '');
-      random = uuid.substring(0, 32);
+    const webCrypto = typeof globalThis !== 'undefined' ? globalThis.crypto : undefined;
+    if (webCrypto && typeof webCrypto.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      webCrypto.getRandomValues(bytes);
+      random = Array.from(bytes)
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
     } else {
-      // Fallback for environments without crypto.randomUUID
+      // Fallback for environments without Web Crypto CSPRNG
       const nodeCrypto = getNodeCrypto();
-      if (nodeCrypto) {
+      if (nodeCrypto && typeof nodeCrypto.randomBytes === 'function') {
         random = nodeCrypto.randomBytes(16).toString('hex');
       } else {
         throw new Error(

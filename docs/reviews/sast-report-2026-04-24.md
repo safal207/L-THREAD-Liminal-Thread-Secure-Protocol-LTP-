@@ -111,8 +111,8 @@ Overall posture: **moderate** with one important hardening issue (insecure RNG f
 
 ## 8) Follow-up status
 
-- [x] HIGH-1 fixed
-- [x] MEDIUM-1 fixed
-- [x] MEDIUM-2 fixed
+- [x] HIGH-1 remediation implemented
+- [x] MEDIUM-1 remediation implemented
+- [x] MEDIUM-2 remediation implemented
 - [ ] CI SAST pipeline added
 - [ ] Re-run completed in network-enabled environment
