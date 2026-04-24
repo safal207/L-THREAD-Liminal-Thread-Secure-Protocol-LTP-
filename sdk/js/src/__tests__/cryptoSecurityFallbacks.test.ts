@@ -13,7 +13,10 @@ function runTest(name: string, fn: () => void | Promise<void>): Promise<void> {
     .then(() => console.log(`✔ ${name}`));
 }
 
-function withOverriddenGlobalCrypto<T>(value: MinimalCrypto | undefined, fn: () => T): T {
+async function withOverriddenGlobalCrypto<T>(
+  value: MinimalCrypto | undefined,
+  fn: () => T | Promise<T>
+): Promise<T> {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
 
   Object.defineProperty(globalThis, 'crypto', {
@@ -24,7 +27,7 @@ function withOverriddenGlobalCrypto<T>(value: MinimalCrypto | undefined, fn: () 
   });
 
   try {
-    return fn();
+    return await fn();
   } finally {
     if (descriptor) {
       Object.defineProperty(globalThis, 'crypto', descriptor);
