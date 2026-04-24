@@ -4,7 +4,7 @@
 **Scope:** JS/TS SDK + test/tooling, Python SDK + tests, Rust SDK  
 **Method:** Best-effort static analysis using available local tooling, pattern-based code audit, and manual review of crypto-critical modules.
 
-## 1) What was executed
+## 1) Commands attempted / intended verification path
 
 ```bash
 node -v && npm -v && python3 --version && rustc --version && cargo --version
@@ -109,3 +109,10 @@ Overall posture: **moderate** with one important hardening issue (insecure RNG f
 - `node tests/security/run_all.js`
 - `cargo audit` (in Rust crate directories)
 
+## 8) Follow-up status
+
+- [x] HIGH-1 fixed
+- [x] MEDIUM-1 fixed
+- [x] MEDIUM-2 fixed
+- [ ] CI SAST pipeline added
+- [ ] Re-run completed in network-enabled environment

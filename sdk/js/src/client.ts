@@ -1280,26 +1280,42 @@ export class LtpClient {
     }
 
     // Node.js environment
-    // Instead of using undeclared 'global' and 'process', check safely for Node features
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nodeCrypto = (typeof window === 'undefined' && typeof (globalThis as any).require === 'function')
-      ? (() => {
-          try { return (globalThis as any).require('crypto'); } catch { return undefined; }
-        })()
-      : undefined;
+    const nodeCrypto = this.getNodeCryptoModule();
     if (nodeCrypto) {
       try {
         const crypto = nodeCrypto;
         return crypto.randomBytes(byteLength).toString('hex');
       } catch (e) {
-        this.logger.warn('Crypto module not available, falling back to UUID-based random');
+        this.logger.warn('Node crypto randomBytes failed, falling back to UUID-based random');
       }
     }
 
-    // Fallback: Use UUID v4 which has crypto-secure randomness
-    // This is still better than Math.random()
+    // Fallback: UUID v4 generated from CSPRNG sources only
     const uuid = this.generateUUIDv4();
     return uuid.replace(/-/g, '').substring(0, byteLength * 2);
+  }
+
+  private getNodeCryptoModule(): any {
+    try {
+      if (typeof require === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        return require('crypto');
+      }
+    } catch (error) {
+      // Ignore
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (typeof globalThis !== 'undefined' && typeof (globalThis as any).require === 'function') {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return (globalThis as any).require('crypto');
+      } catch (error) {
+        // Ignore
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -1308,6 +1324,11 @@ export class LtpClient {
   private generateUUIDv4(): string {
     if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
       return window.crypto.randomUUID();
+    }
+
+    const nodeCrypto = this.getNodeCryptoModule();
+    if (nodeCrypto && typeof nodeCrypto.randomUUID === 'function') {
+      return nodeCrypto.randomUUID();
     }
 
     // Polyfill for UUID v4 using crypto.getRandomValues or crypto.randomBytes
@@ -1329,15 +1350,7 @@ export class LtpClient {
       return `${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}`;
     }
 
-    // Last resort: timestamp-based (not crypto-secure, but better than nothing)
-    const timestamp = Date.now().toString(16);
-    const random = Math.random().toString(16).substring(2);
-    this.logger.warn('Using non-crypto-secure UUID fallback');
-    return `${timestamp}-${random}-4xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, (c) => {
-      const r = Math.random() * 16 | 0;
-      const v = c === 'x' ? r : (r & 0x3 | 0x8);
-      return v.toString(16);
-    });
+    throw new Error('Cryptographically secure randomness is required for UUID generation');
   }
 
   /**
@@ -1615,5 +1628,4 @@ export class LtpClient {
     return { encoded: data, encoding: 'json' };
   }
 }
-
 

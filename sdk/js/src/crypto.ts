@@ -6,9 +6,22 @@
  */
 
 const textEncoder = new TextEncoder();
+let testNodeCryptoLoader: (() => any) | null = null;
+
+/**
+ * Test-only hook to override Node crypto loading behavior.
+ * Pass null to restore default runtime detection.
+ */
+export function __setNodeCryptoLoaderForTests(loader: (() => any) | null): void {
+  testNodeCryptoLoader = loader;
+}
 
 // Helper to get Node.js crypto module safely
 function getNodeCrypto(): any {
+  if (testNodeCryptoLoader) {
+    return testNodeCryptoLoader();
+  }
+
   try {
     if (typeof require === 'function') {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -135,10 +148,9 @@ export async function generateNonce(
       if (nodeCrypto) {
         random = nodeCrypto.randomBytes(16).toString('hex');
       } else {
-        // Last resort fallback
-        random = Array.from({ length: 16 }, () => 
-          Math.floor(Math.random() * 256).toString(16).padStart(2, '0')
-        ).join('');
+        throw new Error(
+          'Cryptographically secure randomness is required for nonce generation; Web Crypto and Node crypto are unavailable'
+        );
       }
     }
   }
