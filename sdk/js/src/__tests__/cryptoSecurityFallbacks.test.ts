@@ -2,13 +2,18 @@ import assert from 'node:assert/strict';
 import { LtpClient } from '../client';
 import { __setNodeCryptoLoaderForTests, generateNonce } from '../crypto';
 
+type MinimalCrypto = {
+  getRandomValues?: <T extends ArrayBufferView>(array: T) => T;
+  randomUUID?: () => string;
+};
+
 function runTest(name: string, fn: () => void | Promise<void>): Promise<void> {
   return Promise.resolve()
     .then(fn)
     .then(() => console.log(`✔ ${name}`));
 }
 
-function withOverriddenGlobalCrypto<T>(value: Crypto | undefined, fn: () => T): T {
+function withOverriddenGlobalCrypto<T>(value: MinimalCrypto | undefined, fn: () => T): T {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
 
   Object.defineProperty(globalThis, 'crypto', {
@@ -44,20 +49,17 @@ async function testNonceFailsClosedWithoutCsprng(): Promise<void> {
 }
 
 async function testNonceUsesGetRandomValuesWhenRandomUuidMissing(): Promise<void> {
-  const fakeCrypto: Pick<Crypto, 'getRandomValues'> = {
-    getRandomValues<T extends ArrayBufferView | null>(array: T): T {
-      if (array && 'byteLength' in array) {
-        const source = array as ArrayBufferView;
-        const view = new Uint8Array(source.buffer, source.byteOffset, source.byteLength);
-        for (let i = 0; i < view.length; i += 1) {
-          view[i] = (i + 1) & 0xff;
-        }
+  const fakeCrypto: MinimalCrypto = {
+    getRandomValues<T extends ArrayBufferView>(array: T): T {
+      const view = new Uint8Array(array.buffer, array.byteOffset, array.byteLength);
+      for (let i = 0; i < view.length; i += 1) {
+        view[i] = (i + 1) & 0xff;
       }
       return array;
     },
   };
 
-  await withOverriddenGlobalCrypto(fakeCrypto as Crypto, async () => {
+  await withOverriddenGlobalCrypto(fakeCrypto, async () => {
     const nonce = await generateNonce('mac-key', 'client-a', Date.now());
     assert.equal(typeof nonce, 'string');
     assert.equal(nonce.length, 64);
