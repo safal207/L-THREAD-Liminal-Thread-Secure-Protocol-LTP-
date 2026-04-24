@@ -23,7 +23,7 @@ async function runTest(test) {
     const testPath = path.join(__dirname, test.file);
     const proc = spawn('node', [testPath], {
       stdio: 'inherit',
-      shell: true
+      shell: false
     });
 
     proc.on('close', (code) => {
@@ -79,4 +79,3 @@ runAllTests().catch(err => {
   console.error('Fatal error:', err);
   process.exit(1);
 });
-
