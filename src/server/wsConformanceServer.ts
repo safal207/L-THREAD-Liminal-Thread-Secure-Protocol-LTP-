@@ -65,10 +65,13 @@ function sendFrame(socket: WebSocket, frame: ConformanceReportFrame | Conformanc
   socket.send(JSON.stringify(frame));
 }
 
-export function createConformanceWSServer(options?: { port?: number; path?: string }) {
-  const port = options?.port ?? Number(process.env.WS_PORT) || 4002;
+const DEFAULT_MAX_PAYLOAD_BYTES = 512 * 1024;
+
+export function createConformanceWSServer(options?: { port?: number; path?: string; maxPayload?: number }) {
+  const port = options?.port ?? (Number(process.env.WS_PORT) || 4002);
   const path = options?.path ?? "/ws/conformance-self-test";
-  const wss = new WebSocketServer({ port, path });
+  const maxPayload = options?.maxPayload ?? DEFAULT_MAX_PAYLOAD_BYTES;
+  const wss = new WebSocketServer({ port, path, maxPayload });
 
   wss.on("connection", (socket) => {
     socket.on("message", (data) => {

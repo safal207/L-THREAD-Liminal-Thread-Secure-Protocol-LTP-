@@ -222,13 +222,10 @@ export class LtpClient {
       ? options.requireSignatureVerification
       : Boolean(macKey);
 
-    // Generate client ID if not provided
-    const clientId = options.clientId || (() => {
-      if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-        return crypto.randomUUID();
-      }
-      return Math.random().toString(36).substring(2, 15);
-    })();
+    // Generate client ID if not provided. Routed through generateUUIDv4 so
+    // the path fails closed when no CSPRNG is available, matching the
+    // behaviour exercised by cryptoSecurityFallbacks.test.ts.
+    const clientId = options.clientId || this.generateUUIDv4();
 
     this.options = {
       clientId,
