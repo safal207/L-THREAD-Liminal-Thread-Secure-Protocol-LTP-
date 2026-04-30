@@ -136,11 +136,14 @@ function sendError(socket: WebSocket, errorCode: string, errorMessage: string, t
   socket.send(JSON.stringify(payload));
 }
 
-export function createOrientationDemoWSServer(options?: { port?: number; path?: string }) {
-  const port = options?.port ?? Number(process.env.WS_PORT) || 4001;
-  const path = options?.path ?? "/ws/orientation-demo";
+const DEFAULT_MAX_PAYLOAD_BYTES = 512 * 1024;
 
-  const wss = new WebSocketServer({ port, path });
+export function createOrientationDemoWSServer(options?: { port?: number; path?: string; maxPayload?: number }) {
+  const port = options?.port ?? (Number(process.env.WS_PORT) || 4001);
+  const path = options?.path ?? "/ws/orientation-demo";
+  const maxPayload = options?.maxPayload ?? DEFAULT_MAX_PAYLOAD_BYTES;
+
+  const wss = new WebSocketServer({ port, path, maxPayload });
 
   wss.on("connection", (socket) => {
     console.log("Client connected to orientation demo WS");
