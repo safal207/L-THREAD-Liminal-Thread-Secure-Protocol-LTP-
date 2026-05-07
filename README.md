@@ -98,6 +98,7 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 
 ## Quick links
 
+- Grant evidence: `docs/GRANT_EVIDENCE.md`
 - DevTools: `docs/devtools/quickstart.md`
 - Compliance: `docs/fintech/Compliance-Inspection.md`
 - Adapters: `adapters/README.md`
