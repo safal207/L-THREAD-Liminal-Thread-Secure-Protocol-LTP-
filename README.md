@@ -98,6 +98,10 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 
 ## Quick links
 
+- Start here: `docs/START_HERE.md`
+- Developer and commercial roadmap: `docs/roadmap/LTP-Developer-and-Commercial-Roadmap.md`
+- Commercial pilot one-pager: `docs/commercial/LTP-Pilot-One-Pager.md`
+- Audit report template: `docs/commercial/LTP-Audit-Report-Template.md`
 - Grant evidence: `docs/GRANT_EVIDENCE.md`
 - DevTools: `docs/devtools/quickstart.md`
 - Compliance: `docs/fintech/Compliance-Inspection.md`
@@ -124,6 +128,8 @@ Local scratch directories such as `.tmp/` are ignored by the repository and excl
 - ✅ Replay analyzer (`ltp inspect trace`)
 - ✅ Two-phase enforcement
 - ✅ GitHub Actions interactive demo
+- 🟡 Community onboarding docs and contributor-ready backlog
 - 🟡 Expanded adapter SDKs
 - 🟡 Rich replay animation renderer
+- 🟡 Commercial pilot and audit templates
 - 🔴 AutoGen v1.2 reference adapter
