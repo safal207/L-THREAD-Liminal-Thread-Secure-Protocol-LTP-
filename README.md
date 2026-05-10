@@ -134,13 +134,23 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 
 ## Local validation
 
-For a clean reviewer flow, run:
+For a clean reviewer flow, first activate the repository pnpm version through Corepack:
+
+```bash
+corepack enable
+corepack prepare pnpm@9.15.0 --activate
+pnpm --version
+```
+
+Then run:
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm test
 pnpm test:conformance
 ```
+
+The same command sequence is checked by `.github/workflows/quickstart-validation.yml`.
 
 `pnpm test` is the curated reviewer-safe validation surface. If you want the broader legacy sweep as well, run `pnpm test:full`.
 
