@@ -1,0 +1,65 @@
+name: README Quickstart Validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - package.json
+      - pnpm-lock.yaml
+      - .github/workflows/quickstart-validation.yml
+      - src/**
+      - tests/**
+      - tools/**
+      - sdk/**
+      - schemas/**
+      - fixtures/**
+      - examples/**
+  pull_request:
+    branches:
+      - main
+    paths:
+      - README.md
+      - package.json
+      - pnpm-lock.yaml
+      - .github/workflows/quickstart-validation.yml
+      - src/**
+      - tests/**
+      - tools/**
+      - sdk/**
+      - schemas/**
+      - fixtures/**
+      - examples/**
+  workflow_dispatch:
+
+jobs:
+  quickstart-validation:
+    name: Validate README quickstart
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Enable pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+          pnpm --version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run reviewer-safe test suite
+        run: pnpm test
+
+      - name: Run conformance tests
+        run: pnpm test:conformance
