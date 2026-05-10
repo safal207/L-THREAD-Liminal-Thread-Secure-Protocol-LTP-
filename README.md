@@ -25,6 +25,28 @@ LTP exists to make those paths inspectable, replayable, and rejectable, with evi
 
 LTP is not a general-purpose runtime orchestrator. In v0.1, its practical identity is deterministic replay, execution-path inspection, admissibility judgment, and evidence export.
 
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+  A["Agent / Runtime"] -->|"emits events"| B["LTP Trace JSONL"]
+  B --> C["Replay Engine"]
+  B --> D["Two-Phase Inspector"]
+  C --> E["Replay Result"]
+  D --> F["Admissibility Decision"]
+  F -->|"admissible"| G["Proceed / Accept"]
+  F -->|"drift"| H["Review / Audit"]
+  F -->|"rejected"| I["Block / Reject"]
+  E --> J["Conformance Report"]
+  F --> J
+  J --> K["Audit Evidence Bundle"]
+  B --> L["SDKs and Adapters"]
+  L --> M["LangGraph / AutoGen / CrewAI / Custom Agents"]
+  J --> N["Commercial Audit / Hosted Conformance / Pilot Review"]
+```
+
+More detail: `docs/architecture/LTP-Architecture.md`
+
 ## What you get
 
 - Deterministic replay-based inspection for agent execution traces.
@@ -99,6 +121,7 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 ## Quick links
 
 - Start here: `docs/START_HERE.md`
+- Architecture: `docs/architecture/LTP-Architecture.md`
 - Developer and commercial roadmap: `docs/roadmap/LTP-Developer-and-Commercial-Roadmap.md`
 - Commercial pilot one-pager: `docs/commercial/LTP-Pilot-One-Pager.md`
 - Audit report template: `docs/commercial/LTP-Audit-Report-Template.md`
@@ -128,8 +151,8 @@ Local scratch directories such as `.tmp/` are ignored by the repository and excl
 - ✅ Replay analyzer (`ltp inspect trace`)
 - ✅ Two-phase enforcement
 - ✅ GitHub Actions interactive demo
-- 🟡 Community onboarding docs and contributor-ready backlog
+- ✅ Community onboarding docs and contributor-ready backlog
+- ✅ Commercial pilot and audit templates
 - 🟡 Expanded adapter SDKs
 - 🟡 Rich replay animation renderer
-- 🟡 Commercial pilot and audit templates
 - 🔴 AutoGen v1.2 reference adapter
