@@ -126,6 +126,7 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 - Commercial pilot one-pager: `docs/commercial/LTP-Pilot-One-Pager.md`
 - Audit report template: `docs/commercial/LTP-Audit-Report-Template.md`
 - Grant evidence: `docs/GRANT_EVIDENCE.md`
+- Related LS grant path: `docs/RELATED_LS_GRANT_PATH.md`
 - DevTools: `docs/devtools/quickstart.md`
 - Compliance: `docs/fintech/Compliance-Inspection.md`
 - Adapters: `adapters/README.md`
