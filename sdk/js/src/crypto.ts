@@ -389,7 +389,6 @@ function timingSafeEqual(a: string, b: string): boolean {
   const crypto = getNodeCrypto();
   if (crypto) {
     try {
-      const Buffer = (globalThis as any).Buffer || require('buffer').Buffer;
       // Build same-length buffers from both inputs by hashing them, so the
       // native timingSafeEqual call always runs over the same byte count
       // regardless of whether a.length === b.length.
