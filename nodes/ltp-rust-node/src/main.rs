@@ -353,7 +353,12 @@ impl AuthConfig {
     }
 
     fn validate_api_key(&self, token: &str) -> Result<Option<String>, Box<ErrorResponse>> {
-        let keys_guard = self.keys.read().expect("auth keys poisoned");
+        // Recover from a poisoned RwLock instead of panicking - the only state
+        // protected here is the API key map, which is rebuilt at reload time.
+        let keys_guard = match self.keys.read() {
+            Ok(g) => g,
+            Err(poisoned) => poisoned.into_inner(),
+        };
         for (id, key) in keys_guard.iter() {
             if constant_time_equal(key.as_bytes(), token.as_bytes()) {
                 return Ok(Some(id.clone()));

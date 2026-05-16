@@ -42,7 +42,10 @@ export function enforceActionBoundary(
   }
 
   // RULE 3: GLOBAL SAFETY
-  if (globallyBanned.some(action => targetState.includes(action))) {
+  // Match the action exactly; substring matching would over-block benign
+  // actions whose name happens to contain a banned one (e.g. `undelete_user`
+  // when `delete_user` is banned).
+  if (globallyBanned.some(action => targetState === action)) {
     return {
       admissible: false,
       reason: `Global Safety Violation: Action '${targetState}' is permanently banned.`,
@@ -53,7 +56,7 @@ export function enforceActionBoundary(
 
   // RULE 4: CRITICAL ACTIONS (Web != Action)
   if (context === 'WEB') {
-    if (criticalActions.some(action => targetState.includes(action))) {
+    if (criticalActions.some(action => targetState === action)) {
       return {
         admissible: false,
         reason: `Policy Violation: Web content cannot initiate critical action '${targetState}'`,
