@@ -763,11 +763,13 @@ class LtpClient:
         
         # Check for HMAC-based nonce format (v0.6+): hmac-{32hex}-{timestamp}
         if nonce.startswith("hmac-"):
-            parts = nonce.split("-")
+            # rsplit from the right so a negative or hyphenated timestamp
+            # cannot break the parse.
+            parts = nonce.split("-", 2)
             if len(parts) != 3:
                 print("[LTP] Invalid HMAC nonce format")
                 return False
-            
+
             _, hmac_part, timestamp_part = parts
             
             # Verify HMAC part has correct length (32 hex chars)
