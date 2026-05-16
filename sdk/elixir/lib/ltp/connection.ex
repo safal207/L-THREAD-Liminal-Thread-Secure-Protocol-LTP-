@@ -592,6 +592,12 @@ defmodule LTP.Connection do
 
       Logger.warning("[LTP] Scheduling reconnect", %{delay_ms: delay, reason: reason})
 
+      # Cancel any existing reconnect timer so repeated disconnects don't leak
+      # timers or fire stale {:reconnect} messages.
+      if state.reconnect_timer do
+        Process.cancel_timer(state.reconnect_timer)
+      end
+
       timer = Process.send_after(self(), {:reconnect}, delay)
 
       new_state = %{

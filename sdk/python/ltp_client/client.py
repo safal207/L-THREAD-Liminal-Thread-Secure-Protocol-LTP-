@@ -331,6 +331,15 @@ class LtpClient:
     async def _message_loop(self, ws: WebSocketClientProtocol) -> None:
         try:
             async for message in ws:
+                # Cap inbound JSON to 1 MiB so a hostile or malformed server
+                # cannot exhaust memory via a single oversized frame.
+                if isinstance(message, (bytes, bytearray)):
+                    raw_len = len(message)
+                else:
+                    raw_len = len(message.encode("utf-8", errors="ignore"))
+                if raw_len > 1_048_576:
+                    print(f"[LTP] Dropping oversized message ({raw_len} bytes)")
+                    continue
                 data = json.loads(message)
                 await self._handle_message(data)
         except websockets.exceptions.ConnectionClosed:
@@ -832,9 +841,12 @@ class LtpClient:
             print("[LTP] Nonce timestamp in future")
             return False
         
-        # Add to seen nonces cache
+        # Add to seen nonces cache, and evict stale entries opportunistically so
+        # the dict cannot grow unbounded on long-lived connections.
         self._seen_nonces[nonce] = now
-        
+        if len(self._seen_nonces) > 1024:
+            self._cleanup_nonces()
+
         return True
 
     def _generate_client_id(self) -> str:
