@@ -371,12 +371,15 @@ fn auth_id_for_key(api_key: &str) -> String {
 }
 
 fn constant_time_equal(a: &[u8], b: &[u8]) -> bool {
-    if a.len() != b.len() {
-        return false;
-    }
-    let mut diff: u8 = 0;
-    for (&x, &y) in a.iter().zip(b.iter()) {
-        diff |= x ^ y;
+    // Fold the length difference into the running diff and always iterate
+    // over max(a.len(), b.len()) so neither the length nor the position of
+    // the first differing byte leaks via timing.
+    let max_len = a.len().max(b.len());
+    let mut diff: u32 = (a.len() ^ b.len()) as u32;
+    for i in 0..max_len {
+        let x = *a.get(i).unwrap_or(&0);
+        let y = *b.get(i).unwrap_or(&0);
+        diff |= (x ^ y) as u32;
     }
     diff == 0
 }

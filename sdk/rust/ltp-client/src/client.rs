@@ -290,11 +290,14 @@ impl LtpClient {
     }
 
     async fn send_handshake_resume(&mut self) -> Result<()> {
+        let thread_id = self.thread_id.clone().ok_or_else(|| {
+            LtpError::InvalidState("send_handshake_resume called without thread_id".to_string())
+        })?;
         let resume = HandshakeResume {
             r#type: "handshake_resume".to_string(),
             ltp_version: "0.6".to_string(),
             client_id: self.client_id.clone(),
-            thread_id: self.thread_id.clone().unwrap(),
+            thread_id,
             resume_reason: "automatic_reconnect".to_string(),
         };
 

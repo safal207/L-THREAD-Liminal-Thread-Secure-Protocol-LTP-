@@ -477,10 +477,14 @@ export class LtpClient {
       this.isConnecting = false;
       if (this.threadId) {
         this.isAttemptingResume = true;
-        void this.sendHandshakeResume();
+        this.sendHandshakeResume().catch((err) => {
+          this.logger.error('Handshake resume failed', err);
+        });
       } else {
         this.isAttemptingResume = false;
-        void this.sendHandshakeInit();
+        this.sendHandshakeInit().catch((err) => {
+          this.logger.error('Handshake init failed', err);
+        });
       }
     };
 
@@ -951,7 +955,9 @@ export class LtpClient {
       this.sessionId = null;
       this.storage.removeItem(this.storageKeys.thread);
       this.storage.removeItem(this.storageKeys.session);
-      void this.sendHandshakeInit();
+      this.sendHandshakeInit().catch((err) => {
+        this.logger.error('Handshake init failed', err);
+      });
       return;
     }
 
@@ -1404,7 +1410,9 @@ export class LtpClient {
 
     // Check for HMAC-based nonce format (v0.6+): hmac-{32hex}-{timestamp}
     if (nonce.startsWith('hmac-')) {
-      const parts = nonce.split('-');
+      // Limit to 3 segments so a timestamp containing a hyphen (e.g. a
+      // future negative value) cannot break the parse.
+      const parts = nonce.split('-', 3);
       if (parts.length !== 3) {
         return 'Invalid HMAC nonce format';
       }
