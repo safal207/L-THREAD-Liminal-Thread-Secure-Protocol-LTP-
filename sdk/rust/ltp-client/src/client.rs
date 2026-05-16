@@ -598,29 +598,26 @@ mod tests {
     }
 
     #[test]
-    fn hmac_nonce_contains_entropy_timestamp_and_mac() {
+    fn hmac_nonce_contains_mac_prefix_and_timestamp() {
         let client = LtpClient::new("ws://example.com", "client-123")
             .with_session_mac_key("test-mac-key");
 
         let nonce = client.generate_nonce().expect("nonce should be generated");
         let parts: Vec<&str> = nonce.split('-').collect();
 
+        // Format aligned with Python/JS/Elixir SDKs: hmac-{32hex}-{timestamp}
         assert_eq!(parts.get(0), Some(&"hmac"), "nonce must start with hmac prefix");
-        assert_eq!(parts.len(), 4, "nonce `{}` did not have four segments", nonce);
+        assert_eq!(parts.len(), 3, "nonce `{}` did not have three segments", nonce);
 
-        let random_hex = parts[1];
+        let hmac_prefix = parts[1];
         let timestamp_part = parts[2];
-        let hmac_prefix = parts[3];
 
-        assert_eq!(random_hex.len(), 32, "random hex `{}` must be 32 chars", random_hex);
-        assert!(is_hex(random_hex), "random hex `{}` must be hexadecimal", random_hex);
+        assert_eq!(hmac_prefix.len(), 32, "HMAC prefix `{}` must be 32 chars", hmac_prefix);
+        assert!(is_hex(hmac_prefix), "HMAC prefix `{}` must be hexadecimal", hmac_prefix);
 
         let timestamp: i64 = timestamp_part
             .parse()
             .expect("timestamp should be numeric milliseconds");
         assert!(timestamp > 0, "timestamp should be positive");
-
-        assert_eq!(hmac_prefix.len(), 32, "HMAC prefix `{}` must be 32 chars", hmac_prefix);
-        assert!(is_hex(hmac_prefix), "HMAC prefix `{}` must be hexadecimal", hmac_prefix);
     }
 }

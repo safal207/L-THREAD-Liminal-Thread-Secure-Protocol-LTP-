@@ -30,14 +30,15 @@ pub fn hmac_sha256(input: &str, key: &str) -> String {
 
 /// Generate a nonce tied to a session MAC key (v0.6+).
 ///
-/// Format: `hmac-{random hex}-{timestamp}-{first 32 chars of HMAC}` where
-/// the HMAC is computed over `{timestamp}-{random hex}` using the supplied
-/// `mac_key`. The format ensures uniqueness (random entropy), ordering
-/// (timestamp), and authenticity (HMAC digest prefix).
+/// Format: `hmac-{first 32 chars of HMAC}-{timestamp}` matching the Python,
+/// JS, and Elixir SDKs. The HMAC is computed over `{timestamp}-{random hex}`
+/// using the supplied `mac_key`; the random_hex is local entropy and is not
+/// transmitted (parity with the other SDKs, which treat the nonce as an
+/// opaque unique identifier for replay tracking).
 pub fn generate_hmac_nonce(mac_key: &str) -> String {
     let timestamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_millis() as i64;
 
     let mut rng = rand::thread_rng();
@@ -53,7 +54,7 @@ pub fn generate_hmac_nonce(mac_key: &str) -> String {
         &hmac[..]
     };
 
-    format!("hmac-{}-{}-{}", random_hex, timestamp, hmac_prefix)
+    format!("hmac-{}-{}", hmac_prefix, timestamp)
 }
 
 /// Generate ECDH key pair for key exchange.
@@ -197,12 +198,19 @@ pub fn verify_ecdh_public_key(
     secret_key: &str,
     max_age_ms: i64,
 ) -> Result<(), String> {
-    // Check timestamp freshness
+    // Check timestamp freshness. Peers in other SDKs may send the timestamp
+    // either in milliseconds or in seconds; detect the seconds form by
+    // comparing against ~year-2001 in ms and normalise to ms.
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or_default()
         .as_millis() as i64;
-    let age = now - timestamp;
+    let timestamp_ms = if timestamp < 1_000_000_000_000 {
+        timestamp.saturating_mul(1000)
+    } else {
+        timestamp
+    };
+    let age = now - timestamp_ms;
 
     if age > max_age_ms {
         return Err(format!(
