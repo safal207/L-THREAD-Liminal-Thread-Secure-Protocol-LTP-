@@ -160,7 +160,7 @@ def hkdf(shared_secret_hex: str, salt: str, info: str, key_length: int = 32) -> 
         )
     
     shared_secret = bytes.fromhex(shared_secret_hex)
-    salt_bytes = salt.encode("utf-8") if salt else b"\x00" * 32
+    salt_bytes = salt.encode("utf-8") if salt is not None and salt != "" else b"\x00" * 32
     info_bytes = info.encode("utf-8")
     
     hkdf_instance = HKDF(

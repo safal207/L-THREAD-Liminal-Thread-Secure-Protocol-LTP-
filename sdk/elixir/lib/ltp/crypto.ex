@@ -79,19 +79,29 @@ defmodule LTP.Crypto do
   @spec hkdf(String.t(), String.t(), String.t(), non_neg_integer()) :: String.t()
   def hkdf(shared_secret_hex, salt, info, key_length \\ 32) do
     shared_secret = Base.decode16!(shared_secret_hex, case: :lower)
-    salt_bytes = if salt, do: salt, else: <<0::256>>
-    
+    salt_bytes = if salt && salt != "", do: salt, else: <<0::256>>
+    info_bytes = if info, do: info, else: <<>>
+
     # HKDF-Extract: PRK = HMAC-SHA256(salt, shared_secret)
     prk = :crypto.mac(:hmac, :sha256, salt_bytes, shared_secret)
-    
-    # HKDF-Expand: OKM = HMAC-SHA256(PRK, info || 0x01 || 0x00...)
-    # Simplified single-step expansion for key_length <= 32 bytes
-    info_bytes = info <> <<1>>
-    okm = :crypto.mac(:hmac, :sha256, prk, info_bytes)
-    
-    # Truncate to desired length
+
+    # HKDF-Expand per RFC 5869: T(i) = HMAC(PRK, T(i-1) || info || i)
+    hash_len = 32
+    n = div(key_length + hash_len - 1, hash_len)
+
+    if n > 255 do
+      raise ArgumentError, "HKDF key_length too large (max 255 * 32 bytes)"
+    end
+
+    okm =
+      Enum.reduce(1..n, {<<>>, <<>>}, fn i, {prev_t, acc} ->
+        t = :crypto.mac(:hmac, :sha256, prk, prev_t <> info_bytes <> <<i>>)
+        {t, acc <> t}
+      end)
+      |> elem(1)
+
     <<derived_key::binary-size(key_length), _::binary>> = okm
-    
+
     Base.encode16(derived_key, case: :lower)
   end
 

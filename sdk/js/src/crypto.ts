@@ -389,18 +389,14 @@ function timingSafeEqual(a: string, b: string): boolean {
   const crypto = getNodeCrypto();
   if (crypto) {
     try {
-      // Native implementation handles length mismatch safely
-      if (a.length !== b.length) {
-        // Still do constant-time comparison of same-length dummy values
-        // to prevent timing leak from early return
-        const Buffer = (globalThis as any).Buffer || require('buffer').Buffer;
-        const dummyA = Buffer.alloc(32);
-        const dummyB = Buffer.alloc(32);
-        crypto.timingSafeEqual(dummyA, dummyB);
-        return false;
-      }
-      const Buffer = (globalThis as any).Buffer || require('buffer').Buffer;
-      return crypto.timingSafeEqual(Buffer.from(a, 'hex'), Buffer.from(b, 'hex'));
+      // Build same-length buffers from both inputs by hashing them, so the
+      // native timingSafeEqual call always runs over the same byte count
+      // regardless of whether a.length === b.length.
+      const hashA = crypto.createHash('sha256').update(a, 'utf8').digest();
+      const hashB = crypto.createHash('sha256').update(b, 'utf8').digest();
+      const hashesEqual = crypto.timingSafeEqual(hashA, hashB);
+      const lengthsEqual = a.length === b.length;
+      return hashesEqual && lengthsEqual;
     } catch (error) {
       // Fall through to manual implementation
     }
