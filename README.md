@@ -3,6 +3,8 @@
 LTP is a deterministic oversight and replay protocol for agent traces.
 It helps teams inspect whether an AI or agent followed an admissible, grounded execution path, detect drift, reject unsupported outputs or actions, and preserve audit-grade evidence for high-risk workflows.
 
+For reviewers navigating the broader ecosystem: LTP is the trace/replay/continuity layer; ProofPath / Compute Witness is the current executable evidence hub. See the [ProofPath ecosystem graph](https://github.com/safal207/ProofPath/blob/main/docs/ECOSYSTEM_GRAPH.md).
+
 ![LTP replay demo preview](assets/replay-demo.svg)
 
 <!-- community-interest:start -->
