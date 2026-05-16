@@ -4,6 +4,7 @@ Version 0.3
 """
 
 import asyncio
+import hmac
 import json
 import os
 import platform
@@ -364,7 +365,9 @@ class LtpClient:
         # Verify hash chain (v0.5+) - detect tampering
         if data.get("prev_message_hash"):
             if self._last_received_hash:
-                if data["prev_message_hash"] != self._last_received_hash:
+                if not hmac.compare_digest(
+                    str(data["prev_message_hash"]), str(self._last_received_hash)
+                ):
                     print("[LTP] Hash chain mismatch - message tampering detected!")
                     return  # Reject tampered message
             else:
