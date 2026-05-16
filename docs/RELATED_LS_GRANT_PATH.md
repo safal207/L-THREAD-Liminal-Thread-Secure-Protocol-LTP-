@@ -25,12 +25,12 @@ Was the session continuous enough to justify continuation, memory, or action?
 
 For grant or reviewer context, start with:
 
-- LS repository: https://github.com/safal207/LS
-- LS Session Continuity Repair Layer: https://github.com/safal207/LS/blob/main/docs/SESSION_CONTINUITY_REPAIR_LAYER.md
-- LS ecosystem map: https://github.com/safal207/LS/blob/main/docs/ECOSYSTEM_INTEGRATION_MAP.md
-- LS AI Co-work Continuity Audit offer: https://github.com/safal207/LS/blob/main/docs/offers/AI_COWORK_CONTINUITY_AUDIT.md
-- Causal Memory Layer: https://github.com/safal207/Causal-Memory-Layer
-- PythiaLabs: https://github.com/safal207/pythiaLabs
+- [LS repository](https://github.com/safal207/LS)
+- [LS Session Continuity Repair Layer](https://github.com/safal207/LS/blob/main/docs/SESSION_CONTINUITY_REPAIR_LAYER.md)
+- [LS ecosystem map](https://github.com/safal207/LS/blob/main/docs/ECOSYSTEM_INTEGRATION_MAP.md)
+- [LS AI Co-work Continuity Audit offer](https://github.com/safal207/LS/blob/main/docs/offers/AI_COWORK_CONTINUITY_AUDIT.md)
+- [Causal Memory Layer](https://github.com/safal207/Causal-Memory-Layer)
+- [PythiaLabs](https://github.com/safal207/pythiaLabs)
 
 ## Positioning boundary
 
