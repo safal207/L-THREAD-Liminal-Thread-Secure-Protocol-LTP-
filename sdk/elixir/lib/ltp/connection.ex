@@ -42,7 +42,8 @@ defmodule LTP.Connection do
     :session_encryption_key,
     :last_sent_hash,
     :last_received_hash,
-    :seen_nonces
+    :seen_nonces,
+    :max_message_age_ms
   ]
 
   # Public API
@@ -78,7 +79,8 @@ defmodule LTP.Connection do
       session_encryption_key: nil,
       last_sent_hash: nil,
       last_received_hash: nil,
-      seen_nonces: %{}
+      seen_nonces: %{},
+      max_message_age_ms: Keyword.get(opts, :max_message_age_ms, 60_000)
     }
 
     WebSockex.start_link(state.url, __MODULE__, state, name: Keyword.get(opts, :name))
@@ -110,7 +112,14 @@ defmodule LTP.Connection do
   def handle_frame({:text, json}, state) do
     case Jason.decode(json) do
       {:ok, message} ->
-        handle_message(message, state)
+        case validate_inbound_replay(message, state) do
+          {:ok, new_state} ->
+            handle_message(message, new_state)
+
+          {:reject, new_state, reason} ->
+            Logger.warning("[LTP] Dropping message: #{reason}", %{type: message["type"]})
+            {:ok, new_state}
+        end
 
       {:error, error} ->
         Logger.error("[LTP] Failed to parse message: #{inspect(error)}")
@@ -259,6 +268,115 @@ defmodule LTP.Connection do
   end
 
   # Private helpers
+
+  # Replay protection: validate the nonce on inbound messages (post-handshake)
+  # and remember accepted nonces so a re-sent frame is rejected. Mirrors the
+  # behaviour of the Python and JS SDKs.
+  defp validate_inbound_replay(message, state) do
+    type = message["type"]
+
+    cond do
+      # Skip checks for handshake protocol messages (no MAC key yet) and for
+      # purely-internal ping/pong frames, matching other SDKs.
+      type in ["handshake_ack", "handshake_reject", "ping", "pong"] ->
+        {:ok, state}
+
+      true ->
+        do_validate_nonce(message, state)
+    end
+  end
+
+  defp do_validate_nonce(message, state) do
+    nonce = message["nonce"]
+    now = System.system_time(:millisecond)
+
+    cond do
+      not is_binary(nonce) or nonce == "" ->
+        {:reject, state, "missing nonce"}
+
+      Map.has_key?(state.seen_nonces, nonce) ->
+        {:reject, state, "replay detected"}
+
+      true ->
+        case parse_nonce_timestamp(nonce, message) do
+          {:ok, ts_ms} ->
+            age = now - ts_ms
+
+            cond do
+              age > state.max_message_age_ms ->
+                {:reject, state, "nonce too old (age #{age}ms)"}
+
+              age < -5_000 ->
+                {:reject, state, "nonce timestamp in future (#{-age}ms skew)"}
+
+              true ->
+                {:ok, remember_nonce(state, nonce, now)}
+            end
+
+          {:error, reason} ->
+            {:reject, state, reason}
+        end
+    end
+  end
+
+  defp parse_nonce_timestamp("hmac-" <> rest, _message) do
+    # Limit to 2 splits so a hyphen inside a timestamp can't break parsing.
+    case String.split(rest, "-", parts: 2) do
+      [hmac_part, ts_str] when byte_size(hmac_part) == 32 ->
+        if hex?(hmac_part) do
+          case Integer.parse(ts_str) do
+            {ts, ""} -> {:ok, ts}
+            _ -> {:error, "invalid HMAC nonce timestamp"}
+          end
+        else
+          {:error, "invalid HMAC nonce (non-hex)"}
+        end
+
+      _ ->
+        {:error, "invalid HMAC nonce format"}
+    end
+  end
+
+  defp parse_nonce_timestamp(nonce, message) do
+    # Legacy: clientId-timestamp-randomHex
+    case String.split(nonce, "-") do
+      [client_id, ts_str, random_hex] when byte_size(random_hex) >= 8 ->
+        meta = message["meta"] || %{}
+        expected_id = is_map(meta) && meta["client_id"]
+
+        cond do
+          expected_id && client_id != expected_id ->
+            {:error, "nonce client_id mismatch"}
+
+          true ->
+            case Integer.parse(ts_str) do
+              {ts, ""} -> {:ok, ts}
+              _ -> {:error, "invalid legacy nonce timestamp"}
+            end
+        end
+
+      _ ->
+        {:error, "invalid nonce format"}
+    end
+  end
+
+  defp hex?(s) do
+    String.match?(s, ~r/^[0-9a-fA-F]+$/)
+  end
+
+  defp remember_nonce(state, nonce, now) do
+    seen = Map.put(state.seen_nonces, nonce, now)
+
+    seen =
+      if map_size(seen) > 1024 do
+        cutoff = now - state.max_message_age_ms * 2
+        :maps.filter(fn _k, ts -> ts >= cutoff end, seen)
+      else
+        seen
+      end
+
+    %{state | seen_nonces: seen}
+  end
 
   defp send_handshake_init(state) do
     # Generate ECDH key pair if enabled
