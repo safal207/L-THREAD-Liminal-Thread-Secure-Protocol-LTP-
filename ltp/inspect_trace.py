@@ -17,17 +17,18 @@ class TraceDecision:
 
 
 def _parse_jsonl(path: Path) -> Iterable[dict]:
-    for line_number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-        stripped = line.strip()
-        if not stripped:
-            continue
-        try:
-            payload = json.loads(stripped)
-        except json.JSONDecodeError as exc:
-            raise ValueError(f"Invalid JSON on line {line_number}: {exc}") from exc
-        if not isinstance(payload, dict):
-            raise ValueError(f"Line {line_number} must be a JSON object")
-        yield payload
+    with path.open(encoding="utf-8") as fh:
+        for line_number, line in enumerate(fh, start=1):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                payload = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"Invalid JSON on line {line_number}: {exc}") from exc
+            if not isinstance(payload, dict):
+                raise ValueError(f"Line {line_number} must be a JSON object")
+            yield payload
 
 
 def _as_anchor_list(raw: object) -> list[str]:
@@ -86,12 +87,6 @@ def evaluate_record(record: dict, phase: str) -> TraceDecision:
     if not anchors:
         return TraceDecision(timestamp, "rejected", "missing_anchor", input_text, output_text, anchors)
 
-    # Precedence policy (two_phase):
-    # 1) malformed anchor / malformed semantic metadata
-    # 2) hard structural safety rejects
-    # 3) short-context drift gate
-    # 4) softer structural drift signals
-    # 5) legacy unsupported-claim keyword proxy
     if phase == "two_phase":
         if any(_is_placeholder_anchor(anchor) for anchor in anchors):
             return TraceDecision(timestamp, "rejected", "malformed_anchor", input_text, output_text, anchors)

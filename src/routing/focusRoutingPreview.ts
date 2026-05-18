@@ -112,10 +112,13 @@ function determineReason(focusMomentum: number, volatility: number): string {
 function fallbackVolatility(decision: RoutingDecision): number {
   if (!decision.options.length) return 0;
   const scores = decision.options.map((option) => option.score);
-  const maxScore = Math.max(...scores);
-  const minScore = Math.min(...scores);
-  const spread = maxScore - minScore;
-  return Number(spread.toFixed(3));
+  let maxScore = scores[0];
+  let minScore = scores[0];
+  for (let i = 1; i < scores.length; i++) {
+    if (scores[i] > maxScore) maxScore = scores[i];
+    if (scores[i] < minScore) minScore = scores[i];
+  }
+  return Number((maxScore - minScore).toFixed(3));
 }
 
 function softenSector(sector: string): string {
