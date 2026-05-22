@@ -16,6 +16,18 @@ For reviewers navigating the broader ecosystem: LTP is the trace/replay/continui
 > Want to join? [Click here](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/stargazers) to show support!
 <!-- community-interest:end -->
 
+## For grant reviewers
+
+If you are evaluating LTP for a $20k-$50k AI safety / open-source infrastructure seed grant, start with:
+
+- Reviewer path: `docs/GRANT_REVIEWER_PATH.md`
+- Seed grant proposal: `docs/GRANT_PROPOSAL_20K_50K.md`
+- Benchmark plan: `docs/BENCHMARK_PLAN.md`
+- Evaluation protocol: `docs/EVALUATION_PROTOCOL.md`
+- Repository map: `docs/REPO_MAP.md`
+- Documentation status: `docs/DOCS_STATUS.md`
+- Existing evidence and non-claims: `docs/GRANT_EVIDENCE.md`
+
 ```bash
 ltp inspect trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay --phase two_phase --color
 ```
@@ -123,6 +135,12 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 ## Quick links
 
 - Start here: `docs/START_HERE.md`
+- Grant reviewer path: `docs/GRANT_REVIEWER_PATH.md`
+- Seed grant proposal: `docs/GRANT_PROPOSAL_20K_50K.md`
+- Benchmark plan: `docs/BENCHMARK_PLAN.md`
+- Evaluation protocol: `docs/EVALUATION_PROTOCOL.md`
+- Repository map: `docs/REPO_MAP.md`
+- Documentation status: `docs/DOCS_STATUS.md`
 - Architecture: `docs/architecture/LTP-Architecture.md`
 - LTP ↔ CML bridge: `docs/architecture/LTP-CML-Bridge.md`
 - Developer and commercial roadmap: `docs/roadmap/LTP-Developer-and-Commercial-Roadmap.md`
