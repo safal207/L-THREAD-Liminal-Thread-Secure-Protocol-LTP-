@@ -24,6 +24,7 @@ If you are evaluating LTP for a $20k-$50k AI safety / open-source infrastructure
 - Seed grant proposal: `docs/GRANT_PROPOSAL_20K_50K.md`
 - Benchmark plan: `docs/BENCHMARK_PLAN.md`
 - Evaluation protocol: `docs/EVALUATION_PROTOCOL.md`
+- Showcase trace map: `docs/SHOWCASE_TRACES.md`
 - Repository map: `docs/REPO_MAP.md`
 - Documentation status: `docs/DOCS_STATUS.md`
 - Existing evidence and non-claims: `docs/GRANT_EVIDENCE.md`
@@ -139,6 +140,7 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 - Seed grant proposal: `docs/GRANT_PROPOSAL_20K_50K.md`
 - Benchmark plan: `docs/BENCHMARK_PLAN.md`
 - Evaluation protocol: `docs/EVALUATION_PROTOCOL.md`
+- Showcase trace map: `docs/SHOWCASE_TRACES.md`
 - Repository map: `docs/REPO_MAP.md`
 - Documentation status: `docs/DOCS_STATUS.md`
 - Architecture: `docs/architecture/LTP-Architecture.md`
