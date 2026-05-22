@@ -8,11 +8,24 @@ It is designed to provide a minimal empirical layer for:
 - explicit trace classification examples,
 - future extension into fuller inspect/replay-driven evaluation.
 
+## Current tracked snapshot
+
+`benchmark/RESULTS.md` is the current tracked benchmark artifact.
+
+At the latest snapshot it reports:
+
+- total cases: 24;
+- correct classifications: 24;
+- mismatches: 0;
+- expected labels: 6 admissible, 7 drift, 11 rejected.
+
+These numbers are scoped only to this deterministic fixture scaffold. They are not a universal model-safety or production-readiness claim.
+
 ## Labels in this scaffold
 
 - **admissible**: trace has anchors and sufficient prompt context; no unsupported claim markers under the configured phase.
-- **drift**: trace has anchors but insufficient prompt context (short input) under current deterministic rules.
-- **rejected**: trace breaks basic safety gating (e.g., missing anchors or unsupported/"guess" style claims in `two_phase`).
+- **drift**: trace has anchors but insufficient prompt context, partial provenance, or weak support under current deterministic rules.
+- **rejected**: trace breaks basic safety gating, such as missing anchors, broken provenance, missing required approval, anchor mismatch, unsupported intermediate step, or unsupported post-hoc claim in `two_phase`.
   - In this scaffold, `approval_present: false` means required approval is explicitly missing, and is therefore a structural reject signal in `two_phase`.
 
 These meanings are scoped to the current scaffold logic and the existing `ltp.inspect_trace.evaluate_record` behavior.
@@ -58,8 +71,10 @@ The command prints:
 
 See also:
 
-- `benchmark/RESULTS.md` for the current deterministic fixture snapshot (generated via `python scripts/generate_benchmark_results.py` or `make benchmark-report`).
+- `benchmark/RESULTS.md` for the current deterministic fixture snapshot.
 - `benchmark/INTERPRETATION.md` for concise interpretation guidance.
+- `docs/SHOWCASE_TRACES.md` for five reviewer-facing examples mapped to existing fixtures.
+- `docs/EVALUATION_PROTOCOL.md` for evaluation rules and overclaiming boundaries.
 
 ## Fixture layout
 
@@ -71,7 +86,7 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 19 cases total, including adversarial and boundary-condition coverage across all labels.
+The fixture set currently contains 24 cases total, including adversarial and boundary-condition coverage across all labels.
 
 ## Adversarial and boundary-case extension
 
@@ -92,6 +107,7 @@ These additions remain intentionally small and deterministic. They improve safet
 - This is **not** a final research benchmark.
 - This is **not** a universal performance claim.
 - This is **not** a model-evaluation suite.
+- This is **not** a production security certification.
 
 It is only a small deterministic scaffold intended to support honest iteration.
 
