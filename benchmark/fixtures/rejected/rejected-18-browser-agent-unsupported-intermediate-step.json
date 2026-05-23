@@ -1,0 +1,19 @@
+{
+  "case_id": "rejected-18-browser-agent-unsupported-intermediate-step",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Browsing-agent trace includes an unsupported intermediate step before the final answer.",
+  "record": {
+    "timestamp": "2026-05-23T10:10:00Z",
+    "input": "Use the retrieved page evidence to answer the question.",
+    "output": "The answer includes an intermediate conclusion not supported by the retrieved page evidence.",
+    "anchors": [
+      "PAGE-EXCERPT-018",
+      "RETRIEVAL-018"
+    ],
+    "approval_present": true,
+    "unsupported_step_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
