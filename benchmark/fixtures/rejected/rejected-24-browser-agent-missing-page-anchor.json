@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-24-browser-agent-missing-page-anchor",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Browsing answer lacks required page anchors.",
+  "record": {
+    "timestamp": "2026-05-23T12:25:00Z",
+    "input": "Answer from the browsed page and cite the page evidence.",
+    "output": "The answer is given without a page evidence anchor.",
+    "anchors": []
+  }
+}
