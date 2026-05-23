@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-13-browser-agent-anchored-finding",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Browsing-agent finding is limited to anchored page evidence.",
+  "record": {
+    "timestamp": "2026-05-23T09:20:00Z",
+    "input": "Report the finding from the browsed page using the captured evidence.",
+    "output": "The finding is stated only as supported by the captured page excerpt and retrieval record.",
+    "anchors": [
+      "PAGE-EXCERPT-013",
+      "RETRIEVAL-RECORD-013"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
