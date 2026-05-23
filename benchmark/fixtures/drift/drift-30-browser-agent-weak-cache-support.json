@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-30-browser-agent-weak-cache-support",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Browser-agent answer has cache anchors but weak support for the conclusion.",
+  "record": {
+    "timestamp": "2026-05-23T14:30:00Z",
+    "input": "Assess whether the cached page supports the answer.",
+    "output": "The cached page may support part of the answer, but support is weak.",
+    "anchors": ["CACHE-030", "PAGE-030"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
