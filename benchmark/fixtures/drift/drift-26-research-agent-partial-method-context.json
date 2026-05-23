@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-26-research-agent-partial-method-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Research-agent answer has anchors but partial method context.",
+  "record": {
+    "timestamp": "2026-05-23T13:20:00Z",
+    "input": "Assess the method claim using the supplied method note and excerpt.",
+    "output": "The method claim is plausible, but the method context is incomplete.",
+    "anchors": ["METHOD-NOTE-026", "EXCERPT-026"],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
