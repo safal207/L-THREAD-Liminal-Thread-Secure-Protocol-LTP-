@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-32-legal-anchor-mismatch-broad-claim",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Legal answer makes a broad claim that mismatches narrow clause anchors.",
+  "record": {
+    "timestamp": "2026-05-23T13:55:00Z",
+    "input": "Use the cited clause to support the legal conclusion.",
+    "output": "The legal conclusion is broader than the cited clause supports.",
+    "anchors": ["CLAUSE-032", "LEGAL-NOTE-032"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "mismatch"
+  }
+}
