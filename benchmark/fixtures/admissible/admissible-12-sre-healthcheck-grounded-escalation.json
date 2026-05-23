@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-12-sre-healthcheck-grounded-escalation",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "SRE escalation is grounded in healthcheck and runbook anchors.",
+  "record": {
+    "timestamp": "2026-05-23T09:15:00Z",
+    "input": "Recommend whether to escalate the incident using the healthcheck and runbook.",
+    "output": "Escalation is recommended because the healthcheck threshold and runbook condition are both met.",
+    "anchors": [
+      "HEALTHCHECK-012",
+      "RUNBOOK-ESCALATION-012"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
