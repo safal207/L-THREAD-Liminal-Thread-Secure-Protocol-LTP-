@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-33-legal-partial-review-note",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Legal answer has review anchors but partial review context.",
+  "record": {
+    "timestamp": "2026-05-23T14:45:00Z",
+    "input": "Assess the conclusion using the review note and clause.",
+    "output": "The conclusion is plausible, but the review note context is incomplete.",
+    "anchors": ["REVIEW-NOTE-033", "CLAUSE-033"],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
