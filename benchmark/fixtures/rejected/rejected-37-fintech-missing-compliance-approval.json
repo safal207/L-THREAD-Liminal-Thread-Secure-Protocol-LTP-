@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-37-fintech-missing-compliance-approval",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Fintech compliance decision has anchors but lacks required approval.",
+  "record": {
+    "timestamp": "2026-05-23T15:10:00Z",
+    "input": "Prepare the compliance decision using audit and policy anchors.",
+    "output": "The compliance decision is prepared for execution.",
+    "anchors": ["AUDIT-037", "POLICY-037"],
+    "approval_present": false,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
