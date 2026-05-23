@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-36-fintech-anchor-mismatch-risk-threshold",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Fintech decision cites anchors that mismatch the stated risk threshold.",
+  "record": {
+    "timestamp": "2026-05-23T15:05:00Z",
+    "input": "Justify the risk threshold decision using the cited policy anchors.",
+    "output": "The decision states a threshold that is not supported by the cited anchors.",
+    "anchors": ["RISK-THRESHOLD-036", "POLICY-036"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "mismatch"
+  }
+}
