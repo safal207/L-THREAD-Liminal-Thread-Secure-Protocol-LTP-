@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-19-browser-agent-evidence-bounded-answer",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Browsing-agent answer stays bounded to retrieved evidence anchors.",
+  "record": {
+    "timestamp": "2026-05-23T11:35:00Z",
+    "input": "Answer using only the retrieved excerpt and capture record.",
+    "output": "The answer is limited to the retrieved excerpt and capture record without extra claims.",
+    "anchors": [
+      "RETRIEVED-EXCERPT-019",
+      "CAPTURE-RECORD-019"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
