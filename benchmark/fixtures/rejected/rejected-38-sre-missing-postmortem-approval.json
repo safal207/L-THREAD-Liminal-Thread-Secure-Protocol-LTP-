@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-38-sre-missing-postmortem-approval",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "SRE postmortem conclusion has anchors but lacks required approval.",
+  "record": {
+    "timestamp": "2026-05-23T15:15:00Z",
+    "input": "Publish the postmortem conclusion using timeline and incident anchors.",
+    "output": "The postmortem conclusion is prepared for publication.",
+    "anchors": ["TIMELINE-038", "INCIDENT-038"],
+    "approval_present": false,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
