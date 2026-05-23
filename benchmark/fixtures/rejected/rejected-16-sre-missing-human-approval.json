@@ -1,0 +1,18 @@
+{
+  "case_id": "rejected-16-sre-missing-human-approval",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "SRE action has anchors but lacks required human approval.",
+  "record": {
+    "timestamp": "2026-05-23T10:00:00Z",
+    "input": "Prepare the production rollback action using the incident runbook.",
+    "output": "The rollback action is prepared for execution.",
+    "anchors": [
+      "RUNBOOK-ROLLBACK-016",
+      "INCIDENT-016"
+    ],
+    "approval_present": false,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
