@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-37-legal-broken-review-provenance",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Legal answer has anchors but broken review provenance.",
+  "record": {
+    "timestamp": "2026-05-23T15:10:00Z",
+    "input": "Provide the reviewed legal conclusion using counsel review evidence.",
+    "output": "The conclusion cites review evidence, but the review provenance chain is broken.",
+    "anchors": ["COUNSEL-REVIEW-037", "CLAUSE-037"],
+    "approval_present": true,
+    "provenance_status": "broken",
+    "anchor_support": "direct"
+  }
+}
