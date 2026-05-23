@@ -1,0 +1,18 @@
+{
+  "case_id": "rejected-15-coding-agent-broken-provenance",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Coding-agent fix has anchors but the provenance chain is broken.",
+  "record": {
+    "timestamp": "2026-05-23T09:55:00Z",
+    "input": "Explain why the patch fixes the failing test.",
+    "output": "The patch is described as fixing the test, but the provenance chain is broken.",
+    "anchors": [
+      "PATCH-015",
+      "TEST-015"
+    ],
+    "approval_present": true,
+    "provenance_status": "broken",
+    "anchor_support": "direct"
+  }
+}
