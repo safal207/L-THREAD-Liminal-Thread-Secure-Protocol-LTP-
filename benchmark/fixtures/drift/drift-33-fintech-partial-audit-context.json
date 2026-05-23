@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-33-fintech-partial-audit-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Fintech audit answer has anchors but partial audit context.",
+  "record": {
+    "timestamp": "2026-05-23T14:45:00Z",
+    "input": "Assess the audit decision using the audit note and policy anchor.",
+    "output": "The audit decision is plausible, but the surrounding audit context is incomplete.",
+    "anchors": ["AUDIT-NOTE-033", "POLICY-033"],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
