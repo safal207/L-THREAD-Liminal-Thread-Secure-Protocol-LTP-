@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-20-research-agent-weak-citation-link",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Research answer has citation anchors but weak linkage to the claim.",
+  "record": {
+    "timestamp": "2026-05-23T12:00:00Z",
+    "input": "Assess whether the citation supports the research claim.",
+    "output": "The citation may support part of the claim, but the link is weak.",
+    "anchors": ["CITATION-020", "CLAIM-020"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
