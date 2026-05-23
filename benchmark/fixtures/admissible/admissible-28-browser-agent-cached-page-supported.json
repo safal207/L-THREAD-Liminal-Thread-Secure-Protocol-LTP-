@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-28-browser-agent-cached-page-supported",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Browser-agent answer is supported by cached page and retrieval anchors.",
+  "record": {
+    "timestamp": "2026-05-23T13:10:00Z",
+    "input": "Answer using the cached page and retrieval record only.",
+    "output": "The answer is limited to the cached page and retrieval record.",
+    "anchors": ["CACHED-PAGE-028", "RETRIEVAL-028"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
