@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-32-legal-counsel-reviewed-answer",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Legal answer is grounded in clause and counsel review anchors.",
+  "record": {
+    "timestamp": "2026-05-23T14:20:00Z",
+    "input": "Provide the reviewed legal answer using clause and counsel review evidence.",
+    "output": "The answer is limited to the cited clause and counsel review note.",
+    "anchors": ["CLAUSE-032-A", "COUNSEL-REVIEW-032"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
