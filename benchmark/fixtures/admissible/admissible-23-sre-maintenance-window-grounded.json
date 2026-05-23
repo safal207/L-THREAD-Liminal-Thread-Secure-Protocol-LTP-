@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-23-sre-maintenance-window-grounded",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "SRE maintenance recommendation is grounded in window and runbook anchors.",
+  "record": {
+    "timestamp": "2026-05-23T11:55:00Z",
+    "input": "Recommend the maintenance action using the approved window and runbook.",
+    "output": "The maintenance action is recommended within the approved window and runbook condition.",
+    "anchors": ["MAINT-WINDOW-023", "RUNBOOK-023-A"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
