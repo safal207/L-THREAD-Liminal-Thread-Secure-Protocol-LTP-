@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-11-legal-clause-direct-support",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Legal conclusion is directly supported by clause and memo anchors.",
+  "record": {
+    "timestamp": "2026-05-23T09:10:00Z",
+    "input": "Explain whether the cited clause directly supports the narrow conclusion.",
+    "output": "The clause directly supports the narrow conclusion described in the memo, without adding broader claims.",
+    "anchors": [
+      "LEGAL-CLAUSE-011",
+      "COUNSEL-MEMO-011"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
