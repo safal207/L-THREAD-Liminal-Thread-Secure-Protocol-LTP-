@@ -14,10 +14,10 @@ It is designed to provide a minimal empirical layer for:
 
 At the latest snapshot it reports:
 
-- total cases: 105;
-- correct classifications: 105;
+- total cases: 115;
+- correct classifications: 115;
 - mismatches: 0;
-- expected labels: 33 admissible, 34 drift, 38 rejected.
+- expected labels: 33 admissible, 39 drift, 43 rejected.
 
 These numbers are scoped only to this deterministic fixture scaffold. They are not a universal model-safety or production-readiness claim.
 
@@ -86,7 +86,7 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 105 cases total, including adversarial and boundary-condition coverage across all labels.
+The fixture set currently contains 115 cases total, including adversarial and boundary-condition coverage across all labels.
 
 ## Adversarial and boundary-case extension
 
