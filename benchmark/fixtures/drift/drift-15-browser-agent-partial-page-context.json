@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-15-browser-agent-partial-page-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Browsing-agent finding has anchors but only partial page context.",
+  "record": {
+    "timestamp": "2026-05-23T10:45:00Z",
+    "input": "Explain the page finding using the captured excerpt and retrieval metadata.",
+    "output": "The finding is plausible, but the captured page context is incomplete.",
+    "anchors": [
+      "PAGE-EXCERPT-015",
+      "RETRIEVAL-META-015"
+    ],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
