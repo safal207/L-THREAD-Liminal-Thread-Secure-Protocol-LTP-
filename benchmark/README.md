@@ -14,10 +14,10 @@ It is designed to provide a minimal empirical layer for:
 
 At the latest snapshot it reports:
 
-- total cases: 30;
-- correct classifications: 30;
+- total cases: 45;
+- correct classifications: 45;
 - mismatches: 0;
-- expected labels: 8 admissible, 9 drift, 13 rejected.
+- expected labels: 13 admissible, 14 drift, 18 rejected.
 
 These numbers are scoped only to this deterministic fixture scaffold. They are not a universal model-safety or production-readiness claim.
 
@@ -86,7 +86,7 @@ benchmark/
     rejected/
 ```
 
-The fixture set currently contains 30 cases total, including adversarial and boundary-condition coverage across all labels.
+The fixture set currently contains 45 cases total, including adversarial and boundary-condition coverage across all labels.
 
 ## Adversarial and boundary-case extension
 
@@ -97,7 +97,7 @@ The fixture library includes targeted adversarial and boundary-condition example
 - anchor mismatch and unsupported intermediate leaps,
 - hallucinated or injected conclusions mixed into otherwise anchored output,
 - suspicious instruction drift and boundary-edge records,
-- coding, research, fintech, legal/citation, and SRE-oriented review examples.
+- coding, research, fintech, legal/citation, browser-agent, and SRE-oriented review examples.
 
 For semantic records, optional fields (`provenance_status`, `anchor_support`, `approval_present`, `unsupported_step_present`) are validated at fixture-load time. In `two_phase`, malformed semantic metadata is rejected explicitly, structural reject signals take precedence over drift checks, and drift checks take precedence over legacy keyword-proxy rejection.
 
