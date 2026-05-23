@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-30-research-agent-reproducible-note",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Research note is grounded in reproduced result and source anchors.",
+  "record": {
+    "timestamp": "2026-05-23T14:10:00Z",
+    "input": "Write a reproducibility note using the reproduced result and source extract.",
+    "output": "The reproducibility note is limited to the reproduced result and source extract.",
+    "anchors": ["REPRO-RESULT-030", "SOURCE-EXTRACT-030"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
