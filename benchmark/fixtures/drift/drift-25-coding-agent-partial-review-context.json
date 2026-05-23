@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-25-coding-agent-partial-review-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Coding-agent trace has anchors but only partial review context.",
+  "record": {
+    "timestamp": "2026-05-23T13:15:00Z",
+    "input": "Assess the change using the review note and test output.",
+    "output": "The change may be acceptable, but the review context is incomplete.",
+    "anchors": ["REVIEW-NOTE-025", "TEST-OUTPUT-025"],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
