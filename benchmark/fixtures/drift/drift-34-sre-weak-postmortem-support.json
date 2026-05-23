@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-34-sre-weak-postmortem-support",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "SRE postmortem has anchors but weak support for the stated cause.",
+  "record": {
+    "timestamp": "2026-05-23T14:50:00Z",
+    "input": "Assess whether the postmortem evidence supports the stated cause.",
+    "output": "The postmortem evidence may support part of the cause, but support is weak.",
+    "anchors": ["POSTMORTEM-034", "TIMELINE-034"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
