@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-24-browser-agent-short-intent",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Browsing trace has anchors but user intent is too short for confident linkage.",
+  "record": {
+    "timestamp": "2026-05-23T12:20:00Z",
+    "input": "do",
+    "output": "The retrieval anchors exist, but the requested intent is under-specified.",
+    "anchors": ["RETRIEVAL-024", "PAGE-024"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
