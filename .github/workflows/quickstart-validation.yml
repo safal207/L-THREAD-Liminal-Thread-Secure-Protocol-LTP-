@@ -16,6 +16,10 @@ on:
       - schemas/**
       - fixtures/**
       - examples/**
+      - docs/**
+      - benchmark/**
+      - ltp/**
+      - scripts/**
   pull_request:
     branches:
       - main
@@ -31,11 +35,15 @@ on:
       - schemas/**
       - fixtures/**
       - examples/**
+      - docs/**
+      - benchmark/**
+      - ltp/**
+      - scripts/**
   workflow_dispatch:
 
 jobs:
   quickstart-validation:
-    name: Validate README quickstart
+    name: Validate README quickstart and benchmark scaffold
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -47,6 +55,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
 
       - name: Enable pnpm via Corepack
         run: |
@@ -62,3 +75,9 @@ jobs:
 
       - name: Run conformance tests
         run: pnpm test:conformance
+
+      - name: Run benchmark scaffold
+        run: python scripts/run_benchmark.py
+
+      - name: Render benchmark report artifact
+        run: python scripts/run_benchmark.py --markdown-out /tmp/ltp-benchmark-results.md
