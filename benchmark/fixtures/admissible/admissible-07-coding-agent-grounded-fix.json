@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-07-coding-agent-grounded-fix",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Coding-agent fix remains grounded in issue and test anchors.",
+  "record": {
+    "timestamp": "2026-05-23T08:00:00Z",
+    "input": "Propose a small code fix using the failing test and issue description.",
+    "output": "The proposed fix is limited to the failing validation branch and is supported by the test evidence.",
+    "anchors": [
+      "ISSUE-CODING-007",
+      "TEST-FAILURE-007"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
