@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-17-fintech-partial-customer-risk-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Fintech recommendation has anchors but partial customer-risk context.",
+  "record": {
+    "timestamp": "2026-05-23T10:55:00Z",
+    "input": "Assess the customer risk recommendation using available risk records.",
+    "output": "The recommendation is plausible, but the customer-risk context is incomplete.",
+    "anchors": [
+      "CUSTOMER-RISK-017",
+      "RISK-POLICY-017"
+    ],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
