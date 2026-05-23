@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-19-sre-minimal-incident-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "SRE trace has anchors but incident prompt context is too minimal.",
+  "record": {
+    "timestamp": "2026-05-23T11:05:00Z",
+    "input": "ok",
+    "output": "The incident anchors exist, but the requested action is under-specified.",
+    "anchors": [
+      "INCIDENT-019",
+      "RUNBOOK-019"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
