@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-11-fintech-weak-risk-evidence",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Fintech risk answer has anchors but weak support for the recommendation.",
+  "record": {
+    "timestamp": "2026-05-23T09:30:00Z",
+    "input": "Recommend whether the customer profile should be escalated for review.",
+    "output": "Escalation may be appropriate, but the available risk evidence is weak.",
+    "anchors": [
+      "CUSTOMER-RISK-011",
+      "ESCALATION-POLICY-011"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
