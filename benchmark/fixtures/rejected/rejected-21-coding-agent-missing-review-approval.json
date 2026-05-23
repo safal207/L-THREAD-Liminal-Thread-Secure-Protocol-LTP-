@@ -1,0 +1,18 @@
+{
+  "case_id": "rejected-21-coding-agent-missing-review-approval",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Coding-agent change has anchors but lacks required reviewer approval.",
+  "record": {
+    "timestamp": "2026-05-23T11:20:00Z",
+    "input": "Prepare the merge action after the test run.",
+    "output": "The merge action is prepared using the test result.",
+    "anchors": [
+      "TEST-RUN-021",
+      "CHANGESET-021"
+    ],
+    "approval_present": false,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
