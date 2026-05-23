@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-18-sre-runbook-noop-grounded",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "SRE no-op recommendation is grounded in runbook and stable telemetry anchors.",
+  "record": {
+    "timestamp": "2026-05-23T10:40:00Z",
+    "input": "Decide whether to take action using the runbook and current telemetry.",
+    "output": "No action is recommended because the runbook threshold is not met and telemetry is stable.",
+    "anchors": [
+      "RUNBOOK-NOOP-018",
+      "TELEMETRY-STABLE-018"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
