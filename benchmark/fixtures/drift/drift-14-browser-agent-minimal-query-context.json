@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-14-browser-agent-minimal-query-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Browsing-agent trace has anchors but the prompt context is too minimal.",
+  "record": {
+    "timestamp": "2026-05-23T09:45:00Z",
+    "input": "go",
+    "output": "The page excerpt is available, but the user intent is under-specified.",
+    "anchors": [
+      "PAGE-EXCERPT-014",
+      "RETRIEVAL-014"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
