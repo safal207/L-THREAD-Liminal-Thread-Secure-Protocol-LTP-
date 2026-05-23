@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-34-browser-agent-anchor-mismatch-cached-page",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Browser-agent answer uses cached page anchors that mismatch the claim.",
+  "record": {
+    "timestamp": "2026-05-23T14:55:00Z",
+    "input": "Use the cached page to support the answer.",
+    "output": "The answer is broader than the cached page supports.",
+    "anchors": ["CACHED-PAGE-034", "CLAIM-034"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "mismatch"
+  }
+}
