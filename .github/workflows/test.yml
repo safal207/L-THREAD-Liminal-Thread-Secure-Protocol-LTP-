@@ -50,7 +50,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          pnpm fetch || echo "pnpm fetch skipped (offline)"
+          pnpm fetch
           pnpm -w install --prefer-offline --frozen-lockfile
       - name: Run inspector contract tests (fast)
         shell: bash
@@ -233,7 +233,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          pnpm fetch || echo "pnpm fetch skipped (offline)"
+          pnpm fetch
           if ! pnpm -w install --prefer-offline --frozen-lockfile; then
             echo "pnpm install retry"
             sleep 5
@@ -302,7 +302,7 @@ jobs:
       - name: Test
         run: |
           cd sdk/python
-          python -m pytest tests/ || echo "No tests yet"
+          python -m pytest tests/
 
   test-elixir:
     name: Test Elixir SDK
@@ -383,7 +383,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          pnpm fetch || echo "pnpm fetch skipped"
+          pnpm fetch
           pnpm -w install --prefer-offline --frozen-lockfile
 
       - uses: actions/setup-python@v4

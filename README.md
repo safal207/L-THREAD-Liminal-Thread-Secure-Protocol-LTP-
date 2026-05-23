@@ -1,4 +1,8 @@
-# LTP — Liminal Thread Protocol
+# LTP - Liminal Thread Protocol
+
+![Status](https://img.shields.io/badge/status-active-brightgreen)
+![Traceability](https://img.shields.io/badge/traceability-deterministic-blue)
+![License](https://img.shields.io/badge/license-MIT-orange)
 
 LTP is a deterministic oversight and replay protocol for agent traces.
 It helps teams inspect whether an AI or agent followed an admissible, grounded execution path, detect drift, reject unsupported outputs or actions, and preserve audit-grade evidence for high-risk workflows.
@@ -8,13 +12,22 @@ For reviewers navigating the broader ecosystem: LTP is the trace/replay/continui
 ![LTP replay demo preview](assets/replay-demo.svg)
 
 <!-- community-interest:start -->
-### 🌟 Community Interest
+### Community Interest
 
 ![Stars](https://img.shields.io/github/stars/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-?style=for-the-badge)
 
-> Current interest: 3 stars → 🌱 New signal 🚀  
+> Current interest: 3 stars
 > Want to join? [Click here](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/stargazers) to show support!
 <!-- community-interest:end -->
+
+**Project status:** Active protocol and SDK development with multi-language CI checks.
+
+**Fast validation (under 2 minutes):**
+
+```bash
+pnpm install --frozen-lockfile
+pnpm test
+```
 
 ## For grant reviewers
 
@@ -28,10 +41,7 @@ If you are evaluating LTP for a $20k-$50k AI safety / open-source infrastructure
 - Repository map: `docs/REPO_MAP.md`
 - Documentation status: `docs/DOCS_STATUS.md`
 - Existing evidence and non-claims: `docs/GRANT_EVIDENCE.md`
-
-```bash
-ltp inspect trace tools/ltp-inspect/fixtures/replay/trace-replay.jsonl --replay --phase two_phase --color
-```
+- Grant brief: `GRANT_BRIEF.md`
 
 ## Why LTP exists
 
@@ -68,12 +78,12 @@ More detail: `docs/architecture/LTP-Architecture.md`
 - Oversight decisions on execution paths: `admissible / drift / rejected`.
 - Two-phase oversight checks (pre-action/pre-generation and post-generation/post-action).
 - Unsupported-path rejection within the oversight profile, including ungrounded or hallucinated claims.
-- Audit-grade evidence via JSONL traces + generated logs.
-- Model/framework agnostic inspection surface (GPT, Claude, LLaMA, Grok, and future stacks).
+- Compliance evidence in JSONL traces and generated reports.
+- Model/framework agnostic inspection surface.
 
 ## Oversight decisions and two-phase checks
 
-LTP classifies **execution paths**, not just output quality:
+LTP classifies execution paths, not just output quality:
 
 - `admissible`: path is grounded/anchored and policy-safe.
 - `drift`: path shows degraded context, weak grounding, or review-required deviation.
@@ -81,57 +91,56 @@ LTP classifies **execution paths**, not just output quality:
 
 Two-phase checks:
 
-1. **Phase 1 (pre-action / pre-generation):** fail the pre-check when reliable anchor context is missing.
-2. **Phase 2 (post-generation / post-action):** inspect produced output/action traces and mark unsupported or fabricated claims/actions as `rejected`.
+1. Phase 1 (pre-action / pre-generation): fail the pre-check when reliable anchor context is missing.
+2. Phase 2 (post-generation / post-action): inspect produced output/action traces and mark unsupported or fabricated claims/actions as `rejected`.
 
 ## LTP vs ordinary logging
 
 | Capability | Regular app logs | Framework tracing | LTP |
 |---|---|---|---|
-| Deterministic replay | ❌ | ⚠️ | ✅ |
-| Execution-path admissibility decisions | ❌ | ⚠️ | ✅ |
-| Unsupported-path rejection (two-phase oversight profile) | ❌ | ❌ | ✅ |
-| Audit-grade evidence export | ⚠️ | ⚠️ | ✅ |
-| Model/framework agnostic inspection surface | ✅ | ❌ | ✅ |
+| Deterministic replay | No | Partial | Yes |
+| Execution-path admissibility decisions | No | Partial | Yes |
+| Unsupported-path rejection | No | No | Yes |
+| Audit-grade evidence export | Partial | Partial | Yes |
+| Model/framework agnostic inspection surface | Yes | No | Yes |
 
-## Live demo (GitHub Actions)
+## Core docs
 
-[![Run LTP Demo](https://img.shields.io/badge/Live%20Demo-Run%20Workflow-blue?style=for-the-badge)](.github/workflows/demo.yml)
+- [Grant brief](./GRANT_BRIEF.md)
+- [Whitepaper](./docs/WHITEPAPER_LTP_v0.1.md)
+- [Adoption guide](./docs/LTP-Adoption-Guide.md)
+- [Conformance docs](./docs/conformance/ci-consume-report.md)
 
-Run `LTP Live Demo` via **workflow_dispatch** to produce:
+## Why this matters
 
-- `replay.log`
-- `replay.gif`
+LTP is best described as a protocol-level trust layer:
+
+- it keeps routing decisions replayable
+- it keeps audit evidence inspectable
+- it avoids coupling to a single framework or model provider
+- it gives operators a deterministic way to verify what happened
 
 ## Use-case cards
 
-<details>
-<summary>💳 Fintech</summary>
+### Fintech
 
 - KYC/AML assistant actions with anchored policy checks.
 - Transfer and approvals with unsupported paths rejected under the oversight profile.
-</details>
 
-<details>
-<summary>🕵️ OSINT</summary>
+### OSINT
 
 - Evidence graph summaries marked `rejected` when source anchors are missing.
 - Replay divergence analysis for investigative chain-of-custody.
-</details>
 
-<details>
-<summary>⚖️ Legal</summary>
+### Legal
 
 - Contract/policy citation enforcement.
 - Post-hoc rejection of unsupported conclusions.
-</details>
 
-<details>
-<summary>🛠️ Infra / SRE</summary>
+### Infra / SRE
 
 - Incident-agent replay to inspect drift before automated actions.
 - Critical runbook actions evaluated against anchor-backed context.
-</details>
 
 ## Quick links
 
@@ -144,7 +153,7 @@ Run `LTP Live Demo` via **workflow_dispatch** to produce:
 - Repository map: `docs/REPO_MAP.md`
 - Documentation status: `docs/DOCS_STATUS.md`
 - Architecture: `docs/architecture/LTP-Architecture.md`
-- LTP ↔ CML bridge: `docs/architecture/LTP-CML-Bridge.md`
+- LTP / CML bridge: `docs/architecture/LTP-CML-Bridge.md`
 - Developer and commercial roadmap: `docs/roadmap/LTP-Developer-and-Commercial-Roadmap.md`
 - Commercial pilot one-pager: `docs/commercial/LTP-Pilot-One-Pager.md`
 - Audit report template: `docs/commercial/LTP-Audit-Report-Template.md`
@@ -180,13 +189,17 @@ The same command sequence is checked by `.github/workflows/quickstart-validation
 
 Local scratch directories such as `.tmp/` are ignored by the repository and excluded from TypeScript test discovery so golden snapshots stay deterministic.
 
+## Positioning for grants
+
+The strongest grant story is not "more features". It is better infrastructure for systems that need transparency, reproducibility, and interoperable evidence.
+
 ## Roadmap
 
-- ✅ Replay analyzer (`ltp inspect trace`)
-- ✅ Two-phase enforcement
-- ✅ GitHub Actions interactive demo
-- ✅ Community onboarding docs and contributor-ready backlog
-- ✅ Commercial pilot and audit templates
-- 🟡 Expanded adapter SDKs
-- 🟡 Rich replay animation renderer
-- 🔴 AutoGen v1.2 reference adapter
+- Done: Replay analyzer (`ltp inspect trace`)
+- Done: Two-phase enforcement
+- Done: GitHub Actions interactive demo
+- Done: Community onboarding docs and contributor-ready backlog
+- Done: Commercial pilot and audit templates
+- In progress: Expanded adapter SDKs
+- In progress: Rich replay animation renderer
+- Planned: AutoGen v1.2 reference adapter

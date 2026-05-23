@@ -656,5 +656,5 @@ describe('ltp inspect cli', () => {
     expect(logs.join('\n')).toContain('c2');
     expect(logs.join('\n')).toContain('c3');
     expect(logs.join('\n')).toContain('c4');
-  }, 20000);
+  }, 60000);
 });

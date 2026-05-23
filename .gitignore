@@ -43,6 +43,7 @@ yarn-error.log*
 # Testing
 coverage/
 .nyc_output/
+.pytest_cache/
 artifacts/**
 !artifacts/traces/
 !artifacts/traces/sample.trace.json
