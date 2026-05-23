@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-30-browser-agent-partial-cache-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Browser-agent answer has cache anchors but partial page context.",
+  "record": {
+    "timestamp": "2026-05-23T14:30:00Z",
+    "input": "Assess the cached page answer using cache and retrieval records.",
+    "output": "The cached answer is plausible, but page context is incomplete.",
+    "anchors": ["CACHE-030", "RETRIEVAL-030"],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
