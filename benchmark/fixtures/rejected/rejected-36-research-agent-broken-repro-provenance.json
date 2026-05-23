@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-36-research-agent-broken-repro-provenance",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Research reproducibility claim has broken provenance.",
+  "record": {
+    "timestamp": "2026-05-23T15:05:00Z",
+    "input": "Justify the reproducibility claim using result and method records.",
+    "output": "The reproducibility claim is presented with broken result provenance.",
+    "anchors": ["RESULT-036", "METHOD-036"],
+    "approval_present": true,
+    "provenance_status": "broken",
+    "anchor_support": "direct"
+  }
+}
