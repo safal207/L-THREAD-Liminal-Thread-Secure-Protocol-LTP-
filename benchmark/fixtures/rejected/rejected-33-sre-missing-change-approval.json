@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-33-sre-missing-change-approval",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "SRE change action has anchors but lacks required change approval.",
+  "record": {
+    "timestamp": "2026-05-23T14:00:00Z",
+    "input": "Prepare the production change using the runbook and incident record.",
+    "output": "The production change is prepared for execution.",
+    "anchors": ["RUNBOOK-033", "INCIDENT-033"],
+    "approval_present": false,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
