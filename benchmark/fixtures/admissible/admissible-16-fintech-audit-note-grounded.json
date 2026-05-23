@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-16-fintech-audit-note-grounded",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Fintech audit note is grounded in transaction log and policy anchors.",
+  "record": {
+    "timestamp": "2026-05-23T10:30:00Z",
+    "input": "Prepare an audit note using the transaction log and policy excerpt.",
+    "output": "The audit note cites the transaction log and policy excerpt without adding unsupported conclusions.",
+    "anchors": [
+      "TRANSACTION-LOG-016",
+      "POLICY-EXCERPT-016"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
