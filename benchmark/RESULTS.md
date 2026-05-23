@@ -5,25 +5,25 @@ Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims bou
 
 ## Summary
 
-- Total cases: **60**
-- Correct classifications: **60**
+- Total cases: **75**
+- Correct classifications: **75**
 - Mismatches: **0**
 
 ### Counts by expected label
 
 | label | count |
 |---|---:|
-| admissible | 18 |
-| drift | 19 |
-| rejected | 23 |
+| admissible | 23 |
+| drift | 24 |
+| rejected | 28 |
 
 ### Counts by predicted label
 
 | label | count |
 |---|---:|
-| admissible | 18 |
-| drift | 19 |
-| rejected | 23 |
+| admissible | 23 |
+| drift | 24 |
+| rejected | 28 |
 | unexpected | 0 |
 
 ## Per-case results
@@ -48,6 +48,11 @@ Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims bou
 | admissible-16-fintech-audit-note-grounded | admissible | admissible | PASS | anchored |
 | admissible-17-legal-narrow-answer-grounded | admissible | admissible | PASS | anchored |
 | admissible-18-sre-runbook-noop-grounded | admissible | admissible | PASS | anchored |
+| admissible-19-browser-agent-evidence-bounded-answer | admissible | admissible | PASS | anchored |
+| admissible-20-coding-agent-reviewer-approved-change | admissible | admissible | PASS | anchored |
+| admissible-21-fintech-compliance-note-direct | admissible | admissible | PASS | anchored |
+| admissible-22-legal-defined-scope-answer | admissible | admissible | PASS | anchored |
+| admissible-23-sre-maintenance-window-grounded | admissible | admissible | PASS | anchored |
 | drift-01 | drift | drift | PASS | insufficient_prompt_context |
 | drift-02 | drift | drift | PASS | insufficient_prompt_context |
 | drift-03 | drift | drift | PASS | insufficient_prompt_context |
@@ -67,6 +72,11 @@ Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims bou
 | drift-17-fintech-partial-customer-risk-context | drift | drift | PASS | partial_provenance_chain |
 | drift-18-legal-weak-precedent-support | drift | drift | PASS | weak_anchor_support |
 | drift-19-sre-minimal-incident-context | drift | drift | PASS | insufficient_prompt_context |
+| drift-20-research-agent-weak-citation-link | drift | drift | PASS | weak_anchor_support |
+| drift-21-fintech-partial-approval-context | drift | drift | PASS | partial_provenance_chain |
+| drift-22-legal-partial-disclosure-context | drift | drift | PASS | partial_provenance_chain |
+| drift-23-sre-weak-runbook-link | drift | drift | PASS | weak_anchor_support |
+| drift-24-browser-agent-short-intent | drift | drift | PASS | insufficient_prompt_context |
 | rejected-01 | rejected | rejected | PASS | missing_anchor |
 | rejected-02 | rejected | rejected | PASS | post_hoc_unsupported_claim |
 | rejected-03 | rejected | rejected | PASS | post_hoc_unsupported_claim |
@@ -90,3 +100,8 @@ Interpretation guide: see `benchmark/INTERPRETATION.md` for scope and claims bou
 | rejected-21-coding-agent-missing-review-approval | rejected | rejected | PASS | missing_required_approval |
 | rejected-22-research-agent-anchor-mismatch | rejected | rejected | PASS | anchor_mismatch |
 | rejected-23-sre-unsupported-remediation-step | rejected | rejected | PASS | unsupported_intermediate_step |
+| rejected-24-browser-agent-missing-page-anchor | rejected | rejected | PASS | missing_anchor |
+| rejected-25-legal-broken-clause-provenance | rejected | rejected | PASS | broken_provenance_chain |
+| rejected-26-fintech-missing-risk-approval | rejected | rejected | PASS | missing_required_approval |
+| rejected-27-coding-agent-anchor-mismatch | rejected | rejected | PASS | anchor_mismatch |
+| rejected-28-sre-unsupported-rollback-step | rejected | rejected | PASS | unsupported_intermediate_step |
