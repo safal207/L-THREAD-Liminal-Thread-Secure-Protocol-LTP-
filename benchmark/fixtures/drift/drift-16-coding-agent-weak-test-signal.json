@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-16-coding-agent-weak-test-signal",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Coding-agent recommendation has test anchors but weak support for the conclusion.",
+  "record": {
+    "timestamp": "2026-05-23T10:50:00Z",
+    "input": "Decide whether the patch fully resolves the bug using the available tests.",
+    "output": "The patch may resolve the bug, but the test signal is weak and needs review.",
+    "anchors": [
+      "PATCH-016",
+      "TEST-SIGNAL-016"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
