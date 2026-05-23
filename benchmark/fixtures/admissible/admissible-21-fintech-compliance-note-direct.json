@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-21-fintech-compliance-note-direct",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Compliance note is directly supported by policy and evidence anchors.",
+  "record": {
+    "timestamp": "2026-05-23T11:45:00Z",
+    "input": "Write a compliance note from the policy excerpt and evidence record.",
+    "output": "The compliance note is limited to the policy excerpt and evidence record.",
+    "anchors": ["COMPLIANCE-POLICY-021", "EVIDENCE-RECORD-021"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
