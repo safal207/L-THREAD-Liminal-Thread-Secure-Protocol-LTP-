@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-10-fintech-policy-anchored-answer",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Fintech policy answer is anchored to active policy and reviewer approval.",
+  "record": {
+    "timestamp": "2026-05-23T09:05:00Z",
+    "input": "Answer whether the policy allows the requested customer-limit exception.",
+    "output": "The exception is allowed only under the documented low-risk condition and requires the recorded reviewer approval.",
+    "anchors": [
+      "FINTECH-POLICY-010",
+      "REVIEWER-APPROVAL-010"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
