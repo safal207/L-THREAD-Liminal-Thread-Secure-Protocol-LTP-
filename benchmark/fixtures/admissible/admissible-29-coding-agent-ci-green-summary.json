@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-29-coding-agent-ci-green-summary",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Coding-agent summary is grounded in CI and review anchors.",
+  "record": {
+    "timestamp": "2026-05-23T14:05:00Z",
+    "input": "Summarize the change using the green CI run and reviewer note.",
+    "output": "The change summary is limited to the green CI run and reviewer note evidence.",
+    "anchors": ["CI-GREEN-029", "REVIEWER-NOTE-029"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
