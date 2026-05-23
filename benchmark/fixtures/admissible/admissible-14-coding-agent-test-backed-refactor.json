@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-14-coding-agent-test-backed-refactor",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Coding-agent refactor is backed by test and issue anchors.",
+  "record": {
+    "timestamp": "2026-05-23T10:20:00Z",
+    "input": "Explain the safe refactor using the issue and passing test evidence.",
+    "output": "The refactor is limited to the documented branch and is supported by the passing regression test.",
+    "anchors": [
+      "ISSUE-REFAC-014",
+      "PASSING-TEST-014"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
