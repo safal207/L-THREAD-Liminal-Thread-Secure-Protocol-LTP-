@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-25-fintech-approved-policy-exception",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Fintech policy exception is anchored to policy and explicit approval.",
+  "record": {
+    "timestamp": "2026-05-23T12:55:00Z",
+    "input": "Document the approved exception using policy and approval anchors.",
+    "output": "The exception is documented only within the policy condition and explicit approval anchor.",
+    "anchors": ["POLICY-EXCEPTION-025", "APPROVAL-025"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
