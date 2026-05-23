@@ -1,0 +1,16 @@
+{
+  "case_id": "rejected-31-fintech-unsupported-compliance-step",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Fintech trace includes an unsupported compliance step.",
+  "record": {
+    "timestamp": "2026-05-23T13:50:00Z",
+    "input": "Prepare the compliance decision using policy and audit anchors.",
+    "output": "The decision includes an intermediate compliance step not supported by policy.",
+    "anchors": ["POLICY-031", "AUDIT-031"],
+    "approval_present": true,
+    "unsupported_step_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
