@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-34-legal-partial-review-record",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Legal answer has anchors but partial counsel review record.",
+  "record": {
+    "timestamp": "2026-05-23T14:50:00Z",
+    "input": "Assess the reviewed legal answer using clause and review records.",
+    "output": "The answer is plausible, but the counsel review record is incomplete.",
+    "anchors": ["CLAUSE-034", "COUNSEL-REVIEW-034"],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
