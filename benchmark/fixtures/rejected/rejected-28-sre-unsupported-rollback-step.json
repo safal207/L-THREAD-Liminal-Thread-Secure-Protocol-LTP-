@@ -1,0 +1,16 @@
+{
+  "case_id": "rejected-28-sre-unsupported-rollback-step",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "SRE trace includes an unsupported rollback step.",
+  "record": {
+    "timestamp": "2026-05-23T12:45:00Z",
+    "input": "Recommend rollback using the runbook and telemetry.",
+    "output": "The recommendation includes an unsupported rollback step before verification.",
+    "anchors": ["RUNBOOK-028", "TELEMETRY-028"],
+    "approval_present": true,
+    "unsupported_step_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
