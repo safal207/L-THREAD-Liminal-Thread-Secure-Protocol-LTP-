@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-15-research-agent-citation-limited-claim",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Research-agent output keeps the claim limited to directly cited evidence.",
+  "record": {
+    "timestamp": "2026-05-23T10:25:00Z",
+    "input": "State the narrow claim supported by the provided citation.",
+    "output": "The narrow claim is stated only within the bounds of the citation and excerpt.",
+    "anchors": [
+      "CITATION-015",
+      "EXCERPT-015"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
