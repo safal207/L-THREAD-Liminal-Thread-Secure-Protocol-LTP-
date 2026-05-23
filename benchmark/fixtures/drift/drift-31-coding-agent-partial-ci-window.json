@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-31-coding-agent-partial-ci-window",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Coding-agent trace has CI anchors but partial run window.",
+  "record": {
+    "timestamp": "2026-05-23T14:35:00Z",
+    "input": "Assess the change using the CI run and test summary.",
+    "output": "The change may be valid, but the CI run window is incomplete.",
+    "anchors": ["CI-RUN-031", "TEST-SUMMARY-031"],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
