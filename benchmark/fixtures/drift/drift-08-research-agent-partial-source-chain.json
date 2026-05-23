@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-08-research-agent-partial-source-chain",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Research summary has anchors but only partial provenance chain.",
+  "record": {
+    "timestamp": "2026-05-23T08:10:00Z",
+    "input": "Summarize the research claim using the available source chain.",
+    "output": "The claim is plausible but source lineage is incomplete and should be reviewed.",
+    "anchors": [
+      "SOURCE-A",
+      "SOURCE-B"
+    ],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
