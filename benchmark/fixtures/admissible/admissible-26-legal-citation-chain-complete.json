@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-26-legal-citation-chain-complete",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Legal answer has complete citation chain and direct support.",
+  "record": {
+    "timestamp": "2026-05-23T13:00:00Z",
+    "input": "Answer the clause question using the full citation chain.",
+    "output": "The answer follows the cited clause chain and does not exceed the provided scope.",
+    "anchors": ["CLAUSE-026", "CITATION-CHAIN-026"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
