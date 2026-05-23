@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-09-research-agent-source-backed-summary",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Research summary is directly backed by complete source anchors.",
+  "record": {
+    "timestamp": "2026-05-23T09:00:00Z",
+    "input": "Summarize the cited research note using only the provided sources.",
+    "output": "The summary is limited to claims directly supported by the supplied research note and source extract.",
+    "anchors": [
+      "RESEARCH-NOTE-009",
+      "SOURCE-EXTRACT-009"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
