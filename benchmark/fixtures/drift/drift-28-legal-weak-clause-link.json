@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-28-legal-weak-clause-link",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Legal answer has clause anchors but weak linkage to the conclusion.",
+  "record": {
+    "timestamp": "2026-05-23T13:30:00Z",
+    "input": "Assess whether the clause supports the conclusion.",
+    "output": "The clause may support part of the conclusion, but the linkage is weak.",
+    "anchors": ["CLAUSE-028", "CONCLUSION-028"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
