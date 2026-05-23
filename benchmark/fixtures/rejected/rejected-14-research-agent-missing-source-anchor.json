@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-14-research-agent-missing-source-anchor",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Research conclusion has no source anchors and must be rejected.",
+  "record": {
+    "timestamp": "2026-05-23T09:50:00Z",
+    "input": "Summarize the claim and cite the supporting source.",
+    "output": "The claim is presented without a traceable source chain.",
+    "anchors": []
+  }
+}
