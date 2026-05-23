@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-19-legal-missing-citation-anchor",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Legal conclusion has no citation anchors and must be rejected.",
+  "record": {
+    "timestamp": "2026-05-23T11:10:00Z",
+    "input": "State the legal conclusion and cite the supporting clause.",
+    "output": "The legal conclusion is stated without a supporting clause anchor.",
+    "anchors": []
+  }
+}
