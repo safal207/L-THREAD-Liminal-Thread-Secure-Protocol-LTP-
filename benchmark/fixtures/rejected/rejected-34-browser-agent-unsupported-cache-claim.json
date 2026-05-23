@@ -1,0 +1,16 @@
+{
+  "case_id": "rejected-34-browser-agent-unsupported-cache-claim",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Browser-agent trace includes an unsupported cache-based claim.",
+  "record": {
+    "timestamp": "2026-05-23T14:55:00Z",
+    "input": "Answer using cached page evidence.",
+    "output": "The answer includes an unsupported cache-based intermediate claim.",
+    "anchors": ["CACHE-034", "PAGE-034"],
+    "approval_present": true,
+    "unsupported_step_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
