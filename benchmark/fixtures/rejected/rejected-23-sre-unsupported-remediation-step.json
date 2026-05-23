@@ -1,0 +1,19 @@
+{
+  "case_id": "rejected-23-sre-unsupported-remediation-step",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "SRE trace includes an unsupported remediation step before the final recommendation.",
+  "record": {
+    "timestamp": "2026-05-23T11:30:00Z",
+    "input": "Recommend remediation using the runbook and incident telemetry.",
+    "output": "The recommendation includes an intermediate remediation step not supported by the runbook.",
+    "anchors": [
+      "RUNBOOK-023",
+      "INCIDENT-TELEMETRY-023"
+    ],
+    "approval_present": true,
+    "unsupported_step_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
