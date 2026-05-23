@@ -1,0 +1,18 @@
+{
+  "case_id": "rejected-17-fintech-policy-anchor-mismatch",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Fintech answer cites anchors that mismatch the requested policy decision.",
+  "record": {
+    "timestamp": "2026-05-23T10:05:00Z",
+    "input": "Justify the requested policy exception using the cited policy anchors.",
+    "output": "The exception is presented as supported by the cited anchors.",
+    "anchors": [
+      "FINTECH-POLICY-017",
+      "RISK-NOTE-017"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "mismatch"
+  }
+}
