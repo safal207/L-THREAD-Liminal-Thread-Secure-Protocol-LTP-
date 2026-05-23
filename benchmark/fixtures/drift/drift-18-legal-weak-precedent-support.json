@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-18-legal-weak-precedent-support",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Legal answer has precedent anchors but weak support for the proposed interpretation.",
+  "record": {
+    "timestamp": "2026-05-23T11:00:00Z",
+    "input": "Assess whether the cited precedent supports the proposed interpretation.",
+    "output": "The precedent may support part of the interpretation, but the support is weak.",
+    "anchors": [
+      "PRECEDENT-018",
+      "LEGAL-NOTE-018"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
