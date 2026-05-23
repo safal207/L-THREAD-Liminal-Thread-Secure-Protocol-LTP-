@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-27-coding-agent-anchor-mismatch",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Coding-agent explanation cites anchors that mismatch the claimed fix.",
+  "record": {
+    "timestamp": "2026-05-23T12:40:00Z",
+    "input": "Explain why the referenced patch fixes the reported issue.",
+    "output": "The explanation presents the patch as fixing the issue, but the anchors mismatch the claim.",
+    "anchors": ["PATCH-027", "ISSUE-027"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "mismatch"
+  }
+}
