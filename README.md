@@ -12,11 +12,11 @@ For reviewers navigating the broader ecosystem: LTP is the trace/replay/continui
 ![LTP replay demo preview](assets/replay-demo.svg)
 
 <!-- community-interest:start -->
-### Community Interest
+### 🌟 Community Interest
 
 ![Stars](https://img.shields.io/github/stars/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-?style=for-the-badge)
 
-> Current interest: 3 stars
+> Current interest: 3 stars → 🌱 New signal 🚀  
 > Want to join? [Click here](https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/stargazers) to show support!
 <!-- community-interest:end -->
 
