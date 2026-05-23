@@ -1,0 +1,18 @@
+{
+  "case_id": "rejected-22-research-agent-anchor-mismatch",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Research answer cites anchors that mismatch the requested claim.",
+  "record": {
+    "timestamp": "2026-05-23T11:25:00Z",
+    "input": "Use the cited sources to support the requested research claim.",
+    "output": "The research claim is presented as supported by the cited sources.",
+    "anchors": [
+      "SOURCE-022-A",
+      "SOURCE-022-B"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "mismatch"
+  }
+}
