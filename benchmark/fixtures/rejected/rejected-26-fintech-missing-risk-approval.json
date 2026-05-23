@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-26-fintech-missing-risk-approval",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Fintech risk action has anchors but lacks required approval.",
+  "record": {
+    "timestamp": "2026-05-23T12:35:00Z",
+    "input": "Prepare the risk action using the policy and risk record.",
+    "output": "The risk action is prepared for execution.",
+    "anchors": ["RISK-RECORD-026", "POLICY-026"],
+    "approval_present": false,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
