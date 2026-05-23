@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-35-coding-agent-missing-ci-anchor",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Coding-agent merge claim lacks required CI anchor.",
+  "record": {
+    "timestamp": "2026-05-23T15:00:00Z",
+    "input": "Explain why the change is safe to merge and cite CI evidence.",
+    "output": "The merge safety claim is stated without CI evidence anchors.",
+    "anchors": []
+  }
+}
