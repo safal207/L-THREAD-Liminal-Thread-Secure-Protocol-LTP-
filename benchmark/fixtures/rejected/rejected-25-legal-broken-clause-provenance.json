@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-25-legal-broken-clause-provenance",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Legal conclusion has anchors but broken clause provenance.",
+  "record": {
+    "timestamp": "2026-05-23T12:30:00Z",
+    "input": "Justify the legal conclusion using the clause chain.",
+    "output": "The conclusion is presented with a broken clause provenance chain.",
+    "anchors": ["CLAUSE-025", "CHAIN-025"],
+    "approval_present": true,
+    "provenance_status": "broken",
+    "anchor_support": "direct"
+  }
+}
