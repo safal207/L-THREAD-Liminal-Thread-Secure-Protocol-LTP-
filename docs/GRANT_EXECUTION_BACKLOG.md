@@ -2,6 +2,8 @@
 
 Status: seed-grant execution plan.
 
+Tracking issue: #448 — Grant tracking: LTP seed execution plan.
+
 This backlog translates the one-page grant draft into concrete work packages.
 
 ## Objective
@@ -9,6 +11,8 @@ This backlog translates the one-page grant draft into concrete work packages.
 Turn LTP from a deterministic 24-case benchmark scaffold into a stronger 100+ case reviewer-ready safety-evaluation package for path-level AI-agent trace inspection.
 
 ## Work package 1: benchmark expansion
+
+Tracking issue: #443.
 
 Goal: expand `benchmark/fixtures` from 24 tracked cases to at least 100 cases.
 
@@ -28,6 +32,8 @@ Definition of done:
 
 ## Work package 2: showcase reports
 
+Tracking issue: #444.
+
 Goal: make the five showcase traces easier for reviewers to inspect.
 
 Deliverables:
@@ -45,6 +51,8 @@ Definition of done:
 
 ## Work package 3: baseline comparison notes
 
+Tracking issue: #445.
+
 Goal: explain what LTP adds beyond ordinary logs, final-output review, and prompt-only guardrails.
 
 Deliverables:
@@ -59,6 +67,8 @@ Definition of done:
 - claims stay scoped to benchmark fixtures.
 
 ## Work package 4: report artifacts
+
+Tracking issue: #446.
 
 Goal: improve reviewer-facing evidence output.
 
@@ -75,6 +85,8 @@ Definition of done:
 - report includes total cases, correct classifications, mismatches, label counts, and per-case reasons.
 
 ## Work package 5: technical report
+
+Tracking issue: #447.
 
 Goal: produce a public technical note or preprint-style draft.
 
