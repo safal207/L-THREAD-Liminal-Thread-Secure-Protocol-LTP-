@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-32-fintech-weak-audit-link",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Fintech answer has audit anchors but weak linkage to the decision.",
+  "record": {
+    "timestamp": "2026-05-23T14:40:00Z",
+    "input": "Assess whether the audit record supports the decision.",
+    "output": "The audit record may support part of the decision, but the linkage is weak.",
+    "anchors": ["AUDIT-032", "DECISION-032"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
