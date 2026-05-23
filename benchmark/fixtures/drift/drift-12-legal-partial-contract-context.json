@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-12-legal-partial-contract-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Legal answer has anchors but only partial contract context.",
+  "record": {
+    "timestamp": "2026-05-23T09:35:00Z",
+    "input": "Assess the narrow contract interpretation using the provided excerpts.",
+    "output": "The interpretation is plausible, but the excerpts provide only partial context.",
+    "anchors": [
+      "CONTRACT-EXCERPT-012",
+      "LEGAL-NOTE-012"
+    ],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
