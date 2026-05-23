@@ -19,15 +19,17 @@ This map helps reviewers find the relevant evidence without reading every file.
 ## Benchmark
 
 - `benchmark/README.md` — benchmark entry point.
-- `benchmark/RESULTS.md` — generated or seed results.
+- `benchmark/RESULTS.md` — current deterministic 24-case snapshot.
 - `benchmark/INTERPRETATION.md` — how to read benchmark outcomes.
 - `docs/BENCHMARK_PLAN.md` — seed benchmark roadmap.
 - `docs/EVALUATION_PROTOCOL.md` — evaluation rules.
+- `docs/SHOWCASE_TRACES.md` — five reviewer-facing examples mapped to existing fixtures.
 
 ## Fixtures
 
-- `fixtures/` — repository-level fixtures.
-- `fixtures/showcase/` — planned reviewer showcase traces.
+- `benchmark/fixtures/admissible/` — admissible fixture cases.
+- `benchmark/fixtures/drift/` — drift fixture cases.
+- `benchmark/fixtures/rejected/` — rejected fixture cases.
 
 ## Grant and reviewer docs
 
