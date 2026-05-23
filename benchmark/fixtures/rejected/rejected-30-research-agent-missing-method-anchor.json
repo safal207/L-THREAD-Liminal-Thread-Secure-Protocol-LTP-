@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-30-research-agent-missing-method-anchor",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Research method claim lacks required method anchors.",
+  "record": {
+    "timestamp": "2026-05-23T13:45:00Z",
+    "input": "State the method claim and cite the method record.",
+    "output": "The method claim is stated without a method record anchor.",
+    "anchors": []
+  }
+}
