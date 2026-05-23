@@ -1,0 +1,16 @@
+{
+  "case_id": "rejected-35-coding-agent-unsupported-merge-step",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Coding-agent trace includes an unsupported merge step.",
+  "record": {
+    "timestamp": "2026-05-23T15:00:00Z",
+    "input": "Prepare the merge using CI and review anchors.",
+    "output": "The trace includes a merge step not supported by the review evidence.",
+    "anchors": ["CI-035", "REVIEW-035"],
+    "approval_present": true,
+    "unsupported_step_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
