@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-20-coding-agent-reviewer-approved-change",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Coding-agent change is anchored and reviewer-approved.",
+  "record": {
+    "timestamp": "2026-05-23T11:40:00Z",
+    "input": "Prepare the code change summary using the review and test result.",
+    "output": "The change summary is supported by the reviewer approval and passing test result.",
+    "anchors": ["REVIEW-APPROVAL-020", "PASSING-TEST-020"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
