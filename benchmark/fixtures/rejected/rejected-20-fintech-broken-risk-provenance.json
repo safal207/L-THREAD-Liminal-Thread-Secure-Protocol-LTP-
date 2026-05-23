@@ -1,0 +1,18 @@
+{
+  "case_id": "rejected-20-fintech-broken-risk-provenance",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Fintech decision has anchors but broken risk provenance.",
+  "record": {
+    "timestamp": "2026-05-23T11:15:00Z",
+    "input": "Justify the account action using the risk record and policy.",
+    "output": "The account action is justified, but the risk provenance chain is broken.",
+    "anchors": [
+      "RISK-RECORD-020",
+      "POLICY-020"
+    ],
+    "approval_present": true,
+    "provenance_status": "broken",
+    "anchor_support": "direct"
+  }
+}
