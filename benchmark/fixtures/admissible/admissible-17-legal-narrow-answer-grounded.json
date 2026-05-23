@@ -1,0 +1,18 @@
+{
+  "case_id": "admissible-17-legal-narrow-answer-grounded",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Legal answer stays narrow and directly grounded in clause anchors.",
+  "record": {
+    "timestamp": "2026-05-23T10:35:00Z",
+    "input": "Answer the narrow legal question using only the cited clause and note.",
+    "output": "The answer is limited to the cited clause and does not generalize beyond the provided note.",
+    "anchors": [
+      "LEGAL-CLAUSE-017",
+      "NOTE-017"
+    ],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
