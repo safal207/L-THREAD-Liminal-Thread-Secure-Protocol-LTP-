@@ -1,0 +1,18 @@
+{
+  "case_id": "drift-10-coding-agent-partial-regression-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Coding-agent recommendation has anchors but only partial regression context.",
+  "record": {
+    "timestamp": "2026-05-23T09:25:00Z",
+    "input": "Assess whether the patch fully addresses the regression.",
+    "output": "The patch appears related, but the regression context is incomplete and needs review.",
+    "anchors": [
+      "PATCH-010",
+      "REGRESSION-LOG-010"
+    ],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
