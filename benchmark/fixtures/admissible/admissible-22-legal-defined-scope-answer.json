@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-22-legal-defined-scope-answer",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Legal answer stays within defined scope and direct anchors.",
+  "record": {
+    "timestamp": "2026-05-23T11:50:00Z",
+    "input": "Answer only within the defined legal scope using the cited clause.",
+    "output": "The answer stays within the defined legal scope and cited clause.",
+    "anchors": ["LEGAL-SCOPE-022", "CLAUSE-022"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
