@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-27-fintech-weak-compliance-support",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Fintech compliance answer has anchors but weak support.",
+  "record": {
+    "timestamp": "2026-05-23T13:25:00Z",
+    "input": "Assess whether the compliance note supports the decision.",
+    "output": "The compliance note may support part of the decision, but support is weak.",
+    "anchors": ["COMPLIANCE-NOTE-027", "DECISION-027"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
