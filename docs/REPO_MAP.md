@@ -34,6 +34,7 @@ This map helps reviewers find the relevant evidence without reading every file.
 ## Grant and reviewer docs
 
 - `docs/START_HERE.md` — first entry point.
+- `docs/GRANT_APPLICATION_ONE_PAGER.md` — one-page application draft.
 - `docs/GRANT_REVIEWER_PATH.md` — 5-minute and 15-minute reviewer path.
 - `docs/GRANT_EVIDENCE.md` — existing evidence and explicit non-claims.
 - `docs/GRANT_PROPOSAL_20K_50K.md` — seed grant proposal.
