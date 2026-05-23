@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-21-fintech-partial-approval-context",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Fintech answer has approval anchor but partial surrounding approval context.",
+  "record": {
+    "timestamp": "2026-05-23T12:05:00Z",
+    "input": "Assess the approved exception using the approval note and policy record.",
+    "output": "The exception appears approved, but the surrounding approval context is incomplete.",
+    "anchors": ["APPROVAL-NOTE-021", "POLICY-RECORD-021"],
+    "approval_present": true,
+    "provenance_status": "partial",
+    "anchor_support": "direct"
+  }
+}
