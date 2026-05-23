@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-24-research-agent-source-triangulated",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Research-agent claim is supported by direct triangulated source anchors.",
+  "record": {
+    "timestamp": "2026-05-23T12:50:00Z",
+    "input": "Summarize the claim only when both source excerpts support it.",
+    "output": "The claim is stated narrowly and is supported by both source excerpts.",
+    "anchors": ["SOURCE-A-024", "SOURCE-B-024"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
