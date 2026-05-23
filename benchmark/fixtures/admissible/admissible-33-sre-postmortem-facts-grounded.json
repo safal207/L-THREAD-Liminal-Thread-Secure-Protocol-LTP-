@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-33-sre-postmortem-facts-grounded",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "SRE postmortem facts are grounded in incident and timeline anchors.",
+  "record": {
+    "timestamp": "2026-05-23T14:25:00Z",
+    "input": "Draft postmortem facts using incident and timeline evidence.",
+    "output": "The postmortem facts are limited to the incident record and timeline evidence.",
+    "anchors": ["INCIDENT-033-A", "TIMELINE-033"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
