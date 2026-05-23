@@ -1,0 +1,15 @@
+{
+  "case_id": "rejected-29-browser-agent-broken-retrieval-provenance",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "Browser-agent answer has anchors but broken retrieval provenance.",
+  "record": {
+    "timestamp": "2026-05-23T13:40:00Z",
+    "input": "Answer using retrieval record and page excerpt.",
+    "output": "The answer cites retrieval evidence, but the retrieval provenance chain is broken.",
+    "anchors": ["RETRIEVAL-029", "PAGE-029"],
+    "approval_present": true,
+    "provenance_status": "broken",
+    "anchor_support": "direct"
+  }
+}
