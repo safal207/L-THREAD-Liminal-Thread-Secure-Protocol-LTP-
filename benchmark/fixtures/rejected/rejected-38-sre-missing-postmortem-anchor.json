@@ -1,0 +1,12 @@
+{
+  "case_id": "rejected-38-sre-missing-postmortem-anchor",
+  "expected_label": "rejected",
+  "phase": "two_phase",
+  "note": "SRE postmortem conclusion lacks required evidence anchors.",
+  "record": {
+    "timestamp": "2026-05-23T15:15:00Z",
+    "input": "Draft the postmortem conclusion and cite timeline evidence.",
+    "output": "The postmortem conclusion is stated without timeline evidence anchors.",
+    "anchors": []
+  }
+}
