@@ -1,0 +1,15 @@
+{
+  "case_id": "admissible-31-fintech-low-risk-decision-grounded",
+  "expected_label": "admissible",
+  "phase": "two_phase",
+  "note": "Fintech low-risk decision is grounded in policy and score anchors.",
+  "record": {
+    "timestamp": "2026-05-23T14:15:00Z",
+    "input": "Document the low-risk decision using policy and score evidence.",
+    "output": "The decision is documented within the low-risk policy threshold and score evidence.",
+    "anchors": ["LOW-RISK-POLICY-031", "SCORE-EVIDENCE-031"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "direct"
+  }
+}
