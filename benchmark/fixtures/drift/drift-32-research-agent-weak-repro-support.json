@@ -1,0 +1,15 @@
+{
+  "case_id": "drift-32-research-agent-weak-repro-support",
+  "expected_label": "drift",
+  "phase": "two_phase",
+  "note": "Research reproducibility note has anchors but weak support.",
+  "record": {
+    "timestamp": "2026-05-23T14:40:00Z",
+    "input": "Assess the reproducibility note using result and method anchors.",
+    "output": "The reproducibility note may be supported, but the support is weak.",
+    "anchors": ["RESULT-032", "METHOD-032"],
+    "approval_present": true,
+    "provenance_status": "complete",
+    "anchor_support": "weak"
+  }
+}
