@@ -2,8 +2,6 @@
 name: External review
 about: Independent review of the LTP v0.2 evidence package
 title: "External review: LTP v0.2 evidence package"
-labels: documentation
-assignees: ''
 ---
 
 ## Reviewer background
