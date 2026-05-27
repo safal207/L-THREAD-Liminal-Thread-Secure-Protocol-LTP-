@@ -41,6 +41,8 @@ import {
 
 const LTP_VERSION = '0.3';
 const SDK_VERSION = '0.3.0';
+const MIN_HEARTBEAT_INTERVAL_MS = 1000;
+const MAX_HEARTBEAT_INTERVAL_MS = 60000;
 const SUBPROTOCOL = 'ltp.v0.3';
 
 class MemoryStorage implements LtpStorage {
@@ -851,7 +853,11 @@ export class LtpClient {
 
     this.threadId = message.thread_id;
     this.sessionId = message.session_id;
-    this.negotiatedHeartbeatMs = message.heartbeat_interval_ms;
+    const rawHeartbeatMs = Number(message.heartbeat_interval_ms);
+    const safeHeartbeatMs = Number.isFinite(rawHeartbeatMs)
+      ? Math.min(MAX_HEARTBEAT_INTERVAL_MS, Math.max(MIN_HEARTBEAT_INTERVAL_MS, rawHeartbeatMs))
+      : MIN_HEARTBEAT_INTERVAL_MS;
+    this.negotiatedHeartbeatMs = safeHeartbeatMs;
     this.persistIds();
 
     // ECDH key exchange - derive session keys (v0.5+)
@@ -1006,7 +1012,12 @@ export class LtpClient {
     }
 
     this.clearHeartbeatTimers();
-    const interval = this.options.heartbeat?.intervalMs || this.negotiatedHeartbeatMs;
+    const userInterval = this.options.heartbeat?.intervalMs;
+    const interval = userInterval !== undefined
+      ? userInterval
+      : Number.isFinite(Number(this.negotiatedHeartbeatMs))
+        ? Math.min(MAX_HEARTBEAT_INTERVAL_MS, Math.max(MIN_HEARTBEAT_INTERVAL_MS, Number(this.negotiatedHeartbeatMs)))
+        : MIN_HEARTBEAT_INTERVAL_MS;
 
     this.heartbeatTimer = setInterval(() => {
       if (this.isConnected) {
