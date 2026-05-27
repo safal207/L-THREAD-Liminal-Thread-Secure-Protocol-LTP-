@@ -1012,11 +1012,12 @@ export class LtpClient {
     }
 
     this.clearHeartbeatTimers();
-    const configuredInterval = this.options.heartbeat?.intervalMs ?? this.negotiatedHeartbeatMs;
-    const numericInterval = Number(configuredInterval);
-    const interval = Number.isFinite(numericInterval)
-      ? Math.min(MAX_HEARTBEAT_INTERVAL_MS, Math.max(MIN_HEARTBEAT_INTERVAL_MS, numericInterval))
-      : MIN_HEARTBEAT_INTERVAL_MS;
+    const userInterval = this.options.heartbeat?.intervalMs;
+    const interval = userInterval !== undefined
+      ? userInterval
+      : Number.isFinite(Number(this.negotiatedHeartbeatMs))
+        ? Math.min(MAX_HEARTBEAT_INTERVAL_MS, Math.max(MIN_HEARTBEAT_INTERVAL_MS, Number(this.negotiatedHeartbeatMs)))
+        : MIN_HEARTBEAT_INTERVAL_MS;
 
     this.heartbeatTimer = setInterval(() => {
       if (this.isConnected) {
