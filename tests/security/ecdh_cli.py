@@ -32,7 +32,8 @@ def main():
         
         secret = derive_shared_secret(private_hex, public_hex)
         print(json.dumps({
-            "secret": secret
+            "secret": "[REDACTED]",
+            "secret_length": len(secret)
         }))
 
     else:
