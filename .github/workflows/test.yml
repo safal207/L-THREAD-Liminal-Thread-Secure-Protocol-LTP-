@@ -292,7 +292,7 @@ jobs:
     needs: verify-types
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.9'
       - name: Install dependencies
@@ -386,7 +386,7 @@ jobs:
           pnpm fetch
           pnpm -w install --prefer-offline --frozen-lockfile
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.9'
 
