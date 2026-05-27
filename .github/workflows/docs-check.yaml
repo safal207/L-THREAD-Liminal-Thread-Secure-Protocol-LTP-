@@ -5,31 +5,57 @@ on:
     paths:
       - 'docs/**/*.md'
       - 'README.md'
+      - '.github/workflows/docs-check.yaml'
+      - '.markdownlint.json'
   push:
     branches:
       - main
     paths:
       - 'docs/**/*.md'
       - 'README.md'
+      - '.github/workflows/docs-check.yaml'
+      - '.markdownlint.json'
 
 jobs:
   markdown-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changed Markdown files
+        id: changed_markdown
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            README.md
+            docs/**/*.md
 
       - name: Markdown Lint
+        if: steps.changed_markdown.outputs.any_changed == 'true'
         uses: DavidAnson/markdownlint-cli2-action@v9
         with:
-          globs: 'docs/**/*.md'
+          globs: ${{ steps.changed_markdown.outputs.all_changed_files }}
 
   link-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Get changed Markdown files
+        id: changed_markdown
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            README.md
+            docs/**/*.md
 
       - name: Check Relative Links
+        if: steps.changed_markdown.outputs.any_changed == 'true'
         uses: lycheeverse/lychee-action@v1.5.0
         with:
-          args: --no-progress --offline 'docs/**/*.md' 'README.md'
+          args: --no-progress --offline ${{ steps.changed_markdown.outputs.all_changed_files }}
           fail: true
