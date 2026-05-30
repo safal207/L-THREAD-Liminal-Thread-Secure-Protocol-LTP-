@@ -83,7 +83,7 @@ jobs:
           node packages/inspect/bin/ltp.js inspect trace --strict --input tools/ltp-inspect/fixtures/canonical-linear.jsonl --format=json --quiet > docs/devtools/inspect-output.txt
       - name: Upload golden traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: golden-traces
           path: |
@@ -91,7 +91,7 @@ jobs:
             specs/flow/golden-transcript.v0.1.jsonl
       - name: Upload canonical inspect output
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: inspect-output
           path: docs/devtools/inspect-output.txt
@@ -276,12 +276,12 @@ jobs:
           set -euxo pipefail
           pnpm -w ltp:report:validate -- artifacts/conformance-report.json
       - name: Upload conformance report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: conformance-report
           path: artifacts/conformance-report.json
       - name: Upload conformance kit reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ltp-conformance-kit
           path: reports/*
