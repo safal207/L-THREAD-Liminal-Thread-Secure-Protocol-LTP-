@@ -25,6 +25,6 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "pdfkit": "^0.18.0"
+    "pdfkit": "^0.19.1"
   }
 }
