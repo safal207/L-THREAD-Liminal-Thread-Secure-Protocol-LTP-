@@ -1,1 +1,12 @@
-test(benchmark): add legal admissible fixture
+# Reviewed gitleaks findings from Security Baseline run 27538325747.
+# Context: docs/tests fixture false-positive triage.
+# Related issue: #475
+# Do not add raw detected values here.
+
+0167b58d6bf3e2b92c7bba82a79211e31b2d60f7:docs/SECURITY_FINDINGS_REVIEW_POLICY.md:stripe-access-token:111
+257a961d6b11e077d57d3b0cceb3d3c7feefc67a:docs/contracts/CANON_MAP.md:generic-api-key:80
+7fb83c8e03261616669954a4ee2c57e0373dd35f:docs/contracts/CANON_MAP.md:generic-api-key:80
+fe76966b521510b0486c1e48119f1f838943e697:docs/contracts/CANON_MAP.md:generic-api-key:80
+e0b104eb4719af020ea37cf8c705ee9955d66768:tests/security/test_metadata_encryption.js:generic-api-key:44
+bb9bdd1cb8382569339632e7f2c913a6b5312ea4:sdk/rust/ltp-client/tests/integration_test.rs:generic-api-key:71
+bb9bdd1cb8382569339632e7f2c913a6b5312ea4:sdk/rust/ltp-client/tests/integration_test.rs:generic-api-key:72
