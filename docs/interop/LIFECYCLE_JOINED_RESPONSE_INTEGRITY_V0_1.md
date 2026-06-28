@@ -16,8 +16,8 @@ OBSERVATION_JOINED
 FULL_LIFECYCLE_JOINED
 ```
 
-The implementation is intentionally separate from the existing `ltp-inspect`
-CLI. Existing trace inspection and text-only checks retain their current
+The implementation is intentionally separate from the existing `ltp inspect
+trace` CLI. Existing trace inspection and text-only checks retain their current
 behavior. The new module raises the evidence level only when portable records
 are supplied.
 
