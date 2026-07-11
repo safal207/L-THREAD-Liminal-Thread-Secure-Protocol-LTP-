@@ -47,7 +47,7 @@
   },
   "devDependencies": {
     "@types/chai": "^5.2.3",
-    "@types/node": "^25.9.1",
+    "@types/node": "^26.1.1",
     "@types/pdfkit": "^0.17.4",
     "@types/ws": "^8.18.1",
     "ajv": "^8.20.0",
