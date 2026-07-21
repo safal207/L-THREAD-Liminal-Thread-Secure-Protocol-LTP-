@@ -1,0 +1,26 @@
+{
+  "schema_version": "gpt56-review-profile-v1",
+  "repository": "safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-",
+  "profile_id": "secure-thread-replay",
+  "required_roles": [
+    "causal_architect",
+    "temporal_provenance",
+    "adversarial_semantics",
+    "authority_safety",
+    "ci_reliability"
+  ],
+  "required_claim_kinds": ["fact", "observation", "hypothesis"],
+  "focus": [
+    "Verify thread identity, message ordering, replay determinism, acknowledgement boundaries, and secure handoff continuity.",
+    "Reject stale, duplicated, reordered, cross-thread, or ambiguously acknowledged records before they influence a decision.",
+    "Attack truncation, partial delivery, confused-deputy behavior, hidden substitution, and false end-to-end completion.",
+    "Keep transport, observation, judgment, authorization, execution, and merge as separate capabilities.",
+    "Require exact protocol pins, deterministic replay, bounded recovery evidence, and fail-closed behavior on missing records."
+  ],
+  "authority": {
+    "can_execute": false,
+    "can_approve": false,
+    "can_merge": false,
+    "can_deploy": false
+  }
+}
