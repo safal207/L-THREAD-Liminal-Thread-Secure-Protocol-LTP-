@@ -12,6 +12,7 @@ Examples:
 
 The script is read-only with respect to the input trace. It writes inspector output,
 stderr, metadata, and a compact Markdown summary into the output directory.
+Relative output directories are resolved from the repository root.
 EOF
 }
 
@@ -27,15 +28,22 @@ if [[ $# -lt 1 || $# -gt 2 ]]; then
 fi
 
 trace="$1"
-out_dir="${2:-artifacts/ltp-audit}"
+out_dir_arg="${2:-artifacts/ltp-audit}"
+invocation_dir="$(pwd -P)"
 
-if [[ ! -f "$trace" ]]; then
-  printf 'ERROR: trace not found: %s\n' "$trace" >&2
+if [[ "$trace" = /* ]]; then
+  trace_abs="$trace"
+else
+  trace_abs="$(cd "$invocation_dir/$(dirname "$trace")" 2>/dev/null && pwd)/$(basename "$trace")"
+fi
+
+if [[ ! -f "$trace_abs" ]]; then
+  printf 'ERROR: trace not found: %s\n' "$trace_abs" >&2
   exit 66
 fi
 
-if [[ ! -s "$trace" ]]; then
-  printf 'ERROR: trace is empty: %s\n' "$trace" >&2
+if [[ ! -s "$trace_abs" ]]; then
+  printf 'ERROR: trace is empty: %s\n' "$trace_abs" >&2
   exit 65
 fi
 
@@ -44,9 +52,14 @@ if ! command -v pnpm >/dev/null 2>&1; then
   exit 69
 fi
 
-repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)"
 cd "$repo_root"
 
+if [[ "$out_dir_arg" = /* ]]; then
+  out_dir="$out_dir_arg"
+else
+  out_dir="$repo_root/$out_dir_arg"
+fi
 mkdir -p "$out_dir"
 
 report_json="$out_dir/inspect.json"
@@ -55,11 +68,9 @@ metadata_file="$out_dir/metadata.txt"
 summary_md="$out_dir/summary.md"
 command_file="$out_dir/command.txt"
 
-trace_abs="$(cd "$(dirname "$trace")" && pwd)/$(basename "$trace")"
-
-cmd=(pnpm -w ltp:inspect -- trace --format json --color never --input "$trace_abs")
+cmd=(pnpm -w ltp:inspect -- trace --quiet --format json --color never --input "$trace_abs")
 if [[ $strict -eq 1 ]]; then
-  cmd=(pnpm -w ltp:inspect -- trace --strict --format json --color never --input "$trace_abs")
+  cmd=(pnpm -w ltp:inspect -- trace --strict --quiet --format json --color never --input "$trace_abs")
 fi
 
 printf '%q ' "${cmd[@]}" >"$command_file"
