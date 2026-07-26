@@ -9,6 +9,8 @@ Use the repository contracts as authoritative:
 - `docs/contracts/ltp-inspect.v1.md`
 - `docs/contracts/ltp-inspect.v1.schema.json`
 - `docs/contracts/ltp-inspect.agents.v0.1.md`
+- `docs/contracts/ltp-critical-actions.v0.1.json`
+- `docs/guardrails/LTP-Critical-Actions-v0.1.md`
 - `docs/devtools/exit-codes.md`
 - `tools/ltp-inspect/README.md`
 
@@ -110,14 +112,7 @@ Blocking rule:
 
 The rule identifies a critical action admitted directly from untrusted `WEB` context.
 
-Current critical actions:
-
-- `transfer_money`
-- `delete_data`
-- `send_email`
-- `approve_trade`
-- `modify_system`
-- `delete_file`
+Resolve the critical-action set from `docs/contracts/ltp-critical-actions.v0.1.json` at the exact inspected revision. Treat that frozen registry as authoritative over duplicated prose lists. Verify that the inspector implementation and agents profile match the same registry. If they diverge, report contract drift and withhold `ADMISSIBLE`.
 
 ## Output handling
 
