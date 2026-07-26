@@ -76,13 +76,13 @@ Record:
 Run the inspector in JSON mode first:
 
 ```bash
-pnpm -w ltp:inspect -- trace --format json --color never --input <trace.jsonl>
+pnpm -w ltp:inspect -- trace --quiet --format json --color never --input <trace.jsonl>
 ```
 
 For canonical/gating checks:
 
 ```bash
-pnpm -w ltp:inspect -- trace --strict --format json --color never --input <trace.jsonl>
+pnpm -w ltp:inspect -- trace --strict --quiet --format json --color never --input <trace.jsonl>
 ```
 
 Treat exit codes as follows:
@@ -175,7 +175,7 @@ See `references/verdict-rules.md` for the complete decision table.
 
 Use this structure:
 
-```markdown
+````markdown
 # LTP Trace Audit
 
 ## Scope
@@ -212,7 +212,7 @@ ADMISSIBLE | DRIFT | REJECTED | INCONCLUSIVE
 ```bash
 <exact commands>
 ```
-```
+````
 
 Keep tool facts and analyst interpretation in separate sections.
 
