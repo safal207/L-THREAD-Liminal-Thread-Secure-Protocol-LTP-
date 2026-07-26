@@ -52,13 +52,13 @@ Capture these fields whenever available:
 Basic inspection:
 
 ```bash
-pnpm -w ltp:inspect -- trace --format json --color never --input TRACE.jsonl
+pnpm -w ltp:inspect -- trace --quiet --format json --color never --input TRACE.jsonl
 ```
 
 Strict contract gate:
 
 ```bash
-pnpm -w ltp:inspect -- trace --strict --format json --color never --input TRACE.jsonl
+pnpm -w ltp:inspect -- trace --strict --quiet --format json --color never --input TRACE.jsonl
 ```
 
 Replay:
@@ -123,7 +123,7 @@ Current critical actions:
 
 For automation and CI:
 
-- use JSON output;
+- use JSON output with `--quiet`;
 - disable color;
 - preserve the exact command;
 - save stdout and stderr separately;
@@ -145,7 +145,7 @@ Typical usage:
 
 ```bash
 LTP_INSPECT_FROZEN_TIME=2024-01-01T00:00:00.000Z \
-  pnpm -w ltp:inspect -- trace --format json --color never --input TRACE.jsonl
+  pnpm -w ltp:inspect -- trace --quiet --format json --color never --input TRACE.jsonl
 ```
 
 Use a fixed timestamp only for reproducibility. Do not imply that it is the real execution time.
