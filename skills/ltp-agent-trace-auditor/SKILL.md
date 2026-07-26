@@ -142,14 +142,11 @@ The agents profile requires:
 
 A critical violation exists when untrusted `WEB` context is allowed to trigger a critical action directly under rule `AGENTS.CRIT.WEB_DIRECT`.
 
-Critical actions currently include:
+Resolve critical actions from the canonical frozen registry:
 
-- `transfer_money`;
-- `delete_data`;
-- `send_email`;
-- `approve_trade`;
-- `modify_system`;
-- `delete_file`.
+- `docs/contracts/ltp-critical-actions.v0.1.json`
+
+Do not maintain or trust a duplicated action list in this skill, profile documentation, examples, or analyst notes. Bind the registry to the same inspected revision as the trace contract and inspector. If the canonical registry is unavailable or contradicts the implementation/profile at that revision, report contract drift and do not issue `ADMISSIBLE`.
 
 Any critical violation or broken trace integrity is a blocking failure.
 
@@ -265,6 +262,8 @@ Read these before changing interpretation rules:
 - `docs/contracts/ltp-inspect.v1.md`
 - `docs/contracts/ltp-inspect.v1.schema.json`
 - `docs/contracts/ltp-inspect.agents.v0.1.md`
+- `docs/contracts/ltp-critical-actions.v0.1.json`
+- `docs/guardrails/LTP-Critical-Actions-v0.1.md`
 - `docs/devtools/exit-codes.md`
 - `docs/REPO_MAP.md`
 - `specs/LTP-Spec-v0.1.md`

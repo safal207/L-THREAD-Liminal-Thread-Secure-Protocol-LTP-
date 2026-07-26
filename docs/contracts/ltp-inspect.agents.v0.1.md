@@ -18,7 +18,7 @@ The inspector scans `route_response` frames for Critical Actions.
 
 *   **Rule:** `AGENTS.CRIT.WEB_DIRECT`
     *   **Logic:** IF `context` == 'WEB' AND `targetState` contains Critical Action AND `admissible` == `true` -> FAIL.
-    *   **Critical Actions:** `transfer_money`, `delete_data`, `send_email`, `approve_trade`, `modify_system`, `delete_file`.
+    *   **Critical Actions:** the keys of `actions` in the canonical frozen registry `docs/contracts/ltp-critical-actions.v0.1.json` at the same repository revision. Implementations and profiles MUST NOT maintain an independent prose list.
     *   **Severity:** `CRITICAL`.
 
 ## Output Structure (JSON)
