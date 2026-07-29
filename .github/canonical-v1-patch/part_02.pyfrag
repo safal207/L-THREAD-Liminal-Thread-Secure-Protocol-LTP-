@@ -1,0 +1,145 @@
+    if value == 0:
+        return "0"
+    if value.is_integer() and abs(value) > _MAX_SAFE_INTEGER:
+        raise ValueError("Canonical Envelope v1 rejects integers outside IEEE-754 safe range")
+
+    absolute = abs(value)
+    raw = repr(value).lower()
+
+    if 1e-6 <= absolute < 1e21:
+        if "e" in raw:
+            raw = format(Decimal(raw), "f")
+        if "." in raw:
+            raw = raw.rstrip("0").rstrip(".")
+        return raw
+
+    if "e" in raw:
+        return _normalize_exponent(raw)
+    return _fixed_to_scientific(raw)
+
+
+def _serialize_json_value(value: Any) -> str:
+    if value is None:
+        return "null"
+    if value is True:
+        return "true"
+    if value is False:
+        return "false"
+    if isinstance(value, str):
+        return _serialize_string(value)
+    if isinstance(value, (int, float)):
+        return _serialize_number(value)
+    if isinstance(value, (list, tuple)):
+        return "[" + ",".join(_serialize_json_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        if not all(isinstance(key, str) for key in value):
+            raise TypeError("Canonical Envelope v1 requires string object keys")
+        parts = []
+        for key in sorted(value, key=_utf16_sort_key):
+            parts.append(f"{_serialize_string(key)}:{_serialize_json_value(value[key])}")
+        return "{" + ",".join(parts) + "}"
+    raise TypeError(f"Canonical Envelope v1 rejects value of type {type(value).__name__}")
+
+
+def _serialize_canonical(message: Dict[str, Any]) -> str:
+    """Serialize Canonical Envelope v1 using RFC 8785/JCS-compatible rules."""
+
+    return _serialize_json_value(_canonical_message(message))
+'''
+replace_once("sdk/python/ltp_client/crypto.py", py_old, py_new)
+
+# ---------------------------------------------------------------------------
+# Rust: canonical byte serializer, safe number handling, UTF-16 key order.
+# ---------------------------------------------------------------------------
+rust_hash_old = r'''/// Generate a deterministic SHA-256 hash commitment for a canonical envelope.
+pub fn hash_envelope(message: &Value) -> Result<String, String> {
+    // Canonicalize message for hashing
+    let canonical = canonicalize_message(message)?;
+    let serialized = serde_json::to_string(&canonical)
+        .map_err(|e| format!("Failed to serialize message: {}", e))?;
+
+    let mut hasher = Sha256::new();
+    hasher.update(serialized.as_bytes());
+    Ok(hex::encode(hasher.finalize()))
+}
+'''
+
+rust_hash_new = r'''/// Generate a deterministic SHA-256 hash commitment for Canonical Envelope v1.
+pub fn hash_envelope(message: &Value) -> Result<String, String> {
+    let serialized = serialize_canonical(message)?;
+    let mut hasher = Sha256::new();
+    hasher.update(serialized.as_bytes());
+    Ok(hex::encode(hasher.finalize()))
+}
+'''
+replace_once("sdk/rust/ltp-client/src/crypto.rs", rust_hash_old, rust_hash_new)
+
+rust_sign_old = r'''/// Sign a message using HMAC-SHA256.
+pub fn sign_message(message: &Value, secret_key: &str) -> Result<String, String> {
+    let canonical = canonicalize_message(message)?;
+    let serialized = serde_json::to_string(&canonical)
+        .map_err(|e| format!("Failed to serialize message: {}", e))?;
+
+    Ok(hmac_sha256(&serialized, secret_key))
+}
+
+/// Verify message signature using constant-time comparison.
+pub fn verify_signature(message: &Value, secret_key: &str) -> Result<bool, String> {
+    let provided_signature = message
+        .get("signature")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing signature field")?;
+
+    let expected_signature = sign_message(message, secret_key)?;
+
+    Ok(constant_time_eq(
+        provided_signature.as_bytes(),
+        expected_signature.as_bytes(),
+    ))
+}
+
+// Private helpers
+
+fn canonicalize_message(message: &Value) -> Result<Value, String> {
+    // Extract canonical fields used for signing/verification
+    let canonical = serde_json::json!({
+        "type": message.get("type").and_then(|v| v.as_str()).unwrap_or(""),
+        "thread_id": message.get("thread_id").and_then(|v| v.as_str()).unwrap_or(""),
+        "session_id": message.get("session_id").and_then(|v| v.as_str()).unwrap_or(""),
+        "timestamp": message.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
+        "nonce": message.get("nonce").and_then(|v| v.as_str()).unwrap_or(""),
+        "payload": message.get("payload").unwrap_or(&serde_json::json!({})),
+        "meta": message.get("meta").unwrap_or(&serde_json::json!({})),
+        "content_encoding": message.get("content_encoding").and_then(|v| v.as_str()).unwrap_or(""),
+    });
+
+    Ok(canonical)
+}
+'''
+
+rust_sign_new = r'''/// Sign a message using HMAC-SHA256 over Canonical Envelope v1 bytes.
+pub fn sign_message(message: &Value, secret_key: &str) -> Result<String, String> {
+    Ok(hmac_sha256(&serialize_canonical(message)?, secret_key))
+}
+
+/// Verify message signature using constant-time comparison.
+pub fn verify_signature(message: &Value, secret_key: &str) -> Result<bool, String> {
+    let provided_signature = message
+        .get("signature")
+        .and_then(|v| v.as_str())
+        .ok_or("Missing signature field")?;
+    let expected_signature = sign_message(message, secret_key)?;
+    Ok(constant_time_eq(
+        provided_signature.as_bytes(),
+        expected_signature.as_bytes(),
+    ))
+}
+
+/// Serialize the protocol signing fields using RFC 8785/JCS-compatible rules.
+pub fn serialize_canonical(message: &Value) -> Result<String, String> {
+    let canonical = serde_json::json!({
+        "type": message.get("type").and_then(Value::as_str).unwrap_or(""),
+        "thread_id": message.get("thread_id").and_then(Value::as_str).unwrap_or(""),
+        "session_id": message.get("session_id").and_then(Value::as_str).unwrap_or(""),
+        "timestamp": message.get("timestamp").cloned().unwrap_or_else(|| Value::from(0)),
+        "nonce": message.get("nonce").and_then(Value::as_str).unwrap_or(""),
