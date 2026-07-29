@@ -1,0 +1,145 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+ROOT = Path.cwd()
+
+
+def replace_once(path: str, old: str, new: str) -> None:
+    target = ROOT / path
+    text = target.read_text(encoding="utf-8")
+    count = text.count(old)
+    if count != 1:
+        raise RuntimeError(f"{path}: expected one replacement target, found {count}")
+    target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
+def write(path: str, content: str) -> None:
+    target = ROOT / path
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(content, encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# JavaScript: keep JSON.stringify number semantics, add strict JSON validation.
+# ---------------------------------------------------------------------------
+js_old = r'''/**
+ * Deterministically serialize objects by sorting keys recursively.
+ */
+function canonicalize(value: any): any {
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce<Record<string, any>>((acc, key) => {
+        acc[key] = canonicalize((value as Record<string, any>)[key]);
+        return acc;
+      }, {});
+  }
+
+  return value;
+}
+
+function serializeCanonical(message: {
+  type: string;
+  thread_id: string;
+  session_id?: string;
+  timestamp: number;
+  nonce: string;
+  payload: any;
+  prev_message_hash?: string;
+  meta?: any;
+  content_encoding?: string;
+}): string {
+  const canonical = canonicalize({
+    type: message.type,
+    thread_id: message.thread_id,
+    session_id: message.session_id || '',
+    timestamp: message.timestamp,
+    nonce: message.nonce,
+    payload: message.payload,
+    prev_message_hash: message.prev_message_hash || '',
+    meta: message.meta || {},
+    content_encoding: message.content_encoding || '',
+  });
+
+  return JSON.stringify(canonical);
+}
+'''
+
+js_new = r'''/**
+ * Canonical Envelope v1 follows RFC 8785 / JCS-compatible JSON rules.
+ * JavaScript's JSON.stringify already provides the normative ECMAScript
+ * number representation; this validator prevents values that are not stable
+ * JSON data from entering a signed envelope.
+ */
+function assertCanonicalJsonValue(value: any, path: string = '$'): void {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+    if (typeof value === 'string') {
+      for (let i = 0; i < value.length; i += 1) {
+        const code = value.charCodeAt(i);
+        if (code >= 0xd800 && code <= 0xdbff) {
+          const next = value.charCodeAt(i + 1);
+          if (!(next >= 0xdc00 && next <= 0xdfff)) {
+            throw new Error(`Canonical Envelope v1 rejects lone UTF-16 surrogate at ${path}`);
+          }
+          i += 1;
+        } else if (code >= 0xdc00 && code <= 0xdfff) {
+          throw new Error(`Canonical Envelope v1 rejects lone UTF-16 surrogate at ${path}`);
+        }
+      }
+    }
+    return;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`Canonical Envelope v1 rejects non-finite number at ${path}`);
+    }
+    if (Number.isInteger(value) && !Number.isSafeInteger(value)) {
+      throw new Error(`Canonical Envelope v1 rejects unsafe integer at ${path}`);
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertCanonicalJsonValue(entry, `${path}[${index}]`));
+    return;
+  }
+
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    for (const key of Object.keys(value)) {
+      assertCanonicalJsonValue(key, `${path}.<key>`);
+      assertCanonicalJsonValue(value[key], `${path}.${key}`);
+    }
+    return;
+  }
+
+  throw new Error(`Canonical Envelope v1 rejects non-JSON value at ${path}`);
+}
+
+/** Sort object keys recursively by UTF-16 code units, as required by JCS. */
+function canonicalize(value: any): any {
+  assertCanonicalJsonValue(value);
+
+  if (Array.isArray(value)) {
+    return value.map(canonicalize);
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.keys(value)
+      .sort()
+      .reduce<Record<string, any>>((acc, key) => {
+        acc[key] = canonicalize((value as Record<string, any>)[key]);
+        return acc;
+      }, {});
+  }
+
+  return value;
+}
+
+function serializeCanonical(message: {
