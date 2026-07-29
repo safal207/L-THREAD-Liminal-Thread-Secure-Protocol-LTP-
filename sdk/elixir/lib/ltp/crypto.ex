@@ -323,14 +323,14 @@ defmodule LTP.Crypto do
     String.slice(hmac_result, 0, 32)
   end
 
-  @doc """Sign a message using HMAC-SHA256 over Canonical Envelope v1 bytes."""
+  @doc "Sign a message using HMAC-SHA256 over Canonical Envelope v1 bytes."
   @spec sign_message(map(), String.t()) :: String.t()
   def sign_message(message, secret_key) do
     :crypto.mac(:hmac, :sha256, secret_key, serialize_canonical(message))
     |> Base.encode16(case: :lower)
   end
 
-  @doc """Verify a message signature using a constant-time comparison."""
+  @doc "Verify a message signature using a constant-time comparison."
   @spec verify_signature(map(), String.t()) :: boolean()
   def verify_signature(message, secret_key) do
     provided_signature = Map.get(message, "signature") || Map.get(message, :signature)
@@ -342,7 +342,7 @@ defmodule LTP.Crypto do
     end
   end
 
-  @doc """Serialize the protocol signing fields using RFC 8785/JCS-compatible rules."""
+  @doc "Serialize the protocol signing fields using RFC 8785/JCS-compatible rules."
   @spec serialize_canonical(map()) :: String.t()
   def serialize_canonical(message) do
     %{
