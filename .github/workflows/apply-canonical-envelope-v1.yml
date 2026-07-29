@@ -1,0 +1,40 @@
+name: Apply Canonical Envelope v1
+
+on:
+  pull_request:
+    branches:
+      - agent/fix-elixir-receive-pipeline
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor == 'safal207' && github.head_ref == 'agent/canonical-envelope-v1'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Assemble and apply patch
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cat .github/canonical-v1-patch/*.pyfrag > /tmp/apply_canonical_v1_patch.py
+          python -m py_compile /tmp/apply_canonical_v1_patch.py
+          python /tmp/apply_canonical_v1_patch.py
+          rm -rf .github/canonical-v1-patch
+          rm -f .github/workflows/apply-canonical-envelope-v1.yml
+
+      - name: Commit canonical envelope implementation
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(protocol): standardize canonical envelope bytes"
+          git push origin HEAD:${{ github.head_ref }}
