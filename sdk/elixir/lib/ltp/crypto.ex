@@ -196,21 +196,13 @@ defmodule LTP.Crypto do
   end
 
   @doc """
-  Generate a deterministic SHA-256 hash commitment for a canonical envelope.
-  
-  Args:
-    - message: Message envelope map
-  
-  Returns:
-    Hex-encoded SHA-256 hash
+  Generate a deterministic SHA-256 hash commitment for Canonical Envelope v1.
   """
   @spec hash_envelope(map()) :: String.t()
   def hash_envelope(message) do
-    # Canonicalize message for hashing
-    canonical = canonicalize_message(message)
-    serialized = Jason.encode!(canonical)
-    
-    :crypto.hash(:sha256, serialized)
+    message
+    |> serialize_canonical()
+    |> then(&:crypto.hash(:sha256, &1))
     |> Base.encode16(case: :lower)
   end
 
@@ -331,45 +323,40 @@ defmodule LTP.Crypto do
     String.slice(hmac_result, 0, 32)
   end
 
-  @doc """
-  Sign a message using HMAC-SHA256.
-  
-  Args:
-    - message: Message map
-    - secret_key: Secret key for signing
-  
-  Returns:
-    Hex-encoded HMAC-SHA256 signature
-  """
+  @doc """Sign a message using HMAC-SHA256 over Canonical Envelope v1 bytes."""
   @spec sign_message(map(), String.t()) :: String.t()
   def sign_message(message, secret_key) do
-    canonical = canonicalize_message(message)
-    serialized = Jason.encode!(canonical)
-    
-    :crypto.mac(:hmac, :sha256, secret_key, serialized)
+    :crypto.mac(:hmac, :sha256, secret_key, serialize_canonical(message))
     |> Base.encode16(case: :lower)
   end
 
-  @doc """
-  Verify message signature using constant-time comparison.
-  
-  Args:
-    - message: Message map with signature field
-    - secret_key: Secret key for verification
-  
-  Returns:
-    true if signature is valid, false otherwise
-  """
+  @doc """Verify a message signature using a constant-time comparison."""
   @spec verify_signature(map(), String.t()) :: boolean()
   def verify_signature(message, secret_key) do
     provided_signature = Map.get(message, "signature") || Map.get(message, :signature)
-    
-    if is_nil(provided_signature) or not is_binary(provided_signature) do
-      false
+
+    if is_binary(provided_signature) do
+      timing_safe_equal(provided_signature, sign_message(message, secret_key))
     else
-      expected_signature = sign_message(message, secret_key)
-      timing_safe_equal(provided_signature, expected_signature)
+      false
     end
+  end
+
+  @doc """Serialize the protocol signing fields using RFC 8785/JCS-compatible rules."""
+  @spec serialize_canonical(map()) :: String.t()
+  def serialize_canonical(message) do
+    %{
+      "type" => get_field(message, "type") || "",
+      "thread_id" => get_field(message, "thread_id") || "",
+      "session_id" => get_field(message, "session_id") || "",
+      "timestamp" => get_field(message, "timestamp") || 0,
+      "nonce" => get_field(message, "nonce") || "",
+      "payload" => get_field(message, "payload") || %{},
+      "prev_message_hash" => get_field(message, "prev_message_hash") || "",
+      "meta" => get_field(message, "meta") || %{},
+      "content_encoding" => get_field(message, "content_encoding") || ""
+    }
+    |> encode_canonical_value()
   end
 
   # Private helpers
@@ -377,41 +364,164 @@ defmodule LTP.Crypto do
   defp timing_safe_equal(a, b) when byte_size(a) == byte_size(b) do
     import Bitwise
 
-    a_bytes = :binary.bin_to_list(a)
-    b_bytes = :binary.bin_to_list(b)
-
-    diff =
-      Enum.reduce(Enum.zip(a_bytes, b_bytes), 0, fn {x, y}, acc ->
-        acc ||| bxor(x, y)
-      end)
-
-    diff == 0
+    Enum.zip(:binary.bin_to_list(a), :binary.bin_to_list(b))
+    |> Enum.reduce(0, fn {x, y}, acc -> acc ||| bxor(x, y) end)
+    |> Kernel.==(0)
   end
 
   defp timing_safe_equal(_a, _b), do: false
 
-  defp canonicalize_message(message) do
-    # Extract canonical fields used for signing/verification
-    %{
-      "type" => get_field(message, "type") || get_field(message, :type) || "",
-      "thread_id" => get_field(message, "thread_id") || get_field(message, :thread_id) || "",
-      "session_id" => get_field(message, "session_id") || get_field(message, :session_id) || "",
-      "timestamp" => get_field(message, "timestamp") || get_field(message, :timestamp) || 0,
-      "nonce" => get_field(message, "nonce") || get_field(message, :nonce) || "",
-      "payload" => get_field(message, "payload") || get_field(message, :payload) || %{},
-      "meta" => get_field(message, "meta") || get_field(message, :meta) || %{},
-      "content_encoding" => get_field(message, "content_encoding") || get_field(message, :content_encoding) || ""
-    }
+  defp encode_canonical_value(nil), do: "null"
+  defp encode_canonical_value(true), do: "true"
+  defp encode_canonical_value(false), do: "false"
+  defp encode_canonical_value(value) when is_binary(value), do: Jason.encode!(value)
+
+  defp encode_canonical_value(value) when is_integer(value) do
+    if abs(value) > 9_007_199_254_740_991 do
+      raise ArgumentError, "Canonical Envelope v1 rejects unsafe integer"
+    end
+
+    Integer.to_string(value)
   end
 
-  defp get_field(map, key) when is_atom(key) do
-    Map.get(map, key) || Map.get(map, Atom.to_string(key))
+  defp encode_canonical_value(value) when is_float(value), do: serialize_float(value)
+
+  defp encode_canonical_value(value) when is_list(value) do
+    "[" <> Enum.map_join(value, ",", &encode_canonical_value/1) <> "]"
+  end
+
+  defp encode_canonical_value(value) when is_map(value) do
+    value
+    |> Enum.map(fn {key, item} -> {to_string(key), item} end)
+    |> Enum.sort_by(fn {key, _} -> utf16_sort_key(key) end)
+    |> Enum.map_join(",", fn {key, item} ->
+      Jason.encode!(key) <> ":" <> encode_canonical_value(item)
+    end)
+    |> then(&("{" <> &1 <> "}"))
+  end
+
+  defp encode_canonical_value(value) do
+    raise ArgumentError, "Canonical Envelope v1 rejects #{inspect(value)}"
+  end
+
+  defp serialize_float(value) do
+    raw = :erlang.float_to_binary(value, [:short]) |> String.downcase()
+    absolute = abs(value)
+
+    cond do
+      value == 0.0 ->
+        "0"
+
+      trunc(value) == value and absolute > 9_007_199_254_740_991 ->
+        raise ArgumentError, "Canonical Envelope v1 rejects unsafe integer"
+
+      absolute >= 1.0e-6 and absolute < 1.0e21 ->
+        raw
+        |> expand_scientific_if_needed()
+        |> trim_fraction()
+
+      String.contains?(raw, "e") ->
+        normalize_exponent(raw)
+
+      true ->
+        fixed_to_scientific(raw)
+    end
+  rescue
+    ArithmeticError -> raise ArgumentError, "Canonical Envelope v1 rejects non-finite number"
+  end
+
+  defp expand_scientific_if_needed(raw) do
+    if String.contains?(raw, "e"), do: expand_scientific(raw), else: raw
+  end
+
+  defp trim_fraction(raw) do
+    if String.contains?(raw, ".") do
+      raw |> String.trim_trailing("0") |> String.trim_trailing(".")
+    else
+      raw
+    end
+  end
+
+  defp normalize_exponent(raw) do
+    [mantissa, exponent_text] = String.split(raw, "e", parts: 2)
+    exponent = String.to_integer(exponent_text)
+    mantissa = String.trim_trailing(mantissa, ".0")
+    sign = if exponent >= 0, do: "+", else: "-"
+    "#{mantissa}e#{sign}#{abs(exponent)}"
+  end
+
+  defp expand_scientific(raw) do
+    [mantissa, exponent_text] = String.split(raw, "e", parts: 2)
+    exponent = String.to_integer(exponent_text)
+    negative = String.starts_with?(mantissa, "-")
+    mantissa = String.trim_leading(mantissa, "-")
+    decimal_index = String.split(mantissa, ".", parts: 2) |> hd() |> String.length()
+    digits = String.replace(mantissa, ".", "")
+    new_index = decimal_index + exponent
+
+    body =
+      cond do
+        new_index <= 0 -> "0." <> String.duplicate("0", -new_index) <> digits
+        new_index >= String.length(digits) -> digits <> String.duplicate("0", new_index - String.length(digits))
+        true -> String.slice(digits, 0, new_index) <> "." <> String.slice(digits, new_index..-1//1)
+      end
+
+    if negative, do: "-" <> body, else: body
+  end
+
+  defp fixed_to_scientific(raw) do
+    negative = String.starts_with?(raw, "-")
+    raw = String.trim_leading(raw, "-")
+    [integer | rest] = String.split(raw, ".", parts: 2)
+    fraction = List.first(rest) || ""
+
+    {digits, exponent} =
+      case first_nonzero(integer) do
+        nil ->
+          index = first_nonzero(fraction)
+          if is_nil(index), do: {"0", 0}, else: {String.slice(fraction, index..-1//1), -(index + 1)}
+
+        index ->
+          {String.slice(integer, index..-1//1) <> fraction, String.length(integer) - index - 1}
+      end
+
+    digits = String.trim_trailing(digits, "0")
+    mantissa =
+      if String.length(digits) > 1 do
+        String.first(digits) <> "." <> String.slice(digits, 1..-1//1)
+      else
+        digits
+      end
+
+    mantissa = if negative, do: "-" <> mantissa, else: mantissa
+    sign = if exponent >= 0, do: "+", else: "-"
+    "#{mantissa}e#{sign}#{abs(exponent)}"
+  end
+
+  defp first_nonzero(value) do
+    value
+    |> String.graphemes()
+    |> Enum.find_index(&(&1 != "0"))
+  end
+
+  defp utf16_sort_key(value) do
+    value
+    |> String.to_charlist()
+    |> Enum.flat_map(fn
+      codepoint when codepoint <= 0xFFFF -> [codepoint]
+      codepoint ->
+        adjusted = codepoint - 0x10000
+        [0xD800 + Bitwise.bsr(adjusted, 10), 0xDC00 + Bitwise.band(adjusted, 0x3FF)]
+    end)
   end
 
   defp get_field(map, key) when is_binary(key) do
-    Map.get(map, key) || Map.get(map, String.to_existing_atom(key))
-  rescue
-    ArgumentError -> nil
+    Map.get(map, key) ||
+      try do
+        Map.get(map, String.to_existing_atom(key))
+      rescue
+        ArgumentError -> nil
+      end
   end
 end
 

@@ -1,0 +1,18 @@
+{
+  "type": "state_update",
+  "thread_id": "thread-123",
+  "session_id": "session-456",
+  "timestamp": 1700000000000,
+  "nonce": "hmac-0123456789abcdef0123456789abcdef-1700000000000",
+  "payload": {
+    "integer_looking_float": 1.0,
+    "negative_zero": -0.0,
+    "small_exponent": 1e-07,
+    "unicode": "Лиминальный поток 🌌"
+  },
+  "prev_message_hash": "abababababababababababababababababababababababababababababababab",
+  "meta": {
+    "client_id": "client-123"
+  },
+  "content_encoding": "json"
+}

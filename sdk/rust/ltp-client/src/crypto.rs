@@ -235,13 +235,9 @@ pub fn verify_ecdh_public_key(
     Ok(())
 }
 
-/// Generate a deterministic SHA-256 hash commitment for a canonical envelope.
+/// Generate a deterministic SHA-256 hash commitment for Canonical Envelope v1.
 pub fn hash_envelope(message: &Value) -> Result<String, String> {
-    // Canonicalize message for hashing
-    let canonical = canonicalize_message(message)?;
-    let serialized = serde_json::to_string(&canonical)
-        .map_err(|e| format!("Failed to serialize message: {}", e))?;
-
+    let serialized = serialize_canonical(message)?;
     let mut hasher = Sha256::new();
     hasher.update(serialized.as_bytes());
     Ok(hex::encode(hasher.finalize()))
@@ -365,13 +361,9 @@ pub fn generate_routing_tag(
     Ok(hmac_result[..32].to_string())
 }
 
-/// Sign a message using HMAC-SHA256.
+/// Sign a message using HMAC-SHA256 over Canonical Envelope v1 bytes.
 pub fn sign_message(message: &Value, secret_key: &str) -> Result<String, String> {
-    let canonical = canonicalize_message(message)?;
-    let serialized = serde_json::to_string(&canonical)
-        .map_err(|e| format!("Failed to serialize message: {}", e))?;
-
-    Ok(hmac_sha256(&serialized, secret_key))
+    Ok(hmac_sha256(&serialize_canonical(message)?, secret_key))
 }
 
 /// Verify message signature using constant-time comparison.
@@ -380,32 +372,208 @@ pub fn verify_signature(message: &Value, secret_key: &str) -> Result<bool, Strin
         .get("signature")
         .and_then(|v| v.as_str())
         .ok_or("Missing signature field")?;
-
     let expected_signature = sign_message(message, secret_key)?;
-
     Ok(constant_time_eq(
         provided_signature.as_bytes(),
         expected_signature.as_bytes(),
     ))
 }
 
-// Private helpers
-
-fn canonicalize_message(message: &Value) -> Result<Value, String> {
-    // Extract canonical fields used for signing/verification
+/// Serialize the protocol signing fields using RFC 8785/JCS-compatible rules.
+pub fn serialize_canonical(message: &Value) -> Result<String, String> {
     let canonical = serde_json::json!({
-        "type": message.get("type").and_then(|v| v.as_str()).unwrap_or(""),
-        "thread_id": message.get("thread_id").and_then(|v| v.as_str()).unwrap_or(""),
-        "session_id": message.get("session_id").and_then(|v| v.as_str()).unwrap_or(""),
-        "timestamp": message.get("timestamp").and_then(|v| v.as_i64()).unwrap_or(0),
-        "nonce": message.get("nonce").and_then(|v| v.as_str()).unwrap_or(""),
-        "payload": message.get("payload").unwrap_or(&serde_json::json!({})),
-        "meta": message.get("meta").unwrap_or(&serde_json::json!({})),
-        "content_encoding": message.get("content_encoding").and_then(|v| v.as_str()).unwrap_or(""),
+        "type": message.get("type").and_then(Value::as_str).unwrap_or(""),
+        "thread_id": message.get("thread_id").and_then(Value::as_str).unwrap_or(""),
+        "session_id": message.get("session_id").and_then(Value::as_str).unwrap_or(""),
+        "timestamp": message.get("timestamp").cloned().unwrap_or_else(|| Value::from(0)),
+        "nonce": message.get("nonce").and_then(Value::as_str).unwrap_or(""),
+        "payload": message.get("payload").cloned().unwrap_or_else(|| serde_json::json!({})),
+        "prev_message_hash": message.get("prev_message_hash").and_then(Value::as_str).unwrap_or(""),
+        "meta": message.get("meta").cloned().unwrap_or_else(|| serde_json::json!({})),
+        "content_encoding": message.get("content_encoding").and_then(Value::as_str).unwrap_or(""),
     });
 
-    Ok(canonical)
+    let mut output = String::new();
+    write_canonical_json(&canonical, &mut output)?;
+    Ok(output)
 }
+
+fn write_canonical_json(value: &Value, output: &mut String) -> Result<(), String> {
+    match value {
+        Value::Null => output.push_str("null"),
+        Value::Bool(flag) => output.push_str(if *flag { "true" } else { "false" }),
+        Value::String(text) => output.push_str(
+            &serde_json::to_string(text).map_err(|e| format!("Failed to encode string: {}", e))?,
+        ),
+        Value::Number(number) => output.push_str(&serialize_number(number)?),
+        Value::Array(items) => {
+            output.push('[');
+            for (index, item) in items.iter().enumerate() {
+                if index > 0 {
+                    output.push(',');
+                }
+                write_canonical_json(item, output)?;
+            }
+            output.push(']');
+        }
+        Value::Object(map) => {
+            let mut entries: Vec<_> = map.iter().collect();
+            entries.sort_by(|(left, _), (right, _)| {
+                left.encode_utf16().cmp(right.encode_utf16())
+            });
+            output.push('{');
+            for (index, (key, item)) in entries.into_iter().enumerate() {
+                if index > 0 {
+                    output.push(',');
+                }
+                output.push_str(
+                    &serde_json::to_string(key)
+                        .map_err(|e| format!("Failed to encode object key: {}", e))?,
+                );
+                output.push(':');
+                write_canonical_json(item, output)?;
+            }
+            output.push('}');
+        }
+    }
+    Ok(())
+}
+
+fn serialize_number(number: &serde_json::Number) -> Result<String, String> {
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+
+    if let Some(value) = number.as_i64() {
+        if value.unsigned_abs() > MAX_SAFE_INTEGER {
+            return Err("Canonical Envelope v1 rejects unsafe integer".to_string());
+        }
+        return Ok(value.to_string());
+    }
+    if let Some(value) = number.as_u64() {
+        if value > MAX_SAFE_INTEGER {
+            return Err("Canonical Envelope v1 rejects unsafe integer".to_string());
+        }
+        return Ok(value.to_string());
+    }
+
+    let value = number
+        .as_f64()
+        .ok_or_else(|| "Canonical Envelope v1 rejects invalid number".to_string())?;
+    if !value.is_finite() {
+        return Err("Canonical Envelope v1 rejects NaN and Infinity".to_string());
+    }
+    if value == 0.0 {
+        return Ok("0".to_string());
+    }
+    if value.fract() == 0.0 && value.abs() > MAX_SAFE_INTEGER as f64 {
+        return Err("Canonical Envelope v1 rejects unsafe integer".to_string());
+    }
+
+    let raw = value.to_string().to_lowercase();
+    let absolute = value.abs();
+    if (1e-6..1e21).contains(&absolute) {
+        let fixed = if raw.contains('e') {
+            expand_scientific(&raw)?
+        } else {
+            raw
+        };
+        return Ok(trim_fraction(fixed));
+    }
+
+    if raw.contains('e') {
+        normalize_exponent(&raw)
+    } else {
+        fixed_to_scientific(&raw)
+    }
+}
+
+fn trim_fraction(mut raw: String) -> String {
+    if raw.contains('.') {
+        while raw.ends_with('0') {
+            raw.pop();
+        }
+        if raw.ends_with('.') {
+            raw.pop();
+        }
+    }
+    raw
+}
+
+fn normalize_exponent(raw: &str) -> Result<String, String> {
+    let (mantissa, exponent_text) = raw
+        .split_once('e')
+        .ok_or_else(|| "Invalid scientific number".to_string())?;
+    let exponent: i32 = exponent_text
+        .parse()
+        .map_err(|_| "Invalid scientific exponent".to_string())?;
+    let mantissa = mantissa.strip_suffix(".0").unwrap_or(mantissa);
+    Ok(format!(
+        "{}e{}{}",
+        mantissa,
+        if exponent >= 0 { "+" } else { "-" },
+        exponent.abs()
+    ))
+}
+
+fn expand_scientific(raw: &str) -> Result<String, String> {
+    let (mantissa, exponent_text) = raw
+        .split_once('e')
+        .ok_or_else(|| "Invalid scientific number".to_string())?;
+    let exponent: i32 = exponent_text
+        .parse()
+        .map_err(|_| "Invalid scientific exponent".to_string())?;
+    let negative = mantissa.starts_with('-');
+    let mantissa = mantissa.trim_start_matches('-');
+    let decimal_index = mantissa.find('.').unwrap_or(mantissa.len()) as i32;
+    let digits: String = mantissa.chars().filter(|ch| *ch != '.').collect();
+    let new_index = decimal_index + exponent;
+    let body = if new_index <= 0 {
+        format!("0.{}{}", "0".repeat((-new_index) as usize), digits)
+    } else if new_index as usize >= digits.len() {
+        format!("{}{}", digits, "0".repeat(new_index as usize - digits.len()))
+    } else {
+        format!(
+            "{}.{}",
+            &digits[..new_index as usize],
+            &digits[new_index as usize..]
+        )
+    };
+    Ok(if negative { format!("-{}", body) } else { body })
+}
+
+fn fixed_to_scientific(raw: &str) -> Result<String, String> {
+    let negative = raw.starts_with('-');
+    let raw = raw.trim_start_matches('-');
+    let (integer, fraction) = raw.split_once('.').unwrap_or((raw, ""));
+
+    let (digits, exponent) = if let Some(index) = integer.bytes().position(|ch| ch != b'0') {
+        (
+            format!("{}{}", &integer[index..], fraction),
+            integer.len() as i32 - index as i32 - 1,
+        )
+    } else if let Some(index) = fraction.bytes().position(|ch| ch != b'0') {
+        (fraction[index..].to_string(), -(index as i32) - 1)
+    } else {
+        return Ok("0".to_string());
+    };
+
+    let digits = digits.trim_end_matches('0');
+    let mut mantissa = digits[..1].to_string();
+    if digits.len() > 1 {
+        mantissa.push('.');
+        mantissa.push_str(&digits[1..]);
+    }
+    if negative {
+        mantissa.insert(0, '-');
+    }
+    Ok(format!(
+        "{}e{}{}",
+        mantissa,
+        if exponent >= 0 { "+" } else { "-" },
+        exponent.abs()
+    ))
+}
+
+// Private helpers
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {

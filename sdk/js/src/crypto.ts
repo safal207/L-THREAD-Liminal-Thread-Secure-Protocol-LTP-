@@ -235,9 +235,60 @@ export async function verifyEcdhPublicKey(
 }
 
 /**
- * Deterministically serialize objects by sorting keys recursively.
+ * Canonical Envelope v1 follows RFC 8785 / JCS-compatible JSON rules.
+ * JavaScript's JSON.stringify already provides the normative ECMAScript
+ * number representation; this validator prevents values that are not stable
+ * JSON data from entering a signed envelope.
  */
+function assertCanonicalJsonValue(value: any, path: string = '$'): void {
+  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
+    if (typeof value === 'string') {
+      for (let i = 0; i < value.length; i += 1) {
+        const code = value.charCodeAt(i);
+        if (code >= 0xd800 && code <= 0xdbff) {
+          const next = value.charCodeAt(i + 1);
+          if (!(next >= 0xdc00 && next <= 0xdfff)) {
+            throw new Error(`Canonical Envelope v1 rejects lone UTF-16 surrogate at ${path}`);
+          }
+          i += 1;
+        } else if (code >= 0xdc00 && code <= 0xdfff) {
+          throw new Error(`Canonical Envelope v1 rejects lone UTF-16 surrogate at ${path}`);
+        }
+      }
+    }
+    return;
+  }
+
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new Error(`Canonical Envelope v1 rejects non-finite number at ${path}`);
+    }
+    if (Number.isInteger(value) && !Number.isSafeInteger(value)) {
+      throw new Error(`Canonical Envelope v1 rejects unsafe integer at ${path}`);
+    }
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => assertCanonicalJsonValue(entry, `${path}[${index}]`));
+    return;
+  }
+
+  if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    for (const key of Object.keys(value)) {
+      assertCanonicalJsonValue(key, `${path}.<key>`);
+      assertCanonicalJsonValue(value[key], `${path}.${key}`);
+    }
+    return;
+  }
+
+  throw new Error(`Canonical Envelope v1 rejects non-JSON value at ${path}`);
+}
+
+/** Sort object keys recursively by UTF-16 code units, as required by JCS. */
 function canonicalize(value: any): any {
+  assertCanonicalJsonValue(value);
+
   if (Array.isArray(value)) {
     return value.map(canonicalize);
   }
@@ -277,7 +328,11 @@ function serializeCanonical(message: {
     content_encoding: message.content_encoding || '',
   });
 
-  return JSON.stringify(canonical);
+  const serialized = JSON.stringify(canonical);
+  if (serialized === undefined) {
+    throw new Error('Canonical Envelope v1 serialization produced undefined');
+  }
+  return serialized;
 }
 
 /**
