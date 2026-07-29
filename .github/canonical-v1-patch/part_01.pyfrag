@@ -1,0 +1,145 @@
+  type: string;
+  thread_id: string;
+  session_id?: string;
+  timestamp: number;
+  nonce: string;
+  payload: any;
+  prev_message_hash?: string;
+  meta?: any;
+  content_encoding?: string;
+}): string {
+  const canonical = canonicalize({
+    type: message.type,
+    thread_id: message.thread_id,
+    session_id: message.session_id || '',
+    timestamp: message.timestamp,
+    nonce: message.nonce,
+    payload: message.payload,
+    prev_message_hash: message.prev_message_hash || '',
+    meta: message.meta || {},
+    content_encoding: message.content_encoding || '',
+  });
+
+  const serialized = JSON.stringify(canonical);
+  if (serialized === undefined) {
+    throw new Error('Canonical Envelope v1 serialization produced undefined');
+  }
+  return serialized;
+}
+'''
+replace_once("sdk/js/src/crypto.ts", js_old, js_new)
+
+# ---------------------------------------------------------------------------
+# Python: implement JCS-compatible serializer without runtime dependencies.
+# ---------------------------------------------------------------------------
+replace_once(
+    "sdk/python/ltp_client/crypto.py",
+    "import json\nimport secrets\nimport time\n",
+    "import json\nimport math\nimport secrets\nimport time\nfrom decimal import Decimal\n",
+)
+
+py_old = r'''def _canonical_message(message: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract the canonical fields used for signing/verification."""
+
+    return {
+        "type": message.get("type", ""),
+        "thread_id": message.get("thread_id", ""),
+        "session_id": message.get("session_id", ""),
+        "timestamp": message.get("timestamp", 0),
+        "nonce": message.get("nonce", ""),
+        "payload": message.get("payload", {}),
+        "prev_message_hash": message.get("prev_message_hash", ""),
+        "meta": message.get("meta", {}),
+        "content_encoding": message.get("content_encoding", ""),
+    }
+
+
+def _serialize_canonical(message: Dict[str, Any]) -> str:
+    """Serialize canonical message deterministically for HMAC signing."""
+
+    canonical = _canonical_message(message)
+    return json.dumps(
+        canonical,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        sort_keys=True,
+    )
+'''
+
+py_new = r'''_MAX_SAFE_INTEGER = 2**53 - 1
+
+
+def _canonical_message(message: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract the Canonical Envelope v1 fields used for signing and hashing."""
+
+    return {
+        "type": message.get("type", ""),
+        "thread_id": message.get("thread_id", ""),
+        "session_id": message.get("session_id", ""),
+        "timestamp": message.get("timestamp", 0),
+        "nonce": message.get("nonce", ""),
+        "payload": message.get("payload", {}),
+        "prev_message_hash": message.get("prev_message_hash", ""),
+        "meta": message.get("meta", {}),
+        "content_encoding": message.get("content_encoding", ""),
+    }
+
+
+def _utf16_sort_key(value: str) -> bytes:
+    return value.encode("utf-16-be", errors="surrogatepass")
+
+
+def _serialize_string(value: str) -> str:
+    for char in value:
+        codepoint = ord(char)
+        if 0xD800 <= codepoint <= 0xDFFF:
+            raise ValueError("Canonical Envelope v1 rejects lone UTF-16 surrogates")
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def _normalize_exponent(raw: str) -> str:
+    mantissa, exponent_text = raw.lower().split("e", 1)
+    exponent = int(exponent_text)
+    if mantissa.endswith(".0"):
+        mantissa = mantissa[:-2]
+    sign = "+" if exponent >= 0 else "-"
+    return f"{mantissa}e{sign}{abs(exponent)}"
+
+
+def _fixed_to_scientific(raw: str) -> str:
+    sign = ""
+    if raw.startswith("-"):
+        sign, raw = "-", raw[1:]
+
+    integer, dot, fraction = raw.partition(".")
+    integer = integer or "0"
+
+    first_integer = next((i for i, ch in enumerate(integer) if ch != "0"), None)
+    if first_integer is not None:
+        significant = (integer[first_integer:] + fraction).rstrip("0")
+        exponent = len(integer) - first_integer - 1
+    else:
+        first_fraction = next((i for i, ch in enumerate(fraction) if ch != "0"), None)
+        if first_fraction is None:
+            return "0"
+        significant = fraction[first_fraction:].rstrip("0")
+        exponent = -(first_fraction + 1)
+
+    mantissa = significant[0]
+    if len(significant) > 1:
+        mantissa += "." + significant[1:]
+    exponent_sign = "+" if exponent >= 0 else "-"
+    return f"{sign}{mantissa}e{exponent_sign}{abs(exponent)}"
+
+
+def _serialize_number(value: int | float) -> str:
+    if isinstance(value, bool):
+        raise TypeError("bool is not a canonical number")
+
+    if isinstance(value, int):
+        if abs(value) > _MAX_SAFE_INTEGER:
+            raise ValueError("Canonical Envelope v1 rejects integers outside IEEE-754 safe range")
+        return str(value)
+
+    if not math.isfinite(value):
+        raise ValueError("Canonical Envelope v1 rejects NaN and Infinity")
