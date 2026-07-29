@@ -1,1 +1,0 @@
-      "thread_id" => get_field(message, "thread_id") || get_field(message, :thread_id) || "",
