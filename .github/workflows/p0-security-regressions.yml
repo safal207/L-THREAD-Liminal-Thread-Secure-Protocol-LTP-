@@ -1,0 +1,62 @@
+name: P0 Security Regressions (Red Until Fixed)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tests/security/p0/**"
+      - "sdk/js/src/crypto.ts"
+      - "sdk/python/ltp_client/client.py"
+      - "sdk/python/ltp_client/crypto.py"
+      - "sdk/rust/ltp-client/src/client.rs"
+      - "sdk/elixir/lib/ltp/connection.ex"
+      - ".github/workflows/p0-security-regressions.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: p0-security-regressions-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  p0-red-suite:
+    name: Four confirmed P0 contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Build JavaScript SDK used by differential test
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/js
+          npm install --ignore-scripts
+          npm run build
+
+      - name: Install Python SDK and test dependencies
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/python
+          python -m pip install -e ".[dev]"
+
+      - name: Run P0 regression contracts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python -m pytest -q tests/security/p0/test_p0_security_regressions.py
