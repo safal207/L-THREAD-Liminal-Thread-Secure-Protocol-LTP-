@@ -1,0 +1,190 @@
+name: Apply Stacked Python Receive Fix
+
+on:
+  pull_request:
+    branches:
+      - agent/p0-security-regressions
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.head_ref == 'agent/fix-python-receive-atomicity'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Apply atomic receive pipeline
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("sdk/python/ltp_client/client.py")
+          text = path.read_text()
+          old = '''    async def _handle_message(self, data: Dict[str, Any]) -> None:
+        if self.on_message:
+            self.on_message(data)
+
+        message_type = data.get("type")
+
+        # Decrypt metadata if encrypted (v0.6+)
+        if data.get("encrypted_metadata") and self._session_encryption_key:
+            try:
+                decrypted_metadata = decrypt_metadata(
+                    data["encrypted_metadata"],
+                    self._session_encryption_key
+                )
+                # Restore plaintext metadata fields
+                data["thread_id"] = decrypted_metadata.get("thread_id", "")
+                data["session_id"] = decrypted_metadata.get("session_id", "")
+                data["timestamp"] = decrypted_metadata.get("timestamp", 0)
+            except Exception as e:
+                print(f"[LTP] Failed to decrypt metadata: {e}")
+                return  # Reject message if decryption fails
+
+        # Verify hash chain (v0.5+) - detect tampering
+        if data.get("prev_message_hash"):
+            if self._last_received_hash:
+                if not hmac.compare_digest(
+                    str(data["prev_message_hash"]), str(self._last_received_hash)
+                ):
+                    print("[LTP] Hash chain mismatch - message tampering detected!")
+                    return  # Reject tampered message
+            else:
+                # First message in chain - accept
+                pass
+        
+        # Update last received hash for next message
+        if message_type not in {"handshake_ack", "handshake_reject"}:
+            try:
+                self._last_received_hash = hash_envelope(data)
+            except Exception as e:
+                print(f"[LTP] Warning: Failed to compute received message hash: {e}")
+
+        if self.require_signature_verification and self._mac_key and message_type not in {
+            "handshake_ack",
+            "handshake_reject",
+        }:
+            if not self._validate_signature(data):
+                return
+            if not self._validate_timestamp(data):
+                return
+            if not self._validate_nonce(data):
+                return
+
+        if message_type == "handshake_ack":
+            await self._handle_handshake_ack(data)
+        elif message_type == "handshake_reject":
+            await self._handle_handshake_reject(data)
+        elif message_type == "pong":
+            self._pong_event.set()
+            if self.on_pong:
+                self.on_pong()
+        elif message_type == "state_update" and self.on_state_update:
+            self.on_state_update(data.get("payload", {}))
+        elif message_type == "event" and self.on_event:
+            self.on_event(data.get("payload", {}))
+        elif message_type == "error":
+            await self._handle_error(data.get("payload", {}))
+        else:
+            pass
+'''
+          new = '''    async def _handle_message(self, data: Dict[str, Any]) -> None:
+        message_type = data.get("type")
+        is_handshake_message = message_type in {"handshake_ack", "handshake_reject"}
+
+        # Decryption is read-only with respect to protocol state. Any failure rejects
+        # the frame before authentication, replay, chain, or application state changes.
+        if data.get("encrypted_metadata") and self._session_encryption_key:
+            try:
+                decrypted_metadata = decrypt_metadata(
+                    data["encrypted_metadata"],
+                    self._session_encryption_key
+                )
+                data["thread_id"] = decrypted_metadata.get("thread_id", "")
+                data["session_id"] = decrypted_metadata.get("session_id", "")
+                data["timestamp"] = decrypted_metadata.get("timestamp", 0)
+            except Exception as e:
+                print(f"[LTP] Failed to decrypt metadata: {e}")
+                return
+
+        requires_authentication = (
+            not is_handshake_message
+            and self.require_signature_verification
+            and bool(self._mac_key)
+        )
+
+        if requires_authentication:
+            if not self._validate_signature(data):
+                return
+            if not self._validate_timestamp(data):
+                return
+
+        candidate_hash: Optional[str] = None
+        if not is_handshake_message:
+            incoming_prev_hash = data.get("prev_message_hash")
+            if self._last_received_hash:
+                if not isinstance(incoming_prev_hash, str) or not incoming_prev_hash:
+                    print("[LTP] Missing previous hash for an active message chain")
+                    return
+                if not hmac.compare_digest(incoming_prev_hash, self._last_received_hash):
+                    print("[LTP] Hash chain mismatch - message tampering detected!")
+                    return
+
+            try:
+                candidate_hash = hash_envelope(data)
+            except Exception as e:
+                print(f"[LTP] Failed to compute received message hash: {e}")
+                return
+
+            # Nonce validation is the first stateful operation. No fallible security
+            # operation follows it, so rejected frames cannot consume replay state.
+            if requires_authentication and not self._validate_nonce(data):
+                return
+
+            self._last_received_hash = candidate_hash
+
+        # Application callbacks see only messages that completed the security gate.
+        if self.on_message:
+            self.on_message(data)
+
+        if message_type == "handshake_ack":
+            await self._handle_handshake_ack(data)
+        elif message_type == "handshake_reject":
+            await self._handle_handshake_reject(data)
+        elif message_type == "pong":
+            self._pong_event.set()
+            if self.on_pong:
+                self.on_pong()
+        elif message_type == "state_update" and self.on_state_update:
+            self.on_state_update(data.get("payload", {}))
+        elif message_type == "event" and self.on_event:
+            self.on_event(data.get("payload", {}))
+        elif message_type == "error":
+            await self._handle_error(data.get("payload", {}))
+'''
+
+          if new in text:
+              print("Patch already present")
+          elif old not in text:
+              raise SystemExit("Expected receive block not found; refusing broad edit")
+          else:
+              path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Commit to stacked head branch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sdk/python/ltp_client/client.py
+          git commit -m "fix(python): authenticate before receive-state commit"
+          git push origin HEAD:${{ github.head_ref }}
