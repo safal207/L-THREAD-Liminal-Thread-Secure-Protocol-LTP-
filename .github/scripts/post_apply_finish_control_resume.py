@@ -1,4 +1,4 @@
-# post-apply-v3
+# post-apply-v4
 from pathlib import Path
 
 
@@ -35,6 +35,18 @@ replace_once(
     heartbeat: { intervalMs: 5, timeoutMs: 15 },
 """,
     "heartbeat fixture negotiated key",
+)
+replace_once(
+    "sdk/elixir/test/ltp/control_resume_security_test.exs",
+    "defp state(overrides \\ %{}) do",
+    "defp state(overrides \\\\ %{}) do",
+    "Elixir state default argument",
+)
+replace_once(
+    "sdk/elixir/test/ltp/control_resume_security_test.exs",
+    "defp signed_control(type, key, overrides \\ %{}) do",
+    "defp signed_control(type, key, overrides \\\\ %{}) do",
+    "Elixir signed control default argument",
 )
 
 print("Applied post-patch compatibility corrections")
