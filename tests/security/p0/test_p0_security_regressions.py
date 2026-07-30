@@ -1,8 +1,7 @@
-"""Red regression tests for the four confirmed LTP P0 security gaps.
+"""Executable regression contracts for confirmed LTP protocol security gaps.
 
-These tests intentionally describe the secure behavior, not the current behavior.
-The draft PR that introduces them is expected to stay red until the protocol fixes
-land. Do not mark these tests xfail, skip them, or weaken their assertions.
+These tests describe secure behavior. Do not mark them xfail, skip them, or weaken
+their assertions: a failure means an SDK boundary has diverged again.
 """
 
 from __future__ import annotations
@@ -42,25 +41,31 @@ process.stdout.write(serializeCanonical(message));
     return result.stdout
 
 
-def test_p0_cross_sdk_canonical_bytes_are_identical() -> None:
-    """JS and Python must sign exactly the same bytes for every legal envelope."""
-
-    envelope = {
+def _envelope(payload: dict) -> dict:
+    return {
         "type": "state_update",
         "thread_id": "thread-123",
         "session_id": "session-456",
         "timestamp": 1_700_000_000_000,
         "nonce": "hmac-0123456789abcdef0123456789abcdef-1700000000000",
-        "payload": {
-            "integer_looking_float": 1.0,
-            "negative_zero": -0.0,
-            "small_exponent": 1e-7,
-            "unicode": "Лиминальный поток 🌌",
-        },
+        "payload": payload,
         "prev_message_hash": "ab" * 32,
         "meta": {"client_id": "client-123"},
         "content_encoding": "json",
     }
+
+
+def test_p0_cross_sdk_canonical_bytes_are_identical() -> None:
+    """JS and Python must sign exactly the same bytes for every legal envelope."""
+
+    envelope = _envelope(
+        {
+            "integer_looking_float": 1.0,
+            "negative_zero": -0.0,
+            "small_exponent": 1e-7,
+            "unicode": "Лиминальный поток 🌌",
+        }
+    )
 
     python_bytes = _serialize_canonical(envelope)
     javascript_bytes = _javascript_canonical(envelope)
@@ -72,6 +77,36 @@ def test_p0_cross_sdk_canonical_bytes_are_identical() -> None:
         f"Python:    {python_bytes}\n"
         f"JavaScript:{javascript_bytes}"
     )
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "fixed_lower_boundary": 1e-6,
+            "exponent_below_boundary": 1e-7,
+            "fixed_upper_value": 1e20,
+            "exponent_upper_boundary": 1e21,
+            "large_exponent": 1e30,
+            "small_exponent": 1e-27,
+        },
+        {
+            "rounding_case": 333333333.33333329,
+            "simple_fraction": 4.5,
+            "small_fixed": 2e-3,
+            "nested": [1.0, -0.0, {"again": -0.0, "tiny": 1e-7}],
+        },
+        {
+            # UTF-16 orders the supplementary key by its leading surrogate, before
+            # U+E000; Unicode code-point ordering would put U+E000 first.
+            "key_order": {"\ue000": "bmp-private-use", "😀": "supplementary"},
+            "unicode": "ключ 🔐",
+        },
+    ],
+)
+def test_canonical_differential_edge_matrix(payload: dict) -> None:
+    envelope = _envelope(payload)
+    assert _javascript_canonical(envelope) == _serialize_canonical(envelope)
 
 
 @pytest.mark.asyncio
@@ -130,6 +165,12 @@ def test_p0_rust_receive_loop_enforces_security_pipeline() -> None:
     )
     assert ("validate_nonce" in receive_loop or "seen_nonces" in receive_loop), (
         "P0: the live Rust receive loop does not enforce replay protection."
+    )
+    assert "let wire_message = message.clone();" in receive_loop, (
+        "P0: encrypted Rust frames must commit the original wire envelope to the hash chain."
+    )
+    assert "verify_hash_chain(\n                            &wire_message" in receive_loop, (
+        "P0: Rust is hashing the decrypted logical envelope instead of the transmitted bytes."
     )
 
 
