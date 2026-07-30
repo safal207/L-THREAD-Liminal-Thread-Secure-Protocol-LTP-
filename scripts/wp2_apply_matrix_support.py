@@ -77,6 +77,24 @@ replace_once(
 ''',
 )
 replace_once(
+    "sdk/js/src/client.ts",
+    """      this.lastSentHash = await hashEnvelope({
+        type: envelopeWithSecurity.type,
+        thread_id: envelopeWithSecurity.thread_id || envelopeWithPrev.thread_id,
+        session_id: envelopeWithSecurity.session_id || envelopeWithPrev.session_id,
+        timestamp: envelopeWithSecurity.timestamp || envelopeWithPrev.timestamp,
+        nonce: envelopeWithSecurity.nonce!,
+        payload: envelopeWithSecurity.payload,
+        prev_message_hash: envelopeWithSecurity.prev_message_hash,
+      });
+""",
+    """      // The sender commits the canonical fields exactly as transmitted. For
+      // metadata-encrypted frames this means the masked routing fields, not the
+      // decrypted logical identifiers used for signature verification.
+      this.lastSentHash = await hashEnvelope(envelopeWithSecurity);
+""",
+)
+replace_once(
     "sdk/elixir/lib/ltp/connection.ex",
     """      client_id: Keyword.fetch!(opts, :client_id),
       device_fingerprint: Keyword.get(opts, :device_fingerprint),
