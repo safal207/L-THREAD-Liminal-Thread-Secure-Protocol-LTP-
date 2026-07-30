@@ -76,5 +76,69 @@ replace_once(
 ''',
 )
 
-subprocess.run(["git", "add", str(PATH.relative_to(ROOT))], cwd=ROOT, check=True)
-print("WP2 WebSockex mailbox handshake fix applied")
+# Heartbeats are also emitted from a WebSockex callback. Returning the frame is
+# required; calling WebSockex.send_frame(self(), ...) synchronously kills the
+# connection process with a self-call error.
+replace_once(
+    '''  def handle_info(:heartbeat, state) do
+    new_state =
+      if state.is_handshake_complete do
+        case send_ping(state) do
+          {:ok, sent_state} ->
+            schedule_heartbeat(sent_state)
+
+          {:error, reason, unchanged_state} ->
+            Logger.error("[LTP] Heartbeat send failed closed: #{reason}")
+            unchanged_state
+        end
+      else
+        state
+      end
+
+    {:ok, new_state}
+  end
+''',
+    '''  def handle_info(:heartbeat, state) do
+    if state.is_handshake_complete do
+      case secure_control_frame("ping", state) do
+        {:ok, ping, sent_state} ->
+          {:reply, {:text, Jason.encode!(ping)}, schedule_heartbeat(sent_state)}
+
+        {:error, reason, unchanged_state} ->
+          Logger.error("[LTP] Heartbeat send failed closed: #{reason}")
+          {:ok, unchanged_state}
+      end
+    else
+      {:ok, state}
+    end
+  end
+''',
+)
+
+replace_once(
+    '''  defp send_ping(state) do
+    case secure_control_frame("ping", state) do
+      {:ok, ping, new_state} ->
+        WebSockex.send_frame(self(), {:text, Jason.encode!(ping)})
+        {:ok, new_state}
+
+      {:error, reason, unchanged_state} ->
+        {:error, reason, unchanged_state}
+    end
+  end
+
+''',
+    '',
+)
+
+subprocess.run(
+    [
+        "git",
+        "add",
+        str(PATH.relative_to(ROOT)),
+        "sdk/elixir/test/ltp/connection_heartbeat_reply_test.exs",
+    ],
+    cwd=ROOT,
+    check=True,
+)
+print("WP2 WebSockex mailbox handshake/heartbeat fix applied")
