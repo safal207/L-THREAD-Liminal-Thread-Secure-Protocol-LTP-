@@ -1,12 +1,15 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { dirname } from "path";
-import {
+import WebSocket from "ws";
+
+(globalThis as any).WebSocket = WebSocket;
+const {
   generateNonce,
   hashEnvelope,
   LtpClient,
-  LtpEnvelope,
   signMessage,
-} from "../../../sdk/js/src";
+} = require("../../../sdk/js/dist") as Record<string, any>;
+type LtpEnvelope = any;
 
 const url = process.env.LTP_REFERENCE_URL;
 const outputPath = process.env.LTP_ADAPTER_OUTPUT;
@@ -84,22 +87,22 @@ async function main(): Promise<void> {
       enableMetadataEncryption: false,
       requireSignatureVerification: true,
       heartbeat: { enabled: false, intervalMs: 60_000, timeoutMs: 60_000 },
-      reconnect: { enabled: false, maxRetries: 0, baseDelayMs: 50, maxDelayMs: 50 },
+      reconnect: { maxRetries: 0, baseDelayMs: 50, maxDelayMs: 50 },
     },
     {
-      onConnected: (threadId, sessionId) => {
+      onConnected: (threadId: string, sessionId: string) => {
         const value = { threadId, sessionId };
         const waiter = connectedWaiters.shift();
         if (waiter) waiter(value); else connectedQueue.push(value);
       },
-      onStateUpdate: (payload) => {
+      onStateUpdate: (payload: unknown) => {
         const waiter = updateWaiters.shift();
         if (waiter) waiter(payload); else updateQueue.push(payload);
       },
       onPong: () => {
         pongWaiters.shift()?.();
       },
-      onError: (error) => {
+      onError: (error: any) => {
         const code = error.error_code || "UNKNOWN_ERROR";
         const waiter = errorWaiters.shift();
         if (waiter) waiter(code); else errorQueue.push(code);
@@ -217,7 +220,9 @@ async function main(): Promise<void> {
   }, null, 2)}\n`, "utf8");
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
