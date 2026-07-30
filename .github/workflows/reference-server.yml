@@ -5,6 +5,13 @@ on:
     branches: [main]
     paths:
       - "tools/reference-server/**"
+      - "sdk/js/src/client.ts"
+      - "sdk/python/ltp_client/client.py"
+      - "sdk/rust/ltp-client/src/client.rs"
+      - "sdk/rust/ltp-client/src/types.rs"
+      - "sdk/elixir/lib/ltp/client.ex"
+      - "sdk/elixir/lib/ltp/connection.ex"
+      - "scripts/wp2_apply_wire_compat.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -18,13 +25,123 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: reference-server-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  wp2-wire-compat:
+    if: github.event_name == 'pull_request' && github.event.pull_request.number == 511
+    name: Apply and verify WP2 wire compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout WP2 head
+        uses: actions/checkout@v6
+        with:
+          ref: production/wp2-four-sdk-e2e
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Set up Elixir
+        uses: erlef/setup-elixir@v1
+        with:
+          elixir-version: "1.14"
+          otp-version: "25"
+
+      - name: Enable pnpm
+        shell: bash
+        run: |
+          set -euxo pipefail
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+
+      - name: Apply exact WP2 patch
+        run: python scripts/wp2_apply_wire_compat.py
+
+      - name: Format changed language files
+        shell: bash
+        run: |
+          set -euxo pipefail
+          rustfmt --edition 2021 sdk/rust/ltp-client/src/client.rs sdk/rust/ltp-client/src/types.rs
+          cd sdk/elixir
+          mix deps.get
+          mix format lib/ltp/client.ex lib/ltp/connection.ex
+
+      - name: Install repository dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify JavaScript and reference server
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/js
+          npm install --ignore-scripts
+          npm run build
+          npm test
+          cd ../..
+          pnpm test:reference-server
+
+      - name: Verify Python
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python -m pip install -e "sdk/python[dev]"
+          python -m pytest -q sdk/python/tests
+
+      - name: Verify Rust
+        shell: bash
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+          cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml
+
+      - name: Verify Elixir
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/elixir
+          mix test --trace
+
+      - name: Commit verified runtime changes
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            sdk/js/src/client.ts \
+            sdk/python/ltp_client/client.py \
+            sdk/rust/ltp-client/src/client.rs \
+            sdk/rust/ltp-client/src/types.rs \
+            sdk/elixir/lib/ltp/client.ex \
+            sdk/elixir/lib/ltp/connection.ex \
+            tools/reference-server/server.ts
+          if git diff --cached --quiet; then
+            echo "WP2 runtime patch is already applied"
+          else
+            git commit -m "fix: align SDK wire handshake and resume behavior"
+            git push origin HEAD:production/wp2-four-sdk-e2e
+          fi
+
   reference-server-contracts:
     name: Independent server + deterministic wire scenarios
     runs-on: ubuntu-latest
