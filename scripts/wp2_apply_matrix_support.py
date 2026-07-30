@@ -62,9 +62,20 @@ replace_once(
 """,
 )
 replace_once(
+    "tools/reference-server/protocol.ts",
+    """    prev_message_hash: message.prev_message_hash,
+    meta: {},
+    content_encoding: "",
+""",
+    """    prev_message_hash: message.prev_message_hash,
+    meta: message.meta,
+    content_encoding: message.content_encoding,
+""",
+)
+replace_once(
     "tools/reference-server/referenceServer.test.ts",
     'import { runReferenceScenarios } from "./scenarios";\n',
-    'import { generateNonce } from "./protocol";\nimport { runReferenceScenarios } from "./scenarios";\n',
+    'import { generateNonce, hashEnvelope } from "./protocol";\nimport { runReferenceScenarios } from "./scenarios";\n',
 )
 replace_once(
     "tools/reference-server/referenceServer.test.ts",
@@ -75,7 +86,42 @@ replace_once(
     expect(nonce).toMatch(/^hmac-[0-9a-f]{32}-1900000000000$/);
   });
 
+  it("commits meta and content encoding into the envelope hash", () => {
+    const base = {
+      type: "event",
+      thread_id: "thread",
+      session_id: "session",
+      timestamp: 1_900_000_000_000,
+      nonce: "hmac-0123456789abcdef0123456789abcdef-1900000000000",
+      payload: { scenario_id: "canonical-hash" },
+      prev_message_hash: "",
+      meta: { client_id: "client-a" },
+      content_encoding: "json",
+    };
+    expect(hashEnvelope(base)).not.toBe(hashEnvelope({
+      ...base,
+      meta: { client_id: "client-b" },
+    }));
+    expect(hashEnvelope(base)).not.toBe(hashEnvelope({
+      ...base,
+      content_encoding: "cbor",
+    }));
+  });
+
 ''',
+)
+replace_once(
+    "sdk/js/src/crypto.ts",
+    """  payload: any;
+  prev_message_hash?: string;
+}): Promise<string> {
+""",
+    """  payload: any;
+  prev_message_hash?: string;
+  meta?: any;
+  content_encoding?: string;
+}): Promise<string> {
+""",
 )
 replace_once(
     "sdk/js/src/client.ts",
@@ -100,6 +146,8 @@ replace_once(
         nonce: envelopeWithSecurity.nonce!,
         payload: envelopeWithSecurity.payload,
         prev_message_hash: envelopeWithSecurity.prev_message_hash,
+        meta: envelopeWithSecurity.meta,
+        content_encoding: envelopeWithSecurity.content_encoding,
       });
 """,
 )
@@ -142,8 +190,12 @@ package["scripts"]["e2e:four-sdk"] = (
 )
 package_path.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
 
-# The temporary workflow's explicit add-list predates this runtime discovery.
-# Stage the verified JS fix here; no commit occurs unless all four SDKs pass.
-subprocess.run(["git", "add", "sdk/js/src/client.ts"], cwd=ROOT, check=True)
+# The temporary workflow's explicit add-list predates these runtime discoveries.
+# Stage the verified JS fixes here; no commit occurs unless all four SDKs pass.
+subprocess.run(
+    ["git", "add", "sdk/js/src/client.ts", "sdk/js/src/crypto.ts"],
+    cwd=ROOT,
+    check=True,
+)
 
 print("WP2 matrix support patch applied")
