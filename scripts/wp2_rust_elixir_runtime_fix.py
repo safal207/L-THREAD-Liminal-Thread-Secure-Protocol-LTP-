@@ -92,6 +92,20 @@ elif connection.count(new_guard) != 2:
         "sdk/elixir/lib/ltp/connection.ex: patched ECDH guards are incomplete"
     )
 
+replace_once(
+    "sdk/elixir/lib/ltp/crypto.ex",
+    '''    # Generate key pair using :crypto.generate_key/3
+    # :ecdh - algorithm
+    # :secp256r1 - curve (P-256)
+    # [] - options
+    {public_key, private_key} = :crypto.generate_key(:ecdh, :secp256r1, [])
+''',
+    '''    # The two-argument OTP API generates a fresh private key. The optional
+    # third argument is an existing private key, not an options list.
+    {public_key, private_key} = :crypto.generate_key(:ecdh, :secp256r1)
+''',
+)
+
 subprocess.run(
     [
         "git",
@@ -99,9 +113,11 @@ subprocess.run(
         "sdk/rust/ltp-client/src/types.rs",
         "sdk/rust/ltp-client/src/client.rs",
         "sdk/elixir/lib/ltp/connection.ex",
+        "sdk/elixir/lib/ltp/crypto.ex",
+        "sdk/elixir/test/ltp/crypto_ecdh_test.exs",
     ],
     cwd=ROOT,
     check=True,
 )
 
-print("WP2 Rust timestamp and Elixir handshake fixes applied")
+print("WP2 Rust timestamp and Elixir handshake/ECDH fixes applied")
