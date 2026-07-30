@@ -1,4 +1,4 @@
-name: Reference Server Scenarios
+name: Reference Server and Four-SDK Interoperability
 
 on:
   pull_request:
@@ -6,15 +6,14 @@ on:
     paths:
       - "tools/reference-server/**"
       - "tests/e2e/four-sdk/**"
-      - "sdk/js/src/client.ts"
-      - "sdk/python/ltp_client/client.py"
-      - "sdk/python/tests/test_receive_security_atomicity.py"
+      - "tests/production/readiness-baseline.json"
+      - "docs/production/FOUR_SDK_INTEROPERABILITY.md"
+      - "docs/production/READINESS_BASELINE.md"
+      - "sdk/js/**"
+      - "sdk/python/**"
       - "sdk/rust/ltp-client/**"
-      - "sdk/elixir/lib/ltp/**"
-      - "scripts/wp2_apply_matrix_support.py"
-      - "scripts/wp2_adapter_fixes.py"
-      - "scripts/wp2_python_encrypted_signature_fix.py"
-      - "scripts/wp2_rust_elixir_runtime_fix.py"
+      - "sdk/elixir/**"
+      - "scripts/validate-readiness-baseline.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -23,112 +22,109 @@ on:
     paths:
       - "tools/reference-server/**"
       - "tests/e2e/four-sdk/**"
-      - "sdk/js/src/client.ts"
-      - "sdk/python/ltp_client/client.py"
-      - "sdk/python/tests/test_receive_security_atomicity.py"
+      - "tests/production/readiness-baseline.json"
+      - "docs/production/FOUR_SDK_INTEROPERABILITY.md"
+      - "docs/production/READINESS_BASELINE.md"
+      - "sdk/js/**"
+      - "sdk/python/**"
       - "sdk/rust/ltp-client/**"
-      - "sdk/elixir/lib/ltp/**"
+      - "sdk/elixir/**"
+      - "scripts/validate-readiness-baseline.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: reference-server-${{ github.workflow }}-${{ github.ref }}
+  group: reference-interoperability-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  wp2-four-sdk-matrix:
-    if: github.event_name == 'pull_request' && github.event.pull_request.number == 511
-    name: Build and verify four-SDK wire matrix
+  reference-server-contracts:
+    name: Independent server + deterministic scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run independent reference contracts
+        run: pnpm test:reference-server
+      - name: Generate deterministic evidence
+        run: pnpm reference:scenarios
+      - name: Validate evidence redaction
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('artifacts/reference-server-evidence.json', 'utf8'));
+          if (report.summary.failed !== 0 || report.summary.total < 12) {
+            throw new Error(`reference scenarios failed: ${JSON.stringify(report.summary)}`);
+          }
+          const raw = JSON.stringify(report);
+          for (const forbidden of ['ltp-reference-long-term-secret', 'macKey', 'encryptionKey', 'privateKey']) {
+            if (raw.includes(forbidden)) throw new Error(`evidence leaked forbidden token: ${forbidden}`);
+          }
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reference-server-evidence
+          path: artifacts/reference-server-evidence.json
+          if-no-files-found: error
+
+  four-sdk-interoperability:
+    name: Four native SDKs / 40 server-owned verdicts
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
-      - name: Checkout WP2 head
-        uses: actions/checkout@v6
-        with:
-          ref: production/wp2-four-sdk-e2e
-          fetch-depth: 0
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: "18"
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
-
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-
-      - name: Set up Elixir
-        uses: erlef/setup-elixir@v1
+      - uses: erlef/setup-elixir@v1
         with:
           elixir-version: "1.14"
           otp-version: "25"
-
       - name: Enable pnpm
-        shell: bash
         run: |
-          set -euxo pipefail
           corepack enable
           corepack prepare pnpm@9.15.0 --activate
-
-      - name: Apply exact WP2 matrix support
-        shell: bash
-        run: |
-          set -euxo pipefail
-          python scripts/wp2_apply_matrix_support.py
-          python scripts/wp2_adapter_fixes.py
-          python scripts/wp2_python_encrypted_signature_fix.py
-          python scripts/wp2_rust_elixir_runtime_fix.py
-
-      - name: Format changed language files
-        shell: bash
-        run: |
-          set -euxo pipefail
-          rustfmt --edition 2021 \
-            sdk/rust/ltp-client/src/client.rs \
-            sdk/rust/ltp-client/src/types.rs \
-            sdk/rust/ltp-client/src/client/reference_interop_tests.rs
-          cd sdk/elixir
-          mix deps.get
-          mix format \
-            lib/ltp/client.ex \
-            lib/ltp/connection.ex \
-            ../../tests/e2e/four-sdk/elixir_adapter.exs
-
       - name: Install dependencies
-        shell: bash
         run: |
           set -euxo pipefail
           pnpm install --frozen-lockfile
           python -m pip install -e "sdk/python[dev]"
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
-
-      - name: Verify patched reference contracts
-        run: pnpm test:reference-server
-
-      - name: Verify patched Python security contracts
-        run: python -m pytest -q sdk/python/tests/test_receive_security_atomicity.py
-
-      - name: Verify Rust millisecond timestamp contract
-        run: cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml outbound_timestamps_use_unix_milliseconds
-
-      - name: Run four-SDK matrix
+          cd sdk/elixir
+          mix deps.get
+      - name: Validate readiness source of truth
+        run: python scripts/validate-readiness-baseline.py
+      - name: Run focused cross-SDK regressions
+        run: |
+          python -m pytest -q sdk/python/tests/test_receive_security_atomicity.py
+          cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml outbound_timestamps_use_unix_milliseconds
+          cd sdk/elixir
+          mix test --trace test/ltp/crypto_ecdh_test.exs test/ltp/connection_heartbeat_reply_test.exs
+      - name: Run four native SDK adapters
         run: pnpm e2e:four-sdk
-
-      - name: Validate matrix and evidence redaction
-        shell: bash
+      - name: Validate 40/40 matrix and evidence redaction
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -143,97 +139,11 @@ jobs:
           }
           console.log(report.summary);
           NODE
-
-      - name: Commit verified matrix implementation
-        shell: bash
-        run: |
-          set -euxo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          rm -f tests/e2e/WP2.md
-          git add \
-            package.json \
-            tools/reference-server/protocol.ts \
-            tools/reference-server/server.ts \
-            tools/reference-server/scenarios.ts \
-            tools/reference-server/referenceServer.test.ts \
-            sdk/js/src/client.ts \
-            sdk/js/src/crypto.ts \
-            sdk/python/ltp_client/client.py \
-            sdk/python/tests/test_receive_security_atomicity.py \
-            sdk/elixir/lib/ltp/connection.ex \
-            sdk/rust/ltp-client/Cargo.toml \
-            sdk/rust/ltp-client/src/client.rs \
-            sdk/rust/ltp-client/src/types.rs \
-            sdk/rust/ltp-client/src/client/reference_interop_tests.rs \
-            tests/e2e/four-sdk \
-            docs/production/FOUR_SDK_INTEROPERABILITY.md
-          git add -u tests/e2e/WP2.md
-          if git diff --cached --quiet; then
-            echo "WP2 matrix implementation is already committed"
-          else
-            git commit -m "test: prove four-SDK wire interoperability"
-            git push origin HEAD:production/wp2-four-sdk-e2e
-          fi
-
-      - name: Upload four-SDK evidence
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: four-sdk-interoperability
           path: |
             artifacts/four-sdk-interoperability.json
             artifacts/four-sdk/*.json
             docs/production/FOUR_SDK_INTEROPERABILITY.md
-          if-no-files-found: error
-
-  reference-server-contracts:
-    name: Independent server + deterministic wire scenarios
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: "18"
-
-      - name: Enable pnpm
-        shell: bash
-        run: |
-          set -euxo pipefail
-          corepack enable
-          corepack prepare pnpm@9.15.0 --activate
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run reference-server contracts
-        run: pnpm test:reference-server
-
-      - name: Generate deterministic evidence
-        run: pnpm reference:scenarios
-
-      - name: Validate evidence summary and redaction
-        shell: bash
-        run: |
-          node - <<'NODE'
-          const fs = require('fs');
-          const report = JSON.parse(fs.readFileSync('artifacts/reference-server-evidence.json', 'utf8'));
-          if (report.summary.failed !== 0 || report.summary.total < 12) {
-            throw new Error(`reference scenarios failed: ${JSON.stringify(report.summary)}`);
-          }
-          const raw = JSON.stringify(report);
-          for (const forbidden of ['ltp-reference-long-term-secret', 'macKey', 'encryptionKey', 'privateKey']) {
-            if (raw.includes(forbidden)) throw new Error(`evidence leaked forbidden token: ${forbidden}`);
-          }
-          console.log(report.summary);
-          NODE
-
-      - name: Upload reference-server evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: reference-server-evidence
-          path: artifacts/reference-server-evidence.json
           if-no-files-found: error
