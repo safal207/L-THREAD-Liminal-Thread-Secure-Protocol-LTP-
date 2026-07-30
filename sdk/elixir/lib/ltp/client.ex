@@ -1,7 +1,7 @@
 defmodule LTP.Client do
   @moduledoc """
   High-level LTP client API implemented as a GenServer.
-  
+
   Manages connection lifecycle, provides convenient methods for sending
   state updates and events, and handles reconnection logic.
   """
@@ -20,11 +20,13 @@ defmodule LTP.Client do
           default_affect: map() | nil,
           heartbeat_interval_ms: non_neg_integer(),
           heartbeat_timeout_ms: non_neg_integer(),
-          reconnect: %{
-            max_retries: non_neg_integer(),
-            base_delay_ms: non_neg_integer(),
-            max_delay_ms: non_neg_integer()
-          } | nil
+          reconnect:
+            %{
+              max_retries: non_neg_integer(),
+              base_delay_ms: non_neg_integer(),
+              max_delay_ms: non_neg_integer()
+            }
+            | nil
         }
 
   defstruct [
@@ -40,6 +42,11 @@ defmodule LTP.Client do
     :heartbeat_interval_ms,
     :heartbeat_timeout_ms,
     :reconnect_config,
+    :enable_ecdh_key_exchange,
+    :enable_metadata_encryption,
+    :secret_key,
+    :session_mac_key,
+    :session_encryption_key,
     :thread_id,
     :session_id,
     :is_connected
@@ -116,11 +123,17 @@ defmodule LTP.Client do
       default_affect: Map.get(opts, :default_affect),
       heartbeat_interval_ms: Map.get(opts, :heartbeat_interval_ms, 15_000),
       heartbeat_timeout_ms: Map.get(opts, :heartbeat_timeout_ms, 45_000),
-      reconnect_config: Map.get(opts, :reconnect, %{
-        max_retries: 5,
-        base_delay_ms: 1_000,
-        max_delay_ms: 30_000
-      }),
+      reconnect_config:
+        Map.get(opts, :reconnect, %{
+          max_retries: 5,
+          base_delay_ms: 1_000,
+          max_delay_ms: 30_000
+        }),
+      enable_ecdh_key_exchange: Map.get(opts, :enable_ecdh_key_exchange, false),
+      enable_metadata_encryption: Map.get(opts, :enable_metadata_encryption, false),
+      secret_key: Map.get(opts, :secret_key),
+      session_mac_key: Map.get(opts, :session_mac_key),
+      session_encryption_key: Map.get(opts, :session_encryption_key),
       is_connected: false
     }
 
@@ -137,6 +150,11 @@ defmodule LTP.Client do
       reconnect: state.reconnect_config,
       default_context_tag: state.default_context_tag,
       default_affect: state.default_affect,
+      enable_ecdh_key_exchange: state.enable_ecdh_key_exchange,
+      enable_metadata_encryption: state.enable_metadata_encryption,
+      secret_key: state.secret_key,
+      session_mac_key: state.session_mac_key,
+      session_encryption_key: state.session_encryption_key,
       client_pid: self()
     ]
 
@@ -268,7 +286,7 @@ defmodule LTP.Client do
       type: "state_update",
       thread_id: state.thread_id,
       session_id: state.session_id,
-      timestamp: System.system_time(:second),
+      timestamp: System.system_time(:millisecond),
       content_encoding: :json,
       payload: %{
         kind: kind,
@@ -310,7 +328,7 @@ defmodule LTP.Client do
       type: "event",
       thread_id: state.thread_id,
       session_id: state.session_id,
-      timestamp: System.system_time(:second),
+      timestamp: System.system_time(:millisecond),
       content_encoding: :json,
       payload: %{
         event_type: event_type,
@@ -332,4 +350,3 @@ defmodule LTP.Client do
     |> Base.encode16(case: :lower)
   end
 end
-

@@ -290,19 +290,37 @@ class LtpClient:
         self._ensure_handshake_keys()
         if self.thread_id:
             self.is_attempting_resume = True
+            if self.enable_ecdh_key_exchange:
+                public_key, private_key = generate_ecdh_key_pair()
+                self._ecdh_public_key = public_key
+                self._ecdh_private_key = private_key
+                self._handshake_keys = (public_key, private_key)
+            ecdh_public_key = self._ecdh_public_key or (
+                self._handshake_keys[0] if self._handshake_keys else None
+            )
             resume_payload = {
                 "type": "handshake_resume",
                 "ltp_version": LTP_VERSION,
                 "client_id": self.client_id,
                 "thread_id": self.thread_id,
                 "resume_reason": "automatic_reconnect",
-                "client_public_key": self._handshake_keys[0] if self._handshake_keys else None,
+                "client_public_key": ecdh_public_key,
+                "client_ecdh_public_key": ecdh_public_key if self.enable_ecdh_key_exchange else None,
                 "key_agreement": {
                     "algorithm": "secp256r1",
                     "method": "ecdh",
                     "hkdf": "sha256",
-                },
+                } if ecdh_public_key else {},
             }
+            if self.enable_ecdh_key_exchange and ecdh_public_key and self.secret_key:
+                timestamp = int(time.time() * 1000)
+                resume_payload["client_ecdh_signature"] = sign_ecdh_public_key(
+                    ecdh_public_key,
+                    self.client_id,
+                    timestamp,
+                    self.secret_key,
+                )
+                resume_payload["client_ecdh_timestamp"] = timestamp
             await self._send_raw(resume_payload)
         else:
             self.is_attempting_resume = False

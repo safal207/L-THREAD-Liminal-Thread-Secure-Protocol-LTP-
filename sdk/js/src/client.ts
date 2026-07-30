@@ -251,6 +251,9 @@ export class LtpClient {
       secretKey: options.secretKey,
       requireSignatureVerification: requireVerification,
       maxMessageAge: options.maxMessageAge || 60000, // Default 60 seconds
+      enableEcdhKeyExchange: options.enableEcdhKeyExchange,
+      enableMetadataEncryption: options.enableMetadataEncryption,
+      sessionEncryptionKey: options.sessionEncryptionKey,
     };
     this.events = events;
     this.logger = this.options.logger || defaultLogger;

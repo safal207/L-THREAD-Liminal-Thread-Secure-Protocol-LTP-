@@ -588,12 +588,38 @@ impl LtpClient {
         let thread_id = self.thread_id.clone().ok_or_else(|| {
             LtpError::InvalidState("send_handshake_resume called without thread_id".to_string())
         })?;
+        let (public_key, private_key) = if self.enable_ecdh_key_exchange {
+            let (public_key, private_key) = crypto::generate_ecdh_key_pair();
+            self.ecdh_public_key = Some(public_key.clone());
+            self.ecdh_private_key = Some(private_key.clone());
+            (Some(public_key), Some(private_key))
+        } else {
+            (None, None)
+        };
+        let timestamp = public_key.as_ref().map(|_| now_ms());
+        let signature = match (&public_key, timestamp, &self.secret_key) {
+            (Some(public_key), Some(timestamp), Some(secret_key)) => Some(
+                crypto::sign_ecdh_public_key(public_key, &self.client_id, timestamp, secret_key),
+            ),
+            _ => None,
+        };
         let resume = HandshakeResume {
             r#type: "handshake_resume".to_string(),
             ltp_version: "0.6".to_string(),
             client_id: self.client_id.clone(),
             thread_id,
             resume_reason: "automatic_reconnect".to_string(),
+            client_public_key: public_key.clone(),
+            client_ecdh_public_key: public_key,
+            client_ecdh_signature: signature,
+            client_ecdh_timestamp: timestamp,
+            key_agreement: private_key.map(|_| {
+                serde_json::json!({
+                    "algorithm": "secp256r1",
+                    "method": "ecdh",
+                    "hkdf": "sha256"
+                })
+            }),
         };
 
         let json = serde_json::to_string(&resume)?;

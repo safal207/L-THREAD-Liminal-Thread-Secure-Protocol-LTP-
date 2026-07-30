@@ -96,7 +96,6 @@ defmodule LTP.Connection do
     new_state =
       if state.thread_id and state.security_state_initialized do
         send_handshake_resume(state)
-        state
       else
         send_handshake_init(state)
       end
@@ -531,6 +530,15 @@ defmodule LTP.Connection do
   end
 
   defp send_handshake_resume(state) do
+    {public_key, private_key} =
+      if state.enable_ecdh_key_exchange do
+        LTP.Crypto.generate_ecdh_key_pair()
+      else
+        {nil, nil}
+      end
+
+    state = %{state | ecdh_public_key: public_key, ecdh_private_key: private_key}
+
     handshake = %{
       type: "handshake_resume",
       ltp_version: @ltp_version,
@@ -539,7 +547,45 @@ defmodule LTP.Connection do
       resume_reason: "automatic_reconnect"
     }
 
+    handshake =
+      if public_key do
+        handshake
+        |> Map.put(:client_public_key, public_key)
+        |> Map.put(:client_ecdh_public_key, public_key)
+        |> Map.put(:key_agreement, %{
+          algorithm: "secp256r1",
+          method: "ecdh",
+          hkdf: "sha256"
+        })
+      else
+        handshake
+      end
+
+    handshake =
+      if public_key and state.secret_key do
+        timestamp = System.system_time(:millisecond)
+
+        handshake
+        |> Map.put(
+          :client_ecdh_signature,
+          LTP.Crypto.sign_ecdh_public_key(
+            public_key,
+            state.client_id,
+            timestamp,
+            state.secret_key
+          )
+        )
+        |> Map.put(:client_ecdh_timestamp, timestamp)
+      else
+        handshake
+      end
+
     WebSockex.send_frame(self(), {:text, Jason.encode!(handshake)})
+    state
+  rescue
+    error ->
+      Logger.error("[LTP] Failed to build resume handshake: #{Exception.message(error)}")
+      state
   end
 
   defp handle_message(%{"type" => "handshake_ack"} = ack, state) do
