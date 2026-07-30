@@ -76,26 +76,20 @@ replace_once(
 ''',
 )
 
-replace_once(
-    "sdk/elixir/lib/ltp/connection.ex",
-    '''      if public_key and state.secret_key do
-''',
-    '''      if public_key && state.secret_key do
-''',
-)
-# The same truthy guard exists in the resume builder.
 connection_path = ROOT / "sdk/elixir/lib/ltp/connection.ex"
 connection = connection_path.read_text(encoding="utf-8")
-old_resume_guard = "      if public_key and state.secret_key do\n"
-new_resume_guard = "      if public_key && state.secret_key do\n"
-if old_resume_guard in connection:
-    if connection.count(old_resume_guard) != 1:
+old_guard = "      if public_key and state.secret_key do\n"
+new_guard = "      if public_key && state.secret_key do\n"
+if old_guard in connection:
+    count = connection.count(old_guard)
+    if count != 2:
         raise RuntimeError(
-            "sdk/elixir/lib/ltp/connection.ex: resume public-key guard is ambiguous"
+            f"sdk/elixir/lib/ltp/connection.ex: expected two ECDH guards, found {count}"
         )
-    connection_path.write_text(
-        connection.replace(old_resume_guard, new_resume_guard, 1),
-        encoding="utf-8",
+    connection_path.write_text(connection.replace(old_guard, new_guard), encoding="utf-8")
+elif connection.count(new_guard) != 2:
+    raise RuntimeError(
+        "sdk/elixir/lib/ltp/connection.ex: patched ECDH guards are incomplete"
     )
 
 subprocess.run(
