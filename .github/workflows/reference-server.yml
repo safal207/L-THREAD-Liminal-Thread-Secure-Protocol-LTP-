@@ -14,6 +14,7 @@ on:
       - "scripts/wp2_apply_matrix_support.py"
       - "scripts/wp2_adapter_fixes.py"
       - "scripts/wp2_python_encrypted_signature_fix.py"
+      - "scripts/wp2_rust_elixir_runtime_fix.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -88,6 +89,7 @@ jobs:
           python scripts/wp2_apply_matrix_support.py
           python scripts/wp2_adapter_fixes.py
           python scripts/wp2_python_encrypted_signature_fix.py
+          python scripts/wp2_rust_elixir_runtime_fix.py
 
       - name: Format changed language files
         shell: bash
@@ -118,6 +120,9 @@ jobs:
 
       - name: Verify patched Python security contracts
         run: python -m pytest -q sdk/python/tests/test_receive_security_atomicity.py
+
+      - name: Verify Rust millisecond timestamp contract
+        run: cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml outbound_timestamps_use_unix_milliseconds -- --exact
 
       - name: Run four-SDK matrix
         run: pnpm e2e:four-sdk
@@ -159,6 +164,7 @@ jobs:
             sdk/elixir/lib/ltp/connection.ex \
             sdk/rust/ltp-client/Cargo.toml \
             sdk/rust/ltp-client/src/client.rs \
+            sdk/rust/ltp-client/src/types.rs \
             sdk/rust/ltp-client/src/client/reference_interop_tests.rs \
             tests/e2e/four-sdk \
             docs/production/FOUR_SDK_INTEROPERABILITY.md
