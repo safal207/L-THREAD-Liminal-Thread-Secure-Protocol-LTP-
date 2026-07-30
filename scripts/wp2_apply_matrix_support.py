@@ -52,7 +52,30 @@ replace_once(
     """      this.lastSentHash = hashEnvelope(wire);
 """,
 )
+replace_once(
+    "tools/reference-server/protocol.ts",
+    """  return hmacSha256(`${entityId}:${timestamp}:${deterministicRandomHex}`, macKey);
+""",
+    """  const digest = hmacSha256(`${entityId}:${timestamp}:${deterministicRandomHex}`, macKey);
+  return `hmac-${digest.slice(0, 32)}-${timestamp}`;
+""",
+)
+replace_once(
+    "tools/reference-server/referenceServer.test.ts",
+    'import { runReferenceScenarios } from "./scenarios";\n',
+    'import { generateNonce } from "./protocol";\nimport { runReferenceScenarios } from "./scenarios";\n',
+)
+replace_once(
+    "tools/reference-server/referenceServer.test.ts",
+    'describe("independent LTP reference server", () => {\n',
+    '''describe("independent LTP reference server", () => {
+  it("emits the cross-SDK canonical HMAC nonce format", () => {
+    const nonce = generateNonce("matrix-mac-key", "reference-server", 1_900_000_000_000, "00".repeat(16));
+    expect(nonce).toMatch(/^hmac-[0-9a-f]{32}-1900000000000$/);
+  });
 
+''',
+)
 replace_once(
     "sdk/elixir/lib/ltp/connection.ex",
     """      client_id: Keyword.fetch!(opts, :client_id),
