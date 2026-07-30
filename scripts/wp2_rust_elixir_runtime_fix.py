@@ -68,6 +68,36 @@ replace_once(
 ''',
 )
 
+replace_once(
+    "sdk/elixir/lib/ltp/connection.ex",
+    '''      if state.thread_id and state.security_state_initialized do
+''',
+    '''      if state.thread_id && state.security_state_initialized do
+''',
+)
+
+replace_once(
+    "sdk/elixir/lib/ltp/connection.ex",
+    '''      if public_key and state.secret_key do
+''',
+    '''      if public_key && state.secret_key do
+''',
+)
+# The same truthy guard exists in the resume builder.
+connection_path = ROOT / "sdk/elixir/lib/ltp/connection.ex"
+connection = connection_path.read_text(encoding="utf-8")
+old_resume_guard = "      if public_key and state.secret_key do\n"
+new_resume_guard = "      if public_key && state.secret_key do\n"
+if old_resume_guard in connection:
+    if connection.count(old_resume_guard) != 1:
+        raise RuntimeError(
+            "sdk/elixir/lib/ltp/connection.ex: resume public-key guard is ambiguous"
+        )
+    connection_path.write_text(
+        connection.replace(old_resume_guard, new_resume_guard, 1),
+        encoding="utf-8",
+    )
+
 subprocess.run(
     [
         "git",
@@ -80,4 +110,4 @@ subprocess.run(
     check=True,
 )
 
-print("WP2 Rust timestamp and Elixir unnamed-connection fixes applied")
+print("WP2 Rust timestamp and Elixir handshake fixes applied")
