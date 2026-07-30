@@ -1,0 +1,118 @@
+name: Finish control and resume security
+
+on:
+  push:
+    branches:
+      - security/finish-control-resume
+
+permissions:
+  contents: write
+
+concurrency:
+  group: finish-control-resume-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apply-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Skip after runner cleanup
+        id: guard
+        shell: bash
+        run: |
+          if [ -f .github/scripts/apply_finish_control_resume.py ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.guard.outputs.run == 'true'
+        with:
+          node-version: '18'
+
+      - uses: actions/setup-python@v6
+        if: steps.guard.outputs.run == 'true'
+        with:
+          python-version: '3.11'
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.guard.outputs.run == 'true'
+
+      - uses: erlef/setup-beam@v1
+        if: steps.guard.outputs.run == 'true'
+        with:
+          otp-version: '25'
+          elixir-version: '1.14'
+
+      - name: Install native dependencies
+        if: steps.guard.outputs.run == 'true'
+        run: sudo apt-get update && sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Apply guarded patch
+        if: steps.guard.outputs.run == 'true'
+        run: python .github/scripts/apply_finish_control_resume.py
+
+      - name: Format and test JavaScript
+        if: steps.guard.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/js
+          npm install --ignore-scripts
+          npm test
+
+      - name: Test Python
+        if: steps.guard.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/python
+          python -m pip install -e '.[dev]'
+          python -m pytest tests/
+
+      - name: Format and test Rust
+        if: steps.guard.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/rust/ltp-client
+          cargo fmt --check
+          cargo test
+
+      - name: Format and test Elixir
+        if: steps.guard.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/elixir
+          mix deps.get
+          mix format --check-formatted lib/ltp/connection.ex test/ltp/control_resume_security_test.exs
+          mix test --trace
+
+      - name: Run cross-SDK security contracts
+        if: steps.guard.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python -m pytest -q tests/security/p0/test_p0_security_regressions.py tests/security/test_control_resume_contracts.py
+
+      - name: Commit verified changes
+        if: steps.guard.outputs.run == 'true'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          git config user.name 'security-state-bot'
+          git config user.email 'security-state-bot@users.noreply.github.com'
+          git add sdk tests docs .github/workflows/p0-security-regressions.yml
+          if git diff --cached --quiet; then
+            echo 'No runtime changes to commit'
+            exit 0
+          fi
+          git commit -m 'security: authenticate controls and preserve resumed state'
+          git push origin HEAD:security/finish-control-resume
