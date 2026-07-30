@@ -1,0 +1,138 @@
+name: WP3 Deterministic Fault and Race Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/fault-injection/**"
+      - "tests/fault-injection/**"
+      - "docs/production/WP3_FAULT_RACE_CRASH.md"
+      - "package.json"
+      - ".github/workflows/fault-injection.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/fault-injection/**"
+      - "tests/fault-injection/**"
+      - "docs/production/WP3_FAULT_RACE_CRASH.md"
+      - "package.json"
+      - ".github/workflows/fault-injection.yml"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Deterministic chaos seed
+        required: false
+        default: wp3-scheduled-seed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp3-fault-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-fault-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: erlef/setup-elixir@v1
+        with:
+          elixir-version: "1.14"
+          otp-version: "25"
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+      - name: Install repository and native SDK dependencies
+        run: |
+          set -euxo pipefail
+          pnpm install --frozen-lockfile
+          pnpm --dir sdk/js build
+          python -m pip install -e "sdk/python[dev]"
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+          cd sdk/elixir
+          mix deps.get
+      - name: Run deterministic and live-proxy contract tests
+        run: pnpm test:fault-injection
+      - name: Run four-runtime ownership matrix
+        run: pnpm runtime:fault-matrix
+      - name: Run four native SDKs through the live proxy
+        run: pnpm native:fault-proxy-matrix
+      - name: Generate machine-readable evidence
+        env:
+          INPUT_SEED: ${{ github.event.inputs.seed }}
+        run: |
+          SEED="${INPUT_SEED:-wp3-ci-seed}"
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "schedule" ]; then EXTRA="--extended"; fi
+          pnpm fault:scenarios -- --seed "$SEED" \
+            --out artifacts/wp3-fault-evidence.json $EXTRA
+      - name: Validate evidence and redaction
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const fault = JSON.parse(fs.readFileSync("artifacts/wp3-fault-evidence.json", "utf8"));
+          const runtime = JSON.parse(fs.readFileSync("artifacts/wp3-native-runtime-matrix.json", "utf8"));
+          const proxy = JSON.parse(fs.readFileSync("artifacts/wp3-native-sdk-proxy.json", "utf8"));
+          if (fault.summary.failed !== 0 || fault.summary.passed !== fault.summary.total) {
+            throw new Error(`WP3 contract failed: ${JSON.stringify(fault.summary)}`);
+          }
+          if (fault.scope.live_proxy_wire_injection !== false) {
+            throw new Error("scope boundary changed unexpectedly");
+          }
+          if (runtime.summary.total !== 4 || runtime.summary.passed !== 4 || runtime.summary.failed !== 0) {
+            throw new Error(`runtime matrix failed: ${JSON.stringify(runtime.summary)}`);
+          }
+          const expected = ["elixir", "javascript", "python", "rust"];
+          const actual = runtime.rows.map((row) => row.runtime).sort();
+          if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+            throw new Error(`runtime set mismatch: ${JSON.stringify(actual)}`);
+          }
+          for (const row of runtime.rows) {
+            if (
+              row.stale_owner !== "STALE_TRANSPORT_OWNER" ||
+              row.replay_after_restart !== "REPLAYED_NONCE" ||
+              row.fresh_reset_count !== 1
+            ) {
+              throw new Error(`runtime invariant failed: ${JSON.stringify(row)}`);
+            }
+          }
+          if (
+            proxy.summary.sdks !== 4 ||
+            proxy.summary.total !== 40 ||
+            proxy.summary.passed !== 40 ||
+            proxy.summary.failed !== 0 ||
+            proxy.proxy_fault !== "FRAGMENT"
+          ) {
+            throw new Error(`native SDK proxy matrix failed: ${JSON.stringify(proxy.summary)}`);
+          }
+          const raw = JSON.stringify({ fault, runtime, proxy });
+          for (const forbidden of ["macKey", "encryptionKey", "privateKey", "secretKey", "longTermSecret"]) {
+            if (raw.includes(forbidden)) throw new Error(`evidence leaked ${forbidden}`);
+          }
+          console.log({ fault: fault.summary, runtime: runtime.summary, proxy: proxy.summary });
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wp3-fault-evidence
+          path: |
+            artifacts/wp3-fault-evidence.json
+            artifacts/wp3-native-runtime-matrix.json
+            artifacts/wp3-native-sdk-proxy.json
+            artifacts/wp3-native-sdk-proxy/*.json
+          if-no-files-found: error
