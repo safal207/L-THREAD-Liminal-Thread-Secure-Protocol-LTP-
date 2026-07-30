@@ -102,8 +102,86 @@ replace_once(
       });
 """,
 )
+replace_once(
+    "sdk/js/src/crypto.ts",
+    "export async function hmacSha256(input: string, key: string): Promise<string> {",
+    "export async function hmacSha256(\n  input: string,\n  key: string,\n  keyEncoding: 'utf8' | 'hex' = 'utf8'\n): Promise<string> {",
+)
+replace_once(
+    "sdk/js/src/crypto.ts",
+    """      const keyData = textEncoder.encode(key);
+      const inputData = textEncoder.encode(input);
+""",
+    """      const keyData = keyEncoding === 'hex' ? hexToBuffer(key) : textEncoder.encode(key);
+      const inputData = textEncoder.encode(input);
+""",
+)
+replace_once(
+    "sdk/js/src/crypto.ts",
+    """      const hmac = crypto.createHmac('sha256', key);
+      hmac.update(input);
+""",
+    """      const Buffer = (globalThis as any).Buffer || require('buffer').Buffer;
+      const keyMaterial = keyEncoding === 'hex' ? Buffer.from(key, 'hex') : key;
+      const hmac = crypto.createHmac('sha256', keyMaterial);
+      hmac.update(input);
+""",
+)
+replace_once(
+    "sdk/js/src/crypto.ts",
+    """  const hmac = await hmacSha256(input, macKey);
+  // Return first 32 hex characters (16 bytes) for routing tag
+""",
+    """  const hmac = await hmacSha256(input, macKey, 'hex');
+  // Return first 32 hex characters (16 bytes) for routing tag
+""",
+)
+replace_once(
+    "tools/reference-server/protocol.ts",
+    """export function generateRoutingTag(threadId: string, sessionId: string, macKey: string): string {
+  return hmacSha256(`${threadId}:${sessionId}`, macKey).slice(0, 32);
+}
+""",
+    """export function generateRoutingTag(threadId: string, sessionId: string, macKey: string): string {
+  return createHmac("sha256", Buffer.from(macKey, "hex"))
+    .update(`${threadId}:${sessionId}`)
+    .digest("hex")
+    .slice(0, 32);
+}
+""",
+)
+replace_once(
+    "tools/reference-server/referenceServer.test.ts",
+    'import { generateNonce, hashEnvelope } from "./protocol";\n',
+    'import { generateNonce, generateRoutingTag, hashEnvelope } from "./protocol";\n',
+)
+replace_once(
+    "tools/reference-server/referenceServer.test.ts",
+    '''  it("commits meta and content encoding into the envelope hash", () => {
+''',
+    '''  it("uses decoded session-key bytes for routing tags", () => {
+    const key = "00".repeat(32);
+    expect(generateRoutingTag("thread", "session", key)).toBe(
+      "6fab276f2466ac9bb8d1f5de648b04ba",
+    );
+  });
+
+  it("commits meta and content encoding into the envelope hash", () => {
+''',
+)
 
 # The matrix workflow commits only after every native SDK and all 40 verdicts pass.
-subprocess.run(["git", "add", "sdk/js/src/client.ts"], cwd=ROOT, check=True)
+subprocess.run(
+    [
+        "git",
+        "add",
+        "sdk/js/src/client.ts",
+        "sdk/js/src/crypto.ts",
+        "tools/reference-server/protocol.ts",
+        "tools/reference-server/referenceServer.test.ts",
+    ],
+    cwd=ROOT,
+    check=True,
+)
 
 print("WP2 adapter compatibility fixes applied")
