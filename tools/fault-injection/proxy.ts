@@ -31,14 +31,19 @@ export interface FaultProxyHandle {
   close(): Promise<void>;
 }
 
+interface BufferedFrame {
+  payload: Buffer;
+  isBinary: boolean;
+}
+
 interface ConnectionState {
   clientKey: string;
   generation: number;
   downstream: WebSocket;
   upstream: WebSocket;
   faultIndex: number;
-  delayed: Buffer[];
-  reorder: Buffer | null;
+  delayed: BufferedFrame[];
+  reorder: BufferedFrame | null;
 }
 
 function digest(data: Buffer): string {
@@ -93,12 +98,14 @@ class DeterministicFaultProxy implements FaultProxyHandle {
       this.connections.add(state);
       this.record(state, "proxy", "PASS_THROUGH", "FORWARDED", "OWNER_REGISTERED", Buffer.alloc(0));
 
-      downstream.on("message", (data) => {
-        void this.handleDownstream(state, asBuffer(data));
+      downstream.on("message", (data, isBinary) => {
+        void this.handleDownstream(state, asBuffer(data), isBinary);
       });
-      upstream.on("message", (data) => {
+      upstream.on("message", (data, isBinary) => {
         const payload = asBuffer(data);
-        if (downstream.readyState === WebSocket.OPEN) downstream.send(payload);
+        if (downstream.readyState === WebSocket.OPEN) {
+          downstream.send(payload, { binary: isBinary });
+        }
         this.record(
           state,
           "upstream_to_downstream",
@@ -168,7 +175,11 @@ class DeterministicFaultProxy implements FaultProxyHandle {
     });
   }
 
-  private async handleDownstream(state: ConnectionState, payload: Buffer): Promise<void> {
+  private async handleDownstream(
+    state: ConnectionState,
+    payload: Buffer,
+    isBinary: boolean,
+  ): Promise<void> {
     if (this.activeGeneration.get(state.clientKey) !== state.generation) {
       this.record(
         state,
@@ -190,41 +201,42 @@ class DeterministicFaultProxy implements FaultProxyHandle {
 
     await this.waitForOpen(state.upstream);
     const fault = this.nextFault(state);
+    const frame: BufferedFrame = { payload, isBinary };
     switch (fault) {
       case "DROP_BEFORE_COMMIT":
         this.record(state, "downstream_to_upstream", fault, "DROPPED", fault, payload);
         return;
       case "DROP_AFTER_COMMIT":
-        state.upstream.send(payload);
+        state.upstream.send(payload, { binary: isBinary });
         this.record(state, "downstream_to_upstream", fault, "FORWARDED", fault, payload);
         if (state.downstream.readyState === WebSocket.OPEN) {
           state.downstream.close(4102, "deterministic drop after forward");
         }
         return;
       case "DELAY":
-        state.delayed.push(payload);
+        state.delayed.push(frame);
         this.record(state, "downstream_to_upstream", fault, "BUFFERED", fault, payload);
         return;
       case "DUPLICATE":
-        state.upstream.send(payload);
-        state.upstream.send(payload);
+        state.upstream.send(payload, { binary: isBinary });
+        state.upstream.send(payload, { binary: isBinary });
         this.record(state, "downstream_to_upstream", fault, "FORWARDED", fault, payload);
         return;
       case "REORDER":
         if (!state.reorder) {
-          state.reorder = payload;
+          state.reorder = frame;
           this.record(state, "downstream_to_upstream", fault, "BUFFERED", "REORDER_BUFFERED", payload);
         } else {
-          state.upstream.send(payload);
-          state.upstream.send(state.reorder);
+          state.upstream.send(payload, { binary: isBinary });
+          state.upstream.send(state.reorder.payload, { binary: state.reorder.isBinary });
           this.record(state, "downstream_to_upstream", fault, "FORWARDED", "REORDER_RELEASED", payload);
           state.reorder = null;
         }
         return;
       case "FRAGMENT": {
         const split = Math.max(1, Math.floor(payload.length / 2));
-        state.upstream.send(payload.subarray(0, split), { binary: true, fin: false });
-        state.upstream.send(payload.subarray(split), { binary: true, fin: true });
+        state.upstream.send(payload.subarray(0, split), { binary: isBinary, fin: false });
+        state.upstream.send(payload.subarray(split), { binary: isBinary, fin: true });
         this.record(state, "downstream_to_upstream", fault, "FORWARDED", fault, payload);
         return;
       }
@@ -234,7 +246,7 @@ class DeterministicFaultProxy implements FaultProxyHandle {
       case "SERVER_RESTART":
       case "CORRUPT_SNAPSHOT":
       case "REPLAY":
-        state.upstream.send(payload);
+        state.upstream.send(payload, { binary: isBinary });
         this.record(
           state,
           "downstream_to_upstream",
@@ -245,7 +257,7 @@ class DeterministicFaultProxy implements FaultProxyHandle {
         );
         return;
       default:
-        state.upstream.send(payload);
+        state.upstream.send(payload, { binary: isBinary });
         this.record(
           state,
           "downstream_to_upstream",
@@ -259,28 +271,28 @@ class DeterministicFaultProxy implements FaultProxyHandle {
 
   private flushState(state: ConnectionState): void {
     if (state.upstream.readyState !== WebSocket.OPEN) return;
-    for (const payload of state.delayed.splice(0)) {
-      state.upstream.send(payload);
+    for (const frame of state.delayed.splice(0)) {
+      state.upstream.send(frame.payload, { binary: frame.isBinary });
       this.record(
         state,
         "downstream_to_upstream",
         "DELAY",
         "FORWARDED",
         "DELAY_RELEASED",
-        payload,
+        frame.payload,
       );
     }
     if (state.reorder) {
-      const payload = state.reorder;
+      const frame = state.reorder;
       state.reorder = null;
-      state.upstream.send(payload);
+      state.upstream.send(frame.payload, { binary: frame.isBinary });
       this.record(
         state,
         "downstream_to_upstream",
         "REORDER",
         "FORWARDED",
         "REORDER_FLUSHED",
-        payload,
+        frame.payload,
       );
     }
   }
