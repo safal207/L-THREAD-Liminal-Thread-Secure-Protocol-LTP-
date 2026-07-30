@@ -7,6 +7,7 @@
   "payload": {
     "integer_looking_float": 1.0,
     "negative_zero": -0.0,
+    "safe_integer_float": 1000000.0,
     "small_exponent": 1e-07,
     "unicode": "Лиминальный поток 🌌"
   },
