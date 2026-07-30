@@ -19,6 +19,7 @@
     "reference:scenarios": "ts-node tools/reference-server/scenarios.ts --out artifacts/reference-server-evidence.json",
     "fault:scenarios": "ts-node tools/fault-injection/run.ts",
     "runtime:fault-matrix": "ts-node tests/fault-injection/runtime/run-matrix.ts artifacts/wp3-native-runtime-matrix.json",
+    "native:fault-proxy-matrix": "ts-node tests/fault-injection/native-sdk-proxy-matrix.ts",
     "dev:ltp-node-demo": "ts-node scripts/dev/ltp-node-demo.ts",
     "demo:story": "ts-node scripts/demo/ltp-story-demo.ts",
     "demo:future-weave": "NODE_PATH=node_modules ts-node scripts/dev/story-multipath-demo.ts",
@@ -48,7 +49,7 @@
     "conformance:verify": "pnpm -w ltp:conformance verify",
     "ltp:verify": "ts-node --project scripts/tsconfig.verify.json scripts/verify/ltpVerify.ts --out artifacts/conformance-report.json",
     "ltp:badge": "ts-node scripts/conformance/ltpBadge.ts",
-    "ltp:report:validate": "ts-node --project scripts/tsconfig.verify.json scripts/verify/validateConformanceReport.ts",
+    "ltp:report:validate": "ts-node --project scripts/verify/validateConformanceReport.ts",
     "ltp:inspect": "ts-node tools/ltp-inspect/inspect.ts",
     "marketing:plf:generate": "node scripts/marketing/generatePlfCampaign.js",
     "e2e:four-sdk": "pnpm --dir sdk/js build && ts-node tests/e2e/four-sdk/run-matrix.ts"
