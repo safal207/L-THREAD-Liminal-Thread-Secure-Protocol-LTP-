@@ -5,14 +5,14 @@ on:
     branches: [main]
     paths:
       - "tools/reference-server/**"
+      - "tests/e2e/four-sdk/**"
       - "sdk/js/src/client.ts"
       - "sdk/python/ltp_client/client.py"
-      - "sdk/rust/ltp-client/src/client.rs"
-      - "sdk/rust/ltp-client/src/types.rs"
-      - "sdk/elixir/lib/ltp/client.ex"
-      - "sdk/elixir/lib/ltp/connection.ex"
+      - "sdk/rust/ltp-client/**"
+      - "sdk/elixir/lib/ltp/**"
       - "scripts/wp2_apply_wire_compat.py"
       - "scripts/wp2_prepare_patch.py"
+      - "scripts/wp2_apply_matrix_support.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -20,6 +20,11 @@ on:
     branches: [main]
     paths:
       - "tools/reference-server/**"
+      - "tests/e2e/four-sdk/**"
+      - "sdk/js/src/client.ts"
+      - "sdk/python/ltp_client/client.py"
+      - "sdk/rust/ltp-client/**"
+      - "sdk/elixir/lib/ltp/**"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -33,11 +38,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  wp2-wire-compat:
+  wp2-four-sdk-matrix:
     if: github.event_name == 'pull_request' && github.event.pull_request.number == 511
-    name: Apply and verify WP2 wire compatibility
+    name: Build and verify four-SDK wire matrix
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Checkout WP2 head
         uses: actions/checkout@v6
@@ -74,78 +79,92 @@ jobs:
           corepack enable
           corepack prepare pnpm@9.15.0 --activate
 
-      - name: Apply exact WP2 patch
+      - name: Apply exact WP2 support patches
         shell: bash
         run: |
           set -euxo pipefail
           python scripts/wp2_prepare_patch.py
           python scripts/wp2_apply_wire_compat.py
+          python scripts/wp2_apply_matrix_support.py
 
       - name: Format changed language files
         shell: bash
         run: |
           set -euxo pipefail
-          rustfmt --edition 2021 sdk/rust/ltp-client/src/client.rs sdk/rust/ltp-client/src/types.rs
+          rustfmt --edition 2021 \
+            sdk/rust/ltp-client/src/client.rs \
+            sdk/rust/ltp-client/src/types.rs \
+            sdk/rust/ltp-client/src/client/reference_interop_tests.rs
           cd sdk/elixir
           mix deps.get
-          mix format lib/ltp/client.ex lib/ltp/connection.ex
+          mix format \
+            lib/ltp/client.ex \
+            lib/ltp/connection.ex \
+            ../../tests/e2e/four-sdk/elixir_adapter.exs
 
-      - name: Install repository dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Verify JavaScript and reference server
+      - name: Install dependencies
         shell: bash
         run: |
           set -euxo pipefail
-          cd sdk/js
-          npm install --ignore-scripts
-          npm run build
-          npm test
-          cd ../..
-          pnpm test:reference-server
-
-      - name: Verify Python
-        shell: bash
-        run: |
-          set -euxo pipefail
+          pnpm install --frozen-lockfile
           python -m pip install -e "sdk/python[dev]"
-          python -m pytest -q sdk/python/tests
-
-      - name: Verify Rust
-        shell: bash
-        run: |
-          set -euxo pipefail
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
-          cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml
 
-      - name: Verify Elixir
+      - name: Run four-SDK matrix
+        run: pnpm e2e:four-sdk
+
+      - name: Validate matrix and evidence redaction
         shell: bash
         run: |
-          set -euxo pipefail
-          cd sdk/elixir
-          mix test --trace
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('artifacts/four-sdk-interoperability.json', 'utf8'));
+          if (report.summary.total !== 40 || report.summary.passed !== 40 || report.summary.failed !== 0) {
+            throw new Error(`four-SDK matrix failed: ${JSON.stringify(report.summary)}`);
+          }
+          if (report.adapters.length !== 4) throw new Error('expected four native adapters');
+          const raw = JSON.stringify(report);
+          for (const forbidden of ['ltp-reference-long-term-secret', 'macKey', 'encryptionKey', 'privateKey']) {
+            if (raw.includes(forbidden)) throw new Error(`matrix leaked forbidden token: ${forbidden}`);
+          }
+          console.log(report.summary);
+          NODE
 
-      - name: Commit verified runtime changes
+      - name: Commit verified matrix implementation
         shell: bash
         run: |
           set -euxo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          rm -f tests/e2e/WP2.md
           git add \
-            sdk/js/src/client.ts \
-            sdk/python/ltp_client/client.py \
-            sdk/rust/ltp-client/src/client.rs \
-            sdk/rust/ltp-client/src/types.rs \
-            sdk/elixir/lib/ltp/client.ex \
+            package.json \
+            tools/reference-server/server.ts \
+            tools/reference-server/scenarios.ts \
             sdk/elixir/lib/ltp/connection.ex \
-            tools/reference-server/server.ts
+            sdk/rust/ltp-client/Cargo.toml \
+            sdk/rust/ltp-client/src/client.rs \
+            sdk/rust/ltp-client/src/client/reference_interop_tests.rs \
+            tests/e2e/four-sdk \
+            docs/production/FOUR_SDK_INTEROPERABILITY.md
+          git add -u tests/e2e/WP2.md
           if git diff --cached --quiet; then
-            echo "WP2 runtime patch is already applied"
+            echo "WP2 matrix implementation is already committed"
           else
-            git commit -m "fix: align SDK wire handshake and resume behavior"
+            git commit -m "test: prove four-SDK wire interoperability"
             git push origin HEAD:production/wp2-four-sdk-e2e
           fi
+
+      - name: Upload four-SDK evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: four-sdk-interoperability
+          path: |
+            artifacts/four-sdk-interoperability.json
+            artifacts/four-sdk/*.json
+            docs/production/FOUR_SDK_INTEROPERABILITY.md
+          if-no-files-found: error
 
   reference-server-contracts:
     name: Independent server + deterministic wire scenarios
