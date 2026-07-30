@@ -10,8 +10,10 @@ import {
 export const REFERENCE_PROTOCOL_VERSION = "0.3";
 export const REFERENCE_SUBPROTOCOL = "ltp.v0.3";
 
-export type JsonPrimitive = string | number | boolean | null;
-export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
+// Payloads remain unknown until the canonical JSON validator and scenario-specific
+// structural checks accept them. This avoids pretending arbitrary wire JSON has
+// already been parsed into a trusted application type.
+export type JsonValue = unknown;
 
 export interface LtpEnvelope {
   type: string;
@@ -54,6 +56,7 @@ export interface HandshakeResume {
 }
 
 export interface HandshakeAck {
+  [key: string]: unknown;
   type: "handshake_ack";
   ltp_version: string;
   thread_id: string;
@@ -70,6 +73,7 @@ export interface HandshakeAck {
 }
 
 export interface HandshakeReject {
+  [key: string]: unknown;
   type: "handshake_reject";
   ltp_version: string;
   reason: string;
