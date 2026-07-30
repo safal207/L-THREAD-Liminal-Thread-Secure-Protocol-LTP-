@@ -109,6 +109,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
 
+      - name: Verify patched reference contracts
+        run: pnpm test:reference-server
+
       - name: Run four-SDK matrix
         run: pnpm e2e:four-sdk
 
@@ -138,8 +141,10 @@ jobs:
           rm -f tests/e2e/WP2.md
           git add \
             package.json \
+            tools/reference-server/protocol.ts \
             tools/reference-server/server.ts \
             tools/reference-server/scenarios.ts \
+            tools/reference-server/referenceServer.test.ts \
             sdk/elixir/lib/ltp/connection.ex \
             sdk/rust/ltp-client/Cargo.toml \
             sdk/rust/ltp-client/src/client.rs \
