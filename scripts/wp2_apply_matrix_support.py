@@ -92,7 +92,15 @@ replace_once(
     """      // The sender commits the canonical fields exactly as transmitted. For
       // metadata-encrypted frames this means the masked routing fields, not the
       // decrypted logical identifiers used for signature verification.
-      this.lastSentHash = await hashEnvelope(envelopeWithSecurity);
+      this.lastSentHash = await hashEnvelope({
+        type: envelopeWithSecurity.type,
+        thread_id: envelopeWithSecurity.thread_id,
+        session_id: envelopeWithSecurity.session_id,
+        timestamp: envelopeWithSecurity.timestamp,
+        nonce: envelopeWithSecurity.nonce!,
+        payload: envelopeWithSecurity.payload,
+        prev_message_hash: envelopeWithSecurity.prev_message_hash,
+      });
 """,
 )
 replace_once(
