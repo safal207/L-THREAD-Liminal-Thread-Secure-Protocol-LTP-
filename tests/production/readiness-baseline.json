@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "baseline_id": "ltp-production-readiness-wp0-2026-07-30",
-  "captured_from_commit": "40c9c406c2455276a2d90910ce7e78b6d26b638c",
+  "baseline_id": "ltp-production-readiness-wp1-2026-07-30",
+  "captured_from_commit": "e0323c4e1c12091cc2b2cfd057c2c4566da8e7f5",
   "sdk_version": "0.6.0-alpha.3",
   "sdks": {
     "javascript": {"manifest": "sdk/js/package.json", "runtime": "Node.js >=18", "test": "cd sdk/js && npm test"},
@@ -12,15 +12,23 @@
   "workflows": [
     {"id": "sdk-matrix", "path": ".github/workflows/test.yml", "status": "PROVEN", "scope": "native SDK suites, type consistency, conformance smoke, inspector and RC1 checks"},
     {"id": "p0-security", "path": ".github/workflows/p0-security-regressions.yml", "status": "PROVEN", "scope": "canonical bytes, receive atomicity, controls and resume security"},
-    {"id": "security-baseline", "path": ".github/workflows/security.yml", "status": "PROVEN", "scope": "gitleaks and CodeQL for JavaScript, Python and Rust"}
+    {"id": "security-baseline", "path": ".github/workflows/security.yml", "status": "PROVEN", "scope": "gitleaks and CodeQL for JavaScript, Python and Rust"},
+    {"id": "reference-server", "path": ".github/workflows/reference-server.yml", "status": "PROVEN", "scope": "independent protocol oracle, deterministic real-socket scenarios, evidence redaction and artifact upload"}
   ],
   "capabilities": [
     {
       "id": "handshake-session-establishment",
       "claim": "Handshake and session establishment implementations exist in all SDKs.",
       "status_by_sdk": {"javascript": "PARTIAL", "python": "PARTIAL", "rust": "PARTIAL", "elixir": "PARTIAL"},
-      "evidence": ["sdk/js/src/client.ts", "sdk/python/ltp_client/client.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/lib/ltp/connection.ex", ".github/workflows/test.yml"],
-      "remaining_gap": "No shared reference server proves identical real-socket semantics. Tracked by #500 and #501."
+      "evidence": ["sdk/js/src/client.ts", "sdk/python/ltp_client/client.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/lib/ltp/connection.ex", ".github/workflows/test.yml", "tools/reference-server/server.ts"],
+      "remaining_gap": "The independent server is proven, but each SDK still needs to execute its scenarios. Tracked by #501."
+    },
+    {
+      "id": "independent-reference-server",
+      "claim": "An SDK-independent server executes deterministic positive and negative LTP scenarios over real WebSocket frames.",
+      "status_by_sdk": {"javascript": "NOT_APPLICABLE", "python": "NOT_APPLICABLE", "rust": "NOT_APPLICABLE", "elixir": "NOT_APPLICABLE"},
+      "evidence": ["tools/reference-server/protocol.ts", "tools/reference-server/server.ts", "tools/reference-server/scenarios.ts", "tools/reference-server/referenceServer.test.ts", "tools/reference-server/README.md", ".github/workflows/reference-server.yml"],
+      "remaining_gap": null
     },
     {
       "id": "canonical-envelope-v1",
@@ -33,29 +41,29 @@
       "id": "signature-replay-hash-chain",
       "claim": "Signatures, freshness, replay and hash-chain checks complete before receive-state commit.",
       "status_by_sdk": {"javascript": "PROVEN", "python": "PROVEN", "rust": "PROVEN", "elixir": "PROVEN"},
-      "evidence": ["tests/security/p0/test_p0_security_regressions.py", "sdk/js/src/client.ts", "sdk/python/tests/test_receive_security_atomicity.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/connection_security_test.exs", ".github/workflows/p0-security-regressions.yml"],
-      "remaining_gap": "Shared real-wire negative scenarios remain for #501."
+      "evidence": ["tests/security/p0/test_p0_security_regressions.py", "sdk/js/src/client.ts", "sdk/python/tests/test_receive_security_atomicity.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/connection_security_test.exs", ".github/workflows/p0-security-regressions.yml", "tools/reference-server/referenceServer.test.ts"],
+      "remaining_gap": "The independent oracle proves real-wire rejection; equivalent runs through all four SDKs remain for #501."
     },
     {
       "id": "authenticated-control-frames",
       "claim": "Post-handshake ping/pong require the negotiated session MAC key before liveness mutation.",
       "status_by_sdk": {"javascript": "PROVEN", "python": "PROVEN", "rust": "PROVEN", "elixir": "PROVEN"},
-      "evidence": ["tests/security/test_control_resume_contracts.py", "sdk/js/src/__tests__/controlResumeSecurity.test.ts", "sdk/python/tests/test_control_resume_security.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/control_resume_security_test.exs"],
+      "evidence": ["tests/security/test_control_resume_contracts.py", "sdk/js/src/__tests__/controlResumeSecurity.test.ts", "sdk/python/tests/test_control_resume_security.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/control_resume_security_test.exs", "tools/reference-server/scenarios.ts"],
       "remaining_gap": null
     },
     {
       "id": "resume-security-state",
       "claim": "Same-session resume preserves receive-chain/replay state; fresh sessions reset the namespace.",
       "status_by_sdk": {"javascript": "PROVEN", "python": "PROVEN", "rust": "PROVEN", "elixir": "PROVEN"},
-      "evidence": ["docs/security/SESSION_CONTROL_AND_RESUME_STATE.md", "tests/security/test_control_resume_contracts.py", "sdk/js/src/__tests__/controlResumeSecurity.test.ts", "sdk/python/tests/test_control_resume_security.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/control_resume_security_test.exs"],
+      "evidence": ["docs/security/SESSION_CONTROL_AND_RESUME_STATE.md", "tests/security/test_control_resume_contracts.py", "sdk/js/src/__tests__/controlResumeSecurity.test.ts", "sdk/python/tests/test_control_resume_security.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/control_resume_security_test.exs", "tools/reference-server/scenarios.ts"],
       "remaining_gap": "Crash/restart and concurrent reconnect fault injection remain for #502."
     },
     {
       "id": "metadata-encryption",
       "claim": "Metadata encryption and routing-tag implementations exist in all SDKs.",
       "status_by_sdk": {"javascript": "PARTIAL", "python": "PARTIAL", "rust": "PARTIAL", "elixir": "PARTIAL"},
-      "evidence": ["sdk/js/src/crypto.ts", "sdk/python/ltp_client/crypto.py", "sdk/rust/ltp-client/src/crypto.rs", "sdk/elixir/lib/ltp/crypto.ex"],
-      "remaining_gap": "No shared four-SDK encrypted-metadata wire scenario exists. Tracked by #501."
+      "evidence": ["sdk/js/src/crypto.ts", "sdk/python/ltp_client/crypto.py", "sdk/rust/ltp-client/src/crypto.rs", "sdk/elixir/lib/ltp/crypto.ex", "tools/reference-server/scenarios.ts"],
+      "remaining_gap": "The oracle scenario is proven; all four SDKs still need the same encrypted-metadata wire scenario in #501."
     },
     {
       "id": "cross-sdk-type-consistency",
@@ -68,8 +76,8 @@
       "id": "real-socket-interoperability",
       "claim": "All SDKs execute the same scenarios against an independent reference server.",
       "status_by_sdk": {"javascript": "MISSING", "python": "MISSING", "rust": "MISSING", "elixir": "MISSING"},
-      "evidence": [],
-      "remaining_gap": "Reference server #500 and E2E matrix #501 are required."
+      "evidence": ["tools/reference-server/scenarios.ts", ".github/workflows/reference-server.yml"],
+      "remaining_gap": "The independent server and catalog now exist; four SDK adapters and the scenario matrix are required by #501."
     },
     {
       "id": "conformance-report-generation",
@@ -87,12 +95,11 @@
     }
   ],
   "issue_reconciliation": [
-    {"issue": 419, "assessment": "PARTIAL", "disposition": "NARROW", "reason": "Source/test capability matrix is now explicit; real-socket interoperability remains.", "follow_up_issue": 501},
+    {"issue": 419, "assessment": "PARTIAL", "disposition": "NARROW", "reason": "Source/test capability matrix and independent server exist; four-SDK real-socket interoperability remains.", "follow_up_issue": 501},
     {"issue": 420, "assessment": "PROVEN", "disposition": "CLOSE", "reason": "Positive/negative cryptographic contracts run in mandatory CI.", "follow_up_issue": 505},
     {"issue": 425, "assessment": "PROVEN", "disposition": "CLOSE", "reason": "Mandatory CI runs cross-SDK types, canonical contracts, native suites and conformance validation without secrets.", "follow_up_issue": 501}
   ],
   "open_gaps": [
-    "#500 independent reference server and deterministic E2E harness",
     "#501 four-SDK real-wire interoperability matrix",
     "#502 deterministic fault, reconnect race and crash/restart testing",
     "#503 measured load, soak, backpressure and resource limits",
