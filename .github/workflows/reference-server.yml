@@ -12,6 +12,7 @@ on:
       - "sdk/elixir/lib/ltp/client.ex"
       - "sdk/elixir/lib/ltp/connection.ex"
       - "scripts/wp2_apply_wire_compat.py"
+      - "scripts/wp2_prepare_patch.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -74,7 +75,11 @@ jobs:
           corepack prepare pnpm@9.15.0 --activate
 
       - name: Apply exact WP2 patch
-        run: python scripts/wp2_apply_wire_compat.py
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python scripts/wp2_prepare_patch.py
+          python scripts/wp2_apply_wire_compat.py
 
       - name: Format changed language files
         shell: bash
