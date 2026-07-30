@@ -11,6 +11,7 @@ on:
       - "sdk/rust/ltp-client/**"
       - "sdk/elixir/lib/ltp/**"
       - "scripts/wp2_apply_matrix_support.py"
+      - "scripts/wp2_adapter_fixes.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -78,7 +79,11 @@ jobs:
           corepack prepare pnpm@9.15.0 --activate
 
       - name: Apply exact WP2 matrix support
-        run: python scripts/wp2_apply_matrix_support.py
+        shell: bash
+        run: |
+          set -euxo pipefail
+          python scripts/wp2_apply_matrix_support.py
+          python scripts/wp2_adapter_fixes.py
 
       - name: Format changed language files
         shell: bash
