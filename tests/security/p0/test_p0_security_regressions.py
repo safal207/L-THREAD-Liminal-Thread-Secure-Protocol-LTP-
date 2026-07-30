@@ -10,6 +10,7 @@ import json
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -21,14 +22,18 @@ from ltp_client.crypto import _serialize_canonical
 ROOT = Path(__file__).resolve().parents[3]
 
 
-def _javascript_canonical(message: dict) -> str:
-    """Return the actual canonical bytes produced by the built JS SDK."""
+def _javascript_outcome(message: dict[str, Any]) -> dict[str, Any]:
+    """Return either the JS canonical bytes or its fail-closed rejection."""
 
     script = r"""
 const fs = require('fs');
 const { serializeCanonical } = require('./sdk/js/dist/crypto');
 const message = JSON.parse(fs.readFileSync(0, 'utf8'));
-process.stdout.write(serializeCanonical(message));
+try {
+  process.stdout.write(JSON.stringify({ ok: true, value: serializeCanonical(message) }));
+} catch (error) {
+  process.stdout.write(JSON.stringify({ ok: false, error: String(error && error.message || error) }));
+}
 """
     result = subprocess.run(
         ["node", "-e", script],
@@ -38,10 +43,24 @@ process.stdout.write(serializeCanonical(message));
         capture_output=True,
         check=True,
     )
-    return result.stdout
+    return json.loads(result.stdout)
 
 
-def _envelope(payload: dict) -> dict:
+def _javascript_canonical(message: dict[str, Any]) -> str:
+    outcome = _javascript_outcome(message)
+    if not outcome["ok"]:
+        raise AssertionError(f"JavaScript unexpectedly rejected legal envelope: {outcome['error']}")
+    return outcome["value"]
+
+
+def _python_outcome(message: dict[str, Any]) -> dict[str, Any]:
+    try:
+        return {"ok": True, "value": _serialize_canonical(message)}
+    except (TypeError, ValueError) as error:
+        return {"ok": False, "error": str(error)}
+
+
+def _envelope(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "type": "state_update",
         "thread_id": "thread-123",
@@ -62,6 +81,7 @@ def test_p0_cross_sdk_canonical_bytes_are_identical() -> None:
         {
             "integer_looking_float": 1.0,
             "negative_zero": -0.0,
+            "safe_integer_float": 1_000_000.0,
             "small_exponent": 1e-7,
             "unicode": "Лиминальный поток 🌌",
         }
@@ -85,10 +105,9 @@ def test_p0_cross_sdk_canonical_bytes_are_identical() -> None:
         {
             "fixed_lower_boundary": 1e-6,
             "exponent_below_boundary": 1e-7,
-            "fixed_upper_value": 1e20,
-            "exponent_upper_boundary": 1e21,
-            "large_exponent": 1e30,
             "small_exponent": 1e-27,
+            "safe_integer_float": 1_000_000.0,
+            "max_safe_integer_float": 9_007_199_254_740_991.0,
         },
         {
             "rounding_case": 333333333.33333329,
@@ -104,9 +123,23 @@ def test_p0_cross_sdk_canonical_bytes_are_identical() -> None:
         },
     ],
 )
-def test_canonical_differential_edge_matrix(payload: dict) -> None:
+def test_canonical_differential_edge_matrix(payload: dict[str, Any]) -> None:
     envelope = _envelope(payload)
     assert _javascript_canonical(envelope) == _serialize_canonical(envelope)
+
+
+@pytest.mark.parametrize("unsafe_value", [1e20, 1e21, 1e30, 9_007_199_254_740_992.0])
+def test_canonical_unsafe_integer_rejection_is_cross_sdk(unsafe_value: float) -> None:
+    envelope = _envelope({"unsafe_integer_value": unsafe_value})
+    javascript = _javascript_outcome(envelope)
+    python = _python_outcome(envelope)
+
+    assert not javascript["ok"], (
+        f"JavaScript accepted unsafe integer-valued number {unsafe_value}: {javascript}"
+    )
+    assert not python["ok"], (
+        f"Python accepted unsafe integer-valued number {unsafe_value}: {python}"
+    )
 
 
 @pytest.mark.asyncio
@@ -152,6 +185,7 @@ def test_p0_rust_receive_loop_enforces_security_pipeline() -> None:
     start = source.index("tokio::spawn(async move")
     end = source.index("        Ok(())", start)
     receive_loop = source[start:end]
+    compact_receive_loop = "".join(receive_loop.split())
 
     assert "TODO: Parse and process LTP messages with security features" not in receive_loop, (
         "P0: Rust still contains a placeholder receive path instead of enforcing the "
@@ -166,12 +200,13 @@ def test_p0_rust_receive_loop_enforces_security_pipeline() -> None:
     assert ("validate_nonce" in receive_loop or "seen_nonces" in receive_loop), (
         "P0: the live Rust receive loop does not enforce replay protection."
     )
-    assert "let wire_message = message.clone();" in receive_loop, (
-        "P0: encrypted Rust frames must commit the original wire envelope to the hash chain."
+    assert "letwire_message=message.clone();" in compact_receive_loop, (
+        "P0: encrypted Rust frames must preserve the original wire envelope."
     )
-    assert "verify_hash_chain(\n                            &wire_message" in receive_loop, (
-        "P0: Rust is hashing the decrypted logical envelope instead of the transmitted bytes."
-    )
+    assert (
+        "verify_hash_chain(&wire_message,last_received_hash.as_deref())"
+        in compact_receive_loop
+    ), "P0: Rust is hashing the decrypted logical envelope instead of transmitted bytes."
 
 
 def test_p0_elixir_authenticates_before_application_dispatch() -> None:
