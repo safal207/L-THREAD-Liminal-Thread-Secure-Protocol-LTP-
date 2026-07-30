@@ -111,6 +111,11 @@ subprocess.run(
     cwd=ROOT,
     check=True,
 )
+subprocess.run(
+    ["python", "scripts/wp2_elixir_handle_connect_mailbox_fix.py"],
+    cwd=ROOT,
+    check=True,
+)
 
 subprocess.run(
     [
