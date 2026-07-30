@@ -1,0 +1,78 @@
+name: Reference Server Scenarios
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/reference-server/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/reference-server.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/reference-server/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
+      - ".github/workflows/reference-server.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reference-server-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reference-server-contracts:
+    name: Independent server + deterministic wire scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Enable pnpm
+        shell: bash
+        run: |
+          set -euxo pipefail
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run reference-server contracts
+        run: pnpm test:reference-server
+
+      - name: Generate deterministic evidence
+        run: pnpm reference:scenarios
+
+      - name: Validate evidence summary and redaction
+        shell: bash
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('artifacts/reference-server-evidence.json', 'utf8'));
+          if (report.summary.failed !== 0 || report.summary.total < 12) {
+            throw new Error(`reference scenarios failed: ${JSON.stringify(report.summary)}`);
+          }
+          const raw = JSON.stringify(report);
+          for (const forbidden of ['ltp-reference-long-term-secret', 'macKey', 'encryptionKey', 'privateKey']) {
+            if (raw.includes(forbidden)) throw new Error(`evidence leaked forbidden token: ${forbidden}`);
+          }
+          console.log(report.summary);
+          NODE
+
+      - name: Upload reference-server evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: reference-server-evidence
+          path: artifacts/reference-server-evidence.json
+          if-no-files-found: error

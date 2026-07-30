@@ -2,16 +2,16 @@
 
 > This report is generated from `tests/production/readiness-baseline.json`. The JSON manifest is the source of truth.
 
-- **Baseline ID:** `ltp-production-readiness-wp0-2026-07-30`
-- **Captured from commit:** `40c9c406c2455276a2d90910ce7e78b6d26b638c`
+- **Baseline ID:** `ltp-production-readiness-wp1-2026-07-30`
+- **Captured from commit:** `e0323c4e1c12091cc2b2cfd057c2c4566da8e7f5`
 - **Synchronized SDK version:** `0.6.0-alpha.3`
 - **Production-readiness epic:** #498
 
 ## What this baseline means
 
-The repository has a materially stronger security baseline than its older status documents suggested: four SDKs share Canonical Envelope v1, mandatory native suites, atomic inbound state transitions, authenticated post-handshake controls and same-session resume protection.
+The repository now contains an independent LTP reference server with deterministic real-WebSocket scenarios. The server does not import any SDK implementation and proves authenticated handshake/resume, business traffic, ping/pong, encrypted metadata and fail-closed rejection paths with redacted evidence.
 
-It does **not** yet prove production readiness. In particular, it does not prove that four independent clients behave identically against one real reference server under faults and load.
+It still does **not** prove production readiness or four-SDK interoperability. JavaScript, Python, Rust and Elixir must each run the same reference scenarios in #501.
 
 ## Status legend
 
@@ -37,19 +37,21 @@ It does **not** yet prove production readiness. In particular, it does not prove
 | `sdk-matrix` | **PROVEN** | Native SDK suites, type consistency, conformance smoke, inspector and RC1 checks in `.github/workflows/test.yml`. |
 | `p0-security` | **PROVEN** | Canonical bytes, receive atomicity, authenticated controls and resume-state security in `.github/workflows/p0-security-regressions.yml`. |
 | `security-baseline` | **PROVEN** | Gitleaks and CodeQL for JavaScript, Python and Rust in `.github/workflows/security.yml`. |
+| `reference-server` | **PROVEN** | Independent oracle, deterministic real-socket scenarios, evidence redaction and artifact upload in `.github/workflows/reference-server.yml`. |
 
 ## Capability matrix
 
 | Capability | JavaScript | Python | Rust | Elixir | Production proof still missing |
 |---|---|---|---|---|---|
-| `handshake-session-establishment` | PARTIAL | PARTIAL | PARTIAL | PARTIAL | Shared real-socket reference-server proof: #500 and #501. |
+| `handshake-session-establishment` | PARTIAL | PARTIAL | PARTIAL | PARTIAL | The independent server exists; SDK adapters remain in #501. |
+| `independent-reference-server` | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | — |
 | `canonical-envelope-v1` | PROVEN | PROVEN | PROVEN | PROVEN | — |
-| `signature-replay-hash-chain` | PROVEN | PROVEN | PROVEN | PROVEN | Shared real-wire negative scenarios: #501. |
+| `signature-replay-hash-chain` | PROVEN | PROVEN | PROVEN | PROVEN | The oracle proves wire rejection; four-SDK runs remain in #501. |
 | `authenticated-control-frames` | PROVEN | PROVEN | PROVEN | PROVEN | — |
 | `resume-security-state` | PROVEN | PROVEN | PROVEN | PROVEN | Crash/restart and concurrent reconnect injection: #502. |
-| `metadata-encryption` | PARTIAL | PARTIAL | PARTIAL | PARTIAL | Shared encrypted-metadata E2E scenario: #501. |
+| `metadata-encryption` | PARTIAL | PARTIAL | PARTIAL | PARTIAL | The oracle scenario exists; four-SDK encrypted-metadata E2E remains in #501. |
 | `cross-sdk-type-consistency` | PROVEN | PROVEN | PROVEN | PROVEN | Behavioral wire interoperability is separate: #501. |
-| `real-socket-interoperability` | MISSING | MISSING | MISSING | MISSING | Reference server #500 and E2E matrix #501. |
+| `real-socket-interoperability` | MISSING | MISSING | MISSING | MISSING | The server/catalog exist; four SDK adapters and matrix remain in #501. |
 | `conformance-report-generation` | PROVEN | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | Repository-level tool, not four native generators. |
 | `semantic-inspector` | PROVEN | NOT_APPLICABLE | NOT_APPLICABLE | NOT_APPLICABLE | — |
 
@@ -57,7 +59,11 @@ It does **not** yet prove production readiness. In particular, it does not prove
 
 ### `handshake-session-establishment`
 
-Implementations exist in `sdk/js/src/client.ts`, `sdk/python/ltp_client/client.py`, `sdk/rust/ltp-client/src/client.rs` and `sdk/elixir/lib/ltp/connection.ex`. Native compilation and tests run in `sdk-matrix`. Status remains PARTIAL because one independent server has not exercised all four implementations over real sockets.
+Implementations exist in all four SDKs. `tools/reference-server/server.ts` now provides an independent authenticated server-side state machine. Status remains PARTIAL until #501 connects every SDK to it.
+
+### `independent-reference-server`
+
+`tools/reference-server/protocol.ts` independently implements canonical JSON, HMAC, P-256 ECDH, HKDF, AES-GCM, routing tags and hash commitments. `server.ts` owns the state machine, `scenarios.ts` drives real sockets and `referenceServer.test.ts` proves deterministic replay and evidence redaction. The `reference-server` workflow publishes the evidence artifact.
 
 ### `canonical-envelope-v1`
 
@@ -65,19 +71,19 @@ The shared vector is `tests/security/canonical-envelope-v1.json`. Native tests e
 
 ### `signature-replay-hash-chain`
 
-Evidence includes `tests/security/p0/test_p0_security_regressions.py`, Python receive-atomicity tests, the Rust live receive pipeline, Elixir authentication-before-dispatch tests and JavaScript security paths. State mutation follows successful authentication and chain validation.
+Native tests prove atomic inbound security boundaries. The reference server additionally rejects invalid signatures, stale timestamps, replayed nonces and broken chains before inbound state commit over real WebSocket frames.
 
 ### `authenticated-control-frames`
 
-Evidence includes `tests/security/test_control_resume_contracts.py` plus native JavaScript, Python, Rust and Elixir tests. Unsigned or replayed `pong` cannot change liveness state.
+Native SDK tests and the reference scenario catalog prove that post-handshake ping/pong use the negotiated session key.
 
 ### `resume-security-state`
 
-The normative state model is documented in `docs/security/SESSION_CONTROL_AND_RESUME_STATE.md`. Native tests prove same-session preservation and fresh-session reset. Extended fault and crash evidence belongs to #502.
+The normative state model is documented in `docs/security/SESSION_CONTROL_AND_RESUME_STATE.md`. The reference scenario preserves both directions of the hash chain and replay state across an authenticated same-session resume. Extended fault/crash evidence belongs to #502.
 
 ### `metadata-encryption`
 
-Implementations exist in the four crypto modules. Status is PARTIAL because there is no single real-wire scenario comparing encryption, routing tags, decryption and rejection behavior across all SDKs.
+The reference server executes an AES-256-GCM encrypted-metadata and routing-tag round trip. SDK status remains PARTIAL until each implementation runs the shared scenario in #501.
 
 ### `cross-sdk-type-consistency`
 
@@ -85,7 +91,7 @@ Implementations exist in the four crypto modules. Status is PARTIAL because ther
 
 ### `real-socket-interoperability`
 
-Evidence: **none yet**. #500 creates the independent server and #501 creates the scenario × SDK matrix.
+The independent server and scenario catalog are now proven, but no SDK adapter matrix exists yet. #501 owns that remaining evidence.
 
 ### `conformance-report-generation`
 
@@ -99,13 +105,12 @@ Inspector contract and matrix tests run from `tools/ltp-inspect`, with packaged 
 
 | Issue | Assessment | Disposition | Follow-up | Reason |
 |---|---|---|---|---|
-| #419 | PARTIAL | NARROW | #501 | The source/test compatibility matrix now exists, but wire-level interoperability remains missing. |
+| #419 | PARTIAL | NARROW | #501 | The capability matrix and independent server exist; four-SDK wire interoperability remains. |
 | #420 | PROVEN | CLOSE | #505 | Positive and negative cryptographic contracts run in mandatory CI; fuzz expansion remains separate. |
-| #425 | PROVEN | CLOSE | #501 | Mandatory CI already runs cross-SDK types, canonical contracts, native suites and conformance validation without secrets. |
+| #425 | PROVEN | CLOSE | #501 | Mandatory CI runs cross-SDK types, canonical contracts, native suites and conformance validation without secrets. |
 
 ## Open production-readiness gaps
 
-- #500 independent reference server and deterministic E2E harness.
 - #501 four-SDK real-wire interoperability matrix.
 - #502 deterministic fault, reconnect race and crash/restart testing.
 - #503 measured load, soak, backpressure and resource limits.
@@ -117,4 +122,4 @@ Inspector contract and matrix tests run from `tools/ltp-inspect`, with packaged 
 
 ## Explicit non-claims
 
-This baseline does **not** claim that LTP is production-ready, that the four SDKs are wire-interoperable, or that performance and resilience limits are known. Those claims become available only after the dependent production-readiness work packages are completed with reproducible evidence.
+This baseline does **not** claim that LTP is production-ready, that the four SDKs are wire-interoperable, or that performance and resilience limits are known. The reference server is an oracle and test harness, not a production deployment template.
