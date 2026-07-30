@@ -188,6 +188,7 @@ async function testHeartbeatReconnect() {
   const client = new LtpClient('ws://localhost:8080', {
     clientId: 'hb-client',
     storage,
+    sessionMacKey: 'heartbeat-session-key',
     heartbeat: { intervalMs: 5, timeoutMs: 15 },
     reconnect: { baseDelayMs: 5, maxDelayMs: 10, maxRetries: 2 },
   });

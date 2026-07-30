@@ -10,9 +10,9 @@ use aes_gcm::{
 use hex;
 use hkdf::Hkdf;
 use hmac::{digest::KeyInit, Hmac, Mac};
-use rand::Rng;
 use p256::elliptic_curve::sec1::ToEncodedPoint;
 use p256::{EncodedPoint, SecretKey};
+use rand::Rng;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -71,7 +71,10 @@ pub fn generate_ecdh_key_pair() -> (String, String) {
     // Private key: 32 bytes
     let private_key_bytes = secret.to_bytes();
 
-    (hex::encode(public_key_bytes), hex::encode(private_key_bytes))
+    (
+        hex::encode(public_key_bytes),
+        hex::encode(private_key_bytes),
+    )
 }
 
 /// Derive shared secret from ECDH key exchange.
@@ -255,8 +258,8 @@ pub fn encrypt_metadata(metadata: &Value, encryption_key_hex: &str) -> Result<St
     // Decode encryption key
     let key_bytes = hex::decode(encryption_key_hex)
         .map_err(|e| format!("Failed to decode encryption key: {}", e))?;
-    let cipher = Aes256Gcm::new_from_slice(&key_bytes)
-        .map_err(|e| format!("Invalid key length: {}", e))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(&key_bytes).map_err(|e| format!("Invalid key length: {}", e))?;
 
     // Generate random IV (12 bytes for GCM)
     let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
@@ -311,8 +314,8 @@ pub fn decrypt_metadata(
     // Decode encryption key
     let key_bytes = hex::decode(encryption_key_hex)
         .map_err(|e| format!("Failed to decode encryption key: {}", e))?;
-    let cipher = Aes256Gcm::new_from_slice(&key_bytes)
-        .map_err(|e| format!("Invalid key length: {}", e))?;
+    let cipher =
+        Aes256Gcm::new_from_slice(&key_bytes).map_err(|e| format!("Invalid key length: {}", e))?;
 
     let nonce_array: [u8; 12] = nonce_bytes
         .try_into()
@@ -418,9 +421,7 @@ fn write_canonical_json(value: &Value, output: &mut String) -> Result<(), String
         }
         Value::Object(map) => {
             let mut entries: Vec<_> = map.iter().collect();
-            entries.sort_by(|(left, _), (right, _)| {
-                left.encode_utf16().cmp(right.encode_utf16())
-            });
+            entries.sort_by(|(left, _), (right, _)| left.encode_utf16().cmp(right.encode_utf16()));
             output.push('{');
             for (index, (key, item)) in entries.into_iter().enumerate() {
                 if index > 0 {
@@ -529,7 +530,11 @@ fn expand_scientific(raw: &str) -> Result<String, String> {
     let body = if new_index <= 0 {
         format!("0.{}{}", "0".repeat((-new_index) as usize), digits)
     } else if new_index as usize >= digits.len() {
-        format!("{}{}", digits, "0".repeat(new_index as usize - digits.len()))
+        format!(
+            "{}{}",
+            digits,
+            "0".repeat(new_index as usize - digits.len())
+        )
     } else {
         format!(
             "{}.{}",

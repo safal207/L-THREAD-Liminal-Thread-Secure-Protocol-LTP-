@@ -190,7 +190,7 @@ export class LtpClient {
   private pendingConnectReject?: (reason?: unknown) => void;
 
   private storage: LtpStorage;
-  private storageKeys: { thread: string; session: string };
+  private storageKeys: { thread: string; session: string; security: string };
   private reconnectConfig: NormalizedReconnectStrategy;
   private heartbeatConfig: NormalizedHeartbeatOptions;
   private logger: LtpLogger;
@@ -259,8 +259,10 @@ export class LtpClient {
     this.storageKeys = {
       thread: `ltp_thread_id:${this.options.clientId}`,
       session: `ltp_session_id:${this.options.clientId}`,
+      security: `ltp_security_state:${this.options.clientId}`,
     };
     this.loadPersistedIds();
+    this.restoreSecurityState();
 
     this.reconnectConfig = {
       ...DEFAULT_RECONNECT,
@@ -304,7 +306,7 @@ export class LtpClient {
     this.clearHeartbeatTimers();
     this.clearReconnectTimer();
     this.stopNonceCleanup();
-    this.seenNonces.clear(); // Clear nonce cache on disconnect
+    this.persistSecurityState(); // Preserve replay state for authenticated resume
 
     if (this.ws) {
       this.ws.close();
@@ -376,11 +378,31 @@ export class LtpClient {
    * Send ping message (usually handled automatically by heartbeat)
    */
   public sendPing(): void {
-    if (!this.ensureReadyForSend('send ping')) {
+    if (!this.ensureReadyForSend('send ping') || !this.requireControlMacKey('send ping')) {
       return;
     }
 
-    this.send(this.buildEnvelope('ping', {}));
+    void this.send(this.buildEnvelope('ping', {}));
+  }
+
+  private sendPong(): void {
+    if (!this.ensureReadyForSend('send pong') || !this.requireControlMacKey('send pong')) {
+      return;
+    }
+
+    void this.send(this.buildEnvelope('pong', {}));
+  }
+
+  private requireControlMacKey(action: string): boolean {
+    if (this.options.sessionMacKey) {
+      return true;
+    }
+    this.logger.error(`Cannot ${action}: post-handshake control frames require a session MAC key`);
+    this.handleError({
+      error_code: 'MISSING_CONTROL_MAC_KEY',
+      error_message: 'Post-handshake ping/pong require the negotiated session MAC key',
+    });
+    return false;
   }
 
   /**
@@ -621,7 +643,10 @@ export class LtpClient {
     const envelopeMsg = message as LtpEnvelope;
     await this.decryptMetadataIfNeeded(envelopeMsg);
 
-    const macKey = this.options.sessionMacKey || this.options.secretKey;
+    const isControlMessage = envelopeMsg.type === 'ping' || envelopeMsg.type === 'pong';
+    const macKey = isControlMessage
+      ? this.options.sessionMacKey
+      : this.options.sessionMacKey || this.options.secretKey;
     if (!(await this.verifyMessageSecurity(envelopeMsg, macKey))) {
       return;
     }
@@ -636,6 +661,9 @@ export class LtpClient {
         break;
       case 'handshake_reject':
         this.handleHandshakeReject(message as HandshakeRejectMessage);
+        break;
+      case 'ping':
+        this.sendPong();
         break;
       case 'pong':
         this.clearHeartbeatTimeout();
@@ -688,8 +716,12 @@ export class LtpClient {
     macKey?: string
   ): Promise<boolean> {
     const isHandshakeMessage = envelope.type === 'handshake_ack' || envelope.type === 'handshake_reject';
+    const isControlMessage = envelope.type === 'ping' || envelope.type === 'pong';
+    const requiresAuthentication = !isHandshakeMessage && (
+      this.options.requireSignatureVerification || (this.isHandshakeComplete && isControlMessage)
+    );
 
-    if (!this.options.requireSignatureVerification || isHandshakeMessage) {
+    if (!requiresAuthentication) {
       return true;
     }
 
@@ -791,7 +823,7 @@ export class LtpClient {
     }
 
     const clientId = envelope.meta?.client_id;
-    const nonceError = this.validateNonce(envelope.nonce, clientId);
+    const nonceError = this.validateNonce(envelope.nonce, clientId, false);
     if (nonceError) {
       this.logger.error('Nonce validation failed - REJECTING', {
         type: envelope.type,
@@ -828,6 +860,8 @@ export class LtpClient {
         payload: envelope.payload,
         prev_message_hash: envelope.prev_message_hash,
       });
+      this.seenNonces.set(envelope.nonce!, Date.now());
+      this.persistSecurityState();
     } catch (error) {
       this.logger.error('Failed to hash envelope - REJECTING', error);
       this.handleError({
@@ -851,6 +885,8 @@ export class LtpClient {
       resumed: message.resumed,
     });
 
+    const previousSessionId = this.sessionId;
+    const resumedSameSession = message.resumed === true && previousSessionId === message.session_id;
     this.threadId = message.thread_id;
     this.sessionId = message.session_id;
     const rawHeartbeatMs = Number(message.heartbeat_interval_ms);
@@ -936,9 +972,11 @@ export class LtpClient {
     this.startHeartbeat();
     this.startNonceCleanup(); // Start replay protection cleanup
 
-    // Reset hash chain at the start of each session
-    this.lastSentHash = null;
-    this.lastReceivedHash = null;
+    if (resumedSameSession) {
+      this.persistSecurityState();
+    } else {
+      this.resetSecurityState();
+    }
 
     if (this.events.onConnected) {
       this.events.onConnected(this.threadId, this.sessionId);
@@ -961,6 +999,7 @@ export class LtpClient {
       this.sessionId = null;
       this.storage.removeItem(this.storageKeys.thread);
       this.storage.removeItem(this.storageKeys.session);
+      this.resetSecurityState();
       this.sendHandshakeInit().catch((err) => {
         this.logger.error('Handshake init failed', err);
       });
@@ -989,9 +1028,8 @@ export class LtpClient {
     this.isConnected = false;
     this.isHandshakeComplete = false;
     this.clearHeartbeatTimers();
-    this.stopNonceCleanup(); // Stop replay protection cleanup
-    this.lastSentHash = null;
-    this.lastReceivedHash = null;
+    this.stopNonceCleanup(); // State survives transport reconnect for the same session
+    this.persistSecurityState();
     this.ecdhPrivateKey = null;
     this.ecdhPublicKey = null;
 
@@ -1071,6 +1109,12 @@ export class LtpClient {
       return;
     }
 
+    const isControlMessage = message.type === 'ping' || message.type === 'pong';
+    if (isControlMessage && !this.options.sessionMacKey) {
+      this.logger.error('Refusing unsigned post-handshake control frame', undefined, { type: message.type });
+      return;
+    }
+
     const nonce = await this.generateNonce();
 
     const envelopeWithPrev: LtpEnvelope = {
@@ -1137,6 +1181,7 @@ export class LtpClient {
         payload: envelopeWithSecurity.payload,
         prev_message_hash: envelopeWithSecurity.prev_message_hash,
       });
+      this.persistSecurityState();
 
       this.sendRaw(envelopeWithSecurity);
     } catch (error) {
@@ -1229,6 +1274,59 @@ export class LtpClient {
   private loadPersistedIds(): void {
     this.threadId = this.storage.getItem(this.storageKeys.thread);
     this.sessionId = this.storage.getItem(this.storageKeys.session);
+  }
+
+  private persistSecurityState(): void {
+    if (!this.sessionId) {
+      return;
+    }
+    this.storage.setItem(this.storageKeys.security, JSON.stringify({
+      version: 1,
+      sessionId: this.sessionId,
+      lastSentHash: this.lastSentHash,
+      lastReceivedHash: this.lastReceivedHash,
+      seenNonces: Array.from(this.seenNonces.entries()),
+    }));
+  }
+
+  private restoreSecurityState(): void {
+    const serialized = this.storage.getItem(this.storageKeys.security);
+    if (!serialized || !this.sessionId) {
+      return;
+    }
+    try {
+      const state = JSON.parse(serialized) as {
+        version?: number;
+        sessionId?: string;
+        lastSentHash?: string | null;
+        lastReceivedHash?: string | null;
+        seenNonces?: Array<[string, number]>;
+      };
+      if (state.version !== 1 || state.sessionId !== this.sessionId) {
+        this.storage.removeItem(this.storageKeys.security);
+        return;
+      }
+      this.lastSentHash = typeof state.lastSentHash === 'string' ? state.lastSentHash : null;
+      this.lastReceivedHash = typeof state.lastReceivedHash === 'string' ? state.lastReceivedHash : null;
+      this.seenNonces = new Map(
+        Array.isArray(state.seenNonces)
+          ? state.seenNonces.filter(
+              (entry): entry is [string, number] =>
+                Array.isArray(entry) && typeof entry[0] === 'string' && typeof entry[1] === 'number'
+            )
+          : []
+      );
+    } catch (error) {
+      this.logger.warn('Discarding invalid persisted security state', { error: String(error) });
+      this.storage.removeItem(this.storageKeys.security);
+    }
+  }
+
+  private resetSecurityState(): void {
+    this.lastSentHash = null;
+    this.lastReceivedHash = null;
+    this.seenNonces.clear();
+    this.storage.removeItem(this.storageKeys.security);
   }
 
   private scheduleReconnect(reason: string): void {
@@ -1407,7 +1505,7 @@ export class LtpClient {
    * @param clientId Expected client ID (from message meta) - only for legacy format
    * @returns Error message if invalid, null if valid
    */
-  private validateNonce(nonce: string | undefined, clientId: string | undefined): string | null {
+  private validateNonce(nonce: string | undefined, clientId: string | undefined, commit = true): string | null {
     if (!nonce) {
       return 'Missing nonce';
     }
@@ -1489,8 +1587,10 @@ export class LtpClient {
       return `Nonce timestamp in future${unitHint}`;
     }
 
-    // Add to seen nonces cache
-    this.seenNonces.set(nonce, now);
+    if (commit) {
+      this.seenNonces.set(nonce, now);
+      this.persistSecurityState();
+    }
 
     return null; // Valid
   }

@@ -73,15 +73,31 @@ class ThreadStorage:
         return entry.get("thread_id"), entry.get("session_id")
 
     def set_ids(self, client_id: str, thread_id: str, session_id: str) -> None:
-        self._data[client_id] = {
-            "thread_id": thread_id,
-            "session_id": session_id,
-        }
+        entry = self._data.setdefault(client_id, {})
+        entry.update({"thread_id": thread_id, "session_id": session_id})
         self._persist()
 
     def clear(self, client_id: str) -> None:
         if client_id in self._data:
             del self._data[client_id]
+            self._persist()
+
+    def get_security_state(self, client_id: str, session_id: Optional[str]) -> Dict[str, Any]:
+        entry = self._data.get(client_id, {})
+        state = entry.get("security_state", {}) if isinstance(entry, dict) else {}
+        if not session_id or state.get("session_id") != session_id or state.get("version") != 1:
+            return {}
+        return dict(state)
+
+    def set_security_state(self, client_id: str, state: Dict[str, Any]) -> None:
+        entry = self._data.setdefault(client_id, {})
+        entry["security_state"] = state
+        self._persist()
+
+    def clear_security_state(self, client_id: str) -> None:
+        entry = self._data.get(client_id)
+        if isinstance(entry, dict) and "security_state" in entry:
+            del entry["security_state"]
             self._persist()
 
 
@@ -162,6 +178,7 @@ class LtpClient:
         }
 
         # Security configuration
+        self._session_mac_key = session_mac_key
         self._mac_key = session_mac_key or secret_key
         self.secret_key = secret_key
         self.require_signature_verification = (
@@ -180,6 +197,7 @@ class LtpClient:
         self._session_encryption_key: Optional[str] = None
         self._last_sent_hash: Optional[str] = None
         self._last_received_hash: Optional[str] = None
+        self._restore_security_state()
 
         self.on_connected: Optional[Callable[[str, str], None]] = None
         self.on_disconnected: Optional[Callable[[], None]] = None
@@ -420,12 +438,16 @@ class LtpClient:
 
     async def _handle_handshake_ack(self, data: Dict[str, Any]) -> None:
         ack = HandshakeAck.from_dict(data)
+        previous_session_id = self.session_id
+        resumed_same_session = ack.resumed and previous_session_id == ack.session_id
         self.thread_id = ack.thread_id
         self.session_id = ack.session_id
         self.heartbeat_interval_ms = ack.heartbeat_interval_ms
         self.storage.set_ids(self.client_id, ack.thread_id, ack.session_id)
-        self._last_sent_hash = None
-        self._last_received_hash = None
+        if resumed_same_session:
+            self._restore_security_state()
+        else:
+            self._reset_security_state()
 
         # ECDH key exchange - derive session keys (v0.5+)
         server_ecdh_key = ack.server_ecdh_public_key or ack.server_public_key
@@ -460,6 +482,7 @@ class LtpClient:
                 encryption_key, mac_key, _ = derive_session_keys(shared_secret, self.session_id)
                 
                 # Set MAC key for signature verification
+                self._session_mac_key = mac_key
                 self._mac_key = mac_key
                 self.require_signature_verification = True
                 
@@ -482,6 +505,7 @@ class LtpClient:
                 shared_secret = derive_shared_secret(self._handshake_keys[1], ack.server_public_key)
                 # Use derive_session_keys for consistency
                 _, derived_mac, _ = derive_session_keys(shared_secret, ack.session_id)
+                self._session_mac_key = derived_mac
                 self._mac_key = derived_mac
                 self.require_signature_verification = True
             except Exception as error:
@@ -513,6 +537,7 @@ class LtpClient:
         print(f"[LTP] Handshake rejected: {reason}")
         if self.is_attempting_resume:
             self.storage.clear(self.client_id)
+            self._reset_security_state(clear_storage=False)
             self.thread_id = None
             self.session_id = None
             self.is_attempting_resume = False
@@ -533,8 +558,7 @@ class LtpClient:
         if self.heartbeat_task:
             self.heartbeat_task.cancel()
             self.heartbeat_task = None
-        self._last_sent_hash = None
-        self._last_received_hash = None
+        self._persist_security_state()
         self._handshake_keys = None
         if self.on_disconnected:
             self.on_disconnected()
@@ -590,6 +614,9 @@ class LtpClient:
     async def _send_envelope(self, message_type: MessageType, payload: Dict[str, Any]) -> None:
         if not self.is_connected or not self.thread_id or not self.session_id:
             print("[LTP] Cannot send message: not connected")
+            return
+        if message_type in {"ping", "pong"} and not self._session_mac_key:
+            print("[LTP] Refusing post-handshake control frame without a session MAC key")
             return
 
         envelope = self._build_envelope(message_type, payload)
@@ -660,13 +687,17 @@ class LtpClient:
                 print(f"[LTP] Warning: Failed to encrypt metadata: {e}")
                 # Continue without encryption
 
-        # Sign message (v0.5+)
-        if self._mac_key:
-            message_dict["signature"] = sign_message(message_dict, self._mac_key)
+        # Post-handshake control frames are bound only to the negotiated session key.
+        signing_key = self._session_mac_key if msg_type in {"ping", "pong"} else self._mac_key
+        if signing_key:
+            message_dict["signature"] = sign_message(message_dict, signing_key)
+        elif msg_type in {"ping", "pong"}:
+            raise RuntimeError("post-handshake control frame requires a session MAC key")
 
         # Compute hash for next message's prev_message_hash (v0.5+ hash chaining)
         try:
             self._last_sent_hash = hash_envelope(message_dict)
+            self._persist_security_state()
         except Exception as e:
             print(f"[LTP] Warning: Failed to compute message hash: {e}")
 
@@ -683,10 +714,41 @@ class LtpClient:
             return
         await self.ws.send(json.dumps(message))
 
+    def _persist_security_state(self) -> None:
+        if not self.session_id:
+            return
+        self.storage.set_security_state(self.client_id, {
+            "version": 1,
+            "session_id": self.session_id,
+            "last_sent_hash": self._last_sent_hash,
+            "last_received_hash": self._last_received_hash,
+            "seen_nonces": dict(self._seen_nonces),
+        })
+
+    def _restore_security_state(self) -> None:
+        state = self.storage.get_security_state(self.client_id, self.session_id)
+        if not state:
+            return
+        self._last_sent_hash = state.get("last_sent_hash") if isinstance(state.get("last_sent_hash"), str) else None
+        self._last_received_hash = state.get("last_received_hash") if isinstance(state.get("last_received_hash"), str) else None
+        seen = state.get("seen_nonces", {})
+        self._seen_nonces = {
+            str(nonce): int(timestamp)
+            for nonce, timestamp in seen.items()
+            if isinstance(nonce, str) and isinstance(timestamp, (int, float))
+        } if isinstance(seen, dict) else {}
+
+    def _reset_security_state(self, clear_storage: bool = True) -> None:
+        self._last_sent_hash = None
+        self._last_received_hash = None
+        self._seen_nonces = {}
+        if clear_storage:
+            self.storage.clear_security_state(self.client_id)
+
     def _get_timestamp(self) -> int:
         return int(time.time() * 1000)
 
-    def _validate_signature(self, message: Dict[str, Any]) -> bool:
+    def _validate_signature(self, message: Dict[str, Any], mac_key: Optional[str] = None) -> bool:
         required_fields = [
             "type",
             "thread_id",
@@ -709,10 +771,11 @@ class LtpClient:
             print("[LTP] Invalid or missing signature; rejecting message")
             return False
 
-        if not self._mac_key:
+        verification_key = mac_key or self._mac_key
+        if not verification_key:
             return False
 
-        if not verify_signature(message, self._mac_key):
+        if not verify_signature(message, verification_key):
             print("[LTP] Signature verification failed; rejecting message")
             return False
 
@@ -752,7 +815,7 @@ class LtpClient:
         for nonce in stale_nonces:
             del self._seen_nonces[nonce]
 
-    def _validate_nonce(self, message: Dict[str, Any]) -> bool:
+    def _validate_nonce(self, message: Dict[str, Any], commit: bool = True) -> bool:
         """Validate nonce for replay protection (v0.5+, updated v0.6+).
         
         Supports both HMAC-based nonces (v0.6+) and legacy format.
@@ -841,11 +904,11 @@ class LtpClient:
             print("[LTP] Nonce timestamp in future")
             return False
         
-        # Add to seen nonces cache, and evict stale entries opportunistically so
-        # the dict cannot grow unbounded on long-lived connections.
-        self._seen_nonces[nonce] = now
-        if len(self._seen_nonces) > 1024:
-            self._cleanup_nonces()
+        if commit:
+            self._seen_nonces[nonce] = now
+            if len(self._seen_nonces) > 1024:
+                self._cleanup_nonces()
+            self._persist_security_state()
 
         return True
 
@@ -862,7 +925,7 @@ class LtpClient:
         random_hex = secrets.token_hex(16)  # Increased entropy
         
         # Get MAC key for HMAC-based nonce
-        mac_key = self._mac_key or self.secret_key
+        mac_key = self._session_mac_key or self._mac_key or self.secret_key
         
         if mac_key:
             # HMAC-based nonce (v0.6+) - NO client ID leak
