@@ -33,6 +33,7 @@ interface CommandSpec {
   args: string[];
   cwd?: string;
   env?: Record<string, string>;
+  timeoutMs?: number;
 }
 
 const EXPECTED_ACTIONS = [
@@ -54,12 +55,14 @@ function commandFor(sdk: Sdk): CommandSpec {
       return {
         command: "pnpm",
         args: ["exec", "ts-node", "tests/e2e/four-sdk/javascript_adapter.ts"],
+        timeoutMs: 45_000,
       };
     case "python":
       return {
         command: "python",
         args: ["tests/e2e/four-sdk/python_adapter.py"],
         env: { PYTHONPATH: resolve("sdk/python") },
+        timeoutMs: 45_000,
       };
     case "rust":
       return {
@@ -75,12 +78,14 @@ function commandFor(sdk: Sdk): CommandSpec {
           "--nocapture",
           "--test-threads=1",
         ],
+        timeoutMs: 180_000,
       };
     case "elixir":
       return {
         command: "mix",
         args: ["run", "../../tests/e2e/four-sdk/elixir_adapter.exs"],
         cwd: resolve("sdk/elixir"),
+        timeoutMs: 60_000,
       };
   }
 }
@@ -92,8 +97,23 @@ async function runProcess(spec: CommandSpec, env: NodeJS.ProcessEnv): Promise<vo
       env: { ...process.env, ...env, ...spec.env },
       stdio: ["ignore", "pipe", "pipe"],
     });
+    const label = `${spec.command} ${spec.args.join(" ")}`;
+    const timeoutMs = spec.timeoutMs ?? 60_000;
     let stdout = "";
     let stderr = "";
+    let settled = false;
+    const finish = (error?: Error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (error) rejectPromise(error); else resolvePromise();
+    };
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL");
+      finish(new Error(`${label} timed out after ${timeoutMs}ms\nstdout:\n${stdout}\nstderr:\n${stderr}`));
+    }, timeoutMs);
+
+    console.log(`[WP2] starting ${label}`);
     child.stdout.on("data", (chunk) => {
       const text = chunk.toString();
       stdout += text;
@@ -104,13 +124,14 @@ async function runProcess(spec: CommandSpec, env: NodeJS.ProcessEnv): Promise<vo
       stderr += text;
       process.stderr.write(text);
     });
-    child.once("error", rejectPromise);
+    child.once("error", (error) => finish(error));
     child.once("close", (code) => {
       if (code === 0) {
-        resolvePromise();
+        console.log(`[WP2] completed ${label}`);
+        finish();
       } else {
-        rejectPromise(new Error(
-          `${spec.command} ${spec.args.join(" ")} exited ${code}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+        finish(new Error(
+          `${label} exited ${code}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
         ));
       }
     });
@@ -226,6 +247,7 @@ async function main(): Promise<void> {
     for (const sdk of SDKS) {
       const outputPath = resolve(artifactDir, `${sdk}.json`);
       const spec = commandFor(sdk);
+      console.log(`[WP2] running ${sdk} adapter`);
       await runProcess(spec, {
         LTP_REFERENCE_URL: server.url,
         LTP_REFERENCE_SECRET: SECRET,
