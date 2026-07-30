@@ -122,7 +122,7 @@ jobs:
         run: python -m pytest -q sdk/python/tests/test_receive_security_atomicity.py
 
       - name: Verify Rust millisecond timestamp contract
-        run: cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml outbound_timestamps_use_unix_milliseconds -- --exact
+        run: cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml outbound_timestamps_use_unix_milliseconds
 
       - name: Run four-SDK matrix
         run: pnpm e2e:four-sdk
