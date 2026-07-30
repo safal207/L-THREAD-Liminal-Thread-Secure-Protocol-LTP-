@@ -107,6 +107,12 @@ replace_once(
 )
 
 subprocess.run(
+    ["python", "scripts/wp2_elixir_handshake_reply_fix.py"],
+    cwd=ROOT,
+    check=True,
+)
+
+subprocess.run(
     [
         "git",
         "add",
