@@ -87,7 +87,9 @@ if "mod reference_interop_tests;" not in client:
 
 package_path = ROOT / "package.json"
 package = json.loads(package_path.read_text(encoding="utf-8"))
-package["scripts"]["e2e:four-sdk"] = "ts-node tests/e2e/four-sdk/run-matrix.ts"
+package["scripts"]["e2e:four-sdk"] = (
+    "pnpm --dir sdk/js build && ts-node tests/e2e/four-sdk/run-matrix.ts"
+)
 package_path.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
 
 print("WP2 matrix support patch applied")
