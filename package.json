@@ -18,6 +18,7 @@
     "reference:server": "ts-node tools/reference-server/server.ts",
     "reference:scenarios": "ts-node tools/reference-server/scenarios.ts --out artifacts/reference-server-evidence.json",
     "fault:scenarios": "ts-node tools/fault-injection/run.ts",
+    "runtime:fault-matrix": "ts-node tests/fault-injection/runtime/run-matrix.ts artifacts/wp3-native-runtime-matrix.json",
     "dev:ltp-node-demo": "ts-node scripts/dev/ltp-node-demo.ts",
     "demo:story": "ts-node scripts/demo/ltp-story-demo.ts",
     "demo:future-weave": "NODE_PATH=node_modules ts-node scripts/dev/story-multipath-demo.ts",
