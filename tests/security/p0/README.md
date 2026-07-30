@@ -1,17 +1,17 @@
 # P0 Security Regression Suite
 
-This directory contains **red tests** for four confirmed protocol-level security gaps.
-The tests express the required secure behavior and are intentionally expected to fail
-on the current implementation.
+This directory contains permanent executable contracts for four confirmed
+protocol-level security gaps. Each test was introduced as a red reproducer and must
+remain green because the corresponding runtime boundary is now fixed.
 
 ## Covered findings
 
-| ID | Contract | Current failure |
+| ID | Contract | Closed by |
 |---|---|---|
-| P0-CANON-001 | Every SDK signs and hashes identical canonical bytes | JavaScript and Python serialize legal JSON numbers differently |
-| P0-STATE-002 | Rejected input cannot mutate committed security state | Python updates `last_received_hash` before signature validation |
-| P0-RUST-003 | The live Rust receive path enforces auth, replay, and chain checks | The receive loop only logs frames and contains a security TODO |
-| P0-ELIXIR-004 | Elixir authenticates and validates chain state before dispatch | The real inbound path validates nonce shape but not signature/hash chain |
+| P0-CANON-001 | Every SDK signs and hashes identical canonical bytes | Canonical Envelope v1, shared golden vectors, and differential edge tests |
+| P0-STATE-002 | Rejected input cannot mutate committed security state | Python authentication-before-commit receive pipeline |
+| P0-RUST-003 | The live Rust receive path enforces auth, replay, and chain checks | Verified live receive loop with wire-envelope chain commitment |
+| P0-ELIXIR-004 | Elixir authenticates and validates chain state before dispatch | Atomic inbound security gate before application dispatch |
 
 ## Run locally
 
@@ -30,10 +30,11 @@ python -m pytest -q tests/security/p0/test_p0_security_regressions.py
 - Do not mark these tests `xfail` or `skip`.
 - Do not add `continue-on-error` to the workflow.
 - Do not replace behavioral evidence with documentation assertions.
-- A finding is closed only when its test passes because the runtime transition was fixed.
+- Do not weaken a test oracle to accommodate an SDK divergence.
 - Changes to a test oracle require an explicit security-review explanation.
+- A regression in any contract blocks merge until the runtime boundary is repaired.
 
-## Expected lifecycle
+## Evidence lifecycle
 
 ```text
 red reproducer
@@ -41,4 +42,5 @@ red reproducer
 → green regression
 → cross-SDK differential verification
 → independent security re-review
+→ permanent merge gate
 ```
