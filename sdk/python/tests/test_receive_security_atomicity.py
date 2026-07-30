@@ -40,6 +40,67 @@ def test_rejected_frame_cannot_mutate_state_or_reach_callbacks():
     client.on_state_update.assert_not_called()
 
 
+def test_required_signature_without_mac_key_fails_closed():
+    client = LtpClient(
+        url="ws://localhost:8080",
+        client_id="missing-mac-key-client",
+        require_signature_verification=True,
+    )
+    client.on_message = MagicMock()
+    client.on_state_update = MagicMock()
+
+    message = {
+        "type": "state_update",
+        "thread_id": "thread-123",
+        "session_id": "session-456",
+        "timestamp": 1_700_000_000_000,
+        "nonce": "untrusted-nonce",
+        "payload": {"kind": "test", "data": {"value": 1}},
+        "meta": {},
+        "content_encoding": "json",
+        "prev_message_hash": "",
+        "signature": "attacker-controlled",
+    }
+
+    asyncio.run(client._handle_message(message))
+
+    assert client._last_received_hash is None
+    assert client._seen_nonces == {}
+    client.on_message.assert_not_called()
+    client.on_state_update.assert_not_called()
+
+
+def test_encrypted_metadata_without_session_key_fails_closed():
+    client = LtpClient(
+        url="ws://localhost:8080",
+        client_id="missing-encryption-key-client",
+        require_signature_verification=False,
+    )
+    client.on_message = MagicMock()
+    client.on_state_update = MagicMock()
+
+    message = {
+        "type": "state_update",
+        "thread_id": "",
+        "session_id": None,
+        "timestamp": 0,
+        "nonce": "untrusted-nonce",
+        "payload": {"kind": "test", "data": {"value": 1}},
+        "meta": {},
+        "content_encoding": "json",
+        "prev_message_hash": "",
+        "encrypted_metadata": "ciphertext:iv:tag",
+        "signature": "attacker-controlled",
+    }
+
+    asyncio.run(client._handle_message(message))
+
+    assert client._last_received_hash is None
+    assert client._seen_nonces == {}
+    client.on_message.assert_not_called()
+    client.on_state_update.assert_not_called()
+
+
 def test_accepted_frame_commits_state_before_dispatch():
     client = LtpClient(
         url="ws://localhost:8080",
