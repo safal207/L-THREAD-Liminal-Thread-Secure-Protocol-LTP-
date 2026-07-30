@@ -34,9 +34,9 @@ concurrency:
 
 jobs:
   p0-regression-suite:
-    name: Four confirmed P0 contracts
+    name: P0 contracts + native security suites
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
@@ -52,23 +52,64 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Build JavaScript SDK used by differential test
+      - name: Install Rust system dependencies
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Set up Elixir
+        uses: erlef/setup-elixir@v1
+        with:
+          elixir-version: "1.14"
+          otp-version: "25"
+
+      - name: Build JavaScript SDK and run canonical contract
         shell: bash
         run: |
           set -euxo pipefail
           cd sdk/js
           npm install --ignore-scripts
           npm run build
+          node dist/__tests__/canonicalEnvelopeV1.test.js
 
-      - name: Install Python SDK and test dependencies
+      - name: Install Python SDK and run native security contracts
         shell: bash
         run: |
           set -euxo pipefail
           cd sdk/python
           python -m pip install -e ".[dev]"
+          cd ../..
+          python -m pytest -q \
+            sdk/python/tests/test_canonical_envelope_v1.py \
+            sdk/python/tests/test_receive_security_atomicity.py
 
-      - name: Run P0 regression contracts
+      - name: Run cross-SDK P0 regression contracts
         shell: bash
         run: |
           set -euxo pipefail
           python -m pytest -q tests/security/p0/test_p0_security_regressions.py
+
+      - name: Run Rust native security contracts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml --test canonical_envelope_v1
+          cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml --lib client::tests
+
+      - name: Run Elixir native security contracts
+        shell: bash
+        run: |
+          set -euxo pipefail
+          cd sdk/elixir
+          mix deps.get
+          mix test --trace \
+            test/ltp/canonical_envelope_v1_test.exs \
+            test/ltp/connection_security_test.exs \
+            test/ltp/connection_fail_closed_test.exs
