@@ -44,6 +44,7 @@ defmodule LTP.Connection do
     :last_sent_hash,
     :last_received_hash,
     :seen_nonces,
+    :security_state_initialized,
     :max_message_age_ms
   ]
 
@@ -76,9 +77,10 @@ defmodule LTP.Connection do
       ecdh_private_key: nil,
       ecdh_public_key: nil,
       session_encryption_key: Keyword.get(opts, :session_encryption_key),
-      last_sent_hash: nil,
-      last_received_hash: nil,
-      seen_nonces: %{},
+      last_sent_hash: Keyword.get(opts, :last_sent_hash),
+      last_received_hash: Keyword.get(opts, :last_received_hash),
+      seen_nonces: Keyword.get(opts, :seen_nonces, %{}),
+      security_state_initialized: Keyword.get(opts, :security_state_initialized, false),
       max_message_age_ms: Keyword.get(opts, :max_message_age_ms, 60_000)
     }
 
@@ -92,7 +94,7 @@ defmodule LTP.Connection do
     Logger.info("[LTP] WebSocket connected, initiating handshake...")
 
     new_state =
-      if state.thread_id do
+      if state.thread_id and state.security_state_initialized do
         send_handshake_resume(state)
         state
       else
@@ -112,7 +114,7 @@ defmodule LTP.Connection do
 
     case Jason.decode(json) do
       {:ok, %{"type" => type} = message}
-      when type in ["handshake_ack", "handshake_reject", "ping", "pong"] ->
+      when type in ["handshake_ack", "handshake_reject"] ->
         handle_message(message, state)
 
       {:ok, message} when is_map(message) ->
@@ -149,8 +151,14 @@ defmodule LTP.Connection do
   def handle_info(:heartbeat, state) do
     new_state =
       if state.is_handshake_complete do
-        send_ping(state)
-        schedule_heartbeat(state)
+        case send_ping(state) do
+          {:ok, sent_state} ->
+            schedule_heartbeat(sent_state)
+
+          {:error, reason, unchanged_state} ->
+            Logger.error("[LTP] Heartbeat send failed closed: #{reason}")
+            unchanged_state
+        end
       else
         state
       end
@@ -196,7 +204,8 @@ defmodule LTP.Connection do
          :ok <- validate_message_timestamp(logical_message, state),
          {:ok, candidate_hash} <- verify_hash_chain(wire_message, last_hash),
          {:ok, replay_state} <- validate_inbound_replay(logical_message, state) do
-      {:ok, logical_message, %{replay_state | last_received_hash: candidate_hash}}
+      {:ok, logical_message,
+       %{replay_state | last_received_hash: candidate_hash, security_state_initialized: true}}
     else
       nil ->
         {:reject, state, "no receive MAC key configured"}
@@ -389,7 +398,14 @@ defmodule LTP.Connection do
       |> Map.put(:nonce, nonce)
       |> Map.put(:prev_message_hash, state.last_sent_hash)
 
-    signing_key = state.session_mac_key || state.secret_key
+    type = Map.get(envelope, :type) || Map.get(envelope, "type")
+    control_frame = type in ["ping", "pong"]
+
+    signing_key =
+      if control_frame, do: state.session_mac_key, else: state.session_mac_key || state.secret_key
+
+    if control_frame and not is_binary(state.session_mac_key),
+      do: raise("post-handshake control frame requires negotiated session MAC key")
 
     envelope =
       if is_binary(signing_key) do
@@ -414,8 +430,7 @@ defmodule LTP.Connection do
             timestamp: Map.get(envelope, :timestamp, 0)
           }
 
-          encrypted_metadata =
-            LTP.Crypto.encrypt_metadata(metadata, state.session_encryption_key)
+          encrypted_metadata = LTP.Crypto.encrypt_metadata(metadata, state.session_encryption_key)
 
           routing_tag =
             LTP.Crypto.generate_routing_tag(
@@ -433,7 +448,7 @@ defmodule LTP.Connection do
       end
 
     message_hash = LTP.Crypto.hash_envelope(envelope)
-    {:ok, envelope, %{state | last_sent_hash: message_hash}}
+    {:ok, envelope, %{state | last_sent_hash: message_hash, security_state_initialized: true}}
   rescue
     error ->
       {:error, Exception.message(error), state}
@@ -532,6 +547,8 @@ defmodule LTP.Connection do
     session_id = ack["session_id"]
     heartbeat_interval_ms = ack["heartbeat_interval_ms"] || state.heartbeat_interval_ms
 
+    resumed_same_session = ack["resumed"] == true and state.session_id == session_id
+
     new_state =
       if state.enable_ecdh_key_exchange and state.ecdh_private_key do
         handle_ecdh_key_exchange(ack, state, thread_id, session_id)
@@ -547,6 +564,19 @@ defmodule LTP.Connection do
         }
       end
 
+    new_state =
+      if resumed_same_session do
+        new_state
+      else
+        %{
+          new_state
+          | last_sent_hash: nil,
+            last_received_hash: nil,
+            seen_nonces: %{},
+            security_state_initialized: false
+        }
+      end
+
     if new_state.is_handshake_complete do
       if state.client_pid, do: send(state.client_pid, {:ltp_connected, thread_id, session_id})
       start_heartbeat(new_state, heartbeat_interval_ms)
@@ -559,7 +589,16 @@ defmodule LTP.Connection do
     reason = reject["reason"]
 
     if state.thread_id do
-      new_state = %{state | thread_id: nil, session_id: nil}
+      new_state = %{
+        state
+        | thread_id: nil,
+          session_id: nil,
+          last_sent_hash: nil,
+          last_received_hash: nil,
+          seen_nonces: %{},
+          security_state_initialized: false
+      }
+
       send_handshake_init(new_state)
       {:ok, new_state}
     else
@@ -570,16 +609,15 @@ defmodule LTP.Connection do
     end
   end
 
-  defp handle_message(%{"type" => "ping"} = ping, state) do
-    pong = %{
-      type: "pong",
-      thread_id: ping["thread_id"],
-      session_id: ping["session_id"],
-      timestamp: System.system_time(:second)
-    }
+  defp handle_message(%{"type" => "ping"}, state) do
+    case secure_control_frame("pong", state) do
+      {:ok, pong, new_state} ->
+        {:reply, {:text, Jason.encode!(pong)}, new_state}
 
-    WebSockex.send_frame(self(), {:text, Jason.encode!(pong)})
-    {:ok, state}
+      {:error, reason, unchanged_state} ->
+        Logger.error("[LTP] Refusing insecure pong: #{reason}")
+        {:ok, unchanged_state}
+    end
   end
 
   defp handle_message(%{"type" => "pong"}, state) do
@@ -656,15 +694,29 @@ defmodule LTP.Connection do
 
   # ---- heartbeat and reconnect -------------------------------------------
 
-  defp send_ping(state) do
-    ping = %{
-      type: "ping",
+  defp secure_control_frame(type, state) do
+    envelope = %{
+      type: type,
       thread_id: state.thread_id,
       session_id: state.session_id,
-      timestamp: System.system_time(:second)
+      timestamp: System.system_time(:millisecond),
+      payload: %{},
+      meta: %{client_id: state.client_id},
+      content_encoding: "json"
     }
 
-    WebSockex.send_frame(self(), {:text, Jason.encode!(ping)})
+    apply_security_features(envelope, state)
+  end
+
+  defp send_ping(state) do
+    case secure_control_frame("ping", state) do
+      {:ok, ping, new_state} ->
+        WebSockex.send_frame(self(), {:text, Jason.encode!(ping)})
+        {:ok, new_state}
+
+      {:error, reason, unchanged_state} ->
+        {:error, reason, unchanged_state}
+    end
   end
 
   defp start_heartbeat(state, _interval_ms) do

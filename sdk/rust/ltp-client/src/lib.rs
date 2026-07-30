@@ -3,7 +3,7 @@ pub mod crypto;
 pub mod error;
 pub mod types;
 
-pub use client::LtpClient;
+pub use client::{LtpClient, ReceiveSecuritySnapshot};
 pub use crypto::*;
 pub use error::{LtpError, Result};
 pub use types::*;

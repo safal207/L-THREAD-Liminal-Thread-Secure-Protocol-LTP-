@@ -2,10 +2,12 @@ use crate::crypto;
 use crate::error::{LtpError, Result};
 use crate::types::*;
 use futures_util::{SinkExt, StreamExt};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
+use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 type WsStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
@@ -13,6 +15,23 @@ type WsStream = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 const MAX_MESSAGE_AGE_MS: i64 = 60_000;
 const MAX_FUTURE_SKEW_MS: i64 = 5_000;
 const MAX_SEEN_NONCES: usize = 4_096;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ReceiveSecuritySnapshot {
+    pub version: u8,
+    pub thread_id: String,
+    pub session_id: String,
+    pub last_received_hash: Option<String>,
+    pub seen_nonces: Vec<String>,
+}
+
+#[derive(Debug, Default)]
+struct ReceiveSecurityState {
+    session_id: Option<String>,
+    last_received_hash: Option<String>,
+    seen_nonces: HashSet<String>,
+    generation: u64,
+}
 
 fn now_ms() -> i64 {
     SystemTime::now()
@@ -180,8 +199,7 @@ pub struct LtpClient {
     ecdh_public_key: Option<String>,
     session_encryption_key: Option<String>,
     last_sent_hash: Option<String>,
-    last_received_hash: Option<String>,
-    seen_nonces: HashSet<String>,
+    receive_security: Arc<Mutex<ReceiveSecurityState>>,
 }
 
 impl LtpClient {
@@ -214,8 +232,7 @@ impl LtpClient {
             ecdh_public_key: None,
             session_encryption_key: None,
             last_sent_hash: None,
-            last_received_hash: None,
-            seen_nonces: HashSet::new(),
+            receive_security: Arc::new(Mutex::new(ReceiveSecurityState::default())),
         }
     }
 
@@ -294,7 +311,11 @@ impl LtpClient {
             self.send_handshake_init().await?;
         }
 
+        let previous_session_id = self.session_id.clone();
         let ack = self.wait_for_handshake_ack(&mut read).await?;
+        let receive_generation = self
+            .prepare_receive_security_for_ack(previous_session_id.as_deref(), &ack)
+            .await?;
         self.thread_id = Some(ack.thread_id.clone());
         self.session_id = Some(ack.session_id.clone());
         self.is_connected = true;
@@ -308,13 +329,9 @@ impl LtpClient {
             self.handle_ecdh_key_exchange(&ack)?;
         }
 
-        let receive_mac_key = self
-            .session_mac_key
-            .clone()
-            .or_else(|| self.secret_key.clone());
+        let receive_mac_key = self.session_mac_key.clone();
         let receive_encryption_key = self.session_encryption_key.clone();
-        let mut last_received_hash = self.last_received_hash.clone();
-        let mut seen_nonces = std::mem::take(&mut self.seen_nonces);
+        let receive_security = Arc::clone(&self.receive_security);
 
         tokio::spawn(async move {
             while let Some(msg) = read.next().await {
@@ -327,8 +344,6 @@ impl LtpClient {
                                 continue;
                             }
                         };
-                        // Keep the exact wire representation for hash-chain commitment.
-                        // Signature verification and dispatch use the decrypted logical view.
                         let wire_message = message.clone();
 
                         if let Err(error) = decrypt_incoming_metadata(
@@ -342,7 +357,7 @@ impl LtpClient {
                         let mac_key = match receive_mac_key.as_deref() {
                             Some(key) => key,
                             None => {
-                                eprintln!("Dropping LTP frame: no receive MAC key is configured");
+                                eprintln!("Dropping LTP frame: no negotiated session MAC key");
                                 continue;
                             }
                         };
@@ -360,28 +375,46 @@ impl LtpClient {
                                 continue;
                             }
                         }
-
                         if let Err(error) = validate_timestamp(&message) {
                             eprintln!("Dropping LTP frame: {}", error);
                             continue;
                         }
 
+                        let (expected_hash, mut candidate_nonces) = {
+                            let security = receive_security.lock().await;
+                            if security.generation != receive_generation {
+                                break;
+                            }
+                            (
+                                security.last_received_hash.clone(),
+                                security.seen_nonces.clone(),
+                            )
+                        };
                         let candidate_hash =
-                            match verify_hash_chain(&wire_message, last_received_hash.as_deref()) {
+                            match verify_hash_chain(&wire_message, expected_hash.as_deref()) {
                                 Ok(hash) => hash,
                                 Err(error) => {
                                     eprintln!("Dropping LTP frame: {}", error);
                                     continue;
                                 }
                             };
-
-                        if let Err(error) = validate_nonce(&message, &mut seen_nonces) {
+                        if let Err(error) = validate_nonce(&message, &mut candidate_nonces) {
                             eprintln!("Dropping LTP frame: {}", error);
                             continue;
                         }
 
-                        // Security state is committed only after all fallible checks pass.
-                        last_received_hash = Some(candidate_hash);
+                        let mut security = receive_security.lock().await;
+                        if security.generation != receive_generation {
+                            break;
+                        }
+                        if security.last_received_hash.as_deref() != expected_hash.as_deref() {
+                            eprintln!(
+                                "Dropping LTP frame: concurrent receive-state commit detected"
+                            );
+                            continue;
+                        }
+                        security.last_received_hash = Some(candidate_hash);
+                        security.seen_nonces = candidate_nonces;
                         eprintln!("Received authenticated LTP frame: {}", message);
                     }
                     Ok(Message::Close(_)) => break,
@@ -417,6 +450,15 @@ impl LtpClient {
         self.send_envelope(envelope).await
     }
 
+    /// Send an authenticated heartbeat ping.
+    pub async fn send_ping(&mut self) -> Result<()> {
+        if !self.is_connected {
+            return Err(LtpError::NotConnected);
+        }
+        let envelope = self.build_control_envelope("ping")?;
+        self.send_envelope(envelope).await
+    }
+
     /// Get current thread ID
     pub fn thread_id(&self) -> Option<&String> {
         self.thread_id.as_ref()
@@ -433,6 +475,66 @@ impl LtpClient {
         envelope: LtpEnvelope,
     ) -> Result<LtpEnvelope> {
         self.finalize_envelope(envelope)
+    }
+
+    pub async fn export_receive_security_snapshot(&self) -> Result<ReceiveSecuritySnapshot> {
+        let thread_id = self.thread_id.clone().ok_or_else(|| {
+            LtpError::InvalidState("Cannot snapshot receive state without thread ID".to_string())
+        })?;
+        let session_id = self.session_id.clone().ok_or_else(|| {
+            LtpError::InvalidState("Cannot snapshot receive state without session ID".to_string())
+        })?;
+        let security = self.receive_security.lock().await;
+        let mut seen_nonces: Vec<String> = security.seen_nonces.iter().cloned().collect();
+        seen_nonces.sort();
+        Ok(ReceiveSecuritySnapshot {
+            version: 1,
+            thread_id,
+            session_id,
+            last_received_hash: security.last_received_hash.clone(),
+            seen_nonces,
+        })
+    }
+
+    pub async fn restore_receive_security_snapshot(
+        &mut self,
+        snapshot: ReceiveSecuritySnapshot,
+    ) -> Result<()> {
+        if snapshot.version != 1 {
+            return Err(LtpError::InvalidState(
+                "Unsupported receive snapshot version".to_string(),
+            ));
+        }
+        self.thread_id = Some(snapshot.thread_id.clone());
+        self.session_id = Some(snapshot.session_id.clone());
+        let mut security = self.receive_security.lock().await;
+        security.session_id = Some(snapshot.session_id);
+        security.last_received_hash = snapshot.last_received_hash;
+        security.seen_nonces = snapshot.seen_nonces.into_iter().collect();
+        Ok(())
+    }
+
+    async fn prepare_receive_security_for_ack(
+        &self,
+        previous_session_id: Option<&str>,
+        ack: &HandshakeAck,
+    ) -> Result<u64> {
+        let resumed_same_session =
+            ack.resumed && previous_session_id == Some(ack.session_id.as_str());
+        let mut security = self.receive_security.lock().await;
+        security.generation = security.generation.wrapping_add(1);
+        if resumed_same_session {
+            if security.session_id.as_deref() != Some(ack.session_id.as_str()) {
+                return Err(LtpError::InvalidState(
+                    "Resume acknowledged without matching receive security snapshot".to_string(),
+                ));
+            }
+        } else {
+            security.session_id = Some(ack.session_id.clone());
+            security.last_received_hash = None;
+            security.seen_nonces.clear();
+        }
+        Ok(security.generation)
     }
 
     async fn send_handshake_init(&mut self) -> Result<()> {
@@ -603,10 +705,21 @@ impl LtpClient {
         envelope.nonce = Some(nonce);
         envelope.prev_message_hash = self.last_sent_hash.clone();
 
-        if let Some(signing_key) = self.session_mac_key.as_ref().or(self.secret_key.as_ref()) {
-            let signature = crypto::sign_message(&serde_json::to_value(&envelope)?, signing_key)?;
-            envelope.signature = Some(signature);
-        }
+        let is_control = envelope.r#type == "ping" || envelope.r#type == "pong";
+        let signing_key = if is_control {
+            self.session_mac_key.as_ref().ok_or_else(|| {
+                LtpError::InvalidState(
+                    "Post-handshake control frame requires negotiated session MAC key".to_string(),
+                )
+            })?
+        } else {
+            self.session_mac_key
+                .as_ref()
+                .or(self.secret_key.as_ref())
+                .ok_or_else(|| LtpError::InvalidState("No signing key configured".to_string()))?
+        };
+        let signature = crypto::sign_message(&serde_json::to_value(&envelope)?, signing_key)?;
+        envelope.signature = Some(signature);
 
         if self.enable_metadata_encryption {
             if let (Some(ref encryption_key), Some(ref mac_key)) = (
@@ -677,16 +790,6 @@ impl LtpClient {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    fn verify_hash_chain(&mut self, envelope: &LtpEnvelope) -> Result<()> {
-        let envelope_value = serde_json::to_value(envelope)
-            .map_err(|e| LtpError::InvalidState(format!("Failed to serialize envelope: {}", e)))?;
-        let candidate_hash =
-            verify_hash_chain(&envelope_value, self.last_received_hash.as_deref())?;
-        self.last_received_hash = Some(candidate_hash);
-        Ok(())
-    }
-
     fn build_state_update_envelope<T: Serialize>(
         &self,
         kind: &str,
@@ -710,6 +813,26 @@ impl LtpClient {
                 data: payload_data,
             },
             meta: Some(meta),
+            nonce: None,
+            signature: None,
+            prev_message_hash: None,
+            encrypted_metadata: None,
+            routing_tag: None,
+        })
+    }
+
+    fn build_control_envelope(&self, control_type: &str) -> Result<LtpEnvelope> {
+        Ok(LtpEnvelope {
+            r#type: control_type.to_string(),
+            thread_id: self.thread_id.clone().unwrap_or_default(),
+            session_id: self.session_id.clone(),
+            timestamp: get_current_timestamp(),
+            content_encoding: ContentEncoding::Json,
+            payload: Payload {
+                kind: "control".to_string(),
+                data: serde_json::json!({}),
+            },
+            meta: Some(serde_json::json!({"client_id": self.client_id})),
             nonce: None,
             signature: None,
             prev_message_hash: None,
@@ -839,6 +962,86 @@ mod tests {
 
         assert!(crypto::verify_signature(&value, "session-mac-key").expect("verify"));
         assert!(!crypto::verify_signature(&value, "long-term-secret").expect("verify"));
+    }
+
+    #[test]
+    fn control_frames_require_and_use_session_mac_key() {
+        let mut without_key = LtpClient::new("ws://example.com", "client");
+        without_key.thread_id = Some("thread".to_string());
+        without_key.session_id = Some("session".to_string());
+        let ping = without_key.build_control_envelope("ping").unwrap();
+        assert!(without_key.prepare_envelope_for_offline_send(ping).is_err());
+
+        let mut with_key = LtpClient::new("ws://example.com", "client")
+            .with_secret_key("long-term")
+            .with_session_mac_key("session-key");
+        with_key.thread_id = Some("thread".to_string());
+        with_key.session_id = Some("session".to_string());
+        let ping = with_key.build_control_envelope("ping").unwrap();
+        let secured = with_key.prepare_envelope_for_offline_send(ping).unwrap();
+        let value = serde_json::to_value(secured).unwrap();
+        assert!(crypto::verify_signature(&value, "session-key").unwrap());
+        assert!(!crypto::verify_signature(&value, "long-term").unwrap());
+    }
+
+    #[tokio::test]
+    async fn receive_snapshot_preserves_resume_and_new_session_resets() {
+        let mut client = LtpClient::new("ws://example.com", "client");
+        client.thread_id = Some("thread-1".to_string());
+        client.session_id = Some("session-1".to_string());
+        {
+            let mut state = client.receive_security.lock().await;
+            state.session_id = Some("session-1".to_string());
+            state.last_received_hash = Some("hash-1".to_string());
+            state.seen_nonces.insert("nonce-1".to_string());
+        }
+        let snapshot = client.export_receive_security_snapshot().await.unwrap();
+        let mut restored = LtpClient::new("ws://example.com", "client");
+        restored
+            .restore_receive_security_snapshot(snapshot)
+            .await
+            .unwrap();
+        let resumed = HandshakeAck {
+            r#type: "handshake_ack".to_string(),
+            ltp_version: "0.6".to_string(),
+            thread_id: "thread-1".to_string(),
+            session_id: "session-1".to_string(),
+            resumed: true,
+            server_capabilities: None,
+            heartbeat_interval_ms: 1000,
+            metadata: None,
+            server_public_key: None,
+            server_ecdh_public_key: None,
+            server_ecdh_signature: None,
+            server_ecdh_timestamp: None,
+            key_agreement: None,
+        };
+        restored
+            .prepare_receive_security_for_ack(Some("session-1"), &resumed)
+            .await
+            .unwrap();
+        assert_eq!(
+            restored
+                .receive_security
+                .lock()
+                .await
+                .last_received_hash
+                .as_deref(),
+            Some("hash-1")
+        );
+
+        let fresh = HandshakeAck {
+            session_id: "session-2".to_string(),
+            resumed: false,
+            ..resumed
+        };
+        restored
+            .prepare_receive_security_for_ack(Some("session-1"), &fresh)
+            .await
+            .unwrap();
+        let state = restored.receive_security.lock().await;
+        assert!(state.last_received_hash.is_none());
+        assert!(state.seen_nonces.is_empty());
     }
 
     #[test]

@@ -203,10 +203,9 @@ def test_p0_rust_receive_loop_enforces_security_pipeline() -> None:
     assert "letwire_message=message.clone();" in compact_receive_loop, (
         "P0: encrypted Rust frames must preserve the original wire envelope."
     )
-    assert (
-        "verify_hash_chain(&wire_message,last_received_hash.as_deref())"
-        in compact_receive_loop
-    ), "P0: Rust is hashing the decrypted logical envelope instead of transmitted bytes."
+    assert "verify_hash_chain(&wire_message," in compact_receive_loop, (
+        "P0: Rust is hashing the decrypted logical envelope instead of transmitted bytes."
+    )
 
 
 def test_p0_elixir_authenticates_before_application_dispatch() -> None:
