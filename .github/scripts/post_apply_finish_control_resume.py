@@ -1,4 +1,4 @@
-# post-apply-v5
+# post-apply-v6
 from pathlib import Path
 
 
@@ -47,6 +47,19 @@ replace_once(
     "defp signed_control(type, key, overrides \\ %{}) do",
     "defp signed_control(type, key, overrides \\\\ %{}) do",
     "Elixir signed control default argument",
+)
+replace_once(
+    "tests/security/p0/test_p0_security_regressions.py",
+    """    assert (
+        "verify_hash_chain(&wire_message,last_received_hash.as_deref())"
+        in compact_receive_loop
+    ), "P0: Rust is hashing the decrypted logical envelope instead of transmitted bytes."
+""",
+    """    assert "verify_hash_chain(&wire_message," in compact_receive_loop, (
+        "P0: Rust is hashing the decrypted logical envelope instead of transmitted bytes."
+    )
+""",
+    "Rust wire-envelope structural oracle",
 )
 
 print("Applied post-patch compatibility corrections")
