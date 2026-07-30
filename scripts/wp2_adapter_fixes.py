@@ -19,5 +19,10 @@ replace_once(
     "reconnect: { enabled: false, maxRetries: 0, baseDelayMs: 50, maxDelayMs: 50 },",
     "reconnect: { maxRetries: 0, baseDelayMs: 50, maxDelayMs: 50 },",
 )
+replace_once(
+    "tests/e2e/four-sdk/javascript_adapter.ts",
+    'from "../../../sdk/js/src";',
+    'from "../../../sdk/js/dist";',
+)
 
 print("WP2 adapter compatibility fixes applied")
