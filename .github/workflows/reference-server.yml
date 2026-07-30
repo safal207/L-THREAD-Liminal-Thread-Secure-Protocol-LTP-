@@ -8,10 +8,12 @@ on:
       - "tests/e2e/four-sdk/**"
       - "sdk/js/src/client.ts"
       - "sdk/python/ltp_client/client.py"
+      - "sdk/python/tests/test_receive_security_atomicity.py"
       - "sdk/rust/ltp-client/**"
       - "sdk/elixir/lib/ltp/**"
       - "scripts/wp2_apply_matrix_support.py"
       - "scripts/wp2_adapter_fixes.py"
+      - "scripts/wp2_python_encrypted_signature_fix.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -22,6 +24,7 @@ on:
       - "tests/e2e/four-sdk/**"
       - "sdk/js/src/client.ts"
       - "sdk/python/ltp_client/client.py"
+      - "sdk/python/tests/test_receive_security_atomicity.py"
       - "sdk/rust/ltp-client/**"
       - "sdk/elixir/lib/ltp/**"
       - "package.json"
@@ -84,6 +87,7 @@ jobs:
           set -euxo pipefail
           python scripts/wp2_apply_matrix_support.py
           python scripts/wp2_adapter_fixes.py
+          python scripts/wp2_python_encrypted_signature_fix.py
 
       - name: Format changed language files
         shell: bash
@@ -111,6 +115,9 @@ jobs:
 
       - name: Verify patched reference contracts
         run: pnpm test:reference-server
+
+      - name: Verify patched Python security contracts
+        run: python -m pytest -q sdk/python/tests/test_receive_security_atomicity.py
 
       - name: Run four-SDK matrix
         run: pnpm e2e:four-sdk
@@ -145,6 +152,10 @@ jobs:
             tools/reference-server/server.ts \
             tools/reference-server/scenarios.ts \
             tools/reference-server/referenceServer.test.ts \
+            sdk/js/src/client.ts \
+            sdk/js/src/crypto.ts \
+            sdk/python/ltp_client/client.py \
+            sdk/python/tests/test_receive_security_atomicity.py \
             sdk/elixir/lib/ltp/connection.ex \
             sdk/rust/ltp-client/Cargo.toml \
             sdk/rust/ltp-client/src/client.rs \
