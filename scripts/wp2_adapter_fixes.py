@@ -162,7 +162,7 @@ replace_once(
     '''  it("uses decoded session-key bytes for routing tags", () => {
     const key = "00".repeat(32);
     expect(generateRoutingTag("thread", "session", key)).toBe(
-      "6fab276f2466ac9bb8d1f5de648b04ba",
+      "8dfd3a3b9951f6ba4c59a9340a17459e",
     );
   });
 
