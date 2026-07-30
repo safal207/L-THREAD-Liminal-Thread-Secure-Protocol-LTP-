@@ -166,8 +166,18 @@ defmodule LTP.Connection do
 
   @impl WebSockex
   def handle_info({:send_message, envelope}, state) do
-    {secure_envelope, new_state} = apply_security_features(envelope, state)
-    {:reply, {:text, Jason.encode!(secure_envelope)}, new_state}
+    case apply_security_features(envelope, state) do
+      {:ok, secure_envelope, new_state} ->
+        {:reply, {:text, Jason.encode!(secure_envelope)}, new_state}
+
+      {:error, reason, unchanged_state} ->
+        Logger.error("[LTP] Refusing insecure outbound frame: #{reason}")
+
+        if unchanged_state.client_pid,
+          do: send(unchanged_state.client_pid, {:ltp_error, {:outbound_security_failed, reason}})
+
+        {:ok, unchanged_state}
+    end
   end
 
   @impl WebSockex
@@ -389,40 +399,44 @@ defmodule LTP.Connection do
       end
 
     envelope =
-      if state.enable_metadata_encryption and state.session_encryption_key and
-           state.session_mac_key do
-        metadata = %{
-          thread_id: Map.get(envelope, :thread_id, ""),
-          session_id: Map.get(envelope, :session_id, ""),
-          timestamp: Map.get(envelope, :timestamp, 0)
-        }
+      cond do
+        not state.enable_metadata_encryption ->
+          envelope
 
-        encrypted_metadata =
-          LTP.Crypto.encrypt_metadata(metadata, state.session_encryption_key)
+        not is_binary(state.session_encryption_key) or
+            not is_binary(state.session_mac_key) ->
+          raise "metadata encryption enabled without negotiated session keys"
 
-        routing_tag =
-          LTP.Crypto.generate_routing_tag(
-            Map.get(envelope, :thread_id, ""),
-            Map.get(envelope, :session_id, ""),
-            state.session_mac_key
-          )
+        true ->
+          metadata = %{
+            thread_id: Map.get(envelope, :thread_id, ""),
+            session_id: Map.get(envelope, :session_id, ""),
+            timestamp: Map.get(envelope, :timestamp, 0)
+          }
 
-        envelope
-        |> Map.put(:encrypted_metadata, encrypted_metadata)
-        |> Map.put(:routing_tag, routing_tag)
-        |> Map.put(:thread_id, "")
-        |> Map.put(:session_id, nil)
-        |> Map.put(:timestamp, 0)
-      else
-        envelope
+          encrypted_metadata =
+            LTP.Crypto.encrypt_metadata(metadata, state.session_encryption_key)
+
+          routing_tag =
+            LTP.Crypto.generate_routing_tag(
+              Map.get(envelope, :thread_id, ""),
+              Map.get(envelope, :session_id, ""),
+              state.session_mac_key
+            )
+
+          envelope
+          |> Map.put(:encrypted_metadata, encrypted_metadata)
+          |> Map.put(:routing_tag, routing_tag)
+          |> Map.put(:thread_id, "")
+          |> Map.put(:session_id, nil)
+          |> Map.put(:timestamp, 0)
       end
 
     message_hash = LTP.Crypto.hash_envelope(envelope)
-    {envelope, %{state | last_sent_hash: message_hash}}
+    {:ok, envelope, %{state | last_sent_hash: message_hash}}
   rescue
     error ->
-      Logger.error("[LTP] Failed to apply outbound security: #{Exception.message(error)}")
-      {envelope, state}
+      {:error, Exception.message(error), state}
   end
 
   defp generate_nonce(state) do
@@ -481,7 +495,12 @@ defmodule LTP.Connection do
         handshake
         |> Map.put(
           :client_ecdh_signature,
-          LTP.Crypto.sign_ecdh_public_key(public_key, state.client_id, timestamp, state.secret_key)
+          LTP.Crypto.sign_ecdh_public_key(
+            public_key,
+            state.client_id,
+            timestamp,
+            state.secret_key
+          )
         )
         |> Map.put(:client_ecdh_timestamp, timestamp)
       else
@@ -528,8 +547,12 @@ defmodule LTP.Connection do
         }
       end
 
-    if state.client_pid, do: send(state.client_pid, {:ltp_connected, thread_id, session_id})
-    start_heartbeat(new_state, heartbeat_interval_ms)
+    if new_state.is_handshake_complete do
+      if state.client_pid, do: send(state.client_pid, {:ltp_connected, thread_id, session_id})
+      start_heartbeat(new_state, heartbeat_interval_ms)
+    else
+      {:close, new_state}
+    end
   end
 
   defp handle_message(%{"type" => "handshake_reject"} = reject, state) do
@@ -540,7 +563,9 @@ defmodule LTP.Connection do
       send_handshake_init(new_state)
       {:ok, new_state}
     else
-      if state.client_pid, do: send(state.client_pid, {:ltp_error, "Handshake rejected: #{reason}"})
+      if state.client_pid,
+        do: send(state.client_pid, {:ltp_error, "Handshake rejected: #{reason}"})
+
       {:close, state}
     end
   end
@@ -649,7 +674,10 @@ defmodule LTP.Connection do
   end
 
   defp schedule_heartbeat(state) do
-    %{state | heartbeat_timer: Process.send_after(self(), :heartbeat, state.heartbeat_interval_ms)}
+    %{
+      state
+      | heartbeat_timer: Process.send_after(self(), :heartbeat, state.heartbeat_interval_ms)
+    }
   end
 
   defp schedule_heartbeat_timeout(state) do
