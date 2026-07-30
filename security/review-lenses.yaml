@@ -1,0 +1,206 @@
+version: 1
+name: ltp-dual-cyber-lens
+purpose: >-
+  Shared, model-independent security review contract for L-THREAD/LTP.
+  Codex Security, Claude Code Security, human reviewers, and local tools must
+  use the same evidence and acceptance rules while searching independently.
+
+review_principles:
+  - id: independent_first_pass
+    rule: Each reviewer must inspect the code independently before reading another reviewer's findings.
+  - id: evidence_over_plausibility
+    rule: A finding requires code-path evidence, affected invariant, and a reproducible trigger or a bounded proof argument.
+  - id: no_state_before_auth
+    rule: Untrusted input must not mutate security state before authentication, freshness, replay, and chain checks pass.
+  - id: fail_closed
+    rule: Requested security features must either complete successfully or terminate the transition; silent fallback is forbidden.
+  - id: cross_sdk_is_protocol
+    rule: A property is not implemented until JS, Python, Rust, and Elixir agree on bytes, states, errors, and downgrade behavior.
+  - id: patch_requires_regression
+    rule: Every accepted finding must produce a regression test that fails before the patch and passes after it.
+
+severity:
+  P0:
+    definition: Remote compromise, authentication bypass, forged protocol state, cross-SDK security failure, or reliable pre-authentication denial of service.
+  P1:
+    definition: High-impact attack requiring constrained conditions, downgrade, replay, chain corruption, or persistent availability failure.
+  P2:
+    definition: Defense-in-depth gap, information leak, local misuse, or incomplete hardening with limited direct impact.
+  P3:
+    definition: Documentation drift, weak observability, test gap, or maintainability issue that can conceal future security defects.
+
+lenses:
+  - id: protocol_truth
+    question: Do version claims, status documents, defaults, and runtime behavior describe the same protocol?
+    inspect:
+      - protocol and SDK version constants
+      - SECURITY_HARDENING.md and SECURITY_SYNC_STATUS.md
+      - feature flags and defaults
+      - legacy compatibility paths
+    adversarial_cases:
+      - client advertises an older subprotocol while using newer fields
+      - documentation marks incomplete verification as complete
+      - a peer triggers a weaker compatibility mode
+
+  - id: canonical_bytes
+    question: Do all SDKs produce exactly the same signed and hashed bytes for every allowed envelope?
+    inspect:
+      - field inclusion and omission
+      - recursive key ordering
+      - numbers, negative zero, exponents, Unicode, null, and absent fields
+      - prev_message_hash, meta, and content_encoding coverage
+    required_proof:
+      - shared golden vectors consumed by all SDKs
+      - byte-for-byte canonical output comparison
+
+  - id: cryptographic_binding
+    question: Are identity, session, direction, protocol version, algorithm, and chain position bound to the cryptographic proof?
+    inspect:
+      - ECDH public-key authentication
+      - HKDF salt and info separation
+      - use of session_mac_key versus long-term secret_key
+      - AES-GCM associated data
+      - routing tag construction and collision scope
+    adversarial_cases:
+      - unknown-key-share
+      - key substitution
+      - cross-session signature replay
+      - cross-protocol message reuse
+
+  - id: transition_atomicity
+    question: Can rejected input mutate nonce caches, hash heads, session identifiers, counters, or application state?
+    expected_pipeline:
+      - UNTRUSTED
+      - PARSED
+      - SCHEMA_VALID
+      - DECRYPTED
+      - AUTHENTICATED
+      - FRESH
+      - NON_REPLAYED
+      - CHAIN_VALID
+      - COMMITTED
+      - DISPATCHED
+    invariant: State changes occur only at COMMITTED and are atomic with acceptance.
+
+  - id: concurrency_and_ordering
+    question: Can concurrent sends or receives fork the hash chain, reorder commits, or race session state?
+    inspect:
+      - async functions called without awaiting
+      - WebSocket callbacks that launch parallel handlers
+      - send queues and receive queues
+      - reconnect and heartbeat overlap
+    adversarial_cases:
+      - two sends in the same event-loop tick
+      - delayed signature computation
+      - message N+1 completes verification before message N
+
+  - id: replay_and_resume
+    question: Does replay protection survive reconnect, resume, process restart, cache cleanup, and multiple replicas?
+    inspect:
+      - nonce generation and validation
+      - nonce-cache scope and eviction
+      - session resumption proof
+      - reset of hash-chain heads
+      - timestamp normalization and clock skew
+    adversarial_cases:
+      - replay immediately after reconnect
+      - replay on another replica
+      - reuse of persisted thread_id with a new key
+      - seconds-versus-milliseconds ambiguity
+
+  - id: fail_open_and_downgrade
+    question: Can any exception, missing key, missing signature, unsupported algorithm, or decryption failure continue insecurely?
+    inspect:
+      - catch/rescue blocks
+      - warning-only security failures
+      - placeholder signatures
+      - plaintext fallback after encryption failure
+      - optional ECDH authentication
+
+  - id: parser_and_resource_exhaustion
+    question: Can hostile frames consume unbounded memory, CPU, recursion, disk, logs, or connection slots?
+    inspect:
+      - inbound and outbound size limits
+      - JSON depth and object width
+      - decompression and alternate codecs
+      - heartbeat values and reconnect timers
+      - nonce and session caches
+      - log amplification
+
+  - id: application_boundary
+    question: Can unauthenticated or partially verified data reach callbacks, logs, metrics, storage, or user-visible state?
+    inspect:
+      - onMessage execution order
+      - event and state-update callbacks
+      - error handlers
+      - debug logging of secrets, nonces, payloads, and identifiers
+
+  - id: agent_and_supply_chain
+    question: Can repository text, dependencies, workflows, generated files, or AI instructions redirect a security agent or CI job?
+    inspect:
+      - CLAUDE.md, AGENTS.md, skills, and prompt-bearing files
+      - pull-request content treated as instructions
+      - GitHub Actions permissions and unpinned actions
+      - dependency install scripts and lockfiles
+      - secret exposure and network egress
+    containment:
+      - read-only review by default
+      - no secret access
+      - no network beyond required model endpoint
+      - no writes outside the review branch
+      - human approval before patch merge
+
+  - id: exploit_chain_composition
+    question: Can individually moderate weaknesses compose into an end-to-end compromise or reliable denial of service?
+    method:
+      - identify entry primitive
+      - identify state or trust escalation
+      - identify persistence or replay primitive
+      - identify impact primitive
+      - test the shortest viable chain
+
+  - id: observability_and_forensics
+    question: Can operators distinguish malformed input, attack attempts, compatibility failures, and internal bugs without logging secrets?
+    inspect:
+      - stable error codes
+      - security event counters
+      - correlation identifiers
+      - rate-limited structured logs
+      - evidence needed to reconstruct accepted transitions
+
+finding_contract:
+  required_fields:
+    - id
+    - title
+    - severity
+    - affected_files
+    - attacker_capability
+    - entry_point
+    - violated_invariant
+    - transition_trace
+    - evidence
+    - reproduction
+    - impact
+    - proposed_fix
+    - regression_test
+    - confidence
+  confidence_values:
+    - confirmed
+    - strongly_supported
+    - hypothesis
+  acceptance_rule: >-
+    Only confirmed and strongly_supported findings may block merge. Hypotheses
+    must be converted into a test, proof, or explicit investigation task.
+
+cross_review_merge:
+  statuses:
+    CONFIRMED_BY_BOTH: Both independent reviewers found materially the same defect.
+    CONFIRMED_BY_ONE: One reviewer supplied reproducible evidence and the other did not refute it.
+    DISPUTED: Reviewers disagree on reachability, impact, or correctness; human adjudication required.
+    DUPLICATE: Same root cause expressed through different symptoms.
+    REJECTED: Not reachable, not security-relevant, or contradicted by evidence.
+  deduplication_key:
+    - root_cause
+    - violated_invariant
+    - first_security_state_mutated
+    - impact
