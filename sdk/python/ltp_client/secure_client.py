@@ -19,9 +19,12 @@ class SecureLtpClient(_BaseLtpClient):
         message_type = data.get("type")
         is_handshake_message = message_type in {"handshake_ack", "handshake_reject"}
 
-        # Decryption does not mutate replay or chain state. A failure rejects the
-        # frame before it can become application-visible.
-        if data.get("encrypted_metadata") and self._session_encryption_key:
+        # An encrypted wire envelope is not meaningful without the negotiated key.
+        # Never fall back to its cleared routing fields or expose it to callbacks.
+        if data.get("encrypted_metadata"):
+            if not self._session_encryption_key:
+                print("[LTP] Encrypted metadata received without a session key")
+                return
             try:
                 decrypted_metadata = decrypt_metadata(
                     data["encrypted_metadata"],
@@ -35,10 +38,14 @@ class SecureLtpClient(_BaseLtpClient):
                 return
 
         requires_authentication = (
-            not is_handshake_message
-            and self.require_signature_verification
-            and bool(self._mac_key)
+            not is_handshake_message and self.require_signature_verification
         )
+
+        # A required authentication policy without a verification key is a hard
+        # configuration/session failure, not permission to accept unsigned data.
+        if requires_authentication and not self._mac_key:
+            print("[LTP] Signature verification required but no MAC key is available")
+            return
 
         # Authenticate and establish freshness before reading or mutating chain
         # and replay state.
