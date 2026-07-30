@@ -10,8 +10,6 @@ on:
       - "sdk/python/ltp_client/client.py"
       - "sdk/rust/ltp-client/**"
       - "sdk/elixir/lib/ltp/**"
-      - "scripts/wp2_apply_wire_compat.py"
-      - "scripts/wp2_prepare_patch.py"
       - "scripts/wp2_apply_matrix_support.py"
       - "package.json"
       - "pnpm-lock.yaml"
@@ -79,13 +77,8 @@ jobs:
           corepack enable
           corepack prepare pnpm@9.15.0 --activate
 
-      - name: Apply exact WP2 support patches
-        shell: bash
-        run: |
-          set -euxo pipefail
-          python scripts/wp2_prepare_patch.py
-          python scripts/wp2_apply_wire_compat.py
-          python scripts/wp2_apply_matrix_support.py
+      - name: Apply exact WP2 matrix support
+        run: python scripts/wp2_apply_matrix_support.py
 
       - name: Format changed language files
         shell: bash
