@@ -45,6 +45,8 @@ For reviewers navigating the broader ecosystem: LTP is the trace/replay/continui
 
 **Project status:** Active protocol and SDK development with multi-language CI checks.
 
+**Production-readiness evidence:** The current capability matrix, exact non-claims and remaining v1.0 work are tracked in the generated [LTP Production Readiness Baseline](docs/production/READINESS_BASELINE.md) and epic #498.
+
 **Fast validation (under 2 minutes):**
 
 ```bash

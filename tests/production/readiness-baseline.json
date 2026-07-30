@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "baseline_id": "ltp-production-readiness-wp0-2026-07-30",
+  "captured_from_commit": "40c9c406c2455276a2d90910ce7e78b6d26b638c",
+  "sdk_version": "0.6.0-alpha.3",
+  "sdks": {
+    "javascript": {"manifest": "sdk/js/package.json", "runtime": "Node.js >=18", "test": "cd sdk/js && npm test"},
+    "python": {"manifest": "sdk/python/setup.py", "runtime": "Python >=3.9", "test": "cd sdk/python && python -m pytest tests/"},
+    "rust": {"manifest": "sdk/rust/ltp-client/Cargo.toml", "runtime": "Rust stable, edition 2021", "test": "cd sdk/rust/ltp-client && cargo test"},
+    "elixir": {"manifest": "sdk/elixir/mix.exs", "runtime": "Elixir ~>1.14 / OTP 25 in CI", "test": "cd sdk/elixir && mix test --trace"}
+  },
+  "workflows": [
+    {"id": "sdk-matrix", "path": ".github/workflows/test.yml", "status": "PROVEN", "scope": "native SDK suites, type consistency, conformance smoke, inspector and RC1 checks"},
+    {"id": "p0-security", "path": ".github/workflows/p0-security-regressions.yml", "status": "PROVEN", "scope": "canonical bytes, receive atomicity, controls and resume security"},
+    {"id": "security-baseline", "path": ".github/workflows/security.yml", "status": "PROVEN", "scope": "gitleaks and CodeQL for JavaScript, Python and Rust"}
+  ],
+  "capabilities": [
+    {
+      "id": "handshake-session-establishment",
+      "claim": "Handshake and session establishment implementations exist in all SDKs.",
+      "status_by_sdk": {"javascript": "PARTIAL", "python": "PARTIAL", "rust": "PARTIAL", "elixir": "PARTIAL"},
+      "evidence": ["sdk/js/src/client.ts", "sdk/python/ltp_client/client.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/lib/ltp/connection.ex", ".github/workflows/test.yml"],
+      "remaining_gap": "No shared reference server proves identical real-socket semantics. Tracked by #500 and #501."
+    },
+    {
+      "id": "canonical-envelope-v1",
+      "claim": "All SDKs produce and validate the shared canonical signed-envelope representation.",
+      "status_by_sdk": {"javascript": "PROVEN", "python": "PROVEN", "rust": "PROVEN", "elixir": "PROVEN"},
+      "evidence": ["tests/security/canonical-envelope-v1.json", "tests/security/p0/test_p0_security_regressions.py", "sdk/js/src/__tests__/canonicalEnvelopeV1.test.ts", "sdk/python/tests/test_canonical_envelope_v1.py", "sdk/rust/ltp-client/tests/canonical_envelope_v1.rs", "sdk/elixir/test/ltp/canonical_envelope_v1_test.exs", ".github/workflows/p0-security-regressions.yml"],
+      "remaining_gap": null
+    },
+    {
+      "id": "signature-replay-hash-chain",
+      "claim": "Signatures, freshness, replay and hash-chain checks complete before receive-state commit.",
+      "status_by_sdk": {"javascript": "PROVEN", "python": "PROVEN", "rust": "PROVEN", "elixir": "PROVEN"},
+      "evidence": ["tests/security/p0/test_p0_security_regressions.py", "sdk/js/src/client.ts", "sdk/python/tests/test_receive_security_atomicity.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/connection_security_test.exs", ".github/workflows/p0-security-regressions.yml"],
+      "remaining_gap": "Shared real-wire negative scenarios remain for #501."
+    },
+    {
+      "id": "authenticated-control-frames",
+      "claim": "Post-handshake ping/pong require the negotiated session MAC key before liveness mutation.",
+      "status_by_sdk": {"javascript": "PROVEN", "python": "PROVEN", "rust": "PROVEN", "elixir": "PROVEN"},
+      "evidence": ["tests/security/test_control_resume_contracts.py", "sdk/js/src/__tests__/controlResumeSecurity.test.ts", "sdk/python/tests/test_control_resume_security.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/control_resume_security_test.exs"],
+      "remaining_gap": null
+    },
+    {
+      "id": "resume-security-state",
+      "claim": "Same-session resume preserves receive-chain/replay state; fresh sessions reset the namespace.",
+      "status_by_sdk": {"javascript": "PROVEN", "python": "PROVEN", "rust": "PROVEN", "elixir": "PROVEN"},
+      "evidence": ["docs/security/SESSION_CONTROL_AND_RESUME_STATE.md", "tests/security/test_control_resume_contracts.py", "sdk/js/src/__tests__/controlResumeSecurity.test.ts", "sdk/python/tests/test_control_resume_security.py", "sdk/rust/ltp-client/src/client.rs", "sdk/elixir/test/ltp/control_resume_security_test.exs"],
+      "remaining_gap": "Crash/restart and concurrent reconnect fault injection remain for #502."
+    },
+    {
+      "id": "metadata-encryption",
+      "claim": "Metadata encryption and routing-tag implementations exist in all SDKs.",
+      "status_by_sdk": {"javascript": "PARTIAL", "python": "PARTIAL", "rust": "PARTIAL", "elixir": "PARTIAL"},
+      "evidence": ["sdk/js/src/crypto.ts", "sdk/python/ltp_client/crypto.py", "sdk/rust/ltp-client/src/crypto.rs", "sdk/elixir/lib/ltp/crypto.ex"],
+      "remaining_gap": "No shared four-SDK encrypted-metadata wire scenario exists. Tracked by #501."
+    },
+    {
+      "id": "cross-sdk-type-consistency",
+      "claim": "CI checks shared type definitions across all SDKs.",
+      "status_by_sdk": {"javascript": "PROVEN", "python": "PROVEN", "rust": "PROVEN", "elixir": "PROVEN"},
+      "evidence": ["tests/cross-sdk/verify-types.js", ".github/workflows/test.yml"],
+      "remaining_gap": "Type consistency is not behavioral wire interoperability. Tracked by #501."
+    },
+    {
+      "id": "real-socket-interoperability",
+      "claim": "All SDKs execute the same scenarios against an independent reference server.",
+      "status_by_sdk": {"javascript": "MISSING", "python": "MISSING", "rust": "MISSING", "elixir": "MISSING"},
+      "evidence": [],
+      "remaining_gap": "Reference server #500 and E2E matrix #501 are required."
+    },
+    {
+      "id": "conformance-report-generation",
+      "claim": "Repository tooling generates and validates a machine-readable conformance report.",
+      "status_by_sdk": {"javascript": "PROVEN", "python": "NOT_APPLICABLE", "rust": "NOT_APPLICABLE", "elixir": "NOT_APPLICABLE"},
+      "evidence": ["docs/conformance/report-schema-v0.1.md", "scripts/verify/validateConformanceReport.ts", ".github/workflows/test.yml"],
+      "remaining_gap": "This is repository-level tooling, not a native generator in every SDK."
+    },
+    {
+      "id": "semantic-inspector",
+      "claim": "The packaged inspector validates canonical traces and emits audit-oriented output.",
+      "status_by_sdk": {"javascript": "PROVEN", "python": "NOT_APPLICABLE", "rust": "NOT_APPLICABLE", "elixir": "NOT_APPLICABLE"},
+      "evidence": ["tools/ltp-inspect/inspect.test.ts", "tools/ltp-inspect/inspect.matrix.test.ts", "packages/inspect", ".github/workflows/test.yml"],
+      "remaining_gap": null
+    }
+  ],
+  "issue_reconciliation": [
+    {"issue": 419, "assessment": "PARTIAL", "disposition": "NARROW", "reason": "Source/test capability matrix is now explicit; real-socket interoperability remains.", "follow_up_issue": 501},
+    {"issue": 420, "assessment": "PROVEN", "disposition": "CLOSE", "reason": "Positive/negative cryptographic contracts run in mandatory CI.", "follow_up_issue": 505},
+    {"issue": 425, "assessment": "PROVEN", "disposition": "CLOSE", "reason": "Mandatory CI runs cross-SDK types, canonical contracts, native suites and conformance validation without secrets.", "follow_up_issue": 501}
+  ],
+  "open_gaps": [
+    "#500 independent reference server and deterministic E2E harness",
+    "#501 four-SDK real-wire interoperability matrix",
+    "#502 deterministic fault, reconnect race and crash/restart testing",
+    "#503 measured load, soak, backpressure and resource limits",
+    "#504 version negotiation and migration policy",
+    "#505 property-based and fuzz assurance",
+    "#506 reproducible signed release engineering",
+    "#507 observability, SLOs and incident response",
+    "#508 independent audit and v1.0 go/no-go"
+  ]
+}
