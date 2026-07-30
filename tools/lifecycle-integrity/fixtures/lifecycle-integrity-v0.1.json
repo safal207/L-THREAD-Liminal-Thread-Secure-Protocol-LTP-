@@ -1,0 +1,372 @@
+{
+  "fixture_version": "0.1",
+  "profile": "org.ltp.lifecycle-integrity.v0.1",
+  "cases": [
+    {
+      "case_id": "fully_joined_supported",
+      "transition_id": "transition-001",
+      "subject_id": "agent:deploy",
+      "response_text": "Deployment completed: 12 artifacts deployed with 2 warnings.",
+      "authorization_record": {
+        "transition_id": "transition-001",
+        "subject_id": "agent:deploy",
+        "action_identity_digest": "sha256:action-001",
+        "binding_digest": "sha256:binding-001",
+        "decision": "ALLOW",
+        "current_state": "ACTIVE",
+        "consumption_state": "UNCONSUMED"
+      },
+      "observations": [
+        {
+          "key": "primary",
+          "record": {
+            "transition_id": "transition-001",
+            "subject_id": "agent:deploy",
+            "authorization_ref": "$AUTHORIZATION_REF",
+            "action_identity_digest": "sha256:action-001",
+            "binding_digest": "sha256:binding-001",
+            "execution_status": "EXECUTED",
+            "observed_at": "2030-01-01T00:04:00Z",
+            "result": {
+              "deployed_artifacts": 12,
+              "warnings": 2,
+              "status": "success"
+            },
+            "result_digest": "$RESULT_DIGEST"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "claim-1",
+          "claim_text": "12 artifacts were deployed.",
+          "observation_keys": ["primary"],
+          "comparison": {
+            "kind": "JSON_POINTER_EQUALS",
+            "pointer": "/deployed_artifacts",
+            "expected_value": 12
+          }
+        }
+      ],
+      "expected": {
+        "verification_level": "FULL_LIFECYCLE_JOINED",
+        "authority": "VALID",
+        "execution": "OBSERVED_EXECUTED",
+        "response_integrity": "VERIFIED",
+        "claim_verdicts": ["SUPPORTED"]
+      }
+    },
+    {
+      "case_id": "fabricated_output_passes_text_shape",
+      "transition_id": "transition-002",
+      "subject_id": "agent:deploy",
+      "response_text": "Command completed successfully. Deployment completed: 20 artifacts deployed.",
+      "authorization_record": {
+        "transition_id": "transition-002",
+        "subject_id": "agent:deploy",
+        "action_identity_digest": "sha256:action-002",
+        "binding_digest": "sha256:binding-002",
+        "decision": "ALLOW",
+        "current_state": "ACTIVE"
+      },
+      "observations": [
+        {
+          "key": "primary",
+          "record": {
+            "transition_id": "transition-002",
+            "subject_id": "agent:deploy",
+            "authorization_ref": "$AUTHORIZATION_REF",
+            "action_identity_digest": "sha256:action-002",
+            "binding_digest": "sha256:binding-002",
+            "execution_status": "EXECUTED",
+            "result": {
+              "deployed_artifacts": 12,
+              "status": "success"
+            },
+            "result_digest": "$RESULT_DIGEST"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "claim-1",
+          "claim_text": "20 artifacts were deployed.",
+          "observation_keys": ["primary"],
+          "text_heuristic": {
+            "pattern": "command completed successfully",
+            "expected_match": true
+          },
+          "comparison": {
+            "kind": "JSON_POINTER_EQUALS",
+            "pointer": "/deployed_artifacts",
+            "expected_value": 20
+          }
+        }
+      ],
+      "expected": {
+        "verification_level": "FULL_LIFECYCLE_JOINED",
+        "authority": "VALID",
+        "execution": "OBSERVED_EXECUTED",
+        "response_integrity": "FAILED",
+        "claim_verdicts": ["CONTRADICTED"],
+        "heuristic_results": ["MATCH"]
+      }
+    },
+    {
+      "case_id": "blocked_but_claimed_executed",
+      "transition_id": "transition-003",
+      "subject_id": "agent:deploy",
+      "response_text": "The deployment tool executed successfully.",
+      "authorization_record": {
+        "transition_id": "transition-003",
+        "subject_id": "agent:deploy",
+        "action_identity_digest": "sha256:action-003",
+        "binding_digest": "sha256:binding-003",
+        "decision": "DENY",
+        "current_state": "DENIED"
+      },
+      "observations": [
+        {
+          "key": "primary",
+          "record": {
+            "transition_id": "transition-003",
+            "subject_id": "agent:deploy",
+            "authorization_ref": "$AUTHORIZATION_REF",
+            "action_identity_digest": "sha256:action-003",
+            "binding_digest": "sha256:binding-003",
+            "execution_status": "BLOCKED",
+            "result": {
+              "reason": "policy denied execution"
+            },
+            "result_digest": "$RESULT_DIGEST"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "claim-1",
+          "claim_text": "The deployment tool executed successfully.",
+          "observation_keys": ["primary"],
+          "comparison": {
+            "kind": "EXECUTION_STATUS_EQUALS",
+            "expected_status": "EXECUTED"
+          }
+        }
+      ],
+      "expected": {
+        "verification_level": "FULL_LIFECYCLE_JOINED",
+        "authority": "DENIED",
+        "execution": "OBSERVED_BLOCKED",
+        "response_integrity": "FAILED",
+        "claim_verdicts": ["CONTRADICTED"]
+      }
+    },
+    {
+      "case_id": "expired_authorization_honest_response",
+      "transition_id": "transition-004",
+      "subject_id": "agent:deploy",
+      "response_text": "The deployment completed before the authorization expired.",
+      "authorization_record": {
+        "transition_id": "transition-004",
+        "subject_id": "agent:deploy",
+        "action_identity_digest": "sha256:action-004",
+        "binding_digest": "sha256:binding-004",
+        "decision": "ALLOW",
+        "current_state": "EXPIRED_AT_REPORT",
+        "issued_at": "2030-01-01T00:00:00Z",
+        "expires_at": "2030-01-01T00:05:00Z"
+      },
+      "observations": [
+        {
+          "key": "primary",
+          "record": {
+            "transition_id": "transition-004",
+            "subject_id": "agent:deploy",
+            "authorization_ref": "$AUTHORIZATION_REF",
+            "action_identity_digest": "sha256:action-004",
+            "binding_digest": "sha256:binding-004",
+            "execution_status": "EXECUTED",
+            "observed_at": "2030-01-01T00:04:00Z",
+            "result": {
+              "completed_before_expiry": true
+            },
+            "result_digest": "$RESULT_DIGEST"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "claim-1",
+          "claim_text": "The deployment completed before the authorization expired.",
+          "observation_keys": ["primary"],
+          "comparison": {
+            "kind": "JSON_POINTER_EQUALS",
+            "pointer": "/completed_before_expiry",
+            "expected_value": true
+          }
+        }
+      ],
+      "expected": {
+        "verification_level": "FULL_LIFECYCLE_JOINED",
+        "authority": "EXPIRED_AT_REPORT",
+        "execution": "OBSERVED_EXECUTED",
+        "response_integrity": "VERIFIED",
+        "claim_verdicts": ["SUPPORTED"]
+      }
+    },
+    {
+      "case_id": "observation_joined_count_drift",
+      "transition_id": "transition-005",
+      "subject_id": "agent:deploy",
+      "response_text": "13 artifacts were deployed.",
+      "authorization_record": null,
+      "observations": [
+        {
+          "key": "primary",
+          "record": {
+            "transition_id": "transition-005",
+            "subject_id": "agent:deploy",
+            "authorization_ref": "sha256:external-authorization",
+            "action_identity_digest": "sha256:action-005",
+            "binding_digest": "sha256:binding-005",
+            "execution_status": "EXECUTED",
+            "result": {
+              "deployed_artifacts": 12
+            },
+            "result_digest": "$RESULT_DIGEST"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "claim-1",
+          "claim_text": "13 artifacts were deployed.",
+          "observation_keys": ["primary"],
+          "comparison": {
+            "kind": "JSON_POINTER_EQUALS",
+            "pointer": "/deployed_artifacts",
+            "expected_value": 13
+          }
+        }
+      ],
+      "expected": {
+        "verification_level": "OBSERVATION_JOINED",
+        "authority": "NOT_EVALUATED",
+        "execution": "OBSERVED_EXECUTED",
+        "response_integrity": "FAILED",
+        "claim_verdicts": ["CONTRADICTED"]
+      }
+    },
+    {
+      "case_id": "missing_citation_binding",
+      "transition_id": "transition-006",
+      "subject_id": "agent:deploy",
+      "response_text": "12 artifacts were deployed.",
+      "authorization_record": null,
+      "observations": [],
+      "claims": [
+        {
+          "claim_id": "claim-1",
+          "claim_text": "12 artifacts were deployed.",
+          "observation_keys": [],
+          "comparison": {
+            "kind": "REFERENCE_PRESENT"
+          }
+        }
+      ],
+      "expected": {
+        "verification_level": "TEXT_HEURISTIC",
+        "authority": "NOT_EVALUATED",
+        "execution": "NOT_OBSERVED",
+        "response_integrity": "FAILED",
+        "claim_verdicts": ["UNVERIFIABLE"]
+      }
+    },
+    {
+      "case_id": "mixed_supported_and_unverifiable",
+      "transition_id": "transition-007",
+      "subject_id": "agent:deploy",
+      "response_text": "12 artifacts were deployed and no user traffic was affected.",
+      "authorization_record": {
+        "transition_id": "transition-007",
+        "subject_id": "agent:deploy",
+        "action_identity_digest": "sha256:action-007",
+        "binding_digest": "sha256:binding-007",
+        "decision": "ALLOW",
+        "current_state": "ACTIVE"
+      },
+      "observations": [
+        {
+          "key": "primary",
+          "record": {
+            "transition_id": "transition-007",
+            "subject_id": "agent:deploy",
+            "authorization_ref": "$AUTHORIZATION_REF",
+            "action_identity_digest": "sha256:action-007",
+            "binding_digest": "sha256:binding-007",
+            "execution_status": "EXECUTED",
+            "result": {
+              "deployed_artifacts": 12
+            },
+            "result_digest": "$RESULT_DIGEST"
+          }
+        }
+      ],
+      "claims": [
+        {
+          "claim_id": "claim-1",
+          "claim_text": "12 artifacts were deployed.",
+          "observation_keys": ["primary"],
+          "comparison": {
+            "kind": "JSON_POINTER_EQUALS",
+            "pointer": "/deployed_artifacts",
+            "expected_value": 12
+          }
+        },
+        {
+          "claim_id": "claim-2",
+          "claim_text": "No user traffic was affected.",
+          "observation_keys": [],
+          "comparison": {
+            "kind": "REFERENCE_PRESENT"
+          }
+        }
+      ],
+      "expected": {
+        "verification_level": "FULL_LIFECYCLE_JOINED",
+        "authority": "VALID",
+        "execution": "OBSERVED_EXECUTED",
+        "response_integrity": "PARTIAL",
+        "claim_verdicts": ["SUPPORTED", "UNVERIFIABLE"]
+      }
+    },
+    {
+      "case_id": "text_only_heuristic_remains_detection_not_proof",
+      "transition_id": "transition-008",
+      "subject_id": "agent:deploy",
+      "response_text": "Command completed successfully with 12 artifacts.",
+      "authorization_record": null,
+      "observations": [],
+      "claims": [
+        {
+          "claim_id": "claim-1",
+          "claim_text": "The command completed successfully.",
+          "observation_keys": [],
+          "comparison": {
+            "kind": "TEXT_PATTERN_ONLY",
+            "pattern": "command completed successfully",
+            "expected_match": true
+          }
+        }
+      ],
+      "expected": {
+        "verification_level": "TEXT_HEURISTIC",
+        "authority": "NOT_EVALUATED",
+        "execution": "NOT_OBSERVED",
+        "response_integrity": "FAILED",
+        "claim_verdicts": ["UNVERIFIABLE"],
+        "heuristic_results": ["MATCH"]
+      }
+    }
+  ]
+}
