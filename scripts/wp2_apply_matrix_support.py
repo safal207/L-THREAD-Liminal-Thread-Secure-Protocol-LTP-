@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -132,5 +133,9 @@ package["scripts"]["e2e:four-sdk"] = (
     "pnpm --dir sdk/js build && ts-node tests/e2e/four-sdk/run-matrix.ts"
 )
 package_path.write_text(json.dumps(package, indent=2) + "\n", encoding="utf-8")
+
+# The temporary workflow's explicit add-list predates this runtime discovery.
+# Stage the verified JS fix here; no commit occurs unless all four SDKs pass.
+subprocess.run(["git", "add", "sdk/js/src/client.ts"], cwd=ROOT, check=True)
 
 print("WP2 matrix support patch applied")
