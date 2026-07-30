@@ -21,8 +21,25 @@ replace_once(
 )
 replace_once(
     "tests/e2e/four-sdk/javascript_adapter.ts",
-    'from "../../../sdk/js/src";',
-    'from "../../../sdk/js/dist";',
+    '''import {
+  generateNonce,
+  hashEnvelope,
+  LtpClient,
+  LtpEnvelope,
+  signMessage,
+} from "../../../sdk/js/src";
+''',
+    '''import WebSocket from "ws";
+
+(globalThis as any).WebSocket = WebSocket;
+const {
+  generateNonce,
+  hashEnvelope,
+  LtpClient,
+  signMessage,
+} = require("../../../sdk/js/dist") as Record<string, any>;
+type LtpEnvelope = any;
+''',
 )
 
 print("WP2 adapter compatibility fixes applied")
