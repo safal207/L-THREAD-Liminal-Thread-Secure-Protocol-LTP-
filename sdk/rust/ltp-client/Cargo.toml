@@ -7,6 +7,10 @@ description = "LTP (Liminal Thread Protocol) client SDK for Rust"
 license = "MIT"
 repository = "https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-"
 
+[features]
+default = []
+reference-interop = []
+
 [dependencies]
 tokio = { version = "1.35", features = ["full"] }
 tokio-tungstenite = { version = "0.21", features = ["native-tls"] }

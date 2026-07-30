@@ -256,7 +256,7 @@ class ReferenceScenarioClient {
     }
 
     if (options.commit !== false) {
-      this.lastSentHash = hashEnvelope(logical);
+      this.lastSentHash = hashEnvelope(wire);
     }
     return { logical, wire, raw: JSON.stringify(wire) };
   }

@@ -37,6 +37,7 @@ export interface ReferenceEvidenceRecord {
   verdict: ReferenceVerdict;
   reason_code: string;
   frame_digest: string;
+  client_id?: string;
   thread_id?: string;
   session_id?: string;
   state_digest?: string;
@@ -52,12 +53,14 @@ export interface ReferenceServerOptions {
   heartbeatIntervalMs?: number;
   maxMessageAgeMs?: number;
   maxFutureSkewMs?: number;
+  supportedProtocolVersions?: string[];
   seed?: string;
   clock?: () => number;
 }
 
 interface SessionState extends SessionKeys {
   clientId: string;
+  protocolVersion: string;
   threadId: string;
   sessionId: string;
   generation: number;
@@ -113,6 +116,7 @@ class ReferenceServer implements ReferenceServerHandle {
   private readonly heartbeatIntervalMs: number;
   private readonly maxMessageAgeMs: number;
   private readonly maxFutureSkewMs: number;
+  private readonly supportedProtocolVersions: string[];
   private readonly seed: string;
   private readonly clock: () => number;
   private readonly sessions = new Map<string, SessionState>();
@@ -132,6 +136,7 @@ class ReferenceServer implements ReferenceServerHandle {
     this.heartbeatIntervalMs = options.heartbeatIntervalMs ?? 15_000;
     this.maxMessageAgeMs = options.maxMessageAgeMs ?? 60_000;
     this.maxFutureSkewMs = options.maxFutureSkewMs ?? 5_000;
+    this.supportedProtocolVersions = options.supportedProtocolVersions ?? ["0.3", "0.6"];
     this.seed = options.seed ?? "reference";
     this.clock = options.clock ?? Date.now;
     this.wss = new WebSocketServer({
@@ -252,6 +257,7 @@ class ReferenceServer implements ReferenceServerHandle {
       last_received_hash: state.lastReceivedHash,
       last_sent_hash: state.lastSentHash,
       seen_nonces: [...state.seenNonces].sort(),
+      protocol_version: state.protocolVersion,
       thread_id: state.threadId,
       session_id: state.sessionId,
     }));
@@ -276,6 +282,7 @@ class ReferenceServer implements ReferenceServerHandle {
       verdict,
       reason_code: reasonCode,
       frame_digest: frameDigest(rawFrame),
+      client_id: state?.clientId,
       thread_id: state?.threadId,
       session_id: state?.sessionId,
       state_digest: state ? this.stateDigest(state) : undefined,
@@ -394,14 +401,14 @@ class ReferenceServer implements ReferenceServerHandle {
     raw: string,
     socket: WebSocket,
   ): { publicKey: string; timestamp: number; signature: string } | null {
-    if (frame.ltp_version !== this.protocolVersion) {
+    if (!this.supportedProtocolVersions.includes(frame.ltp_version)) {
       this.record("inbound", frame.type, "REJECTED", "UNSUPPORTED_VERSION", raw);
       const reject: HandshakeReject = {
         type: "handshake_reject",
         ltp_version: this.protocolVersion,
         reason: "unsupported_version",
         suggest_new: false,
-        supported_versions: [this.protocolVersion],
+        supported_versions: [...this.supportedProtocolVersions],
       };
       this.sendPlain(socket, reject, "UNSUPPORTED_VERSION");
       return null;
@@ -453,7 +460,7 @@ class ReferenceServer implements ReferenceServerHandle {
     const timestamp = this.clock();
     return {
       type: "handshake_ack",
-      ltp_version: this.protocolVersion,
+      ltp_version: state.protocolVersion,
       thread_id: state.threadId,
       session_id: state.sessionId,
       resumed,
@@ -497,6 +504,7 @@ class ReferenceServer implements ReferenceServerHandle {
     const sessionKeys = deriveSessionKeys(sharedSecret, sessionId);
     const state: SessionState = {
       clientId: frame.client_id,
+      protocolVersion: frame.ltp_version,
       threadId,
       sessionId,
       generation: 1,
@@ -529,6 +537,18 @@ class ReferenceServer implements ReferenceServerHandle {
         suggest_new: true,
       };
       this.sendPlain(socket, reject, "THREAD_NOT_FOUND");
+      return;
+    }
+    if (frame.ltp_version !== state.protocolVersion) {
+      this.record("inbound", frame.type, "REJECTED", "SESSION_VERSION_MISMATCH", raw, state);
+      const reject: HandshakeReject = {
+        type: "handshake_reject",
+        ltp_version: state.protocolVersion,
+        reason: "session_version_mismatch",
+        suggest_new: true,
+        supported_versions: [...this.supportedProtocolVersions],
+      };
+      this.sendPlain(socket, reject, "SESSION_VERSION_MISMATCH", state);
       return;
     }
 
@@ -646,7 +666,9 @@ class ReferenceServer implements ReferenceServerHandle {
       return;
     }
 
-    const candidateHash = hashEnvelope(logical);
+    // The chain commits the exact transmitted envelope. Signature checks use
+    // the decrypted logical view, but reconnect continuity must follow wire bytes.
+    const candidateHash = hashEnvelope(wireFrame);
     state.lastReceivedHash = candidateHash;
     state.seenNonces.add(logical.nonce);
     this.record("inbound", logical.type, "ACCEPTED", "SECURITY_PIPELINE_ACCEPTED", raw, state, scenarioId);

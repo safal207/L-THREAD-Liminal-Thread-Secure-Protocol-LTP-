@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
 import { describe, expect, it } from "vitest";
+import { generateNonce, generateRoutingTag, hashEnvelope } from "./protocol";
 import { runReferenceScenarios } from "./scenarios";
 
 const EXPECTED_SCENARIOS = [
@@ -18,6 +19,40 @@ const EXPECTED_SCENARIOS = [
 ];
 
 describe("independent LTP reference server", () => {
+  it("emits the cross-SDK canonical HMAC nonce format", () => {
+    const nonce = generateNonce("matrix-mac-key", "reference-server", 1_900_000_000_000, "00".repeat(16));
+    expect(nonce).toMatch(/^hmac-[0-9a-f]{32}-1900000000000$/);
+  });
+
+  it("uses decoded session-key bytes for routing tags", () => {
+    const key = "00".repeat(32);
+    expect(generateRoutingTag("thread", "session", key)).toBe(
+      "8dfd3a3b9951f6ba4c59a9340a17459e",
+    );
+  });
+
+  it("commits meta and content encoding into the envelope hash", () => {
+    const base = {
+      type: "event",
+      thread_id: "thread",
+      session_id: "session",
+      timestamp: 1_900_000_000_000,
+      nonce: "hmac-0123456789abcdef0123456789abcdef-1900000000000",
+      payload: { scenario_id: "canonical-hash" },
+      prev_message_hash: "",
+      meta: { client_id: "client-a" },
+      content_encoding: "json",
+    };
+    expect(hashEnvelope(base)).not.toBe(hashEnvelope({
+      ...base,
+      meta: { client_id: "client-b" },
+    }));
+    expect(hashEnvelope(base)).not.toBe(hashEnvelope({
+      ...base,
+      content_encoding: "cbor",
+    }));
+  });
+
   it("passes the deterministic positive and negative wire scenario catalog", async () => {
     const report = await runReferenceScenarios({ seed: "wp1-contract" });
 

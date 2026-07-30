@@ -290,19 +290,37 @@ class LtpClient:
         self._ensure_handshake_keys()
         if self.thread_id:
             self.is_attempting_resume = True
+            if self.enable_ecdh_key_exchange:
+                public_key, private_key = generate_ecdh_key_pair()
+                self._ecdh_public_key = public_key
+                self._ecdh_private_key = private_key
+                self._handshake_keys = (public_key, private_key)
+            ecdh_public_key = self._ecdh_public_key or (
+                self._handshake_keys[0] if self._handshake_keys else None
+            )
             resume_payload = {
                 "type": "handshake_resume",
                 "ltp_version": LTP_VERSION,
                 "client_id": self.client_id,
                 "thread_id": self.thread_id,
                 "resume_reason": "automatic_reconnect",
-                "client_public_key": self._handshake_keys[0] if self._handshake_keys else None,
+                "client_public_key": ecdh_public_key,
+                "client_ecdh_public_key": ecdh_public_key if self.enable_ecdh_key_exchange else None,
                 "key_agreement": {
                     "algorithm": "secp256r1",
                     "method": "ecdh",
                     "hkdf": "sha256",
-                },
+                } if ecdh_public_key else {},
             }
+            if self.enable_ecdh_key_exchange and ecdh_public_key and self.secret_key:
+                timestamp = int(time.time() * 1000)
+                resume_payload["client_ecdh_signature"] = sign_ecdh_public_key(
+                    ecdh_public_key,
+                    self.client_id,
+                    timestamp,
+                    self.secret_key,
+                )
+                resume_payload["client_ecdh_timestamp"] = timestamp
             await self._send_raw(resume_payload)
         else:
             self.is_attempting_resume = False
@@ -649,6 +667,15 @@ class LtpClient:
 
         message_dict = envelope.to_dict()
 
+        # Post-handshake control frames are bound only to the negotiated session key.
+        # Sign before routing metadata is encrypted: peers verify the decrypted
+        # logical envelope, while the hash-chain commits the final wire envelope.
+        signing_key = self._session_mac_key if msg_type in {"ping", "pong"} else self._mac_key
+        if signing_key:
+            message_dict["signature"] = sign_message(message_dict, signing_key)
+        elif msg_type in {"ping", "pong"}:
+            raise RuntimeError("post-handshake control frame requires a session MAC key")
+
         # Metadata encryption (v0.6+) - encrypt thread_id, session_id, timestamp
         if self.enable_metadata_encryption and self._session_encryption_key:
             try:
@@ -686,13 +713,6 @@ class LtpClient:
             except Exception as e:
                 print(f"[LTP] Warning: Failed to encrypt metadata: {e}")
                 # Continue without encryption
-
-        # Post-handshake control frames are bound only to the negotiated session key.
-        signing_key = self._session_mac_key if msg_type in {"ping", "pong"} else self._mac_key
-        if signing_key:
-            message_dict["signature"] = sign_message(message_dict, signing_key)
-        elif msg_type in {"ping", "pong"}:
-            raise RuntimeError("post-handshake control frame requires a session MAC key")
 
         # Compute hash for next message's prev_message_hash (v0.5+ hash chaining)
         try:

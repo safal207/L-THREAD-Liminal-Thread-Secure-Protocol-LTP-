@@ -1,68 +1,67 @@
 defmodule LTP.ClientTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
 
   alias LTP.Client
 
+  defmodule StoppableProcess do
+    use GenServer
+
+    def start_link, do: GenServer.start_link(__MODULE__, :ok)
+    @impl GenServer
+    def init(:ok), do: {:ok, %{}}
+  end
+
   describe "start_link/1" do
-    test "starts client with valid options" do
-      opts = %{
-        url: "ws://localhost:8080",
-        client_id: "test-client-1-#{:rand.uniform(100000)}"
-      }
-
-      assert {:ok, pid} = Client.start_link(opts)
-      assert Process.alive?(pid)
-      :ok = Client.stop(pid)
-      Process.sleep(100)
-      refute Process.alive?(pid)
-    end
-
     test "requires url and client_id" do
-      # Missing client_id triggers KeyError inside GenServer init.
-      # GenServer.start_link catches the exception and returns {:error, {reason, stacktrace}}
       result = Client.start_link(%{url: "ws://localhost:8080"})
       assert {:error, {{:badkey, :client_id}, _stacktrace}} = result
     end
-  end
 
-  describe "send_state_update/3" do
-    test "returns error when not connected" do
+    test "reports a connection error when the endpoint is unavailable" do
+      previous = Process.flag(:trap_exit, true)
+      on_exit(fn -> Process.flag(:trap_exit, previous) end)
+
       opts = %{
-        url: "ws://localhost:8080",
-        client_id: "test-client-2-#{:rand.uniform(100000)}"
+        url: "ws://127.0.0.1:1",
+        client_id: "unavailable-endpoint-client"
       }
 
-      {:ok, pid} = Client.start_link(opts)
-      assert Client.send_state_update(pid, %{kind: "test", data: %{}}) == {:error, :not_connected}
-      :ok = Client.stop(pid)
+      assert {:error, %WebSockex.ConnError{original: :econnrefused}} = Client.start_link(opts)
     end
   end
 
-  describe "get_thread_id/1 and get_session_id/1" do
-    test "returns nil when not connected" do
-      opts = %{
-        url: "ws://localhost:8080",
-        client_id: "test-client-3-#{:rand.uniform(100000)}"
-      }
+  describe "send_state_update/3 callback" do
+    test "returns error when not connected" do
+      state = %Client{is_connected: false}
 
-      {:ok, pid} = Client.start_link(opts)
-      assert Client.get_thread_id(pid) == nil
-      assert Client.get_session_id(pid) == nil
-      :ok = Client.stop(pid)
+      assert {:reply, {:error, :not_connected}, ^state} =
+               Client.handle_call(
+                 {:send_state_update, %{kind: "test", data: %{}}, []},
+                 {self(), make_ref()},
+                 state
+               )
+    end
+  end
+
+  describe "thread and session ID callbacks" do
+    test "return nil before a connection is established" do
+      state = %Client{thread_id: nil, session_id: nil, is_connected: false}
+
+      assert {:reply, nil, ^state} =
+               Client.handle_call(:get_thread_id, {self(), make_ref()}, state)
+
+      assert {:reply, nil, ^state} =
+               Client.handle_call(:get_session_id, {self(), make_ref()}, state)
     end
   end
 
   describe "stop/1" do
-    test "stops the client process" do
-      opts = %{
-        url: "ws://localhost:8080",
-        client_id: "test-client-4-#{:rand.uniform(100000)}"
-      }
+    test "stops a GenServer process" do
+      {:ok, pid} = StoppableProcess.start_link()
+      monitor = Process.monitor(pid)
 
-      {:ok, pid} = Client.start_link(opts)
-      assert Process.alive?(pid)
-      :ok = Client.stop(pid)
-      Process.sleep(200)
+      assert :ok = Client.stop(pid)
+      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}
       refute Process.alive?(pid)
     end
   end

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 
 from ltp_client import LtpClient
 from ltp_client.client import LtpClient as DirectImportLtpClient
-from ltp_client.crypto import hash_envelope
+from ltp_client.crypto import decrypt_metadata, hash_envelope, verify_signature
 
 
 def test_public_and_direct_imports_use_hardened_client():
@@ -129,3 +129,35 @@ def test_accepted_frame_commits_state_before_dispatch():
     client.on_state_update.assert_called_once_with(
         {"kind": "test", "data": {"value": 1}}
     )
+
+
+def test_encrypted_outbound_signs_logical_envelope_and_hashes_wire(tmp_path):
+    mac_key = "11" * 32
+    encryption_key = "22" * 32
+    client = LtpClient(
+        url="ws://localhost:8080",
+        client_id="encrypted-outbound-client",
+        session_mac_key=mac_key,
+        require_signature_verification=True,
+        enable_metadata_encryption=True,
+        storage_path=str(tmp_path / "ltp-state.json"),
+    )
+    client.thread_id = "thread-encrypted"
+    client.session_id = "session-encrypted"
+    client._session_encryption_key = encryption_key
+
+    wire = client._build_envelope(
+        msg_type="event",
+        payload={"event_type": "wp2", "data": {"scenario_id": "encrypted-signature"}},
+    )
+
+    assert wire["thread_id"] == ""
+    assert wire["session_id"] == ""
+    assert wire["timestamp"] == 0
+    metadata = decrypt_metadata(wire["encrypted_metadata"], encryption_key)
+    logical = dict(wire)
+    logical.update(metadata)
+
+    assert verify_signature(logical, mac_key)
+    assert not verify_signature(wire, mac_key)
+    assert client._last_sent_hash == hash_envelope(wire)

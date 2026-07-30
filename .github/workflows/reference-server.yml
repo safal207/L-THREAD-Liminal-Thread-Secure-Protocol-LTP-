@@ -1,10 +1,19 @@
-name: Reference Server Scenarios
+name: Reference Server and Four-SDK Interoperability
 
 on:
   pull_request:
     branches: [main]
     paths:
       - "tools/reference-server/**"
+      - "tests/e2e/four-sdk/**"
+      - "tests/production/readiness-baseline.json"
+      - "docs/production/FOUR_SDK_INTEROPERABILITY.md"
+      - "docs/production/READINESS_BASELINE.md"
+      - "sdk/js/**"
+      - "sdk/python/**"
+      - "sdk/rust/ltp-client/**"
+      - "sdk/elixir/**"
+      - "scripts/validate-readiness-baseline.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -12,6 +21,15 @@ on:
     branches: [main]
     paths:
       - "tools/reference-server/**"
+      - "tests/e2e/four-sdk/**"
+      - "tests/production/readiness-baseline.json"
+      - "docs/production/FOUR_SDK_INTEROPERABILITY.md"
+      - "docs/production/READINESS_BASELINE.md"
+      - "sdk/js/**"
+      - "sdk/python/**"
+      - "sdk/rust/ltp-client/**"
+      - "sdk/elixir/**"
+      - "scripts/validate-readiness-baseline.py"
       - "package.json"
       - "pnpm-lock.yaml"
       - ".github/workflows/reference-server.yml"
@@ -21,41 +39,30 @@ permissions:
   contents: read
 
 concurrency:
-  group: reference-server-${{ github.workflow }}-${{ github.ref }}
+  group: reference-interoperability-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   reference-server-contracts:
-    name: Independent server + deterministic wire scenarios
+    name: Independent server + deterministic scenarios
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: "18"
-
       - name: Enable pnpm
-        shell: bash
         run: |
-          set -euxo pipefail
           corepack enable
           corepack prepare pnpm@9.15.0 --activate
-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-
-      - name: Run reference-server contracts
+      - name: Run independent reference contracts
         run: pnpm test:reference-server
-
       - name: Generate deterministic evidence
         run: pnpm reference:scenarios
-
-      - name: Validate evidence summary and redaction
-        shell: bash
+      - name: Validate evidence redaction
         run: |
           node - <<'NODE'
           const fs = require('fs');
@@ -67,12 +74,76 @@ jobs:
           for (const forbidden of ['ltp-reference-long-term-secret', 'macKey', 'encryptionKey', 'privateKey']) {
             if (raw.includes(forbidden)) throw new Error(`evidence leaked forbidden token: ${forbidden}`);
           }
-          console.log(report.summary);
           NODE
-
-      - name: Upload reference-server evidence
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: reference-server-evidence
           path: artifacts/reference-server-evidence.json
+          if-no-files-found: error
+
+  four-sdk-interoperability:
+    name: Four native SDKs / 40 server-owned verdicts
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: erlef/setup-elixir@v1
+        with:
+          elixir-version: "1.14"
+          otp-version: "25"
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+      - name: Install dependencies
+        run: |
+          set -euxo pipefail
+          pnpm install --frozen-lockfile
+          python -m pip install -e "sdk/python[dev]"
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+          cd sdk/elixir
+          mix deps.get
+      - name: Validate readiness source of truth
+        run: python scripts/validate-readiness-baseline.py
+      - name: Run focused cross-SDK regressions
+        run: |
+          python -m pytest -q sdk/python/tests/test_receive_security_atomicity.py
+          cargo test --manifest-path sdk/rust/ltp-client/Cargo.toml outbound_timestamps_use_unix_milliseconds
+          cd sdk/elixir
+          mix test --trace test/ltp/crypto_ecdh_test.exs test/ltp/connection_heartbeat_reply_test.exs
+      - name: Run four native SDK adapters
+        run: pnpm e2e:four-sdk
+      - name: Validate 40/40 matrix and evidence redaction
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('artifacts/four-sdk-interoperability.json', 'utf8'));
+          if (report.summary.total !== 40 || report.summary.passed !== 40 || report.summary.failed !== 0) {
+            throw new Error(`four-SDK matrix failed: ${JSON.stringify(report.summary)}`);
+          }
+          if (report.adapters.length !== 4) throw new Error('expected four native adapters');
+          const raw = JSON.stringify(report);
+          for (const forbidden of ['ltp-reference-long-term-secret', 'macKey', 'encryptionKey', 'privateKey']) {
+            if (raw.includes(forbidden)) throw new Error(`matrix leaked forbidden token: ${forbidden}`);
+          }
+          console.log(report.summary);
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: four-sdk-interoperability
+          path: |
+            artifacts/four-sdk-interoperability.json
+            artifacts/four-sdk/*.json
+            docs/production/FOUR_SDK_INTEROPERABILITY.md
           if-no-files-found: error

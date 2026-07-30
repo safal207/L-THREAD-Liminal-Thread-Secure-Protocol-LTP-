@@ -251,6 +251,9 @@ export class LtpClient {
       secretKey: options.secretKey,
       requireSignatureVerification: requireVerification,
       maxMessageAge: options.maxMessageAge || 60000, // Default 60 seconds
+      enableEcdhKeyExchange: options.enableEcdhKeyExchange,
+      enableMetadataEncryption: options.enableMetadataEncryption,
+      sessionEncryptionKey: options.sessionEncryptionKey,
     };
     this.events = events;
     this.logger = this.options.logger || defaultLogger;
@@ -641,13 +644,16 @@ export class LtpClient {
 
   private async handleMessageAsync(message: LtpMessage): Promise<void> {
     const envelopeMsg = message as LtpEnvelope;
+    // Preserve the exact transmitted fields for the receive hash-chain. Metadata
+    // decryption produces the logical view used for signature/application checks.
+    const wireEnvelope = { ...envelopeMsg } as LtpEnvelope;
     await this.decryptMetadataIfNeeded(envelopeMsg);
 
     const isControlMessage = envelopeMsg.type === 'ping' || envelopeMsg.type === 'pong';
     const macKey = isControlMessage
       ? this.options.sessionMacKey
       : this.options.sessionMacKey || this.options.secretKey;
-    if (!(await this.verifyMessageSecurity(envelopeMsg, macKey))) {
+    if (!(await this.verifyMessageSecurity(envelopeMsg, macKey, wireEnvelope))) {
       return;
     }
 
@@ -713,7 +719,8 @@ export class LtpClient {
 
   private async verifyMessageSecurity(
     envelope: LtpEnvelope,
-    macKey?: string
+    macKey?: string,
+    wireEnvelope: LtpEnvelope = envelope
   ): Promise<boolean> {
     const isHandshakeMessage = envelope.type === 'handshake_ack' || envelope.type === 'handshake_reject';
     const isControlMessage = envelope.type === 'ping' || envelope.type === 'pong';
@@ -852,13 +859,15 @@ export class LtpClient {
 
     try {
       this.lastReceivedHash = await hashEnvelope({
-        type: envelope.type,
-        thread_id: envelope.thread_id!,
-        session_id: envelope.session_id,
-        timestamp: envelope.timestamp,
-        nonce: envelope.nonce!,
-        payload: envelope.payload,
-        prev_message_hash: envelope.prev_message_hash,
+        type: wireEnvelope.type,
+        thread_id: wireEnvelope.thread_id,
+        session_id: wireEnvelope.session_id,
+        timestamp: wireEnvelope.timestamp,
+        nonce: wireEnvelope.nonce!,
+        payload: wireEnvelope.payload,
+        prev_message_hash: wireEnvelope.prev_message_hash,
+        meta: wireEnvelope.meta,
+        content_encoding: wireEnvelope.content_encoding,
       });
       this.seenNonces.set(envelope.nonce!, Date.now());
       this.persistSecurityState();
@@ -1172,14 +1181,19 @@ export class LtpClient {
         }
       }
 
+      // The sender commits the canonical fields exactly as transmitted. For
+      // metadata-encrypted frames this means the masked routing fields, not the
+      // decrypted logical identifiers used for signature verification.
       this.lastSentHash = await hashEnvelope({
         type: envelopeWithSecurity.type,
-        thread_id: envelopeWithSecurity.thread_id || envelopeWithPrev.thread_id,
-        session_id: envelopeWithSecurity.session_id || envelopeWithPrev.session_id,
-        timestamp: envelopeWithSecurity.timestamp || envelopeWithPrev.timestamp,
+        thread_id: envelopeWithSecurity.thread_id,
+        session_id: envelopeWithSecurity.session_id,
+        timestamp: envelopeWithSecurity.timestamp,
         nonce: envelopeWithSecurity.nonce!,
         payload: envelopeWithSecurity.payload,
         prev_message_hash: envelopeWithSecurity.prev_message_hash,
+        meta: envelopeWithSecurity.meta,
+        content_encoding: envelopeWithSecurity.content_encoding,
       });
       this.persistSecurityState();
 
