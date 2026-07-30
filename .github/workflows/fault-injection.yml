@@ -1,0 +1,81 @@
+name: WP3 Deterministic Fault and Race Contract
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/fault-injection/**"
+      - "docs/production/WP3_FAULT_RACE_CRASH.md"
+      - "package.json"
+      - ".github/workflows/fault-injection.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/fault-injection/**"
+      - "docs/production/WP3_FAULT_RACE_CRASH.md"
+      - "package.json"
+      - ".github/workflows/fault-injection.yml"
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: Deterministic chaos seed
+        required: false
+        default: wp3-scheduled-seed
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp3-fault-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic-fault-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run deterministic contract tests
+        run: pnpm test:fault-injection
+      - name: Generate machine-readable evidence
+        env:
+          INPUT_SEED: ${{ github.event.inputs.seed }}
+        run: |
+          SEED="${INPUT_SEED:-wp3-ci-seed}"
+          EXTRA=""
+          if [ "${{ github.event_name }}" = "schedule" ]; then EXTRA="--extended"; fi
+          pnpm fault:scenarios -- --seed "$SEED" \
+            --out artifacts/wp3-fault-evidence.json $EXTRA
+      - name: Validate evidence and redaction
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const report = JSON.parse(fs.readFileSync("artifacts/wp3-fault-evidence.json", "utf8"));
+          if (report.summary.failed !== 0 || report.summary.passed !== report.summary.total) {
+            throw new Error(`WP3 contract failed: ${JSON.stringify(report.summary)}`);
+          }
+          if (report.scope.live_proxy_wire_injection !== false) {
+            throw new Error("scope boundary changed unexpectedly");
+          }
+          const raw = JSON.stringify(report);
+          for (const forbidden of ["macKey", "encryptionKey", "privateKey", "secretKey", "longTermSecret"]) {
+            if (raw.includes(forbidden)) throw new Error(`evidence leaked ${forbidden}`);
+          }
+          console.log(report.summary);
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wp3-fault-evidence
+          path: artifacts/wp3-fault-evidence.json
+          if-no-files-found: error
