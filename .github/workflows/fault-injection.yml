@@ -36,7 +36,7 @@ concurrency:
 jobs:
   deterministic-fault-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
@@ -57,12 +57,22 @@ jobs:
         run: |
           corepack enable
           corepack prepare pnpm@9.15.0 --activate
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Install repository and native SDK dependencies
+        run: |
+          set -euxo pipefail
+          pnpm install --frozen-lockfile
+          pnpm --dir sdk/js build
+          python -m pip install -e "sdk/python[dev]"
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+          cd sdk/elixir
+          mix deps.get
       - name: Run deterministic and live-proxy contract tests
         run: pnpm test:fault-injection
       - name: Run four-runtime ownership matrix
         run: pnpm runtime:fault-matrix
+      - name: Run four native SDKs through the live proxy
+        run: pnpm native:fault-proxy-matrix
       - name: Generate machine-readable evidence
         env:
           INPUT_SEED: ${{ github.event.inputs.seed }}
@@ -78,6 +88,7 @@ jobs:
           const fs = require("fs");
           const fault = JSON.parse(fs.readFileSync("artifacts/wp3-fault-evidence.json", "utf8"));
           const runtime = JSON.parse(fs.readFileSync("artifacts/wp3-native-runtime-matrix.json", "utf8"));
+          const proxy = JSON.parse(fs.readFileSync("artifacts/wp3-native-sdk-proxy.json", "utf8"));
           if (fault.summary.failed !== 0 || fault.summary.passed !== fault.summary.total) {
             throw new Error(`WP3 contract failed: ${JSON.stringify(fault.summary)}`);
           }
@@ -101,11 +112,20 @@ jobs:
               throw new Error(`runtime invariant failed: ${JSON.stringify(row)}`);
             }
           }
-          const raw = JSON.stringify({ fault, runtime });
+          if (
+            proxy.summary.sdks !== 4 ||
+            proxy.summary.total !== 40 ||
+            proxy.summary.passed !== 40 ||
+            proxy.summary.failed !== 0 ||
+            proxy.proxy_fault !== "FRAGMENT"
+          ) {
+            throw new Error(`native SDK proxy matrix failed: ${JSON.stringify(proxy.summary)}`);
+          }
+          const raw = JSON.stringify({ fault, runtime, proxy });
           for (const forbidden of ["macKey", "encryptionKey", "privateKey", "secretKey", "longTermSecret"]) {
             if (raw.includes(forbidden)) throw new Error(`evidence leaked ${forbidden}`);
           }
-          console.log({ fault: fault.summary, runtime: runtime.summary });
+          console.log({ fault: fault.summary, runtime: runtime.summary, proxy: proxy.summary });
           NODE
       - uses: actions/upload-artifact@v4
         with:
@@ -113,4 +133,6 @@ jobs:
           path: |
             artifacts/wp3-fault-evidence.json
             artifacts/wp3-native-runtime-matrix.json
+            artifacts/wp3-native-sdk-proxy.json
+            artifacts/wp3-native-sdk-proxy/*.json
           if-no-files-found: error
