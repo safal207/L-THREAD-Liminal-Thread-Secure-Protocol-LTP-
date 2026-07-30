@@ -15,10 +15,8 @@ fn scenario_envelope(
     previous_hash: Option<String>,
     invalid_signature: bool,
 ) -> Result<LtpEnvelope> {
-    let mut envelope = client.build_event_envelope(
-        "wp2",
-        serde_json::json!({"scenario_id": scenario_id}),
-    )?;
+    let mut envelope =
+        client.build_event_envelope("wp2", serde_json::json!({"scenario_id": scenario_id}))?;
     envelope.timestamp = timestamp;
     envelope.nonce = Some(nonce);
     envelope.prev_message_hash = previous_hash;
@@ -184,6 +182,9 @@ async fn reference_server_interop() {
     if let Some(parent) = Path::new(&output).parent() {
         fs::create_dir_all(parent).expect("create output directory");
     }
-    fs::write(output, format!("{}\n", serde_json::to_string_pretty(&report).unwrap()))
-        .expect("write adapter output");
+    fs::write(
+        output,
+        format!("{}\n", serde_json::to_string_pretty(&report).unwrap()),
+    )
+    .expect("write adapter output");
 }

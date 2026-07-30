@@ -205,8 +205,8 @@ export function hashEnvelope(message: LtpEnvelope): string {
     nonce: message.nonce,
     payload: message.payload,
     prev_message_hash: message.prev_message_hash,
-    meta: {},
-    content_encoding: "",
+    meta: message.meta,
+    content_encoding: message.content_encoding,
   }));
 }
 
@@ -308,11 +308,15 @@ export function generateNonce(
   timestamp: number,
   deterministicRandomHex: string,
 ): string {
-  return hmacSha256(`${entityId}:${timestamp}:${deterministicRandomHex}`, macKey);
+  const digest = hmacSha256(`${entityId}:${timestamp}:${deterministicRandomHex}`, macKey);
+  return `hmac-${digest.slice(0, 32)}-${timestamp}`;
 }
 
 export function generateRoutingTag(threadId: string, sessionId: string, macKey: string): string {
-  return hmacSha256(`${threadId}:${sessionId}`, macKey).slice(0, 32);
+  return createHmac("sha256", Buffer.from(macKey, "hex"))
+    .update(`${threadId}:${sessionId}`)
+    .digest("hex")
+    .slice(0, 32);
 }
 
 export function encryptMetadata(

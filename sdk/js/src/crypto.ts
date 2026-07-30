@@ -76,11 +76,15 @@ function normalizeEncryptionKeyHex(encryptionKey: string): string {
  * Compute HMAC-SHA256 for any string input
  * Used for secure nonce generation and other HMAC operations
  */
-export async function hmacSha256(input: string, key: string): Promise<string> {
+export async function hmacSha256(
+  input: string,
+  key: string,
+  keyEncoding: 'utf8' | 'hex' = 'utf8'
+): Promise<string> {
   // Browser environment - Web Crypto API
   if (typeof window !== 'undefined' && window.crypto && window.crypto.subtle) {
     try {
-      const keyData = textEncoder.encode(key);
+      const keyData = keyEncoding === 'hex' ? hexToBuffer(key) : textEncoder.encode(key);
       const inputData = textEncoder.encode(input);
 
       const cryptoKey = await window.crypto.subtle.importKey(
@@ -105,7 +109,9 @@ export async function hmacSha256(input: string, key: string): Promise<string> {
   const crypto = getNodeCrypto();
   if (crypto) {
     try {
-      const hmac = crypto.createHmac('sha256', key);
+      const Buffer = (globalThis as any).Buffer || require('buffer').Buffer;
+      const keyMaterial = keyEncoding === 'hex' ? Buffer.from(key, 'hex') : key;
+      const hmac = crypto.createHmac('sha256', keyMaterial);
       hmac.update(input);
       return hmac.digest('hex');
     } catch (error) {
@@ -482,6 +488,8 @@ export async function hashEnvelope(message: {
   nonce: string;
   payload: any;
   prev_message_hash?: string;
+  meta?: any;
+  content_encoding?: string;
 }): Promise<string> {
   const canonical = serializeCanonical(message);
 
@@ -995,7 +1003,7 @@ export async function generateRoutingTag(
   macKey: string
 ): Promise<string> {
   const input = `${threadId}:${sessionId}`;
-  const hmac = await hmacSha256(input, macKey);
+  const hmac = await hmacSha256(input, macKey, 'hex');
   // Return first 32 hex characters (16 bytes) for routing tag
   return hmac.substring(0, 32);
 }

@@ -24,11 +24,9 @@ defmodule LTP.Crypto do
   """
   @spec generate_ecdh_key_pair() :: {String.t(), String.t()}
   def generate_ecdh_key_pair do
-    # Generate key pair using :crypto.generate_key/3
-    # :ecdh - algorithm
-    # :secp256r1 - curve (P-256)
-    # [] - options
-    {public_key, private_key} = :crypto.generate_key(:ecdh, :secp256r1, [])
+    # The two-argument OTP API generates a fresh private key. The optional
+    # third argument is an existing private key, not an options list.
+    {public_key, private_key} = :crypto.generate_key(:ecdh, :secp256r1)
     
     # Convert to hex strings
     public_key_hex = Base.encode16(public_key, case: :lower)

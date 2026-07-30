@@ -53,6 +53,8 @@ defmodule LTP.Connection do
     state = %__MODULE__{
       url: Keyword.fetch!(opts, :url),
       client_id: Keyword.fetch!(opts, :client_id),
+      thread_id: Keyword.get(opts, :thread_id),
+      session_id: Keyword.get(opts, :session_id),
       device_fingerprint: Keyword.get(opts, :device_fingerprint),
       intent: Keyword.get(opts, :intent, "resonant_link"),
       capabilities: Keyword.get(opts, :capabilities, ["state-update", "events", "ping-pong"]),
@@ -84,7 +86,10 @@ defmodule LTP.Connection do
       max_message_age_ms: Keyword.get(opts, :max_message_age_ms, 60_000)
     }
 
-    WebSockex.start_link(state.url, __MODULE__, state, name: Keyword.get(opts, :name))
+    case Keyword.get(opts, :name) do
+      nil -> WebSockex.start_link(state.url, __MODULE__, state)
+      name -> WebSockex.start_link(state.url, __MODULE__, state, name: name)
+    end
   end
 
   def init(state), do: {:ok, state}
@@ -92,15 +97,8 @@ defmodule LTP.Connection do
   @impl WebSockex
   def handle_connect(_conn, state) do
     Logger.info("[LTP] WebSocket connected, initiating handshake...")
-
-    new_state =
-      if state.thread_id and state.security_state_initialized do
-        send_handshake_resume(state)
-      else
-        send_handshake_init(state)
-      end
-
-    {:ok, new_state}
+    send(self(), :send_handshake)
+    {:ok, state}
   end
 
   @impl WebSockex
@@ -147,22 +145,38 @@ defmodule LTP.Connection do
   end
 
   @impl WebSockex
-  def handle_info(:heartbeat, state) do
-    new_state =
-      if state.is_handshake_complete do
-        case send_ping(state) do
-          {:ok, sent_state} ->
-            schedule_heartbeat(sent_state)
-
-          {:error, reason, unchanged_state} ->
-            Logger.error("[LTP] Heartbeat send failed closed: #{reason}")
-            unchanged_state
-        end
+  def handle_info(:send_handshake, state) do
+    result =
+      if state.thread_id && state.security_state_initialized do
+        build_handshake_resume(state)
       else
-        state
+        build_handshake_init(state)
       end
 
-    {:ok, new_state}
+    case result do
+      {:ok, handshake, new_state} ->
+        {:reply, {:text, Jason.encode!(handshake)}, new_state}
+
+      {:error, reason, unchanged_state} ->
+        Logger.error("[LTP] Failed to build handshake: #{reason}")
+        {:close, unchanged_state}
+    end
+  end
+
+  @impl WebSockex
+  def handle_info(:heartbeat, state) do
+    if state.is_handshake_complete do
+      case secure_control_frame("ping", state) do
+        {:ok, ping, sent_state} ->
+          {:reply, {:text, Jason.encode!(ping)}, schedule_heartbeat(sent_state)}
+
+        {:error, reason, unchanged_state} ->
+          Logger.error("[LTP] Heartbeat send failed closed: #{reason}")
+          {:ok, unchanged_state}
+      end
+    else
+      {:ok, state}
+    end
   end
 
   @impl WebSockex
@@ -468,7 +482,7 @@ defmodule LTP.Connection do
 
   # ---- handshake and dispatch --------------------------------------------
 
-  defp send_handshake_init(state) do
+  defp build_handshake_init(state) do
     {public_key, private_key} =
       if state.enable_ecdh_key_exchange do
         LTP.Crypto.generate_ecdh_key_pair()
@@ -503,7 +517,7 @@ defmodule LTP.Connection do
       end
 
     handshake =
-      if public_key and state.secret_key do
+      if public_key && state.secret_key do
         timestamp = System.system_time(:millisecond)
 
         handshake
@@ -521,15 +535,12 @@ defmodule LTP.Connection do
         handshake
       end
 
-    WebSockex.send_frame(self(), {:text, Jason.encode!(handshake)})
-    state
+    {:ok, handshake, state}
   rescue
-    error ->
-      Logger.error("[LTP] Failed to build handshake: #{Exception.message(error)}")
-      state
+    error -> {:error, Exception.message(error), state}
   end
 
-  defp send_handshake_resume(state) do
+  defp build_handshake_resume(state) do
     {public_key, private_key} =
       if state.enable_ecdh_key_exchange do
         LTP.Crypto.generate_ecdh_key_pair()
@@ -562,7 +573,7 @@ defmodule LTP.Connection do
       end
 
     handshake =
-      if public_key and state.secret_key do
+      if public_key && state.secret_key do
         timestamp = System.system_time(:millisecond)
 
         handshake
@@ -580,12 +591,9 @@ defmodule LTP.Connection do
         handshake
       end
 
-    WebSockex.send_frame(self(), {:text, Jason.encode!(handshake)})
-    state
+    {:ok, handshake, state}
   rescue
-    error ->
-      Logger.error("[LTP] Failed to build resume handshake: #{Exception.message(error)}")
-      state
+    error -> {:error, Exception.message(error), state}
   end
 
   defp handle_message(%{"type" => "handshake_ack"} = ack, state) do
@@ -645,8 +653,14 @@ defmodule LTP.Connection do
           security_state_initialized: false
       }
 
-      send_handshake_init(new_state)
-      {:ok, new_state}
+      case build_handshake_init(new_state) do
+        {:ok, handshake, reset_state} ->
+          {:reply, {:text, Jason.encode!(handshake)}, reset_state}
+
+        {:error, build_reason, unchanged_state} ->
+          Logger.error("[LTP] Failed to rebuild handshake after rejection: #{build_reason}")
+          {:close, unchanged_state}
+      end
     else
       if state.client_pid,
         do: send(state.client_pid, {:ltp_error, "Handshake rejected: #{reason}"})

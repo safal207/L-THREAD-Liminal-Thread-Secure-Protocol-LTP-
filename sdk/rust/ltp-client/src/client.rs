@@ -924,6 +924,19 @@ mod tests {
     }
 
     #[test]
+    fn outbound_timestamps_use_unix_milliseconds() {
+        let client = LtpClient::new("ws://example.com", "client");
+        let event = client
+            .build_event_envelope("timestamp", serde_json::json!({"value": 1}))
+            .expect("event envelope");
+        assert!(
+            event.timestamp >= 1_000_000_000_000,
+            "timestamp {} is not expressed in milliseconds",
+            event.timestamp
+        );
+    }
+
+    #[test]
     fn receive_chain_requires_previous_hash_after_first_commit() {
         let first = serde_json::json!({
             "type": "state_update",
@@ -1082,3 +1095,5 @@ mod tests {
         assert_eq!(seen.len(), 1);
     }
 }
+#[cfg(all(test, feature = "reference-interop"))]
+mod reference_interop_tests;

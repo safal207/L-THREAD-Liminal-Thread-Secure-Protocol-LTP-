@@ -667,6 +667,15 @@ class LtpClient:
 
         message_dict = envelope.to_dict()
 
+        # Post-handshake control frames are bound only to the negotiated session key.
+        # Sign before routing metadata is encrypted: peers verify the decrypted
+        # logical envelope, while the hash-chain commits the final wire envelope.
+        signing_key = self._session_mac_key if msg_type in {"ping", "pong"} else self._mac_key
+        if signing_key:
+            message_dict["signature"] = sign_message(message_dict, signing_key)
+        elif msg_type in {"ping", "pong"}:
+            raise RuntimeError("post-handshake control frame requires a session MAC key")
+
         # Metadata encryption (v0.6+) - encrypt thread_id, session_id, timestamp
         if self.enable_metadata_encryption and self._session_encryption_key:
             try:
@@ -704,13 +713,6 @@ class LtpClient:
             except Exception as e:
                 print(f"[LTP] Warning: Failed to encrypt metadata: {e}")
                 # Continue without encryption
-
-        # Post-handshake control frames are bound only to the negotiated session key.
-        signing_key = self._session_mac_key if msg_type in {"ping", "pong"} else self._mac_key
-        if signing_key:
-            message_dict["signature"] = sign_message(message_dict, signing_key)
-        elif msg_type in {"ping", "pong"}:
-            raise RuntimeError("post-handshake control frame requires a session MAC key")
 
         # Compute hash for next message's prev_message_hash (v0.5+ hash chaining)
         try:

@@ -37,6 +37,7 @@ export interface ReferenceEvidenceRecord {
   verdict: ReferenceVerdict;
   reason_code: string;
   frame_digest: string;
+  client_id?: string;
   thread_id?: string;
   session_id?: string;
   state_digest?: string;
@@ -281,6 +282,7 @@ class ReferenceServer implements ReferenceServerHandle {
       verdict,
       reason_code: reasonCode,
       frame_digest: frameDigest(rawFrame),
+      client_id: state?.clientId,
       thread_id: state?.threadId,
       session_id: state?.sessionId,
       state_digest: state ? this.stateDigest(state) : undefined,
@@ -664,7 +666,9 @@ class ReferenceServer implements ReferenceServerHandle {
       return;
     }
 
-    const candidateHash = hashEnvelope(logical);
+    // The chain commits the exact transmitted envelope. Signature checks use
+    // the decrypted logical view, but reconnect continuity must follow wire bytes.
+    const candidateHash = hashEnvelope(wireFrame);
     state.lastReceivedHash = candidateHash;
     state.seenNonces.add(logical.nonce);
     this.record("inbound", logical.type, "ACCEPTED", "SECURITY_PIPELINE_ACCEPTED", raw, state, scenarioId);
