@@ -49,7 +49,7 @@
     "conformance:verify": "pnpm -w ltp:conformance verify",
     "ltp:verify": "ts-node --project scripts/tsconfig.verify.json scripts/verify/ltpVerify.ts --out artifacts/conformance-report.json",
     "ltp:badge": "ts-node scripts/conformance/ltpBadge.ts",
-    "ltp:report:validate": "ts-node --project scripts/verify/validateConformanceReport.ts",
+    "ltp:report:validate": "ts-node --project scripts/tsconfig.verify.json scripts/verify/validateConformanceReport.ts",
     "ltp:inspect": "ts-node tools/ltp-inspect/inspect.ts",
     "marketing:plf:generate": "node scripts/marketing/generatePlfCampaign.js",
     "e2e:four-sdk": "pnpm --dir sdk/js build && ts-node tests/e2e/four-sdk/run-matrix.ts"
