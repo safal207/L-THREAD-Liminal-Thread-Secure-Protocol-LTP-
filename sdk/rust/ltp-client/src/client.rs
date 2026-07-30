@@ -67,17 +67,17 @@ fn validate_nonce(message: &Value, seen_nonces: &mut HashSet<String>) -> Result<
     }
 
     if let Some(rest) = nonce.strip_prefix("hmac-") {
-        let (mac_prefix, timestamp_text) = rest.rsplit_once('-').ok_or_else(|| {
-            LtpError::InvalidState("Invalid HMAC nonce format".to_string())
-        })?;
+        let (mac_prefix, timestamp_text) = rest
+            .rsplit_once('-')
+            .ok_or_else(|| LtpError::InvalidState("Invalid HMAC nonce format".to_string()))?;
         if mac_prefix.len() != 32 || !mac_prefix.chars().all(|c| c.is_ascii_hexdigit()) {
             return Err(LtpError::InvalidState(
                 "Invalid HMAC nonce authentication prefix".to_string(),
             ));
         }
-        let nonce_timestamp = timestamp_text.parse::<i64>().map_err(|_| {
-            LtpError::InvalidState("Invalid HMAC nonce timestamp".to_string())
-        })?;
+        let nonce_timestamp = timestamp_text
+            .parse::<i64>()
+            .map_err(|_| LtpError::InvalidState("Invalid HMAC nonce timestamp".to_string()))?;
         let nonce_age_ms = now_ms().saturating_sub(normalize_timestamp_ms(nonce_timestamp));
         if nonce_age_ms > MAX_MESSAGE_AGE_MS || nonce_age_ms < -MAX_FUTURE_SKEW_MS {
             return Err(LtpError::InvalidState(
@@ -106,18 +106,26 @@ fn decrypt_incoming_metadata(message: &mut Value, encryption_key: Option<&str>) 
             "Encrypted metadata received without a negotiated encryption key".to_string(),
         )
     })?;
-    let metadata = crypto::decrypt_metadata(encrypted_metadata, encryption_key)
-        .map_err(|error| LtpError::InvalidState(format!("Metadata decryption failed: {}", error)))?;
+    let metadata =
+        crypto::decrypt_metadata(encrypted_metadata, encryption_key).map_err(|error| {
+            LtpError::InvalidState(format!("Metadata decryption failed: {}", error))
+        })?;
     let object = message.as_object_mut().ok_or_else(|| {
         LtpError::InvalidState("Inbound LTP frame is not a JSON object".to_string())
     })?;
     object.insert(
         "thread_id".to_string(),
-        metadata.get("thread_id").cloned().unwrap_or(Value::String(String::new())),
+        metadata
+            .get("thread_id")
+            .cloned()
+            .unwrap_or(Value::String(String::new())),
     );
     object.insert(
         "session_id".to_string(),
-        metadata.get("session_id").cloned().unwrap_or(Value::String(String::new())),
+        metadata
+            .get("session_id")
+            .cloned()
+            .unwrap_or(Value::String(String::new())),
     );
     object.insert(
         "timestamp".to_string(),
@@ -319,6 +327,9 @@ impl LtpClient {
                                 continue;
                             }
                         };
+                        // Keep the exact wire representation for hash-chain commitment.
+                        // Signature verification and dispatch use the decrypted logical view.
+                        let wire_message = message.clone();
 
                         if let Err(error) = decrypt_incoming_metadata(
                             &mut message,
@@ -342,7 +353,10 @@ impl LtpClient {
                                 continue;
                             }
                             Err(error) => {
-                                eprintln!("Dropping LTP frame: signature verification error: {}", error);
+                                eprintln!(
+                                    "Dropping LTP frame: signature verification error: {}",
+                                    error
+                                );
                                 continue;
                             }
                         }
@@ -352,16 +366,14 @@ impl LtpClient {
                             continue;
                         }
 
-                        let candidate_hash = match verify_hash_chain(
-                            &message,
-                            last_received_hash.as_deref(),
-                        ) {
-                            Ok(hash) => hash,
-                            Err(error) => {
-                                eprintln!("Dropping LTP frame: {}", error);
-                                continue;
-                            }
-                        };
+                        let candidate_hash =
+                            match verify_hash_chain(&wire_message, last_received_hash.as_deref()) {
+                                Ok(hash) => hash,
+                                Err(error) => {
+                                    eprintln!("Dropping LTP frame: {}", error);
+                                    continue;
+                                }
+                            };
 
                         if let Err(error) = validate_nonce(&message, &mut seen_nonces) {
                             eprintln!("Dropping LTP frame: {}", error);
@@ -519,23 +531,31 @@ impl LtpClient {
                 LtpError::InvalidState("Server did not provide ECDH public key".to_string())
             })?;
 
-        if let (Some(ref signature), Some(timestamp)) = (
-            ack.server_ecdh_signature.as_ref(),
-            ack.server_ecdh_timestamp,
-        ) {
-            if let Some(ref secret_key) = self.secret_key {
-                crypto::verify_ecdh_public_key(
-                    server_ecdh_public_key,
-                    "server",
-                    timestamp,
-                    signature,
-                    secret_key,
-                    300_000,
+        if let Some(ref secret_key) = self.secret_key {
+            let signature = ack.server_ecdh_signature.as_ref().ok_or_else(|| {
+                LtpError::InvalidState(
+                    "Authenticated ECDH requires a server key signature".to_string(),
                 )
-                .map_err(|e| {
-                    LtpError::InvalidState(format!("ECDH signature verification failed: {}", e))
-                })?;
-            }
+            })?;
+            let timestamp = ack.server_ecdh_timestamp.ok_or_else(|| {
+                LtpError::InvalidState(
+                    "Authenticated ECDH requires a server key timestamp".to_string(),
+                )
+            })?;
+            let session_id = self.session_id.as_ref().ok_or_else(|| {
+                LtpError::InvalidState("Session ID not available for ECDH binding".to_string())
+            })?;
+            crypto::verify_ecdh_public_key(
+                server_ecdh_public_key,
+                session_id,
+                timestamp,
+                signature,
+                secret_key,
+                300_000,
+            )
+            .map_err(|e| {
+                LtpError::InvalidState(format!("ECDH signature verification failed: {}", e))
+            })?;
         }
 
         let private_key = self.ecdh_private_key.as_ref().ok_or_else(|| {
@@ -583,8 +603,8 @@ impl LtpClient {
         envelope.nonce = Some(nonce);
         envelope.prev_message_hash = self.last_sent_hash.clone();
 
-        if let Some(ref secret_key) = self.secret_key {
-            let signature = crypto::sign_message(&serde_json::to_value(&envelope)?, secret_key)?;
+        if let Some(signing_key) = self.session_mac_key.as_ref().or(self.secret_key.as_ref()) {
+            let signature = crypto::sign_message(&serde_json::to_value(&envelope)?, signing_key)?;
             envelope.signature = Some(signature);
         }
 
@@ -636,8 +656,8 @@ impl LtpClient {
                     "Encrypted metadata received without a negotiated key".to_string(),
                 )
             })?;
-            let metadata = crypto::decrypt_metadata(encrypted_metadata, encryption_key)
-                .map_err(|e| {
+            let metadata =
+                crypto::decrypt_metadata(encrypted_metadata, encryption_key).map_err(|e| {
                     LtpError::InvalidState(format!("Failed to decrypt metadata: {}", e))
                 })?;
             envelope.thread_id = metadata
@@ -661,7 +681,8 @@ impl LtpClient {
     fn verify_hash_chain(&mut self, envelope: &LtpEnvelope) -> Result<()> {
         let envelope_value = serde_json::to_value(envelope)
             .map_err(|e| LtpError::InvalidState(format!("Failed to serialize envelope: {}", e)))?;
-        let candidate_hash = verify_hash_chain(&envelope_value, self.last_received_hash.as_deref())?;
+        let candidate_hash =
+            verify_hash_chain(&envelope_value, self.last_received_hash.as_deref())?;
         self.last_received_hash = Some(candidate_hash);
         Ok(())
     }
@@ -735,14 +756,19 @@ mod tests {
 
     #[test]
     fn hmac_nonce_contains_mac_prefix_and_timestamp() {
-        let client = LtpClient::new("ws://example.com", "client-123")
-            .with_session_mac_key("test-mac-key");
+        let client =
+            LtpClient::new("ws://example.com", "client-123").with_session_mac_key("test-mac-key");
 
         let nonce = client.generate_nonce().expect("nonce should be generated");
         let parts: Vec<&str> = nonce.split('-').collect();
 
         assert_eq!(parts.first(), Some(&"hmac"));
-        assert_eq!(parts.len(), 3, "nonce `{}` did not have three segments", nonce);
+        assert_eq!(
+            parts.len(),
+            3,
+            "nonce `{}` did not have three segments",
+            nonce
+        );
         assert_eq!(parts[1].len(), 32);
         assert!(is_hex(parts[1]));
         assert!(parts[2].parse::<i64>().expect("timestamp") > 0);
@@ -763,6 +789,56 @@ mod tests {
         let first_hash = verify_hash_chain(&first, None).expect("first hash");
         let missing_link = verify_hash_chain(&first, Some(&first_hash));
         assert!(missing_link.is_err());
+    }
+
+    #[test]
+    fn encrypted_receive_chain_commits_wire_envelope() {
+        let wire = serde_json::json!({
+            "type": "state_update",
+            "thread_id": "",
+            "session_id": null,
+            "timestamp": 0,
+            "nonce": "nonce-wire",
+            "payload": {"kind": "test", "data": {}},
+            "meta": {},
+            "content_encoding": "json",
+            "prev_message_hash": "",
+            "encrypted_metadata": "ciphertext:iv:tag"
+        });
+        let mut logical = wire.clone();
+        logical["thread_id"] = Value::String("thread".to_string());
+        logical["session_id"] = Value::String("session".to_string());
+        logical["timestamp"] = Value::from(1_700_000_000_000_i64);
+
+        let committed = verify_hash_chain(&wire, None).expect("wire hash");
+        assert_eq!(
+            committed,
+            crypto::hash_envelope(&wire).expect("wire hash direct")
+        );
+        assert_ne!(
+            committed,
+            crypto::hash_envelope(&logical).expect("logical hash")
+        );
+    }
+
+    #[test]
+    fn outbound_signing_prefers_negotiated_session_mac_key() {
+        let mut client = LtpClient::new("ws://example.com", "client-123")
+            .with_secret_key("long-term-secret")
+            .with_session_mac_key("session-mac-key");
+        client.thread_id = Some("thread".to_string());
+        client.session_id = Some("session".to_string());
+
+        let envelope = client
+            .build_state_update_envelope("test", serde_json::json!({"value": 1}))
+            .expect("envelope");
+        let finalized = client
+            .prepare_envelope_for_offline_send(envelope)
+            .expect("finalized envelope");
+        let value = serde_json::to_value(&finalized).expect("value");
+
+        assert!(crypto::verify_signature(&value, "session-mac-key").expect("verify"));
+        assert!(!crypto::verify_signature(&value, "long-term-secret").expect("verify"));
     }
 
     #[test]
