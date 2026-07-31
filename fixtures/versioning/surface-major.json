@@ -1,0 +1,8 @@
+{
+  "version": "1.0.0",
+  "snapshot_schema": 2,
+  "canonical_envelope": "canonical-envelope-v1",
+  "required_capabilities": ["canonical-envelope-v1", "authenticated-ecdh", "authenticated-controls", "hash-chain-continuity", "replay-protection", "resume-security-state", "version-capability-negotiation", "state-schema-migration"],
+  "optional_capabilities": ["metadata-encryption", "routing-tags", "lifecycle-evidence"],
+  "stable_reason_codes": ["UNSUPPORTED_VERSION", "UNKNOWN_REQUIRED_CAPABILITY", "MISSING_REQUIRED_CAPABILITY", "REQUIRED_CAPABILITY_UNAVAILABLE", "DOWNGRADE_BLOCKED", "INCOMPATIBLE_STATE_VERSION", "MIGRATION_REQUIRED"]
+}
