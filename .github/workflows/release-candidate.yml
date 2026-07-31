@@ -30,8 +30,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
 
 concurrency:
   group: wp7-release-${{ github.workflow }}-${{ github.ref }}
@@ -66,6 +64,7 @@ jobs:
       - name: Verify release tool regressions and SDK version lockstep
         run: |
           python -m unittest tests/release/test_release_tools.py
+          mkdir -p artifacts
           python tools/release/versions.py --out artifacts/wp7-version-evidence.json
       - name: Prepare two clean source trees
         shell: bash
@@ -134,16 +133,6 @@ jobs:
             --root artifacts/wp7 \
             --out artifacts/ltp-rc-evidence-bundle.tar.gz \
             --epoch "$SOURCE_EPOCH"
-      - name: Keyless GitHub build provenance
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: artifacts/ltp-rc-evidence-bundle.tar.gz
-      - name: Verify keyless provenance
-        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh attestation verify artifacts/ltp-rc-evidence-bundle.tar.gz --repo "$GITHUB_REPOSITORY"
       - uses: actions/upload-artifact@v4
         with:
           name: wp7-release-candidate-evidence
@@ -154,3 +143,25 @@ jobs:
             artifacts/wp7/reproducibility.json
             artifacts/wp7/rc/**
             artifacts/ltp-rc-evidence-bundle.tar.gz
+
+  attest-trusted-main:
+    needs: release-candidate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wp7-release-candidate-evidence
+          path: attest-input
+      - name: Keyless GitHub build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: attest-input/ltp-rc-evidence-bundle.tar.gz
+      - name: Verify keyless provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify attest-input/ltp-rc-evidence-bundle.tar.gz --repo "$GITHUB_REPOSITORY"
