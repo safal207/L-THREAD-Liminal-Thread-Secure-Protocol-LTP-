@@ -152,6 +152,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+      issues: write
     steps:
       - uses: actions/download-artifact@v4
         with:
@@ -161,7 +162,41 @@ jobs:
         uses: actions/attest-build-provenance@v2
         with:
           subject-path: attest-input/ltp-rc-evidence-bundle.tar.gz
-      - name: Verify keyless provenance
+      - name: Verify keyless provenance and retain log
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh attestation verify attest-input/ltp-rc-evidence-bundle.tar.gz --repo "$GITHUB_REPOSITORY"
+        run: |
+          mkdir -p trusted-provenance
+          gh attestation verify attest-input/ltp-rc-evidence-bundle.tar.gz \
+            --repo "$GITHUB_REPOSITORY" | tee trusted-provenance/verification.txt
+          sha256sum attest-input/ltp-rc-evidence-bundle.tar.gz \
+            | tee trusted-provenance/bundle.sha256
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wp7-trusted-provenance-verification
+          retention-days: 90
+          if-no-files-found: error
+          path: trusted-provenance/**
+      - name: Record trusted exit evidence and close WP7
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$(gh issue view 506 --repo "$GITHUB_REPOSITORY" --json state --jq .state)" != "OPEN" ]]; then
+            exit 0
+          fi
+          BUNDLE_SHA="$(cut -d' ' -f1 trusted-provenance/bundle.sha256)"
+          BODY=$(cat <<EOF
+          Trusted WP7 provenance verified on protected main.
+
+          - Source SHA: \`${GITHUB_SHA}\`
+          - Workflow run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+          - RC bundle SHA-256: \`${BUNDLE_SHA}\`
+          - Verification artifact: \`wp7-trusted-provenance-verification\`
+          - Verification command: \`gh attestation verify ltp-rc-evidence-bundle.tar.gz --repo ${GITHUB_REPOSITORY}\`
+
+          The release workflow used GitHub keyless attestation after two clean builds, SBOM/checksum validation and canonical-content reproducibility checks. No registry publication occurred.
+          EOF
+          )
+          gh issue close 506 --repo "$GITHUB_REPOSITORY" --reason completed --comment "$BODY"
