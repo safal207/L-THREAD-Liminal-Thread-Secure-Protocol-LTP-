@@ -90,7 +90,9 @@ random sleep or winner assumption is used.
 
 The exit artifact includes three digest-only timelines:
 
-- **duplicate:** one accepted frame followed by `REPLAYED_NONCE`;
+- **duplicate:** exactly one copy is accepted; the identical second copy is rejected
+  as `BROKEN_HASH_CHAIN` because chain continuity is checked before the nonce replay
+  set. The independent restart scenario separately proves `REPLAYED_NONCE`;
 - **delay:** `DELAY` buffer evidence, explicit `DELAY_RELEASED`, then acceptance;
 - **reorder:** the later chained frame reaches the server first and receives
   `BROKEN_HASH_CHAIN`, while the earlier frame is accepted after release.
