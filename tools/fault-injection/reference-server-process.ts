@@ -48,6 +48,17 @@ function checksum(body: SnapshotBody): string {
   return sha256(canonicalBody(body));
 }
 
+function maxPersistedId(sessions: PersistedSession[] | undefined): number {
+  let maximum = 0;
+  for (const session of sessions || []) {
+    for (const id of [session.threadId, session.sessionId]) {
+      const match = typeof id === "string" ? id.match(/-(\d+)$/) : null;
+      if (match) maximum = Math.max(maximum, Number(match[1]));
+    }
+  }
+  return maximum;
+}
+
 function snapshotFromServer(server: any): SnapshotFile {
   const sessions: PersistedSession[] = [...server.sessions.values()].map((state: any) => ({
     clientId: state.clientId,
@@ -70,8 +81,10 @@ function snapshotFromServer(server: any): SnapshotFile {
 
 function restoreIntoServer(server: any, filePath: string | undefined): RestoreStatus {
   if (!filePath || !existsSync(filePath)) return "EMPTY";
+  let observedMaxId = 0;
   try {
     const parsed = JSON.parse(readFileSync(filePath, "utf8")) as SnapshotFile;
+    observedMaxId = maxPersistedId(parsed.sessions);
     const body: SnapshotBody = {
       schema_version: parsed.schema_version,
       profile: parsed.profile,
@@ -87,12 +100,7 @@ function restoreIntoServer(server: any, filePath: string | undefined): RestoreSt
       throw new Error("snapshot identity or checksum mismatch");
     }
 
-    let maxId = 0;
     for (const persisted of body.sessions) {
-      for (const id of [persisted.threadId, persisted.sessionId]) {
-        const match = id.match(/-(\d+)$/);
-        if (match) maxId = Math.max(maxId, Number(match[1]));
-      }
       server.sessions.set(persisted.threadId, {
         clientId: persisted.clientId,
         protocolVersion: persisted.protocolVersion,
@@ -109,11 +117,15 @@ function restoreIntoServer(server: any, filePath: string | undefined): RestoreSt
         activeSocket: { readyState: WebSocket.CLOSED },
       });
     }
-    server.idCounter = Math.max(server.idCounter || 0, maxId);
+    server.idCounter = Math.max(server.idCounter || 0, observedMaxId);
     return "RESTORED";
   } catch (error) {
     server.sessions.clear();
     server.routes.clear();
+    // Preserve a monotonic namespace floor even when the payload is rejected.
+    // A fresh authenticated handshake must be visibly new, not reuse an ID
+    // that appeared inside the corrupt snapshot.
+    server.idCounter = Math.max(server.idCounter || 0, observedMaxId);
     process.stderr.write(
       `[wp3-reference-process] persisted state reset: ${error instanceof Error ? error.message : String(error)}\n`,
     );
