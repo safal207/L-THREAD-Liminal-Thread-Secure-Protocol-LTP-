@@ -49,14 +49,14 @@ Crossing the boundary is explicit. The server records `BACKPRESSURE_LIMIT`, does
 - reconnect storm and abuse boundaries;
 - two measured native-process rounds per SDK after warmup.
 
-### Scheduled soak profile
+### Protected-main and scheduled soak profile
 
 - 32 concurrent authenticated sessions;
 - 256 secured business frames per session;
 - four measured native-process rounds per SDK after warmup;
 - retained JSON, JSONL, Markdown and SVG evidence.
 
-The weekly profile is a bounded CI soak, not a substitute for deployment-specific multi-hour or multi-day endurance testing.
+Every protected-main push that changes the WP4 surface runs this soak profile before exit evidence is recorded. The same profile also runs weekly and through manual workflow dispatch. It is a bounded CI soak, not a substitute for deployment-specific multi-hour or multi-day endurance testing.
 
 ## Metrics
 
