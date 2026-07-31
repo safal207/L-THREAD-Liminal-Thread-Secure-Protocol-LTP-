@@ -1,3 +1,5 @@
+/// <reference lib="dom" />
+
 import { readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { serializeCanonical } from "../../../sdk/js/src/crypto";
