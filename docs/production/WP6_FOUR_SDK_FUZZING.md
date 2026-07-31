@@ -32,7 +32,9 @@ Pull requests run the deterministic four-SDK matrix on a bounded corpus and a sh
 Local command:
 
 ```bash
-pnpm wp6:differential -- --seed 439041101 --cases 512 \
+pnpm exec ts-node tests/wp6/differential/run-matrix.ts \
+  --seed 439041101 \
+  --cases 512 \
   --out artifacts/wp6-four-sdk-differential.json \
   --artifact-dir artifacts/wp6-differential
 ```
