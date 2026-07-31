@@ -54,12 +54,12 @@
     "include_transitive_where_supported": true
   },
   "signing": {
-    "trusted_release_mode": "github-keyless-attestation",
+    "trusted_release_mode": "github-keyless-attestation-on-main",
     "pull_request_mode": "ephemeral-ed25519-self-test",
     "long_lived_credentials": false
   },
   "promotion": {
-    "release_candidate": "workflow_dispatch on main; no registry publish",
+    "release_candidate": "protected main push or workflow_dispatch; no registry publish",
     "stable": "manual approval after WP4, WP8 and WP9 production gates",
     "publishing_credentials_in_pull_requests": false
   }
