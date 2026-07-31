@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "profile": "org.ltp.release.policy.v1",
+  "version_source": "tests/production/readiness-baseline.json",
+  "source_date_epoch": "git_commit_timestamp",
+  "clean_builds_required": 2,
+  "packages": [
+    {
+      "id": "javascript",
+      "name": "@liminal/ltp-client",
+      "manifest": "sdk/js/package.json",
+      "registry": "npm",
+      "build_format": "npm-pack"
+    },
+    {
+      "id": "python",
+      "name": "ltp-client",
+      "manifest": "sdk/python/setup.py",
+      "registry": "pypi",
+      "build_format": "wheel-and-sdist"
+    },
+    {
+      "id": "rust",
+      "name": "ltp-client",
+      "manifest": "sdk/rust/ltp-client/Cargo.toml",
+      "registry": "crates.io",
+      "build_format": "cargo-package"
+    },
+    {
+      "id": "elixir",
+      "name": "ltp_elixir",
+      "manifest": "sdk/elixir/mix.exs",
+      "registry": "hex.pm",
+      "build_format": "hex-build"
+    }
+  ],
+  "required_gates": [
+    "Test LTP SDKs",
+    "Reference Server and Four-SDK Interoperability",
+    "P0 Security Regressions",
+    "Security Baseline",
+    "WP6 Adversarial Validation and Fuzzing",
+    "WP6 Four-SDK Differential Fuzzing"
+  ],
+  "reproducibility": {
+    "raw_archive_digest": "sha256",
+    "canonical_content_digest": "sha256",
+    "comparison": "exact",
+    "documented_exceptions_allowed": true
+  },
+  "sbom": {
+    "format": "CycloneDX",
+    "spec_version": "1.5",
+    "include_transitive_where_supported": true
+  },
+  "signing": {
+    "trusted_release_mode": "github-keyless-attestation-on-main",
+    "pull_request_mode": "ephemeral-ed25519-self-test",
+    "long_lived_credentials": false
+  },
+  "promotion": {
+    "release_candidate": "protected main push or workflow_dispatch; no registry publish",
+    "stable": "manual approval after WP4, WP8 and WP9 production gates",
+    "publishing_credentials_in_pull_requests": false
+  }
+}

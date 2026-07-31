@@ -42,8 +42,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/liminal/ltp-protocol.git"
+    "url": "git+https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-.git"
   },
+  "bugs": {
+    "url": "https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-/issues"
+  },
+  "homepage": "https://github.com/safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-#readme",
   "engines": {
     "node": ">=18.0.0"
   }
