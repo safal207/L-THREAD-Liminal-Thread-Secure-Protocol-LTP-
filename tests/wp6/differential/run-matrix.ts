@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { serializeCanonical as referenceSerializeCanonical } from "../../../tools/reference-server/protocol";
+import { serializeCanonicalEnvelope } from "../../../tools/reference-server/protocol";
 import { AdapterCaseResult, AdapterReport, buildReport } from "./common";
 import { DEFAULT_CASES, DEFAULT_SEED, DifferentialCorpus, generateCorpus } from "./corpus";
 
@@ -150,7 +150,7 @@ async function main(): Promise<void> {
   const corpusPath = resolve(options.artifactDir, "corpus.json");
   writeFileSync(corpusPath, `${JSON.stringify(corpus, null, 2)}\n`, "utf8");
 
-  const reference = buildReport("reference", corpus, (value) => referenceSerializeCanonical(value as any));
+  const reference = buildReport("reference", corpus, (value) => serializeCanonicalEnvelope(value as any));
   validateReport(reference, "reference", corpus);
   writeFileSync(resolve(options.artifactDir, "reference.json"), `${JSON.stringify(reference, null, 2)}\n`, "utf8");
 
