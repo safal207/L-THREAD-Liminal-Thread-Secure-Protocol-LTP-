@@ -1,0 +1,152 @@
+name: WP6 Four-SDK Differential Fuzzing
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tests/wp6/differential/**"
+      - "tools/adversarial/**"
+      - "tools/reference-server/**"
+      - "sdk/js/src/crypto.ts"
+      - "sdk/python/ltp_client/crypto.py"
+      - "sdk/rust/ltp-client/**"
+      - "sdk/elixir/lib/ltp/crypto.ex"
+      - "docs/production/WP6_FOUR_SDK_FUZZING.md"
+      - ".github/workflows/wp6-differential-fuzz.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tests/wp6/differential/**"
+      - "tools/adversarial/**"
+      - "tools/reference-server/**"
+      - "sdk/js/src/crypto.ts"
+      - "sdk/python/ltp_client/crypto.py"
+      - "sdk/rust/ltp-client/**"
+      - "sdk/elixir/lib/ltp/crypto.ex"
+      - "docs/production/WP6_FOUR_SDK_FUZZING.md"
+      - ".github/workflows/wp6-differential-fuzz.yml"
+  schedule:
+    - cron: "17 3 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp6-four-sdk-fuzz-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  four-sdk-differential:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: erlef/setup-elixir@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+      - name: Install JavaScript and Elixir dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          (cd sdk/elixir && mix deps.get)
+      - name: Select deterministic campaign size
+        id: campaign
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "cases=5000" >> "$GITHUB_OUTPUT"
+          else
+            echo "cases=512" >> "$GITHUB_OUTPUT"
+          fi
+          echo "seed=439041101" >> "$GITHUB_OUTPUT"
+      - name: Run four-SDK differential campaign
+        run: |
+          pnpm exec ts-node tests/wp6/differential/run-matrix.ts \
+            --seed "${{ steps.campaign.outputs.seed }}" \
+            --cases "${{ steps.campaign.outputs.cases }}" \
+            --out artifacts/wp6-four-sdk-differential-a.json \
+            --artifact-dir artifacts/wp6-differential-a
+      - name: Re-run exact corpus for reproducibility
+        run: |
+          pnpm exec ts-node tests/wp6/differential/run-matrix.ts \
+            --seed "${{ steps.campaign.outputs.seed }}" \
+            --cases "${{ steps.campaign.outputs.cases }}" \
+            --out artifacts/wp6-four-sdk-differential-b.json \
+            --artifact-dir artifacts/wp6-differential-b
+          cmp artifacts/wp6-four-sdk-differential-a.json artifacts/wp6-four-sdk-differential-b.json
+          cmp artifacts/wp6-differential-a/corpus.json artifacts/wp6-differential-b/corpus.json
+      - name: Validate evidence and redaction
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const evidence = JSON.parse(fs.readFileSync("artifacts/wp6-four-sdk-differential-a.json", "utf8"));
+          if (evidence.summary.failed !== 0 || evidence.summary.generator_failures !== 0) {
+            throw new Error(`differential failures: ${JSON.stringify(evidence.summary)}`);
+          }
+          for (const sdk of ["javascript", "python", "rust", "elixir"]) {
+            if (evidence.sdk_summary[sdk].failed !== 0) throw new Error(`${sdk} differential failure`);
+          }
+          if (!evidence.guarantees.canonical_round_trip_digest_agreement || !evidence.guarantees.resource_limits_enforced) {
+            throw new Error("WP6 guarantees are incomplete");
+          }
+          const raw = JSON.stringify(evidence);
+          for (const forbidden of ["privateKey", "macKey", "encryptionKey", "secretKey", "longTermSecret"]) {
+            if (raw.includes(forbidden)) throw new Error(`evidence leaked ${forbidden}`);
+          }
+          console.log({ cases: evidence.case_count, summary: evidence.summary, digest: evidence.evidence_digest });
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp6-four-sdk-differential-evidence
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            artifacts/wp6-four-sdk-differential-a.json
+            artifacts/wp6-differential-a/**
+
+  rust-coverage-guided-fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          components: llvm-tools-preview
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked
+      - name: Run coverage-guided canonical-envelope fuzz target
+        shell: bash
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/artifacts/wp6-rust-fuzz"
+          if [[ "${{ github.event_name }}" == "schedule" ]]; then seconds=120; else seconds=15; fi
+          cd sdk/rust/ltp-client
+          cargo fuzz run canonical_envelope -- \
+            -max_total_time="$seconds" \
+            -artifact_prefix="$GITHUB_WORKSPACE/artifacts/wp6-rust-fuzz/"
+          printf '{"target":"canonical_envelope","seconds":%s,"status":"passed"}\n' "$seconds" \
+            > "$GITHUB_WORKSPACE/artifacts/wp6-rust-fuzz/summary.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp6-rust-coverage-fuzz
+          retention-days: 90
+          if-no-files-found: warn
+          path: artifacts/wp6-rust-fuzz/**

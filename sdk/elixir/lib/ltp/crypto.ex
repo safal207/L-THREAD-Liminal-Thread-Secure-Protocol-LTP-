@@ -349,7 +349,7 @@ defmodule LTP.Crypto do
       "session_id" => get_field(message, "session_id") || "",
       "timestamp" => get_field(message, "timestamp") || 0,
       "nonce" => get_field(message, "nonce") || "",
-      "payload" => get_field(message, "payload") || %{},
+      "payload" => get_field_preserving_json_value(message, "payload", %{}),
       "prev_message_hash" => get_field(message, "prev_message_hash") || "",
       "meta" => get_field(message, "meta") || %{},
       "content_encoding" => get_field(message, "content_encoding") || ""
@@ -372,7 +372,7 @@ defmodule LTP.Crypto do
   defp encode_canonical_value(nil), do: "null"
   defp encode_canonical_value(true), do: "true"
   defp encode_canonical_value(false), do: "false"
-  defp encode_canonical_value(value) when is_binary(value), do: Jason.encode!(value)
+  defp encode_canonical_value(value) when is_binary(value), do: encode_json_string(value)
 
   defp encode_canonical_value(value) when is_integer(value) do
     if abs(value) > 9_007_199_254_740_991 do
@@ -393,7 +393,7 @@ defmodule LTP.Crypto do
     |> Enum.map(fn {key, item} -> {to_string(key), item} end)
     |> Enum.sort_by(fn {key, _} -> utf16_sort_key(key) end)
     |> Enum.map_join(",", fn {key, item} ->
-      Jason.encode!(key) <> ":" <> encode_canonical_value(item)
+      encode_json_string(key) <> ":" <> encode_canonical_value(item)
     end)
     |> then(&("{" <> &1 <> "}"))
   end
@@ -511,6 +511,29 @@ defmodule LTP.Crypto do
         adjusted = codepoint - 0x10000
         [0xD800 + Bitwise.bsr(adjusted, 10), 0xDC00 + Bitwise.band(adjusted, 0x3FF)]
     end)
+  end
+
+  defp encode_json_string(value) do
+    Regex.replace(~r/\\u[0-9A-Fa-f]{4}/, Jason.encode!(value), fn escape ->
+      "\\u" <> (escape |> String.slice(2, 4) |> String.downcase())
+    end)
+  end
+
+  defp get_field_preserving_json_value(map, key, default) when is_binary(key) do
+    case Map.fetch(map, key) do
+      {:ok, value} ->
+        value
+
+      :error ->
+        try do
+          case Map.fetch(map, String.to_existing_atom(key)) do
+            {:ok, value} -> value
+            :error -> default
+          end
+        rescue
+          ArgumentError -> default
+        end
+    end
   end
 
   defp get_field(map, key) when is_binary(key) do
