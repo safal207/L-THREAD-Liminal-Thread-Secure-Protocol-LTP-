@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { dirname } from "path";
 import WebSocket, { RawData, WebSocketServer } from "ws";
+import { CapacityController, CapacityLimits, CapacitySnapshot } from "../capacity/limits";
 import {
   decryptMetadata,
   deriveSessionKeys,
@@ -56,6 +57,7 @@ export interface ReferenceServerOptions {
   supportedProtocolVersions?: string[];
   seed?: string;
   clock?: () => number;
+  capacityLimits?: Partial<CapacityLimits>;
 }
 
 interface SessionState extends SessionKeys {
@@ -67,14 +69,18 @@ interface SessionState extends SessionKeys {
   lastReceivedHash: string | null;
   lastSentHash: string | null;
   seenNonces: Set<string>;
+  nonceTimeline: Array<{ nonce: string; timestamp: number }>;
   routingTag: string;
   activeSocket: WebSocket;
+  lastActivityMs: number;
+  disconnectedAtMs: number | null;
 }
 
 export interface ReferenceServerHandle {
   readonly url: string;
   readonly protocolVersion: string;
   getEvidence(): ReferenceEvidenceRecord[];
+  getCapacitySnapshot(): CapacitySnapshot;
   getSessionSnapshot(threadId: string): {
     threadId: string;
     sessionId: string;
@@ -119,6 +125,7 @@ class ReferenceServer implements ReferenceServerHandle {
   private readonly supportedProtocolVersions: string[];
   private readonly seed: string;
   private readonly clock: () => number;
+  private readonly capacity: CapacityController;
   private readonly sessions = new Map<string, SessionState>();
   private readonly socketSessions = new WeakMap<WebSocket, SessionState>();
   private readonly routes = new Map<string, SessionState>();
@@ -139,11 +146,16 @@ class ReferenceServer implements ReferenceServerHandle {
     this.supportedProtocolVersions = options.supportedProtocolVersions ?? ["0.3", "0.6"];
     this.seed = options.seed ?? "reference";
     this.clock = options.clock ?? Date.now;
+    const capacityOverrides: Partial<CapacityLimits> = { ...options.capacityLimits };
+    if (options.maxPayloadBytes !== undefined) {
+      capacityOverrides.maxFrameBytes = options.maxPayloadBytes;
+    }
+    this.capacity = new CapacityController(capacityOverrides, this.clock, this.maxMessageAgeMs);
     this.wss = new WebSocketServer({
       port: options.port ?? 0,
       host: this.host,
       path: this.path,
-      maxPayload: options.maxPayloadBytes ?? DEFAULT_MAX_PAYLOAD_BYTES,
+      maxPayload: this.capacity.limits.maxFrameBytes ?? DEFAULT_MAX_PAYLOAD_BYTES,
       handleProtocols: (protocols) =>
         protocols.has(REFERENCE_SUBPROTOCOL) ? REFERENCE_SUBPROTOCOL : false,
     });
@@ -151,6 +163,18 @@ class ReferenceServer implements ReferenceServerHandle {
     this.wss.on("connection", (socket) => {
       socket.on("message", (data) => {
         void this.handleRawFrame(socket, data);
+      });
+      socket.on("close", () => {
+        const state = this.socketSessions.get(socket);
+        if (state && state.activeSocket === socket) {
+          state.disconnectedAtMs = this.clock();
+          state.lastActivityMs = this.clock();
+        }
+      });
+      socket.on("error", (error: Error) => {
+        if (/max payload size exceeded/i.test(error.message)) {
+          this.record("inbound", "unknown", "REJECTED", "FRAME_TOO_LARGE", error.message);
+        }
       });
     });
   }
@@ -188,6 +212,20 @@ class ReferenceServer implements ReferenceServerHandle {
 
   getEvidence(): ReferenceEvidenceRecord[] {
     return this.evidence.map((record) => ({ ...record }));
+  }
+
+  getCapacitySnapshot(): CapacitySnapshot {
+    let nonceEntries = 0;
+    for (const state of this.sessions.values()) {
+      this.capacity.pruneNonceCache(state.nonceTimeline, state.seenNonces);
+      nonceEntries += state.seenNonces.size;
+    }
+    return this.capacity.snapshot({
+      activeSessions: this.sessions.size,
+      routeEntries: this.routes.size,
+      nonceEntries,
+      evidenceRecords: this.evidence.length,
+    });
   }
 
   getSessionSnapshot(threadId: string) {
@@ -273,7 +311,7 @@ class ReferenceServer implements ReferenceServerHandle {
     scenarioId?: string,
   ): void {
     this.sequence += 1;
-    this.evidence.push({
+    this.capacity.recordBounded(this.evidence, {
       sequence: this.sequence,
       observed_at_ms: this.clock(),
       direction,
@@ -297,6 +335,15 @@ class ReferenceServer implements ReferenceServerHandle {
     scenarioId?: string,
   ): void {
     const raw = JSON.stringify(frame);
+    const pendingReason = this.capacity.pendingSendReason(
+      socket.bufferedAmount,
+      Buffer.byteLength(raw, "utf8"),
+    );
+    if (pendingReason) {
+      this.record("outbound", String(frame.type ?? "unknown"), "REJECTED", pendingReason, raw, state, scenarioId);
+      socket.close(1013, pendingReason);
+      return;
+    }
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(raw);
     }
@@ -328,11 +375,21 @@ class ReferenceServer implements ReferenceServerHandle {
       content_encoding: "json",
     };
     frame.signature = signEnvelope(frame, state.macKey);
-    state.lastSentHash = hashEnvelope(frame);
     const raw = JSON.stringify(frame);
+    const pendingReason = this.capacity.pendingSendReason(
+      socket.bufferedAmount,
+      Buffer.byteLength(raw, "utf8"),
+    );
+    if (pendingReason) {
+      this.record("outbound", type, "REJECTED", pendingReason, raw, state, scenarioId);
+      socket.close(1013, pendingReason);
+      return frame;
+    }
     if (socket.readyState === WebSocket.OPEN) {
       socket.send(raw);
     }
+    state.lastSentHash = hashEnvelope(frame);
+    state.lastActivityMs = this.clock();
     this.record("outbound", type, "SENT", "SECURE_FRAME_SENT", raw, state, scenarioId);
     return frame;
   }
@@ -366,6 +423,13 @@ class ReferenceServer implements ReferenceServerHandle {
 
   private async handleRawFrame(socket: WebSocket, data: RawData): Promise<void> {
     const raw = data.toString();
+    this.cleanupExpiredSessions();
+    const frameReason = this.capacity.frameReason(Buffer.byteLength(raw, "utf8"));
+    if (frameReason) {
+      this.rejectInbound(socket, raw, "unknown", frameReason, this.socketSessions.get(socket));
+      socket.close(1009, frameReason);
+      return;
+    }
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
@@ -497,6 +561,18 @@ class ReferenceServer implements ReferenceServerHandle {
     if (!validated) {
       return;
     }
+    const sessionReason = this.capacity.newSessionReason(this.sessions.size);
+    if (sessionReason) {
+      this.record("inbound", frame.type, "REJECTED", sessionReason, raw);
+      const reject: HandshakeReject = {
+        type: "handshake_reject",
+        ltp_version: this.protocolVersion,
+        reason: "session_capacity_limit",
+        suggest_new: false,
+      };
+      this.sendPlain(socket, reject, sessionReason);
+      return;
+    }
     const threadId = this.nextId("thread");
     const sessionId = this.nextId("session");
     const serverKeys = generateEcdhKeyPair(`${this.seed}:server:${threadId}:1`);
@@ -512,8 +588,11 @@ class ReferenceServer implements ReferenceServerHandle {
       lastReceivedHash: null,
       lastSentHash: null,
       seenNonces: new Set<string>(),
+      nonceTimeline: [],
       routingTag: generateRoutingTag(threadId, sessionId, sessionKeys.macKey),
       activeSocket: socket,
+      lastActivityMs: this.clock(),
+      disconnectedAtMs: null,
     };
     this.sessions.set(threadId, state);
     this.routes.set(state.routingTag, state);
@@ -525,6 +604,18 @@ class ReferenceServer implements ReferenceServerHandle {
   private handleHandshakeResume(socket: WebSocket, frame: HandshakeResume, raw: string): void {
     const validated = this.validateHandshakeCommon(frame, raw, socket);
     if (!validated) {
+      return;
+    }
+    const reconnectReason = this.capacity.reconnectReason(frame.client_id);
+    if (reconnectReason) {
+      this.record("inbound", frame.type, "REJECTED", reconnectReason, raw);
+      const reject: HandshakeReject = {
+        type: "handshake_reject",
+        ltp_version: this.protocolVersion,
+        reason: "reconnect_rate_limit",
+        suggest_new: false,
+      };
+      this.sendPlain(socket, reject, reconnectReason);
       return;
     }
     const state = this.sessions.get(frame.thread_id);
@@ -565,6 +656,8 @@ class ReferenceServer implements ReferenceServerHandle {
     state.ivKey = sessionKeys.ivKey;
     state.routingTag = generateRoutingTag(state.threadId, state.sessionId, state.macKey);
     state.activeSocket = socket;
+    state.lastActivityMs = this.clock();
+    state.disconnectedAtMs = null;
     this.routes.set(state.routingTag, state);
     this.socketSessions.set(socket, state);
 
@@ -661,8 +754,14 @@ class ReferenceServer implements ReferenceServerHandle {
       this.rejectInbound(socket, raw, logical.type, "BROKEN_HASH_CHAIN", state, scenarioId);
       return;
     }
-    if (state.seenNonces.has(logical.nonce)) {
-      this.rejectInbound(socket, raw, logical.type, "REPLAYED_NONCE", state, scenarioId);
+    const nonceReason = this.capacity.trackNonceReason(
+      logical.nonce,
+      logical.timestamp,
+      state.nonceTimeline,
+      state.seenNonces,
+    );
+    if (nonceReason) {
+      this.rejectInbound(socket, raw, logical.type, nonceReason, state, scenarioId);
       return;
     }
 
@@ -670,7 +769,7 @@ class ReferenceServer implements ReferenceServerHandle {
     // the decrypted logical view, but reconnect continuity must follow wire bytes.
     const candidateHash = hashEnvelope(wireFrame);
     state.lastReceivedHash = candidateHash;
-    state.seenNonces.add(logical.nonce);
+    state.lastActivityMs = this.clock();
     this.record("inbound", logical.type, "ACCEPTED", "SECURITY_PIPELINE_ACCEPTED", raw, state, scenarioId);
 
     if (logical.type === "ping") {
@@ -688,6 +787,21 @@ class ReferenceServer implements ReferenceServerHandle {
         scenario_id: scenarioId || "business-round-trip",
       },
     }, scenarioId);
+  }
+
+  private cleanupExpiredSessions(): void {
+    const now = this.clock();
+    for (const [threadId, state] of this.sessions.entries()) {
+      const disconnected = state.disconnectedAtMs;
+      if (
+        disconnected !== null &&
+        now - disconnected > this.capacity.limits.maxSessionIdleMs &&
+        state.activeSocket.readyState !== WebSocket.OPEN
+      ) {
+        this.sessions.delete(threadId);
+        this.routes.delete(state.routingTag);
+      }
+    }
   }
 }
 

@@ -67,7 +67,7 @@ interface BuiltFrame {
   raw: string;
 }
 
-class ReferenceScenarioClient {
+export class ReferenceScenarioClient {
   private socket: WebSocket | null = null;
   private messages: string[] = [];
   private waiters: Array<(raw: string) => void> = [];
