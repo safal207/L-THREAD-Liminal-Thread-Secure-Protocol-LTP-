@@ -1,0 +1,85 @@
+name: WP6 Adversarial Validation and Fuzzing
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "tools/adversarial/**"
+      - "tests/wp6/**"
+      - "tools/versioning/**"
+      - "config/protocol-capabilities.json"
+      - "docs/wp6-adversarial-validation.md"
+      - ".github/workflows/adversarial.yml"
+  push:
+    branches: [main]
+    paths:
+      - "tools/adversarial/**"
+      - "tests/wp6/**"
+      - "tools/versioning/**"
+      - "config/protocol-capabilities.json"
+      - "docs/wp6-adversarial-validation.md"
+      - ".github/workflows/adversarial.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp6-adversarial-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  adversarial-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run deterministic property and mutation tests
+        run: pnpm exec vitest run tools/adversarial/fuzz.test.ts tools/adversarial/wire.test.ts tools/adversarial/mutations.test.ts
+      - name: Generate 10k-case adversarial evidence
+        run: pnpm exec ts-node tools/adversarial/run-evidence.ts --seed 12648430 --cases 10000 --out artifacts/wp6-adversarial-evidence.json
+      - name: Validate evidence, reproducibility and redaction
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const evidence = JSON.parse(fs.readFileSync("artifacts/wp6-adversarial-evidence.json", "utf8"));
+          if (evidence.case_count !== 10000) throw new Error("unexpected fuzz case count");
+          if (evidence.fuzz.invariant_failures !== 0 || evidence.fuzz.passed !== evidence.case_count) {
+            throw new Error(`fuzz invariants failed: ${JSON.stringify(evidence.fuzz)}`);
+          }
+          if (evidence.fuzz.accepted === 0 || evidence.fuzz.rejected === 0) {
+            throw new Error("campaign must exercise both acceptance and rejection paths");
+          }
+          if (evidence.mutation.killed !== evidence.mutation.total || evidence.mutation.survived.length !== 0) {
+            throw new Error(`security mutations survived: ${JSON.stringify(evidence.mutation)}`);
+          }
+          if (!evidence.guarantees.deterministic_reproduction || evidence.guarantees.rejected_input_authorizes_state_mutation) {
+            throw new Error("fail-closed guarantees are missing");
+          }
+          const raw = JSON.stringify(evidence);
+          for (const forbidden of ["privateKey", "macKey", "encryptionKey", "secretKey", "longTermSecret"]) {
+            if (raw.includes(forbidden)) throw new Error(`evidence leaked ${forbidden}`);
+          }
+          console.log({
+            cases: evidence.case_count,
+            passed: evidence.fuzz.passed,
+            mutations_killed: evidence.mutation.killed,
+            digest: evidence.evidence_digest,
+          });
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wp6-adversarial-evidence
+          path: |
+            artifacts/wp6-adversarial-evidence.json
+            tests/wp6/fuzz/fuzz-seed-corpus.json
+          if-no-files-found: error
