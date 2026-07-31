@@ -1,0 +1,8 @@
+{
+  "version": "0.6.0",
+  "snapshot_schema": 1,
+  "canonical_envelope": "canonical-envelope-v1",
+  "required_capabilities": ["canonical-envelope-v1", "authenticated-ecdh", "authenticated-controls", "hash-chain-continuity", "replay-protection", "resume-security-state"],
+  "optional_capabilities": ["metadata-encryption", "routing-tags"],
+  "stable_reason_codes": ["UNSUPPORTED_VERSION", "MISSING_REQUIRED_CAPABILITY", "DOWNGRADE_BLOCKED"]
+}
