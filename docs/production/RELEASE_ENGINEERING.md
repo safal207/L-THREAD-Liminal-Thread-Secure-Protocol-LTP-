@@ -4,7 +4,7 @@
 
 LTP release candidates are built from an exact source commit in two isolated clean source trees. JavaScript, Python, Rust and Elixir use their native packaging tools, but release identity is defined by the generated manifest and canonical package-content digests rather than by a handwritten checklist.
 
-The workflow never publishes packages. Pull-request code receives only read access. GitHub OIDC and attestation permissions exist in a separate job that can run only through `workflow_dispatch` on `main` after the read-only RC build succeeds.
+The workflow never publishes packages. Pull-request code receives only read access. GitHub OIDC and attestation permissions exist in a separate job that runs only after a successful build from protected `main`—on a `push` produced by a merged change or through `workflow_dispatch` on `main`.
 
 ## Version source
 
@@ -15,7 +15,7 @@ The workflow never publishes packages. Pull-request code receives only read acce
 - `sdk/rust/ltp-client/Cargo.toml`;
 - `sdk/elixir/mix.exs`.
 
-Any mismatch fails before package creation. The generated manifest records the release version, protocol core version and every SDK declaration.
+Any mismatch fails before package creation. The generated manifest records the release version, protocol core version and every SDK declaration. Python package artifacts use the equivalent PEP 440 prerelease form (`0.6.0a3`) for repository version `0.6.0-alpha.3`; that normalization is visible in artifact names and is not treated as hidden version drift.
 
 ## Native package dry-runs
 
@@ -71,7 +71,7 @@ openssl pkeyutl -verify -rawin -pubin \
 
 The signature in PR/RC dry-runs uses an ephemeral key generated inside the job and proves that signing and verification paths work without storing a private key. It is not the stable-release trust anchor.
 
-For a trusted manual RC run from `main`, GitHub creates keyless build provenance for `ltp-rc-evidence-bundle.tar.gz`. Verify it with:
+For a trusted RC build from protected `main`, GitHub creates keyless build provenance for `ltp-rc-evidence-bundle.tar.gz`. Verify it with:
 
 ```bash
 gh attestation verify ltp-rc-evidence-bundle.tar.gz --repo safal207/L-THREAD-Liminal-Thread-Secure-Protocol-LTP-
@@ -79,8 +79,8 @@ gh attestation verify ltp-rc-evidence-bundle.tar.gz --repo safal207/L-THREAD-Lim
 
 ## Promotion
 
-1. Merge an exact-head green WP7 change to `main`.
-2. Run **WP7 Reproducible Release Candidate** manually from `main`.
+1. Merge an exact-head green WP7 change to protected `main`.
+2. Let the resulting `push` build and attest the RC bundle, or rerun **WP7 Reproducible Release Candidate** manually from `main`.
 3. Verify the GitHub attestation and release manifest.
 4. Confirm required security, E2E, versioning and fuzz gates remain green.
 5. Attach the RC bundle, SBOMs and provenance to a GitHub prerelease.
