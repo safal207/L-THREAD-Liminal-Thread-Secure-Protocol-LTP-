@@ -115,7 +115,12 @@ function fixedCases(): DifferentialCase[] {
     {
       id: "fixed-number-boundaries",
       category: "valid-number-boundaries",
-      raw_json: compact(envelope({ small: 1e-7, fixed: 1e-6, large: 1e21, negative_zero: -0 }, 2)),
+      raw_json: compact(envelope({
+        small: 1e-7,
+        fixed: 1e-6,
+        safe_max: 9_007_199_254_740_991,
+        negative_zero: -0,
+      }, 2)),
       expected_verdict: "ACCEPTED",
       expected_reason: "ACCEPTED",
     },
