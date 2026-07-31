@@ -60,7 +60,7 @@ cargo metadata --manifest-path "$ROOT/sdk/rust/ltp-client/Cargo.toml" \
   rm -f ltp_elixir-*.tar
   MIX_ENV=prod mix hex.build > "$TMP/validation/elixir-hex-build.txt"
   cp ltp_elixir-*.tar "$OUT/packages/elixir/"
-  mix deps > "$TMP/elixir-deps.txt"
+  MIX_ENV=prod mix deps > "$TMP/elixir-deps.txt"
 )
 
 # Standardized dependency evidence.
