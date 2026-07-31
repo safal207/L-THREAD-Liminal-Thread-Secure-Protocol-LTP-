@@ -111,6 +111,7 @@ jobs:
           console.log({ cases: evidence.case_count, summary: evidence.summary, digest: evidence.evidence_digest });
           NODE
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: wp6-four-sdk-differential-evidence
           retention-days: 90
