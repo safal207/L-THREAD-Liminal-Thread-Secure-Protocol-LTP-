@@ -1,0 +1,81 @@
+name: WP5 Version Negotiation and Migration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "config/protocol-capabilities.json"
+      - "fixtures/versioning/**"
+      - "tools/versioning/**"
+      - "docs/protocol/VERSIONING_AND_COMPATIBILITY.md"
+      - "docs/protocol/generated/SUPPORTED_VERSION_MATRIX.md"
+      - "package.json"
+      - ".github/workflows/versioning.yml"
+  push:
+    branches: [main]
+    paths:
+      - "config/protocol-capabilities.json"
+      - "fixtures/versioning/**"
+      - "tools/versioning/**"
+      - "docs/protocol/VERSIONING_AND_COMPATIBILITY.md"
+      - "docs/protocol/generated/SUPPORTED_VERSION_MATRIX.md"
+      - "package.json"
+      - ".github/workflows/versioning.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp5-versioning-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  versioning-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run negotiation, migration and release-surface tests
+        run: pnpm test:versioning
+      - name: Verify generated compatibility matrix
+        run: pnpm versioning:matrix -- --check --out artifacts/wp5-version-compatibility.json
+      - name: Generate migration and release evidence
+        run: pnpm versioning:evidence -- --out artifacts/wp5-version-migration-evidence.json
+      - name: Validate evidence and redaction
+        run: |
+          node - <<'NODE'
+          const fs = require("fs");
+          const matrix = JSON.parse(fs.readFileSync("artifacts/wp5-version-compatibility.json", "utf8"));
+          const evidence = JSON.parse(fs.readFileSync("artifacts/wp5-version-migration-evidence.json", "utf8"));
+          if (matrix.summary.failed !== 0 || matrix.summary.passed !== matrix.summary.total) {
+            throw new Error(`compatibility matrix failed: ${JSON.stringify(matrix.summary)}`);
+          }
+          if (evidence.summary.failed !== 0 || evidence.summary.passed !== evidence.summary.checks) {
+            throw new Error(`WP5 evidence failed: ${JSON.stringify(evidence.summary)}`);
+          }
+          if (!evidence.candidate_versions.includes("1.0.0")) {
+            throw new Error("normative 1.0 candidate profile is missing");
+          }
+          const raw = JSON.stringify({ matrix, evidence });
+          for (const forbidden of ["privateKey", "macKey", "encryptionKey", "secretKey", "longTermSecret"]) {
+            if (raw.includes(forbidden)) throw new Error(`evidence leaked ${forbidden}`);
+          }
+          console.log({ matrix: matrix.summary, evidence: evidence.summary });
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wp5-versioning-evidence
+          path: |
+            artifacts/wp5-version-compatibility.json
+            artifacts/wp5-version-migration-evidence.json
+          if-no-files-found: error
