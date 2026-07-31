@@ -1,0 +1,42 @@
+name: WP4 Apply Exact Evidence SHA Patch
+
+on:
+  push:
+    branches:
+      - agent/wp4-capacity-backpressure-limits
+    paths:
+      - "tools/capacity/apply_evidence_sha_patch.py"
+      - ".github/workflows/wp4-apply-evidence-sha-patch.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/wp4-capacity-backpressure-limits
+          fetch-depth: 0
+          token: ${{ github.token }}
+      - name: Apply exact traceability patch
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = "agent/wp4-capacity-backpressure-limits"
+          python tools/capacity/apply_evidence_sha_patch.py
+          grep -q 'source_sha: process.env.LTP_SOURCE_SHA || process.env.GITHUB_SHA' tools/capacity/run.ts
+      - name: Remove one-shot machinery
+        run: |
+          rm tools/capacity/apply_evidence_sha_patch.py
+          rm .github/workflows/wp4-apply-evidence-sha-patch.yml
+      - name: Commit traceability fix
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tools/capacity/run.ts tools/capacity/apply_evidence_sha_patch.py .github/workflows/wp4-apply-evidence-sha-patch.yml
+          git diff --cached --check
+          git commit -m "fix(wp4): bind capacity evidence to tested head"
+          git push origin HEAD:agent/wp4-capacity-backpressure-limits
