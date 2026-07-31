@@ -1,0 +1,186 @@
+{
+  "schema_version": 1,
+  "profile": "org.ltp.protocol.capability-registry.v1",
+  "policy_version": "1.0.0",
+  "capabilities": [
+    {
+      "id": "canonical-envelope-v1",
+      "classification": "required",
+      "status": "stable",
+      "owner": "protocol-core",
+      "since": "0.3.0",
+      "normative_v1": true,
+      "description": "Canonical JSON envelope serialization and hashing."
+    },
+    {
+      "id": "authenticated-ecdh",
+      "classification": "required",
+      "status": "stable",
+      "owner": "protocol-security",
+      "since": "0.6.0",
+      "normative_v1": true,
+      "description": "Authenticated ephemeral ECDH handshake with signed peer keys."
+    },
+    {
+      "id": "authenticated-controls",
+      "classification": "required",
+      "status": "stable",
+      "owner": "protocol-security",
+      "since": "0.3.0",
+      "normative_v1": true,
+      "description": "Control frames use the same authenticated envelope as business frames."
+    },
+    {
+      "id": "hash-chain-continuity",
+      "classification": "required",
+      "status": "stable",
+      "owner": "protocol-security",
+      "since": "0.6.0",
+      "normative_v1": true,
+      "description": "Each accepted frame advances an authenticated previous-hash chain."
+    },
+    {
+      "id": "replay-protection",
+      "classification": "required",
+      "status": "stable",
+      "owner": "protocol-security",
+      "since": "0.6.0",
+      "normative_v1": true,
+      "description": "Accepted nonces remain rejected across reconnect and restored state."
+    },
+    {
+      "id": "resume-security-state",
+      "classification": "required",
+      "status": "stable",
+      "owner": "protocol-lifecycle",
+      "since": "0.3.0",
+      "normative_v1": true,
+      "description": "Same-session resume preserves committed chain and replay state."
+    },
+    {
+      "id": "version-capability-negotiation",
+      "classification": "required",
+      "status": "candidate",
+      "owner": "protocol-evolution",
+      "since": "1.0.0",
+      "normative_v1": true,
+      "description": "Version and required-capability selection is explicit and fail-closed."
+    },
+    {
+      "id": "state-schema-migration",
+      "classification": "required",
+      "status": "candidate",
+      "owner": "protocol-evolution",
+      "since": "1.0.0",
+      "normative_v1": true,
+      "description": "Persisted security state has explicit schema identity and migration rules."
+    },
+    {
+      "id": "metadata-encryption",
+      "classification": "optional",
+      "status": "stable",
+      "owner": "protocol-privacy",
+      "since": "0.3.0",
+      "normative_v1": true,
+      "description": "Thread and session routing metadata may be encrypted."
+    },
+    {
+      "id": "routing-tags",
+      "classification": "optional",
+      "status": "stable",
+      "owner": "protocol-privacy",
+      "since": "0.6.0",
+      "normative_v1": true,
+      "description": "Opaque authenticated routing tags replace plaintext routing identity."
+    },
+    {
+      "id": "lifecycle-evidence",
+      "classification": "optional",
+      "status": "experimental",
+      "owner": "protocol-observability",
+      "since": "1.0.0",
+      "normative_v1": true,
+      "description": "Digest-only lifecycle evidence can be emitted for independent verification."
+    }
+  ],
+  "versions": [
+    {
+      "version": "0.3.0",
+      "status": "legacy",
+      "wire_supported": true,
+      "snapshot_schema": 1,
+      "canonical_envelope": "canonical-envelope-v1",
+      "required_capabilities": [
+        "canonical-envelope-v1",
+        "authenticated-controls",
+        "resume-security-state"
+      ],
+      "optional_capabilities": [
+        "metadata-encryption"
+      ]
+    },
+    {
+      "version": "0.6.0",
+      "status": "current",
+      "wire_supported": true,
+      "snapshot_schema": 1,
+      "canonical_envelope": "canonical-envelope-v1",
+      "required_capabilities": [
+        "canonical-envelope-v1",
+        "authenticated-ecdh",
+        "authenticated-controls",
+        "hash-chain-continuity",
+        "replay-protection",
+        "resume-security-state"
+      ],
+      "optional_capabilities": [
+        "metadata-encryption",
+        "routing-tags"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "status": "candidate",
+      "wire_supported": false,
+      "snapshot_schema": 2,
+      "canonical_envelope": "canonical-envelope-v1",
+      "required_capabilities": [
+        "canonical-envelope-v1",
+        "authenticated-ecdh",
+        "authenticated-controls",
+        "hash-chain-continuity",
+        "replay-protection",
+        "resume-security-state",
+        "version-capability-negotiation",
+        "state-schema-migration"
+      ],
+      "optional_capabilities": [
+        "metadata-encryption",
+        "routing-tags",
+        "lifecycle-evidence"
+      ]
+    }
+  ],
+  "migrations": [
+    {
+      "id": "state-v1-0.3-to-0.6",
+      "from_version": "0.3.0",
+      "to_version": "0.6.0",
+      "from_snapshot_schema": 1,
+      "to_snapshot_schema": 1,
+      "classification": "compatible",
+      "requires_explicit_approval": false,
+      "preserves_session_identity": true
+    },
+    {
+      "id": "state-v1-to-v2-1.0",
+      "from_version": "0.6.0",
+      "to_version": "1.0.0",
+      "from_snapshot_schema": 1,
+      "to_snapshot_schema": 2,
+      "classification": "breaking",
+      "requires_explicit_approval": true,
+      "preserves_session_identity": false
+    }
+  ]
+}
