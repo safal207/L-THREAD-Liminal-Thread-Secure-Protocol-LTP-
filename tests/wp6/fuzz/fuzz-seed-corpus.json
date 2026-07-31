@@ -1,0 +1,12 @@
+{
+  "seed": 20260731,
+  "cases": [
+    {"name":"empty_envelope","mutation":"remove_all_fields"},
+    {"name":"invalid_utf8","mutation":"corrupt_text_encoding"},
+    {"name":"unknown_opcode","mutation":"inject_unknown_frame_type"},
+    {"name":"oversized_payload","mutation":"exceed_limits"},
+    {"name":"broken_hash_chain","mutation":"change_previous_digest"},
+    {"name":"downgrade_attempt","mutation":"force_lower_security_floor"},
+    {"name":"invalid_migration_state","mutation":"illegal_transition"}
+  ]
+}
