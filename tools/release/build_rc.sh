@@ -11,6 +11,7 @@ OUT="$(python -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$OUT")"
 rm -rf "$OUT"
 mkdir -p "$OUT"/{packages/{javascript,python,rust,elixir},sbom,source,validation}
 TMP="$(mktemp -d)"
+mkdir -p "$TMP/validation"
 trap 'rm -rf "$TMP"' EXIT
 
 export SOURCE_DATE_EPOCH="$SOURCE_EPOCH"
@@ -23,21 +24,26 @@ export CARGO_INCREMENTAL=0
 python "$ROOT/tools/release/versions.py" --out "$OUT/versions.json"
 RELEASE_VERSION="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["release_version"])' "$OUT/versions.json")"
 
+# Archive the clean source before any package manager creates generated files.
+python "$ROOT/tools/release/release_tool.py" archive \
+  --root "$ROOT" --out "$OUT/source/ltp-${RELEASE_VERSION}-source.tar.gz" \
+  --epoch "$SOURCE_EPOCH"
+
 # JavaScript / npm dry-run package.
 corepack enable
 corepack prepare pnpm@9.15.0 --activate
 (cd "$ROOT" && pnpm install --frozen-lockfile)
 (cd "$ROOT/sdk/js" && pnpm build)
 (cd "$ROOT/sdk/js" && npm pack --silent --pack-destination "$OUT/packages/javascript")
-(cd "$ROOT/sdk/js" && npm pack --dry-run --json > "$OUT/validation/npm-pack-dry-run.json")
+(cd "$ROOT/sdk/js" && npm pack --dry-run --json > "$TMP/validation/npm-pack-dry-run.json")
 (cd "$ROOT/sdk/js" && pnpm list --prod --depth Infinity --json > "$TMP/javascript-deps.json")
 
 # Python / PyPI dry-run artifacts.
 python -m pip install --disable-pip-version-check --quiet build twine
 python -m build "$ROOT/sdk/python" --outdir "$OUT/packages/python"
-python -m twine check "$OUT/packages/python"/* > "$OUT/validation/python-twine-check.txt"
+python -m twine check "$OUT/packages/python"/* > "$TMP/validation/python-twine-check.txt"
 python -m pip install --disable-pip-version-check --dry-run --ignore-installed \
-  --report "$TMP/python-deps.json" "$ROOT/sdk/python" > "$OUT/validation/python-pip-dry-run.txt"
+  --report "$TMP/python-deps.json" "$ROOT/sdk/python" > "$TMP/validation/python-pip-dry-run.txt"
 
 # Rust / crates.io dry-run package.
 cargo package --manifest-path "$ROOT/sdk/rust/ltp-client/Cargo.toml" --allow-dirty --no-verify
@@ -52,7 +58,7 @@ cargo metadata --manifest-path "$ROOT/sdk/rust/ltp-client/Cargo.toml" \
   mix local.hex --force
   MIX_ENV=prod mix deps.get --only prod
   rm -f ltp_elixir-*.tar
-  MIX_ENV=prod mix hex.build > "$OUT/validation/elixir-hex-build.txt"
+  MIX_ENV=prod mix hex.build > "$TMP/validation/elixir-hex-build.txt"
   cp ltp_elixir-*.tar "$OUT/packages/elixir/"
   mix deps > "$TMP/elixir-deps.txt"
 )
@@ -75,17 +81,22 @@ python "$ROOT/tools/release/release_tool.py" sbom \
   --package-name 'ltp_elixir' --version "$RELEASE_VERSION" \
   --source-sha "$SOURCE_SHA" --out "$OUT/sbom/elixir.cdx.json"
 
-# Deterministic source archive and release manifest.
-python "$ROOT/tools/release/release_tool.py" archive \
-  --root "$ROOT" --out "$OUT/source/ltp-${RELEASE_VERSION}-source.tar.gz" \
+MANIFEST_ARGS=(
+  manifest
+  --build-dir "$OUT"
+  --versions "$OUT/versions.json"
+  --source-sha "$SOURCE_SHA"
   --epoch "$SOURCE_EPOCH"
-python "$ROOT/tools/release/release_tool.py" manifest \
-  --build-dir "$OUT" --versions "$OUT/versions.json" \
-  --source-sha "$SOURCE_SHA" --epoch "$SOURCE_EPOCH" \
-  ${WORKFLOW_RUN:+--workflow-run "$WORKFLOW_RUN"} \
   --out "$OUT/release-manifest.json"
-python "$ROOT/tools/release/release_tool.py" checksums \
-  --build-dir "$OUT" --out "$OUT/checksums.sha256"
+)
+if [[ -n "$WORKFLOW_RUN" ]]; then
+  MANIFEST_ARGS+=(--workflow-run "$WORKFLOW_RUN")
+fi
+python "$ROOT/tools/release/release_tool.py" "${MANIFEST_ARGS[@]}"
 
+# Diagnostic logs are retained but excluded from reproducibility identity.
+cp -R "$TMP/validation/." "$OUT/validation/"
 printf 'release_version=%s\nsource_sha=%s\nsource_date_epoch=%s\n' \
   "$RELEASE_VERSION" "$SOURCE_SHA" "$SOURCE_EPOCH" > "$OUT/validation/build-context.txt"
+python "$ROOT/tools/release/release_tool.py" checksums \
+  --build-dir "$OUT" --out "$OUT/checksums.sha256"
