@@ -1,1 +1,79 @@
-{"schema_version":1,"cases":[]}
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "current-0.6-selects-highest-common",
+      "input": {
+        "client_versions": ["0.3.0", "0.6.0"],
+        "client_capabilities": ["canonical-envelope-v1", "authenticated-ecdh", "authenticated-controls", "hash-chain-continuity", "replay-protection", "resume-security-state", "metadata-encryption"]
+      },
+      "expected": { "ok": true, "selected_version": "0.6.0" }
+    },
+    {
+      "id": "legacy-0.3-remains-explicitly-supported",
+      "input": {
+        "client_versions": ["0.3.0"],
+        "client_capabilities": ["canonical-envelope-v1", "authenticated-controls", "resume-security-state"]
+      },
+      "expected": { "ok": true, "selected_version": "0.3.0" }
+    },
+    {
+      "id": "no-overlap-fails-closed",
+      "input": { "client_versions": ["2.0.0"], "client_capabilities": [] },
+      "expected": { "ok": false, "reason_code": "UNSUPPORTED_VERSION" }
+    },
+    {
+      "id": "unknown-required-capability-fails-closed",
+      "input": {
+        "client_versions": ["0.6.0"],
+        "client_capabilities": ["canonical-envelope-v1", "authenticated-ecdh", "authenticated-controls", "hash-chain-continuity", "replay-protection", "resume-security-state"],
+        "required_capabilities": ["unknown-required-feature"]
+      },
+      "expected": { "ok": false, "reason_code": "UNKNOWN_REQUIRED_CAPABILITY" }
+    },
+    {
+      "id": "missing-server-required-capability-fails",
+      "input": {
+        "client_versions": ["0.6.0"],
+        "client_capabilities": ["canonical-envelope-v1", "authenticated-ecdh", "authenticated-controls", "hash-chain-continuity", "resume-security-state"]
+      },
+      "expected": { "ok": false, "reason_code": "MISSING_REQUIRED_CAPABILITY" }
+    },
+    {
+      "id": "security-floor-blocks-silent-downgrade",
+      "input": {
+        "client_versions": ["0.3.0"],
+        "minimum_version": "0.6.0",
+        "client_capabilities": ["canonical-envelope-v1", "authenticated-controls", "resume-security-state"]
+      },
+      "expected": { "ok": false, "reason_code": "DOWNGRADE_BLOCKED" }
+    },
+    {
+      "id": "known-required-capability-unavailable",
+      "input": {
+        "client_versions": ["0.3.0"],
+        "client_capabilities": ["canonical-envelope-v1", "authenticated-controls", "resume-security-state"],
+        "required_capabilities": ["authenticated-ecdh"]
+      },
+      "expected": { "ok": false, "reason_code": "REQUIRED_CAPABILITY_UNAVAILABLE" }
+    },
+    {
+      "id": "same-version-resume",
+      "input": {
+        "client_versions": ["0.6.0"],
+        "client_capabilities": ["canonical-envelope-v1", "authenticated-ecdh", "authenticated-controls", "hash-chain-continuity", "replay-protection", "resume-security-state"],
+        "prior_session": { "protocol_version": "0.6.0", "snapshot_schema": 1, "canonical_envelope": "canonical-envelope-v1" }
+      },
+      "expected": { "ok": true, "selected_version": "0.6.0", "resume_verdict": "RESUME" }
+    },
+    {
+      "id": "compatible-resume-transition",
+      "input": {
+        "client_versions": ["0.6.0"],
+        "client_capabilities": ["canonical-envelope-v1", "authenticated-ecdh", "authenticated-controls", "hash-chain-continuity", "replay-protection", "resume-security-state"],
+        "prior_session": { "protocol_version": "0.3.0", "snapshot_schema": 1, "canonical_envelope": "canonical-envelope-v1" }
+      },
+      "expected": { "ok": true, "selected_version": "0.6.0", "resume_verdict": "MIGRATE" }
+    }
+  ]
+}
