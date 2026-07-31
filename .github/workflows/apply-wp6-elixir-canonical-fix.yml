@@ -1,0 +1,43 @@
+name: Apply WP6 Elixir Canonical Fix
+
+on:
+  push:
+    branches:
+      - agent/wp6-four-sdk-differential-fuzzing
+    paths:
+      - "tools/maintenance/patch-wp6-elixir-canonical.py"
+      - ".github/workflows/apply-wp6-elixir-canonical-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: agent/wp6-four-sdk-differential-fuzzing
+      - uses: erlef/setup-elixir@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      - name: Install Elixir dependencies
+        run: cd sdk/elixir && mix deps.get
+      - name: Apply exact self-checking patch
+        run: python tools/maintenance/patch-wp6-elixir-canonical.py
+      - name: Run minimized Elixir regression tests
+        run: cd sdk/elixir && mix test test/ltp/wp6_canonical_regression_test.exs
+      - name: Remove one-time patch machinery
+        run: |
+          rm tools/maintenance/patch-wp6-elixir-canonical.py
+          rm .github/workflows/apply-wp6-elixir-canonical-fix.yml
+      - name: Commit patched SDK
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "fix(elixir): preserve JSON payloads and lowercase escapes"
+          git push origin HEAD:agent/wp6-four-sdk-differential-fuzzing
