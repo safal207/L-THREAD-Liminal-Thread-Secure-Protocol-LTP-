@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
-      LTP_CAPACITY_PROFILE: ${{ inputs.profile || (github.event_name == 'schedule' && 'soak') || 'pr' }}
+      LTP_CAPACITY_PROFILE: ${{ inputs.profile || ((github.event_name == 'schedule' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) && 'soak') || 'pr' }}
       LTP_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v6
@@ -116,3 +116,51 @@ jobs:
           retention-days: 90
           if-no-files-found: error
           path: artifacts/wp4/**
+
+  record-main-soak:
+    needs: capacity
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: wp4-capacity-soak-evidence
+          path: soak-evidence
+      - name: Record protected-main soak evidence and close WP4
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          report = json.loads(Path("soak-evidence/capacity-report.json").read_text())
+          high = report["high_rate"]
+          latency = high["latency_ms"]
+          memory = high["memory"]
+          capacity = high["capacity_snapshot"]
+          lines = [
+              "Protected-main WP4 soak profile passed.",
+              "",
+              f"- Source SHA: `{os.environ['GITHUB_SHA']}`",
+              f"- Workflow run: {os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              "- Evidence artifact: `wp4-capacity-soak-evidence`",
+              f"- Secured frames: `{high['workload']['accepted_frames']}/{high['workload']['attempted_frames']}`",
+              f"- Failure rate: `{high['workload']['failure_rate']}`",
+              f"- Throughput: `{high['throughput_frames_per_second']} frames/s`",
+              f"- Latency P50/P95/P99: `{latency['p50']}/{latency['p95']}/{latency['p99']} ms`",
+              f"- RSS growth: `{memory['rss_growth_mib']} MiB` (gate `{memory['ceiling_mib']} MiB`)",
+              f"- Active sessions / nonce entries: `{capacity['activeSessions']}/{capacity['nonceEntries']}`",
+              "- Security verification: `enabled`",
+              "- Stable fail-closed limits: `FRAME_TOO_LARGE`, `SESSION_CAPACITY_LIMIT`, `NONCE_CACHE_LIMIT`, `RECONNECT_RATE_LIMIT`",
+              "",
+              "The result is a measured range for this exact runner and source SHA, not a universal deployment claim.",
+          ]
+          Path("wp4-exit-comment.md").write_text("\n".join(lines) + "\n")
+          PY
+          gh issue comment 503 --repo "$GITHUB_REPOSITORY" --body-file wp4-exit-comment.md
+          gh issue close 503 --repo "$GITHUB_REPOSITORY" --reason completed
