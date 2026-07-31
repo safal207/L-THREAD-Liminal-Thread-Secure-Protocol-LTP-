@@ -363,14 +363,24 @@ async function runFaultTimeline(
 
     const evidence = server.getEvidence();
     const proxyEvidence = proxy.getEvidence();
+    let terminalReason = "SECURITY_PIPELINE_ACCEPTED";
     if (fault === "DUPLICATE") {
-      const accepted = evidence.some((record) =>
-        record.scenario_id === "wp3:duplicate" && record.verdict === "ACCEPTED"
+      const duplicateRows = evidence.filter((record) =>
+        record.direction === "inbound" && record.scenario_id === "wp3:duplicate"
       );
-      const replay = evidence.some((record) =>
-        record.scenario_id === "wp3:duplicate" && record.reason_code === "REPLAYED_NONCE"
+      const acceptedCount = duplicateRows.filter((record) => record.verdict === "ACCEPTED").length;
+      const rejected = duplicateRows.find((record) =>
+        record.verdict === "REJECTED" && record.reason_code === "BROKEN_HASH_CHAIN"
       );
-      if (!accepted || !replay) throw new Error("duplicate timeline did not accept once and reject replay");
+      // The first copy commits the exact frame hash. The second identical copy
+      // therefore fails the chain check before the later nonce-replay check.
+      // This is the earliest deterministic fail-closed gate for a wire duplicate.
+      if (acceptedCount !== 1 || !rejected) {
+        throw new Error(
+          `duplicate timeline expected one acceptance and BROKEN_HASH_CHAIN, got ${JSON.stringify(duplicateRows)}`,
+        );
+      }
+      terminalReason = rejected.reason_code;
     }
     if (fault === "DELAY") {
       const buffered = proxyEvidence.some((record) => record.reason_code === "DELAY");
@@ -390,10 +400,12 @@ async function runFaultTimeline(
         record.scenario_id === "wp3:reorder-first" && record.verdict === "ACCEPTED"
       );
       if (!buffered || !released || !broken || !accepted) throw new Error("reorder timeline incomplete");
+      terminalReason = "BROKEN_HASH_CHAIN";
     }
 
     return {
       fault,
+      terminal_reason: terminalReason,
       proxy_records: proxyEvidence.length,
       server_records: evidence.length,
       proxy_digest: sha256(JSON.stringify(proxyEvidence)),
