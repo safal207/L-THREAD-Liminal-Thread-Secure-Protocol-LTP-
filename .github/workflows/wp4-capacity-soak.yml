@@ -1,0 +1,118 @@
+name: WP4 Capacity, Backpressure and Soak
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "config/capacity/**"
+      - "tools/capacity/**"
+      - "tools/reference-server/**"
+      - "tests/e2e/four-sdk/**"
+      - "sdk/**"
+      - "docs/production/CAPACITY_LIMITS.md"
+      - "package.json"
+      - ".github/workflows/wp4-capacity-soak.yml"
+  push:
+    branches: [main]
+    paths:
+      - "config/capacity/**"
+      - "tools/capacity/**"
+      - "tools/reference-server/**"
+      - "tests/e2e/four-sdk/**"
+      - "sdk/**"
+      - "docs/production/CAPACITY_LIMITS.md"
+      - "package.json"
+      - ".github/workflows/wp4-capacity-soak.yml"
+  schedule:
+    - cron: "23 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: Capacity profile
+        required: true
+        default: soak
+        type: choice
+        options:
+          - pr
+          - soak
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp4-capacity-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capacity:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      LTP_CAPACITY_PROFILE: ${{ inputs.profile || (github.event_name == 'schedule' && 'soak') || 'pr' }}
+      LTP_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      - name: Install locked JavaScript dependencies
+        run: |
+          corepack enable
+          corepack prepare pnpm@9.15.0 --activate
+          pnpm install --frozen-lockfile
+      - name: Install native SDK dependencies
+        run: |
+          python -m pip install --disable-pip-version-check --quiet websockets cryptography pytest pytest-asyncio
+          cargo fetch --manifest-path sdk/rust/ltp-client/Cargo.toml --locked
+          (cd sdk/elixir && mix local.hex --force && mix deps.get)
+      - name: Build JavaScript SDK
+        run: pnpm --dir sdk/js build
+      - name: Verify hard-limit and metric regressions
+        run: pnpm exec vitest run tools/capacity/limits.test.ts tools/capacity/metrics.test.ts tools/reference-server/referenceServer.test.ts
+      - name: Run secured capacity profile
+        run: pnpm exec ts-node tools/capacity/run.ts
+      - name: Validate evidence contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("artifacts/wp4/capacity-report.json").read_text())
+          assert report["exit"]["passed"] is True
+          assert report["exit"]["security_verification_enabled"] is True
+          assert report["exit"]["no_unbounded_memory_growth"] is True
+          assert report["exit"]["replay_cache_bounded"] is True
+          assert report["exit"]["stable_reason_codes_verified"] is True
+          assert report["high_rate"]["latency_ms"]["count"] > 0
+          for sdk in ("javascript", "python", "rust", "elixir"):
+              evidence = report["sdk_profiles"][sdk]
+              assert evidence["process_failures"] == 0
+              assert evidence["security_verification_enabled"] is True
+              assert evidence["scenario_latency_ms_per_action"]["count"] > 0
+          print(json.dumps({
+              "profile": report["profile"]["name"],
+              "throughput": report["high_rate"]["throughput_frames_per_second"],
+              "p99_ms": report["high_rate"]["latency_ms"]["p99"],
+              "rss_growth_mib": report["high_rate"]["memory"]["rss_growth_mib"],
+          }))
+          PY
+      - name: Publish workflow summary
+        if: success()
+        run: cat artifacts/wp4/capacity-report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: wp4-capacity-${{ env.LTP_CAPACITY_PROFILE }}-evidence
+          retention-days: 90
+          if-no-files-found: error
+          path: artifacts/wp4/**
