@@ -4,6 +4,11 @@ import WebSocket from "ws";
 import { sha256 } from "../reference-server/protocol";
 import { startReferenceServer } from "../reference-server/server";
 
+interface PersistedNonceEntry {
+  nonce: string;
+  timestamp: number;
+}
+
 interface PersistedSession {
   clientId: string;
   protocolVersion: string;
@@ -13,6 +18,9 @@ interface PersistedSession {
   lastReceivedHash: string | null;
   lastSentHash: string | null;
   seenNonces: string[];
+  nonceTimeline?: PersistedNonceEntry[];
+  lastActivityMs?: number;
+  disconnectedAtMs?: number | null;
 }
 
 interface SnapshotBody {
@@ -32,14 +40,25 @@ const seed = process.env.LTP_SERVER_SEED || "wp3-exit";
 const secret = process.env.LTP_REFERENCE_SECRET || "ltp-reference-long-term-secret";
 const snapshotPath = process.env.LTP_SERVER_SNAPSHOT;
 
+function canonicalSession(session: PersistedSession): PersistedSession {
+  const normalized: PersistedSession = {
+    ...session,
+    seenNonces: [...session.seenNonces].sort(),
+  };
+  // Optional capacity fields preserve the checksum of legacy v1 snapshots when
+  // absent, while new snapshots retain exact replay-window timing.
+  if (session.nonceTimeline !== undefined) {
+    normalized.nonceTimeline = [...session.nonceTimeline]
+      .sort((left, right) => left.timestamp - right.timestamp || left.nonce.localeCompare(right.nonce));
+  }
+  return normalized;
+}
+
 function canonicalBody(body: SnapshotBody): string {
   return JSON.stringify({
     ...body,
     sessions: [...body.sessions]
-      .map((session) => ({
-        ...session,
-        seenNonces: [...session.seenNonces].sort(),
-      }))
+      .map(canonicalSession)
       .sort((left, right) => left.threadId.localeCompare(right.threadId)),
   });
 }
@@ -69,6 +88,10 @@ function snapshotFromServer(server: any): SnapshotFile {
     lastReceivedHash: state.lastReceivedHash,
     lastSentHash: state.lastSentHash,
     seenNonces: [...state.seenNonces].sort(),
+    nonceTimeline: [...(state.nonceTimeline || [])]
+      .map((entry: PersistedNonceEntry) => ({ nonce: entry.nonce, timestamp: entry.timestamp })),
+    lastActivityMs: Number.isFinite(state.lastActivityMs) ? state.lastActivityMs : Date.now(),
+    disconnectedAtMs: state.disconnectedAtMs ?? null,
   }));
   const body: SnapshotBody = {
     schema_version: 1,
@@ -77,6 +100,31 @@ function snapshotFromServer(server: any): SnapshotFile {
     sessions,
   };
   return { ...body, checksum: checksum(body) };
+}
+
+function restoredNonceTimeline(
+  persisted: PersistedSession,
+  fallbackTimestamp: number,
+): PersistedNonceEntry[] {
+  const byNonce = new Map<string, PersistedNonceEntry>();
+  for (const entry of persisted.nonceTimeline || []) {
+    if (
+      entry &&
+      typeof entry.nonce === "string" &&
+      Number.isFinite(entry.timestamp)
+    ) {
+      byNonce.set(entry.nonce, { nonce: entry.nonce, timestamp: entry.timestamp });
+    }
+  }
+  // Legacy v1 snapshots contain only the set. Treat unknown-age entries as
+  // currently replay-valid rather than evicting them and weakening protection.
+  for (const nonce of persisted.seenNonces) {
+    if (!byNonce.has(nonce)) {
+      byNonce.set(nonce, { nonce, timestamp: fallbackTimestamp });
+    }
+  }
+  return [...byNonce.values()]
+    .sort((left, right) => left.timestamp - right.timestamp || left.nonce.localeCompare(right.nonce));
 }
 
 function restoreIntoServer(server: any, filePath: string | undefined): RestoreStatus {
@@ -100,7 +148,9 @@ function restoreIntoServer(server: any, filePath: string | undefined): RestoreSt
       throw new Error("snapshot identity or checksum mismatch");
     }
 
+    const restoredAt = Date.now();
     for (const persisted of body.sessions) {
+      const nonceTimeline = restoredNonceTimeline(persisted, restoredAt);
       server.sessions.set(persisted.threadId, {
         clientId: persisted.clientId,
         protocolVersion: persisted.protocolVersion,
@@ -109,12 +159,15 @@ function restoreIntoServer(server: any, filePath: string | undefined): RestoreSt
         generation: persisted.generation,
         lastReceivedHash: persisted.lastReceivedHash,
         lastSentHash: persisted.lastSentHash,
-        seenNonces: new Set(persisted.seenNonces),
+        seenNonces: new Set(nonceTimeline.map((entry) => entry.nonce)),
+        nonceTimeline,
         encryptionKey: "",
         macKey: "",
         ivKey: "",
         routingTag: "",
         activeSocket: { readyState: WebSocket.CLOSED },
+        lastActivityMs: persisted.lastActivityMs ?? restoredAt,
+        disconnectedAtMs: persisted.disconnectedAtMs ?? restoredAt,
       });
     }
     server.idCounter = Math.max(server.idCounter || 0, observedMaxId);

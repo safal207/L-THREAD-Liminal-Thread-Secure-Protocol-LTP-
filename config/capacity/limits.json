@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "profile": "org.ltp.capacity.limits.v1",
+  "limits": {
+    "max_frame_bytes": 524288,
+    "max_concurrent_sessions": 256,
+    "max_seen_nonces_per_session": 4096,
+    "max_evidence_records": 50000,
+    "max_pending_send_bytes": 1048576,
+    "max_reconnects_per_window": 8,
+    "reconnect_window_ms": 10000,
+    "max_session_idle_ms": 300000
+  },
+  "reason_codes": [
+    "FRAME_TOO_LARGE",
+    "SESSION_CAPACITY_LIMIT",
+    "NONCE_CACHE_LIMIT",
+    "BACKPRESSURE_LIMIT",
+    "RECONNECT_RATE_LIMIT"
+  ],
+  "interpretation": "Measured safe defaults for the GitHub-hosted WP4 profile. Deployments must re-run the capacity harness on their own hardware and may lower limits without weakening security verification."
+}
