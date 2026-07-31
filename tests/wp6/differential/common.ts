@@ -20,11 +20,14 @@ export interface AdapterReport {
 
 function valueDepth(value: unknown, depth = 0): number {
   if (value === null || typeof value !== "object") return depth;
-  if (Array.isArray(value)) {
-    return value.reduce((maximum, item) => Math.max(maximum, valueDepth(item, depth + 1)), depth + 1);
+  const children: unknown[] = Array.isArray(value)
+    ? value
+    : Object.values(value as Record<string, unknown>);
+  let maximum = depth + 1;
+  for (const child of children) {
+    maximum = Math.max(maximum, valueDepth(child, depth + 1));
   }
-  return Object.values(value as Record<string, unknown>)
-    .reduce((maximum, item) => Math.max(maximum, valueDepth(item, depth + 1)), depth + 1);
+  return maximum;
 }
 
 export function classifyCase(
