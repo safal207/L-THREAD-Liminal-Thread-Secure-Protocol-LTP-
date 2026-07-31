@@ -36,7 +36,7 @@ concurrency:
 jobs:
   deterministic-fault-contract:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v4
@@ -73,6 +73,8 @@ jobs:
         run: pnpm runtime:fault-matrix
       - name: Run four native SDKs through the live proxy
         run: pnpm native:fault-proxy-matrix
+      - name: Run native crash, server restart and reconnect exit
+        run: pnpm wp3:exit
       - name: Generate machine-readable evidence
         env:
           INPUT_SEED: ${{ github.event.inputs.seed }}
@@ -89,11 +91,12 @@ jobs:
           const fault = JSON.parse(fs.readFileSync("artifacts/wp3-fault-evidence.json", "utf8"));
           const runtime = JSON.parse(fs.readFileSync("artifacts/wp3-native-runtime-matrix.json", "utf8"));
           const proxy = JSON.parse(fs.readFileSync("artifacts/wp3-native-sdk-proxy.json", "utf8"));
+          const exit = JSON.parse(fs.readFileSync("artifacts/wp3-exit-evidence.json", "utf8"));
           if (fault.summary.failed !== 0 || fault.summary.passed !== fault.summary.total) {
             throw new Error(`WP3 contract failed: ${JSON.stringify(fault.summary)}`);
           }
           if (fault.scope.live_proxy_wire_injection !== false) {
-            throw new Error("scope boundary changed unexpectedly");
+            throw new Error("foundation scope boundary changed unexpectedly");
           }
           if (runtime.summary.total !== 4 || runtime.summary.passed !== 4 || runtime.summary.failed !== 0) {
             throw new Error(`runtime matrix failed: ${JSON.stringify(runtime.summary)}`);
@@ -121,11 +124,37 @@ jobs:
           ) {
             throw new Error(`native SDK proxy matrix failed: ${JSON.stringify(proxy.summary)}`);
           }
-          const raw = JSON.stringify({ fault, runtime, proxy });
-          for (const forbidden of ["macKey", "encryptionKey", "privateKey", "secretKey", "longTermSecret"]) {
+          if (exit.summary.total !== 4 || exit.summary.passed !== 4 || exit.summary.failed !== 0) {
+            throw new Error(`WP3 exit failed: ${JSON.stringify(exit.summary)}`);
+          }
+          if (
+            exit.crash_restart.client_exit !== "SIGKILL_AFTER_ACK_BEFORE_SENDER_COMMIT" ||
+            exit.crash_restart.server_process_changed !== true ||
+            exit.crash_restart.restore_status !== "RESTORED" ||
+            exit.crash_restart.replay_verdict !== "REPLAYED_NONCE" ||
+            exit.crash_restart.post_restart_verdict !== "ACCEPTED"
+          ) {
+            throw new Error(`crash/restart evidence invalid: ${JSON.stringify(exit.crash_restart)}`);
+          }
+          if (
+            exit.reconnect_race.simultaneous_resumes !== 2 ||
+            exit.reconnect_race.authoritative_open_sockets !== 1 ||
+            exit.reconnect_race.winner_accepted !== true
+          ) {
+            throw new Error(`reconnect race evidence invalid: ${JSON.stringify(exit.reconnect_race)}`);
+          }
+          if (
+            exit.corrupt_snapshot.restore_status !== "RESET" ||
+            exit.corrupt_snapshot.fresh_thread_created !== true ||
+            exit.authenticated_fault_timelines.length !== 3
+          ) {
+            throw new Error(`reset/timeline evidence invalid: ${JSON.stringify(exit)}`);
+          }
+          const raw = JSON.stringify({ fault, runtime, proxy, exit });
+          for (const forbidden of ["raw_frame", "macKey", "encryptionKey", "privateKey", "secretKey", "longTermSecret", "ltp-reference-long-term-secret"]) {
             if (raw.includes(forbidden)) throw new Error(`evidence leaked ${forbidden}`);
           }
-          console.log({ fault: fault.summary, runtime: runtime.summary, proxy: proxy.summary });
+          console.log({ fault: fault.summary, runtime: runtime.summary, proxy: proxy.summary, exit: exit.summary });
           NODE
       - uses: actions/upload-artifact@v4
         with:
@@ -135,4 +164,5 @@ jobs:
             artifacts/wp3-native-runtime-matrix.json
             artifacts/wp3-native-sdk-proxy.json
             artifacts/wp3-native-sdk-proxy/*.json
+            artifacts/wp3-exit-evidence.json
           if-no-files-found: error
