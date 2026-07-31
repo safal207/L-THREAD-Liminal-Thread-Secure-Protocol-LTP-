@@ -539,7 +539,7 @@ async function main(): Promise<void> {
     schema_version: 1,
     profile,
     interpretation: "Measured range for this exact source, workflow and runtime context; not a universal capacity claim.",
-    source_sha: process.env.GITHUB_SHA || process.env.LTP_SOURCE_SHA || "local",
+    source_sha: process.env.LTP_SOURCE_SHA || process.env.GITHUB_SHA || "local",
     workflow_run: process.env.GITHUB_RUN_ID || null,
     hardware_runtime_context: {
       os: { platform: platform(), release: release(), arch: arch() },
