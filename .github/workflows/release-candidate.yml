@@ -1,0 +1,156 @@
+name: WP7 Reproducible Release Candidate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "config/release/**"
+      - "tools/release/**"
+      - "tests/release/**"
+      - "sdk/js/package.json"
+      - "sdk/python/setup.py"
+      - "sdk/rust/ltp-client/Cargo.toml"
+      - "sdk/rust/ltp-client/Cargo.lock"
+      - "sdk/elixir/mix.exs"
+      - "sdk/elixir/mix.lock"
+      - "tests/production/readiness-baseline.json"
+      - "docs/production/RELEASE_ENGINEERING.md"
+      - ".github/workflows/release-candidate.yml"
+  push:
+    branches: [main]
+    paths:
+      - "config/release/**"
+      - "tools/release/**"
+      - "tests/release/**"
+      - "sdk/**"
+      - "tests/production/readiness-baseline.json"
+      - "docs/production/RELEASE_ENGINEERING.md"
+      - ".github/workflows/release-candidate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: wp7-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      WORKFLOW_RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: erlef/setup-elixir@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      - name: Verify release tool regressions and SDK version lockstep
+        run: |
+          python -m unittest tests/release/test_release_tools.py
+          python tools/release/versions.py --out artifacts/wp7-version-evidence.json
+      - name: Prepare two clean source trees
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "SOURCE_EPOCH=$(git show -s --format=%ct "$SOURCE_SHA")" >> "$GITHUB_ENV"
+          rm -rf /tmp/ltp-build-a /tmp/ltp-build-b /tmp/ltp-out-a /tmp/ltp-out-b
+          mkdir -p /tmp/ltp-build-a /tmp/ltp-build-b
+          git archive "$SOURCE_SHA" | tar -x -C /tmp/ltp-build-a
+          git archive "$SOURCE_SHA" | tar -x -C /tmp/ltp-build-b
+      - name: Clean build A
+        run: bash /tmp/ltp-build-a/tools/release/build_rc.sh /tmp/ltp-out-a "$SOURCE_SHA" "$SOURCE_EPOCH" "$WORKFLOW_RUN"
+      - name: Clean build B
+        run: bash /tmp/ltp-build-b/tools/release/build_rc.sh /tmp/ltp-out-b "$SOURCE_SHA" "$SOURCE_EPOCH" "$WORKFLOW_RUN"
+      - name: Compare clean-build artifact contents
+        run: |
+          mkdir -p artifacts/wp7
+          python tools/release/release_tool.py compare \
+            --a /tmp/ltp-out-a/release-manifest.json \
+            --b /tmp/ltp-out-b/release-manifest.json \
+            --out artifacts/wp7/reproducibility.json
+          cp -R /tmp/ltp-out-a artifacts/wp7/rc
+      - name: Exercise checksum signature and verification without persistent keys
+        shell: bash
+        run: |
+          set -euo pipefail
+          openssl genpkey -algorithm ED25519 -out /tmp/wp7-ephemeral-signing.pem
+          openssl pkey -in /tmp/wp7-ephemeral-signing.pem -pubout -out artifacts/wp7/rc/checksums.pub
+          openssl pkeyutl -sign -rawin \
+            -inkey /tmp/wp7-ephemeral-signing.pem \
+            -in artifacts/wp7/rc/checksums.sha256 \
+            -out artifacts/wp7/rc/checksums.sha256.sig
+          openssl pkeyutl -verify -rawin -pubin \
+            -inkey artifacts/wp7/rc/checksums.pub \
+            -in artifacts/wp7/rc/checksums.sha256 \
+            -sigfile artifacts/wp7/rc/checksums.sha256.sig
+          rm -f /tmp/wp7-ephemeral-signing.pem
+      - name: Validate manifest, SBOMs, checksums and credential policy
+        run: |
+          python - <<'PY'
+          import hashlib, json, pathlib
+          root = pathlib.Path("artifacts/wp7/rc")
+          manifest = json.loads((root / "release-manifest.json").read_text())
+          repro = json.loads(pathlib.Path("artifacts/wp7/reproducibility.json").read_text())
+          assert manifest["source_sha"] == "${{ env.SOURCE_SHA }}"
+          assert manifest["credential_policy"]["long_lived_credentials_used"] is False
+          assert repro["reproducible"] is True
+          assert repro["summary"]["canonical_failures"] == 0
+          for sdk in ("javascript", "python", "rust", "elixir"):
+              sbom = json.loads((root / "sbom" / f"{sdk}.cdx.json").read_text())
+              assert sbom["bomFormat"] == "CycloneDX"
+              assert sbom["specVersion"] == "1.5"
+              assert sbom["metadata"]["properties"][0]["value"] == manifest["source_sha"]
+          for line in (root / "checksums.sha256").read_text().splitlines():
+              expected, relative = line.split("  ", 1)
+              actual = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+              assert actual == expected, relative
+          forbidden = ("privateKey", "secretKey", "longTermSecret", "publishingToken")
+          raw = json.dumps(manifest)
+          assert not any(item in raw for item in forbidden)
+          print({"version": manifest["release_version"], "artifacts": len(manifest["artifacts"]), "repro": repro["summary"]})
+          PY
+      - name: Create deterministic RC evidence bundle
+        run: |
+          python tools/release/release_tool.py archive \
+            --root artifacts/wp7 \
+            --out artifacts/ltp-rc-evidence-bundle.tar.gz \
+            --epoch "$SOURCE_EPOCH"
+      - name: Keyless GitHub build provenance
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: artifacts/ltp-rc-evidence-bundle.tar.gz
+      - name: Verify keyless provenance
+        if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh attestation verify artifacts/ltp-rc-evidence-bundle.tar.gz --repo "$GITHUB_REPOSITORY"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wp7-release-candidate-evidence
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            artifacts/wp7-version-evidence.json
+            artifacts/wp7/reproducibility.json
+            artifacts/wp7/rc/**
+            artifacts/ltp-rc-evidence-bundle.tar.gz
