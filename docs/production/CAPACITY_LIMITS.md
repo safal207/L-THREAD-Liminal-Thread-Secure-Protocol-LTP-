@@ -58,6 +58,8 @@ Crossing the boundary is explicit. The server records `BACKPRESSURE_LIMIT`, does
 
 Every protected-main push that changes the WP4 surface runs this soak profile before exit evidence is recorded. The same profile also runs weekly and through manual workflow dispatch. It is a bounded CI soak, not a substitute for deployment-specific multi-hour or multi-day endurance testing.
 
+A documentation-only update inside this WP4 surface may be used as a controlled retrigger when a previous protected-main run did not publish its exit comment. The retrigger does not change capacity limits or runtime behavior; the new source SHA and workflow run must still be recorded in the retained evidence.
+
 ## Metrics
 
 The harness reports:
