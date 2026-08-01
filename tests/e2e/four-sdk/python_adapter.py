@@ -10,10 +10,17 @@ from ltp_client import LtpClient
 from ltp_client.crypto import hash_envelope, sign_message
 
 SDK = "python"
-CLIENT_ID = f"wp2-{SDK}"
 URL = os.environ.get("LTP_REFERENCE_URL")
 OUTPUT = os.environ.get("LTP_ADAPTER_OUTPUT")
 SECRET = os.environ.get("LTP_REFERENCE_SECRET", "ltp-reference-long-term-secret")
+BASE_CLIENT_ID = f"wp2-{SDK}"
+CLIENT_ID = BASE_CLIENT_ID
+if OUTPUT and os.environ.get("LTP_CAPACITY_PROFILE") in {"pr", "soak"}:
+    # Capacity profiling repeats the complete lifecycle scenario several times.
+    # Give every measurement round an independent client namespace so those
+    # intended measurements do not masquerade as one reconnect storm. The
+    # dedicated WP4 abuse profile still proves the real reconnect limit.
+    CLIENT_ID = f"{BASE_CLIENT_ID}-{Path(OUTPUT).stem}"
 
 if not URL or not OUTPUT:
     raise RuntimeError("LTP_REFERENCE_URL and LTP_ADAPTER_OUTPUT are required")
