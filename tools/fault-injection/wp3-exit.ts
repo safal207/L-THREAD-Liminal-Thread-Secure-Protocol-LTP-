@@ -123,7 +123,7 @@ async function startServerProcess(snapshotPath: string, seed: string): Promise<{
   const child = spawnTypeScript("tools/fault-injection/reference-server-process.ts", {
     LTP_SERVER_SNAPSHOT: snapshotPath,
     LTP_SERVER_SEED: seed,
-    LTP_REFERENCE_SECRET: SECRET,
+    LTP_REFERENCE_SECRET: SECRET, // fcrp: fixture
   });
   const ready = await waitForMessage<ChildReady>(child, "ready");
   return { child, ready };
@@ -435,7 +435,7 @@ async function main(): Promise<void> {
 
     crashChild = spawnTypeScript("tools/fault-injection/native-crash-client.ts", {
       LTP_REFERENCE_URL: initial.ready.url,
-      LTP_REFERENCE_SECRET: SECRET,
+      LTP_REFERENCE_SECRET: SECRET, // fcrp: fixture
     });
     const crash = await waitForMessage<CrashReport>(crashChild, "acknowledged");
     const snapshot = await childRequest<SnapshotWritten>(
