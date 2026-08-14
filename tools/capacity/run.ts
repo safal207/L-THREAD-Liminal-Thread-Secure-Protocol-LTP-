@@ -451,7 +451,7 @@ async function runSdkProfiles(profile: CapacityProfile) {
         const outputPath = resolve(outputDir, `${sdk}-${round < 0 ? "warmup" : round}.json`);
         const result = await runTimedProcess(spec, {
           LTP_REFERENCE_URL: server.url,
-          LTP_REFERENCE_SECRET: SECRET,
+          LTP_REFERENCE_SECRET: SECRET, // fcrp: fixture
           LTP_ADAPTER_OUTPUT: outputPath,
         });
         const adapter = JSON.parse(readFileSync(outputPath, "utf8")) as {
