@@ -18,6 +18,7 @@ type FixtureCase = {
     canonical_outcome_ids: Array<string | null>;
     replay_outcome_ids?: string[][];
     attempt_ids?: string[][];
+    effective_deadline_at?: Array<string | null>;
   };
 };
 
@@ -76,6 +77,11 @@ describe('request/outcome continuity', () => {
         expect(first.requests.map((request) => request.attempt_ids)).toEqual(
           caseData.expected.attempt_ids,
         );
+      }
+      if (caseData.expected.effective_deadline_at) {
+        expect(
+          first.requests.map((request) => request.effective_deadline_at),
+        ).toEqual(caseData.expected.effective_deadline_at);
       }
     },
   );
@@ -174,6 +180,86 @@ describe('request/outcome continuity', () => {
     expect(report.requests[0].status).toBe('BROKEN');
     expect(report.requests[0].canonical_outcome_id).toBeNull();
     expect(report.requests[0].terminal_status).toBeNull();
+  });
+
+  it('rejects timestamps without an explicit UTC offset', () => {
+    const input = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    input.requests[0].occurred_at = '2026-08-27T10:00:00';
+
+    expect(() => verifyRequestOutcomeContinuity(input)).toThrowError(
+      /ISO-8601 instant with an explicit UTC offset/,
+    );
+  });
+
+  it('rejects identifiers with leading or trailing whitespace', () => {
+    const requestInput = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    requestInput.requests[0].request_id = ' req-1';
+
+    expect(() => verifyRequestOutcomeContinuity(requestInput)).toThrowError(
+      /request_id must not contain leading or trailing whitespace/,
+    );
+
+    const outcomeInput = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    outcomeInput.outcomes[0].outcome_id = 'outcome-1 ';
+
+    expect(() => verifyRequestOutcomeContinuity(outcomeInput)).toThrowError(
+      /outcome_id must not contain leading or trailing whitespace/,
+    );
+  });
+
+  it('does not depend on localeCompare for deterministic ordering', () => {
+    const report = (() => {
+      const originalLocaleCompare = String.prototype.localeCompare;
+      String.prototype.localeCompare = () => {
+        throw new Error(
+          'localeCompare must not be used by continuity verification',
+        );
+      };
+      try {
+        return verifyRequestOutcomeContinuity(
+          findCase('explicit_replay_keeps_one_canonical_outcome').input,
+        );
+      } finally {
+        String.prototype.localeCompare = originalLocaleCompare;
+      }
+    })();
+
+    expect(report.overall_status).toBe('CONTINUOUS');
+    expect(report.findings.map((entry) => entry.code)).toEqual([
+      'REPLAY_DETECTED',
+    ]);
+  });
+
+  it('deduplicates repeated orphan delivery by outcome_id', () => {
+    const input = structuredClone(
+      findCase('outcome_without_request_is_orphaned').input,
+    );
+    input.outcomes.push(structuredClone(input.outcomes[0]));
+
+    const report = verifyRequestOutcomeContinuity(input);
+
+    expect(report.orphan_outcome_ids).toEqual(['outcome-5']);
+    expect(report.findings.map((entry) => entry.code)).toEqual([
+      'BROKEN_ORPHAN_RESPONSE',
+    ]);
+  });
+
+  it('uses the latest declared retry deadline as the operative deadline', () => {
+    const report = verifyRequestOutcomeContinuity(
+      findCase('latest_retry_deadline_remains_pending').input,
+    );
+
+    expect(report.requests[0].status).toBe('PENDING');
+    expect(report.requests[0].effective_deadline_at).toBe(
+      '2026-08-27T13:00:00Z',
+    );
+    expect(report.findings).toEqual([]);
   });
 
   it('keeps the external-effect and exactly-once claims out of scope', () => {
