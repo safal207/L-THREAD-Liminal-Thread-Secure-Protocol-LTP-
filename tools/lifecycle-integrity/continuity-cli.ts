@@ -8,6 +8,10 @@ import {
   type ContinuityVerificationInput,
   verifyRequestOutcomeContinuity,
 } from './continuity';
+import {
+  assertNoDuplicateJsonObjectNames,
+  DuplicateJsonObjectNameError,
+} from './json-duplicate-names';
 
 const SCHEMA_FILES = {
   request: 'ltp-request-envelope.v0.1.schema.json',
@@ -77,6 +81,7 @@ function assignUniqueOption(
   parsed[field] = value;
 }
 
+/** Parses the public continuity CLI argument surface. */
 export function parseContinuityCliArgs(argv: string[]): ContinuityCliArgs {
   const parsed: ContinuityCliArgs = {
     allowBroken: false,
@@ -162,6 +167,7 @@ export function parseContinuityCliArgs(argv: string[]): ContinuityCliArgs {
   return parsed;
 }
 
+/** Returns the source-tree location of the normative v0.1 schemas. */
 export function defaultContinuitySchemaDir(): string {
   return path.resolve(__dirname, '../../docs/contracts');
 }
@@ -197,8 +203,10 @@ function readJsonFile(filePath: string, label: string): unknown {
     );
   }
 
+  const normalized = raw.replace(/^\uFEFF/, '');
+  let parsed: unknown;
   try {
-    return JSON.parse(raw.replace(/^\uFEFF/, ''));
+    parsed = JSON.parse(normalized);
   } catch (error) {
     throw new ContinuityCliError(
       `${label} is not valid JSON: ${filePath}: ${
@@ -206,6 +214,25 @@ function readJsonFile(filePath: string, label: string): unknown {
       }`,
     );
   }
+
+  try {
+    assertNoDuplicateJsonObjectNames(normalized);
+  } catch (error) {
+    if (error instanceof DuplicateJsonObjectNameError) {
+      throw new ContinuityCliError(
+        `${label} contains duplicate object name ${JSON.stringify(
+          error.duplicateName,
+        )} at ${error.objectPath || '/'}: ${filePath}`,
+      );
+    }
+    throw new ContinuityCliError(
+      `${label} could not be checked for duplicate object names: ${filePath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+
+  return parsed;
 }
 
 function schemaPath(schemaDir: string, fileName: string): string {
@@ -236,6 +263,7 @@ function assertSchema(
   );
 }
 
+/** Loads and compiles the normative input and report schema set. */
 export function createContinuitySchemaValidators(
   schemaDir = defaultContinuitySchemaDir(),
 ): {
@@ -330,6 +358,7 @@ function writeReport(
   );
 }
 
+/** Runs the continuity CLI and returns its stable process exit code. */
 export function runContinuityCli(
   argv = process.argv.slice(2),
   io: ContinuityCliIo = defaultIo,
