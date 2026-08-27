@@ -1,0 +1,65 @@
+{
+  "as_of": "2026-08-27T10:10:00Z",
+  "outcomes": [
+    {
+      "attempt_id": "release-attempt-2",
+      "metadata": {
+        "bridge_profile": "cgqa-smart-contract-continuity-bridge-v0.1",
+        "canonical_finality_established": false,
+        "claim_boundary_digest": "sha256:a718946d6bc09a8a0b1e505f54e07ce0404c38f09b3b57653d98dfdfc3d44d1d",
+        "execution_trace_digest": "sha256:4f9d5349f8584aedaf6254d22d08c1f0762ba34839116839cdefa9fb383202ff",
+        "mapping": "reviewed_evm_receipt_event",
+        "observation_id": "release-receipt-42",
+        "observed_block_number": 100,
+        "observed_confirmation_count": 4,
+        "observed_head_number": 103,
+        "parent_observation_id": "delivery-accepted-42",
+        "producer": "ContractGraph-QA",
+        "receipt_capture_digest": "sha256:acee6ad05869c42dc42d5f7d16febae8dab4e6a3d93cb611fac5f4172f6607a8",
+        "receipt_profile_digest": "sha256:8888888888888888888888888888888888888888888888888888888888888888",
+        "source_kind": "CONTRACT_RECEIPT",
+        "subject_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+        "transaction_hash": "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      },
+      "occurred_at": "2026-08-27T10:01:00Z",
+      "outcome_id": "release-receipt-42",
+      "profile": "org.ltp.outcome-envelope.v0.1",
+      "record_type": "OUTCOME",
+      "replay_of_outcome_id": null,
+      "request_id": "release-escrow-42",
+      "result_digest": "sha256:acee6ad05869c42dc42d5f7d16febae8dab4e6a3d93cb611fac5f4172f6607a8",
+      "schema_version": 1,
+      "terminal_status": "COMPLETED",
+      "trace_id": "escrow-42-lifecycle"
+    }
+  ],
+  "requests": [
+    {
+      "attempt_id": "release-attempt-2",
+      "continuation_id": null,
+      "deadline_at": "2026-08-27T10:05:00Z",
+      "metadata": {
+        "args_digest": "sha256:6666666666666666666666666666666666666666666666666666666666666666",
+        "bridge_profile": "cgqa-smart-contract-continuity-bridge-v0.1",
+        "chain_family": "evm",
+        "chain_id": 8453,
+        "contract_address": "0x1111111111111111111111111111111111111111",
+        "function_name": "releasePayment",
+        "function_selector": "0x12345678",
+        "nonce": 42,
+        "producer": "ContractGraph-QA",
+        "sender": "0x2222222222222222222222222222222222222222"
+      },
+      "occurred_at": "2026-08-27T10:00:30Z",
+      "parent_request_id": null,
+      "payload_digest": "sha256:7777777777777777777777777777777777777777777777777777777777777777",
+      "profile": "org.ltp.request-envelope.v0.1",
+      "record_type": "REQUEST",
+      "request_id": "release-escrow-42",
+      "retry_of_attempt_id": null,
+      "schema_version": 1,
+      "state": "PENDING",
+      "trace_id": "escrow-42-lifecycle"
+    }
+  ]
+}

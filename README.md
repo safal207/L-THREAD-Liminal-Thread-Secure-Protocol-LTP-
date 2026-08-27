@@ -32,7 +32,7 @@ Use it to debug, evaluate, and monitor AI agents when the path matters as much a
 LTP is a deterministic oversight and replay protocol for agent traces.
 It helps teams inspect whether an AI or agent followed an admissible, grounded execution path, detect drift, reject unsupported outputs or actions, and preserve audit-grade evidence for high-risk workflows.
 
-For reviewers navigating the broader ecosystem: LTP is the trace/replay/continuity layer in a broader trustworthy-agent evidence architecture. See the [Portfolio Reviewer Path](docs/PORTFOLIO_REVIEWER_PATH.md), the [Ecosystem Spider Map](docs/ECOSYSTEM_SPIDER_MAP.md), the [LS Grant Reviewer Packet 2026](https://github.com/safal207/LS/blob/main/docs/GRANT_REVIEWER_PACKET_2026.md), and the [ProofPath ecosystem graph](https://github.com/safal207/ProofPath/blob/main/docs/ECOSYSTEM_GRAPH.md).
+For reviewers navigating the broader ecosystem: LTP is the trace/replay/continuity layer in a broader trustworthy-agent evidence architecture. See the [Portfolio Reviewer Path](docs/PORTFOLIO_REVIEWER_PATH.md), the [Ecosystem Spider Map](docs/ECOSYSTEM_SPIDER_MAP.md), the [ContractGraph-QA Smart Contract Continuity integration](docs/integrations/CONTRACTGRAPH_QA_SMART_CONTRACT_CONTINUITY.md), the [LS Grant Reviewer Packet 2026](https://github.com/safal207/LS/blob/main/docs/GRANT_REVIEWER_PACKET_2026.md), and the [ProofPath ecosystem graph](https://github.com/safal207/ProofPath/blob/main/docs/ECOSYSTEM_GRAPH.md).
 
 <!-- community-interest:start -->
 ### 🌟 Community Interest
