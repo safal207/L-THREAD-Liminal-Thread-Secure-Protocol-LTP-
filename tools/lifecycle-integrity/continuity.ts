@@ -277,6 +277,11 @@ export function verifyRequestOutcomeContinuity(
 
   input.requests.forEach((request, index) => {
     const validated = validateRequest(request, index);
+    if (validated.occurredAt > asOfTime) {
+      throw new ContinuityEnvelopeError(
+        `requests[${index}].occurred_at cannot be after as_of`,
+      );
+    }
     if (attemptOwners.has(request.attempt_id)) {
       throw new ContinuityEnvelopeError(`duplicate attempt_id: ${request.attempt_id}`);
     }
@@ -290,9 +295,23 @@ export function verifyRequestOutcomeContinuity(
   });
 
   const outcomeTime = new Map<OutcomeEnvelope, number>();
+  const outcomeOwners = new Map<string, string>();
   const outcomesByRequest = new Map<string, OutcomeEnvelope[]>();
   input.outcomes.forEach((outcome, index) => {
-    outcomeTime.set(outcome, validateOutcome(outcome, index));
+    const occurredAt = validateOutcome(outcome, index);
+    if (occurredAt > asOfTime) {
+      throw new ContinuityEnvelopeError(
+        `outcomes[${index}].occurred_at cannot be after as_of`,
+      );
+    }
+    const existingOwner = outcomeOwners.get(outcome.outcome_id);
+    if (existingOwner && existingOwner !== outcome.request_id) {
+      throw new ContinuityEnvelopeError(
+        `outcome_id ${outcome.outcome_id} cannot belong to multiple requests`,
+      );
+    }
+    outcomeTime.set(outcome, occurredAt);
+    outcomeOwners.set(outcome.outcome_id, outcome.request_id);
     outcomesByRequest.set(outcome.request_id, [
       ...(outcomesByRequest.get(outcome.request_id) ?? []),
       outcome,
@@ -374,7 +393,8 @@ export function verifyRequestOutcomeContinuity(
       ),
     ];
     for (const parentId of parentIds) {
-      if (!requestIds.has(parentId)) {
+      const parentAttempts = requestsById.get(parentId);
+      if (!parentAttempts) {
         local.push(
           finding(
             'BROKEN_PARENT_GAP',
@@ -383,6 +403,21 @@ export function verifyRequestOutcomeContinuity(
             `Request ${requestId} references unknown parent ${parentId}.`,
           ),
         );
+      } else {
+        const parentStartedAt = Math.min(
+          ...parentAttempts.map((item) => requestTime.get(item) ?? Infinity),
+        );
+        const childStartedAt = requestTime.get(attempts[0]) ?? -Infinity;
+        if (parentStartedAt > childStartedAt) {
+          local.push(
+            finding(
+              'BROKEN_TIME_REVERSAL',
+              requestId,
+              [parentId, attempts[0].attempt_id],
+              `Parent request ${parentId} begins after child request ${requestId}.`,
+            ),
+          );
+        }
       }
     }
     if (parentIds.length > 1) {
@@ -437,7 +472,8 @@ export function verifyRequestOutcomeContinuity(
     const canonicalOutcomes = uniqueOutcomes
       .filter((item) => !item.replay_of_outcome_id)
       .sort((left, right) => left.outcome_id.localeCompare(right.outcome_id));
-    const canonicalOutcome = canonicalOutcomes[0] ?? null;
+    const canonicalOutcome =
+      canonicalOutcomes.length === 1 ? canonicalOutcomes[0] : null;
     if (uniqueOutcomes.length > 0 && canonicalOutcomes.length === 0) {
       local.push(
         finding(
@@ -468,6 +504,18 @@ export function verifyRequestOutcomeContinuity(
               requestId,
               [replay.outcome_id, replay.replay_of_outcome_id ?? ''],
               `Replay ${replay.outcome_id} does not reference the canonical outcome.`,
+            ),
+          );
+        } else if (
+          (outcomeTime.get(replay) ?? -Infinity) <
+          (outcomeTime.get(canonicalOutcome) ?? Infinity)
+        ) {
+          local.push(
+            finding(
+              'BROKEN_TIME_REVERSAL',
+              requestId,
+              [canonicalOutcome.outcome_id, replay.outcome_id],
+              `Replay ${replay.outcome_id} precedes its canonical outcome.`,
             ),
           );
         } else if (terminalSignature(replay) !== terminalSignature(canonicalOutcome)) {
@@ -538,7 +586,7 @@ export function verifyRequestOutcomeContinuity(
     const deadline = deadlines[0] ?? null;
     const latestAttempt = attempts[attempts.length - 1];
     if (
-      !canonicalOutcome &&
+      uniqueOutcomes.length === 0 &&
       latestAttempt.state !== 'DEFERRED' &&
       deadline &&
       asOfTime > deadline.time
