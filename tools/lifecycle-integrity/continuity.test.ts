@@ -123,6 +123,59 @@ describe('request/outcome continuity', () => {
     );
   });
 
+  it('rejects request and outcome records that occur after as_of', () => {
+    const futureRequest = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    futureRequest.requests[0].occurred_at = '2026-08-27T12:01:00Z';
+    futureRequest.requests[0].deadline_at = '2026-08-27T12:30:00Z';
+
+    expect(() => verifyRequestOutcomeContinuity(futureRequest)).toThrowError(
+      /requests\[0\]\.occurred_at cannot be after as_of/,
+    );
+
+    const futureOutcome = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    futureOutcome.outcomes[0].occurred_at = '2026-08-27T12:01:00Z';
+
+    expect(() => verifyRequestOutcomeContinuity(futureOutcome)).toThrowError(
+      /outcomes\[0\]\.occurred_at cannot be after as_of/,
+    );
+  });
+
+  it('rejects one outcome_id assigned to different logical requests', () => {
+    const input = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    input.requests.push({
+      ...input.requests[0],
+      request_id: 'req-1-other',
+      trace_id: 'trace-1-other',
+      attempt_id: 'attempt-1-other',
+    });
+    input.outcomes.push({
+      ...input.outcomes[0],
+      request_id: 'req-1-other',
+      trace_id: 'trace-1-other',
+      attempt_id: 'attempt-1-other',
+    });
+
+    expect(() => verifyRequestOutcomeContinuity(input)).toThrowError(
+      /outcome_id outcome-1 cannot belong to multiple requests/,
+    );
+  });
+
+  it('does not choose an arbitrary canonical outcome during a conflict', () => {
+    const report = verifyRequestOutcomeContinuity(
+      findCase('two_canonical_outcomes_conflict').input,
+    );
+
+    expect(report.requests[0].status).toBe('BROKEN');
+    expect(report.requests[0].canonical_outcome_id).toBeNull();
+    expect(report.requests[0].terminal_status).toBeNull();
+  });
+
   it('keeps the external-effect and exactly-once claims out of scope', () => {
     const report = verifyRequestOutcomeContinuity(
       findCase('request_with_terminal_outcome_is_continuous').input,
