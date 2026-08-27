@@ -43,10 +43,38 @@ function compareText(left: string, right: string): number {
 
 function requireValue(args: string[], index: number, flag: string): string {
   const value = args[index + 1];
-  if (!value || value === '--') {
+  if (!value || value === '--' || value.startsWith('-')) {
     throw new ContinuityCliError(`${flag} requires a value`);
   }
   return value;
+}
+
+function requireInlineValue(value: string, flag: string): string {
+  if (value.length === 0) {
+    throw new ContinuityCliError(`${flag} requires a value`);
+  }
+  return value;
+}
+
+function assignInputPath(parsed: ContinuityCliArgs, value: string): void {
+  if (parsed.inputPath !== undefined) {
+    throw new ContinuityCliError(
+      `multiple input paths provided: ${parsed.inputPath}, ${value}`,
+    );
+  }
+  parsed.inputPath = value;
+}
+
+function assignUniqueOption(
+  parsed: ContinuityCliArgs,
+  field: 'outputPath' | 'schemaDir',
+  value: string,
+  flag: string,
+): void {
+  if (parsed[field] !== undefined) {
+    throw new ContinuityCliError(`${flag} may be provided only once`);
+  }
+  parsed[field] = value;
 }
 
 export function parseContinuityCliArgs(argv: string[]): ContinuityCliArgs {
@@ -73,41 +101,62 @@ export function parseContinuityCliArgs(argv: string[]): ContinuityCliArgs {
       continue;
     }
     if (argument === '--input') {
-      parsed.inputPath = requireValue(argv, index, '--input');
+      assignInputPath(parsed, requireValue(argv, index, '--input'));
       index += 1;
       continue;
     }
     if (argument.startsWith('--input=')) {
-      parsed.inputPath = argument.slice('--input='.length);
+      assignInputPath(
+        parsed,
+        requireInlineValue(argument.slice('--input='.length), '--input'),
+      );
       continue;
     }
     if (argument === '--out') {
-      parsed.outputPath = requireValue(argv, index, '--out');
+      assignUniqueOption(
+        parsed,
+        'outputPath',
+        requireValue(argv, index, '--out'),
+        '--out',
+      );
       index += 1;
       continue;
     }
     if (argument.startsWith('--out=')) {
-      parsed.outputPath = argument.slice('--out='.length);
+      assignUniqueOption(
+        parsed,
+        'outputPath',
+        requireInlineValue(argument.slice('--out='.length), '--out'),
+        '--out',
+      );
       continue;
     }
     if (argument === '--schema-dir') {
-      parsed.schemaDir = requireValue(argv, index, '--schema-dir');
+      assignUniqueOption(
+        parsed,
+        'schemaDir',
+        requireValue(argv, index, '--schema-dir'),
+        '--schema-dir',
+      );
       index += 1;
       continue;
     }
     if (argument.startsWith('--schema-dir=')) {
-      parsed.schemaDir = argument.slice('--schema-dir='.length);
+      assignUniqueOption(
+        parsed,
+        'schemaDir',
+        requireInlineValue(
+          argument.slice('--schema-dir='.length),
+          '--schema-dir',
+        ),
+        '--schema-dir',
+      );
       continue;
     }
     if (argument.startsWith('-')) {
       throw new ContinuityCliError(`unknown option: ${argument}`);
     }
-    if (parsed.inputPath) {
-      throw new ContinuityCliError(
-        `multiple input paths provided: ${parsed.inputPath}, ${argument}`,
-      );
-    }
-    parsed.inputPath = argument;
+    assignInputPath(parsed, argument);
   }
 
   return parsed;
@@ -222,6 +271,30 @@ export function createContinuitySchemaValidators(
   };
 }
 
+function sameExistingFile(inputPath: string, outputPath: string): boolean {
+  if (outputPath === inputPath) return true;
+  if (!fs.existsSync(outputPath)) return false;
+
+  try {
+    const inputStat = fs.statSync(inputPath);
+    const outputStat = fs.statSync(outputPath);
+    if (
+      inputStat.dev === outputStat.dev &&
+      inputStat.ino !== 0 &&
+      inputStat.ino === outputStat.ino
+    ) {
+      return true;
+    }
+    return fs.realpathSync(inputPath) === fs.realpathSync(outputPath);
+  } catch (error) {
+    throw new ContinuityCliError(
+      `output target could not be inspected safely: ${outputPath}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+
 function writeReport(
   report: ContinuityReport,
   args: ContinuityCliArgs,
@@ -235,9 +308,9 @@ function writeReport(
   }
 
   const outputPath = path.resolve(args.outputPath);
-  if (outputPath === inputPath) {
+  if (sameExistingFile(inputPath, outputPath)) {
     throw new ContinuityCliError(
-      'output path must differ from the input path to avoid overwriting evidence',
+      'output path must refer to a different file than the input evidence',
     );
   }
 
@@ -287,9 +360,7 @@ export function runContinuityCli(
 
     return report.overall_status === 'BROKEN' && !args.allowBroken ? 2 : 0;
   } catch (error) {
-    io.stderr(
-      `${error instanceof Error ? error.message : String(error)}\n`,
-    );
+    io.stderr(`${error instanceof Error ? error.message : String(error)}\n`);
     return 1;
   }
 }
