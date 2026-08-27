@@ -1,0 +1,29 @@
+{
+  "as_of": "2026-08-27T12:00:00Z",
+  "requests": [
+    {
+      "schema_version": 1,
+      "profile": "org.ltp.request-envelope.v0.1",
+      "record_type": "REQUEST",
+      "request_id": "req-safe",
+      "request\u005fid": "req-shadow",
+      "trace_id": "trace-duplicate-name",
+      "attempt_id": "attempt-duplicate-name",
+      "occurred_at": "2026-08-27T10:00:00Z",
+      "state": "PENDING"
+    }
+  ],
+  "outcomes": [
+    {
+      "schema_version": 1,
+      "profile": "org.ltp.outcome-envelope.v0.1",
+      "record_type": "OUTCOME",
+      "outcome_id": "outcome-duplicate-name",
+      "request_id": "req-safe",
+      "trace_id": "trace-duplicate-name",
+      "attempt_id": "attempt-duplicate-name",
+      "occurred_at": "2026-08-27T10:01:00Z",
+      "terminal_status": "COMPLETED"
+    }
+  ]
+}
