@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ltp:schema:request-outcome-continuity-input:v0.1",
+  "title": "LTP request/outcome continuity input v0.1",
+  "description": "A bounded observation snapshot evaluated by the request/outcome continuity verifier.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "as_of",
+    "requests",
+    "outcomes"
+  ],
+  "properties": {
+    "as_of": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:ltp:schema:request-envelope:v0.1"
+      }
+    },
+    "outcomes": {
+      "type": "array",
+      "items": {
+        "$ref": "urn:ltp:schema:outcome-envelope:v0.1"
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    }
+  },
+  "anyOf": [
+    {
+      "properties": {
+        "requests": {
+          "minItems": 1
+        }
+      }
+    },
+    {
+      "properties": {
+        "outcomes": {
+          "minItems": 1
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\s)[\\s\\S]*\\S$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$"
+    }
+  }
+}
