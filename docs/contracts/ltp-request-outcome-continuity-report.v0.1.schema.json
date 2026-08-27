@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ltp:schema:request-outcome-continuity-report:v0.1",
+  "title": "LTP request/outcome continuity report v0.1",
+  "description": "Deterministic continuity verdict for a bounded request/outcome observation snapshot.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile",
+    "as_of",
+    "overall_status",
+    "requests",
+    "orphan_outcome_ids",
+    "findings",
+    "verifier",
+    "claim_boundary"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "profile": {
+      "const": "org.ltp.request-outcome-continuity-report.v0.1"
+    },
+    "as_of": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "overall_status": {
+      "$ref": "#/$defs/continuity_status"
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/request_result"
+      }
+    },
+    "orphan_outcome_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/identifier"
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    },
+    "verifier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "version"
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "version": {
+          "$ref": "#/$defs/identifier"
+        }
+      }
+    },
+    "claim_boundary": {
+      "const": "This report evaluates continuity only across the supplied request and outcome envelopes as of the declared time. It does not prove authorization, response truth, external side effects, complete pre-observation history, or universal exactly-once execution."
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\s)[\\s\\S]*\\S$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$"
+    },
+    "continuity_status": {
+      "enum": [
+        "CONTINUOUS",
+        "PENDING",
+        "DEFERRED",
+        "BROKEN"
+      ]
+    },
+    "terminal_status": {
+      "enum": [
+        "COMPLETED",
+        "FAILED",
+        "REJECTED",
+        "CANCELLED",
+        "TIMED_OUT"
+      ]
+    },
+    "finding_code": {
+      "enum": [
+        "BROKEN_ORPHAN_RESPONSE",
+        "BROKEN_MISSING_OUTCOME",
+        "BROKEN_CONFLICTING_OUTCOMES",
+        "BROKEN_TIME_REVERSAL",
+        "BROKEN_PARENT_GAP",
+        "BROKEN_RETRY_GAP",
+        "BROKEN_ATTEMPT_GAP",
+        "BROKEN_TRACE_MISMATCH",
+        "BROKEN_REPLAY_GAP",
+        "REPLAY_DETECTED"
+      ]
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "request_id",
+        "record_ids",
+        "detail"
+      ],
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/finding_code"
+        },
+        "request_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "record_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "detail": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "request_result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "request_id",
+        "trace_id",
+        "status",
+        "attempt_ids",
+        "effective_deadline_at",
+        "canonical_outcome_id",
+        "terminal_status",
+        "replay_outcome_ids",
+        "findings"
+      ],
+      "properties": {
+        "request_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "trace_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/continuity_status"
+        },
+        "attempt_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "effective_deadline_at": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "canonical_outcome_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "terminal_status": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/terminal_status"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "replay_outcome_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/identifier"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/finding"
+          }
+        }
+      }
+    }
+  }
+}

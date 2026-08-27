@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ltp:schema:outcome-envelope:v0.1",
+  "title": "LTP outcome envelope v0.1",
+  "description": "One terminal outcome or explicit replay belonging to a logical request attempt.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "profile",
+    "record_type",
+    "outcome_id",
+    "request_id",
+    "trace_id",
+    "attempt_id",
+    "occurred_at",
+    "terminal_status"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "profile": {
+      "const": "org.ltp.outcome-envelope.v0.1"
+    },
+    "record_type": {
+      "const": "OUTCOME"
+    },
+    "outcome_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "request_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "trace_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "attempt_id": {
+      "$ref": "#/$defs/identifier"
+    },
+    "occurred_at": {
+      "$ref": "#/$defs/timestamp"
+    },
+    "terminal_status": {
+      "enum": [
+        "COMPLETED",
+        "FAILED",
+        "REJECTED",
+        "CANCELLED",
+        "TIMED_OUT"
+      ]
+    },
+    "result_digest": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "replay_of_outcome_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/identifier"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!\\s)[\\s\\S]*\\S$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?(?:Z|[+-]\\d{2}:\\d{2})$"
+    }
+  }
+}
