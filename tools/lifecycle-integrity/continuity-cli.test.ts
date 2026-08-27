@@ -18,10 +18,14 @@ type FixtureCase = {
   input: ContinuityVerificationInput;
 };
 
+const fixtureDirectory = path.join(__dirname, 'fixtures');
 const fixturePath = path.join(
-  __dirname,
-  'fixtures',
+  fixtureDirectory,
   'request-outcome-continuity-v0.1.json',
+);
+const duplicateNameFixturePath = path.join(
+  fixtureDirectory,
+  'duplicate-request-id.v0.1.json.txt',
 );
 const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as {
   cases: FixtureCase[];
@@ -35,9 +39,7 @@ function fixtureInput(caseId: string): ContinuityVerificationInput {
   return structuredClone(entry.input);
 }
 
-function writeInput(
-  input: ContinuityVerificationInput | Record<string, unknown>,
-): {
+function writeRawInput(raw: string): {
   directory: string;
   inputPath: string;
 } {
@@ -46,8 +48,17 @@ function writeInput(
   );
   temporaryDirectories.push(directory);
   const inputPath = path.join(directory, 'input.json');
-  fs.writeFileSync(inputPath, `${JSON.stringify(input, null, 2)}\n`, 'utf8');
+  fs.writeFileSync(inputPath, raw, 'utf8');
   return { directory, inputPath };
+}
+
+function writeInput(
+  input: ContinuityVerificationInput | Record<string, unknown>,
+): {
+  directory: string;
+  inputPath: string;
+} {
+  return writeRawInput(`${JSON.stringify(input, null, 2)}\n`);
 }
 
 function captureIo(): {
@@ -180,6 +191,21 @@ describe('request/outcome continuity CLI', () => {
     expect(report.requests[0].canonical_outcome_id).toBe('outcome-1');
   });
 
+  it('rejects escaped-equivalent duplicate JSON object names before schema validation', () => {
+    const raw = fs.readFileSync(duplicateNameFixturePath, 'utf8');
+    const { inputPath } = writeRawInput(raw);
+    const captured = captureIo();
+
+    expect(runContinuityCli([inputPath], captured.io)).toBe(1);
+    expect(captured.stdout).toEqual([]);
+    expect(captured.stderr.join('')).toContain(
+      'duplicate object name "request_id" at /requests/0',
+    );
+    expect(captured.stderr.join('')).not.toContain(
+      'does not match its JSON Schema',
+    );
+  });
+
   it('returns exit code 2 for BROKEN unless explicitly allowed', () => {
     const { inputPath } = writeInput(
       fixtureInput('expired_request_without_outcome_breaks_continuity'),
@@ -244,6 +270,39 @@ describe('request/outcome continuity CLI', () => {
       'output path must refer to a different file',
     );
     expect(fs.readFileSync(inputPath, 'utf8')).toBe(inputBefore);
+
+    const symlinkPath = path.join(directory, 'input-symbolic-link.json');
+    let symlinkAvailable = true;
+    try {
+      fs.symlinkSync(inputPath, symlinkPath, 'file');
+    } catch (error) {
+      const code =
+        error && typeof error === 'object' && 'code' in error
+          ? String(error.code)
+          : '';
+      if (
+        process.platform === 'win32' &&
+        (code === 'EPERM' || code === 'EACCES' || code === 'ENOTSUP')
+      ) {
+        symlinkAvailable = false;
+      } else {
+        throw error;
+      }
+    }
+
+    if (symlinkAvailable) {
+      const symlinkRefused = captureIo();
+      expect(
+        runContinuityCli(
+          [inputPath, '--out', symlinkPath],
+          symlinkRefused.io,
+        ),
+      ).toBe(1);
+      expect(symlinkRefused.stderr.join('')).toContain(
+        'output path must refer to a different file',
+      );
+      expect(fs.readFileSync(inputPath, 'utf8')).toBe(inputBefore);
+    }
   });
 
   it('rejects structurally invalid input before semantic verification', () => {
