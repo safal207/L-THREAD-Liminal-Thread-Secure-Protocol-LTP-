@@ -37,10 +37,14 @@
       },
       "expected": {
         "overall_status": "CONTINUOUS",
-        "request_statuses": ["CONTINUOUS"],
+        "request_statuses": [
+          "CONTINUOUS"
+        ],
         "finding_codes": [],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": ["outcome-1"]
+        "canonical_outcome_ids": [
+          "outcome-1"
+        ]
       }
     },
     {
@@ -64,10 +68,14 @@
       },
       "expected": {
         "overall_status": "PENDING",
-        "request_statuses": ["PENDING"],
+        "request_statuses": [
+          "PENDING"
+        ],
         "finding_codes": [],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": [null]
+        "canonical_outcome_ids": [
+          null
+        ]
       }
     },
     {
@@ -92,10 +100,14 @@
       },
       "expected": {
         "overall_status": "DEFERRED",
-        "request_statuses": ["DEFERRED"],
+        "request_statuses": [
+          "DEFERRED"
+        ],
         "finding_codes": [],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": [null]
+        "canonical_outcome_ids": [
+          null
+        ]
       }
     },
     {
@@ -119,10 +131,16 @@
       },
       "expected": {
         "overall_status": "BROKEN",
-        "request_statuses": ["BROKEN"],
-        "finding_codes": ["BROKEN_MISSING_OUTCOME"],
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_MISSING_OUTCOME"
+        ],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": [null]
+        "canonical_outcome_ids": [
+          null
+        ]
       }
     },
     {
@@ -148,8 +166,12 @@
       "expected": {
         "overall_status": "BROKEN",
         "request_statuses": [],
-        "finding_codes": ["BROKEN_ORPHAN_RESPONSE"],
-        "orphan_outcome_ids": ["outcome-5"],
+        "finding_codes": [
+          "BROKEN_ORPHAN_RESPONSE"
+        ],
+        "orphan_outcome_ids": [
+          "outcome-5"
+        ],
         "canonical_outcome_ids": []
       }
     },
@@ -198,10 +220,16 @@
       },
       "expected": {
         "overall_status": "BROKEN",
-        "request_statuses": ["BROKEN"],
-        "finding_codes": ["BROKEN_CONFLICTING_OUTCOMES"],
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_CONFLICTING_OUTCOMES"
+        ],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": ["outcome-6a"]
+        "canonical_outcome_ids": [
+          null
+        ]
       }
     },
     {
@@ -250,11 +278,21 @@
       },
       "expected": {
         "overall_status": "CONTINUOUS",
-        "request_statuses": ["CONTINUOUS"],
-        "finding_codes": ["REPLAY_DETECTED"],
+        "request_statuses": [
+          "CONTINUOUS"
+        ],
+        "finding_codes": [
+          "REPLAY_DETECTED"
+        ],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": ["outcome-7a"],
-        "replay_outcome_ids": [["outcome-7b"]]
+        "canonical_outcome_ids": [
+          "outcome-7a"
+        ],
+        "replay_outcome_ids": [
+          [
+            "outcome-7b"
+          ]
+        ]
       }
     },
     {
@@ -271,7 +309,9 @@
             "attempt_id": "attempt-8a",
             "occurred_at": "2026-08-27T10:00:00Z",
             "state": "PENDING",
-            "metadata": { "runtime": "before-restart" }
+            "metadata": {
+              "runtime": "before-restart"
+            }
           },
           {
             "schema_version": 1,
@@ -283,7 +323,9 @@
             "occurred_at": "2026-08-27T10:05:00Z",
             "state": "PENDING",
             "retry_of_attempt_id": "attempt-8a",
-            "metadata": { "runtime": "after-restart" }
+            "metadata": {
+              "runtime": "after-restart"
+            }
           }
         ],
         "outcomes": [
@@ -303,11 +345,20 @@
       },
       "expected": {
         "overall_status": "CONTINUOUS",
-        "request_statuses": ["CONTINUOUS"],
+        "request_statuses": [
+          "CONTINUOUS"
+        ],
         "finding_codes": [],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": ["outcome-8"],
-        "attempt_ids": [["attempt-8a", "attempt-8b"]]
+        "canonical_outcome_ids": [
+          "outcome-8"
+        ],
+        "attempt_ids": [
+          [
+            "attempt-8a",
+            "attempt-8b"
+          ]
+        ]
       }
     },
     {
@@ -353,10 +404,16 @@
       },
       "expected": {
         "overall_status": "BROKEN",
-        "request_statuses": ["BROKEN"],
-        "finding_codes": ["BROKEN_RETRY_GAP"],
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_RETRY_GAP"
+        ],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": ["outcome-9"]
+        "canonical_outcome_ids": [
+          "outcome-9"
+        ]
       }
     },
     {
@@ -392,10 +449,16 @@
       },
       "expected": {
         "overall_status": "BROKEN",
-        "request_statuses": ["BROKEN"],
-        "finding_codes": ["BROKEN_TIME_REVERSAL"],
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_TIME_REVERSAL"
+        ],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": ["outcome-10"]
+        "canonical_outcome_ids": [
+          "outcome-10"
+        ]
       }
     },
     {
@@ -419,10 +482,119 @@
       },
       "expected": {
         "overall_status": "BROKEN",
-        "request_statuses": ["BROKEN"],
-        "finding_codes": ["BROKEN_PARENT_GAP"],
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_PARENT_GAP"
+        ],
         "orphan_outcome_ids": [],
-        "canonical_outcome_ids": [null]
+        "canonical_outcome_ids": [
+          null
+        ]
+      }
+    },
+    {
+      "case_id": "parent_after_child_breaks_causal_time_order",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-parent-12",
+            "trace_id": "trace-parent-12",
+            "attempt_id": "attempt-parent-12",
+            "occurred_at": "2026-08-27T10:05:00Z",
+            "state": "PENDING"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-child-12",
+            "trace_id": "trace-child-12",
+            "attempt_id": "attempt-child-12",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING",
+            "parent_request_id": "req-parent-12"
+          }
+        ],
+        "outcomes": []
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN",
+          "PENDING"
+        ],
+        "finding_codes": [
+          "BROKEN_TIME_REVERSAL"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "case_id": "replay_before_canonical_breaks_time_order",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-13",
+            "trace_id": "trace-13",
+            "attempt_id": "attempt-13",
+            "occurred_at": "2026-08-27T09:59:00Z",
+            "state": "PENDING"
+          }
+        ],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-13a",
+            "request_id": "req-13",
+            "trace_id": "trace-13",
+            "attempt_id": "attempt-13",
+            "occurred_at": "2026-08-27T10:01:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-13"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-13b",
+            "request_id": "req-13",
+            "trace_id": "trace-13",
+            "attempt_id": "attempt-13",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-13",
+            "replay_of_outcome_id": "outcome-13a"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_TIME_REVERSAL"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          "outcome-13a"
+        ]
       }
     }
   ]
