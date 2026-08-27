@@ -1,0 +1,274 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { describe, expect, it } from 'vitest';
+import {
+  ContinuityEnvelopeError,
+  type ContinuityVerificationInput,
+  verifyRequestOutcomeContinuity,
+} from './continuity';
+
+type FixtureCase = {
+  case_id: string;
+  input: ContinuityVerificationInput;
+  expected: {
+    overall_status: string;
+    request_statuses: string[];
+    finding_codes: string[];
+    orphan_outcome_ids: string[];
+    canonical_outcome_ids: Array<string | null>;
+    replay_outcome_ids?: string[][];
+    attempt_ids?: string[][];
+    effective_deadline_at?: Array<string | null>;
+  };
+};
+
+const fixturePath = path.join(
+  __dirname,
+  'fixtures',
+  'request-outcome-continuity-v0.1.json',
+);
+const fixture = JSON.parse(fs.readFileSync(fixturePath, 'utf8')) as {
+  schema_version: number;
+  profile: string;
+  cases: FixtureCase[];
+};
+
+function findCase(caseId: string): FixtureCase {
+  const result = fixture.cases.find((entry) => entry.case_id === caseId);
+  if (!result) throw new Error(`fixture case not found: ${caseId}`);
+  return result;
+}
+
+describe('request/outcome continuity', () => {
+  it('uses the versioned machine-readable fixture profile', () => {
+    expect(fixture.schema_version).toBe(1);
+    expect(fixture.profile).toBe(
+      'org.ltp.request-outcome-continuity-fixtures.v0.1',
+    );
+  });
+
+  it.each(fixture.cases.map((entry) => [entry.case_id, entry] as const))(
+    'replays %s deterministically',
+    (_caseId, caseData) => {
+      const first = verifyRequestOutcomeContinuity(caseData.input);
+      const second = verifyRequestOutcomeContinuity(caseData.input);
+
+      expect(second).toEqual(first);
+      expect(first.overall_status).toBe(caseData.expected.overall_status);
+      expect(first.requests.map((request) => request.status)).toEqual(
+        caseData.expected.request_statuses,
+      );
+      expect(first.findings.map((entry) => entry.code)).toEqual(
+        caseData.expected.finding_codes,
+      );
+      expect(first.orphan_outcome_ids).toEqual(
+        caseData.expected.orphan_outcome_ids,
+      );
+      expect(
+        first.requests.map((request) => request.canonical_outcome_id),
+      ).toEqual(caseData.expected.canonical_outcome_ids);
+
+      if (caseData.expected.replay_outcome_ids) {
+        expect(
+          first.requests.map((request) => request.replay_outcome_ids),
+        ).toEqual(caseData.expected.replay_outcome_ids);
+      }
+      if (caseData.expected.attempt_ids) {
+        expect(first.requests.map((request) => request.attempt_ids)).toEqual(
+          caseData.expected.attempt_ids,
+        );
+      }
+      if (caseData.expected.effective_deadline_at) {
+        expect(
+          first.requests.map((request) => request.effective_deadline_at),
+        ).toEqual(caseData.expected.effective_deadline_at);
+      }
+    },
+  );
+
+  it('keeps restart attempts under one logical request', () => {
+    const report = verifyRequestOutcomeContinuity(
+      findCase('restart_retry_preserves_logical_request_identity').input,
+    );
+
+    expect(report.requests).toHaveLength(1);
+    expect(report.requests[0].request_id).toBe('req-8');
+    expect(report.requests[0].attempt_ids).toEqual([
+      'attempt-8a',
+      'attempt-8b',
+    ]);
+    expect(report.requests[0].status).toBe('CONTINUOUS');
+  });
+
+  it('detects replay without creating a second canonical completion', () => {
+    const report = verifyRequestOutcomeContinuity(
+      findCase('explicit_replay_keeps_one_canonical_outcome').input,
+    );
+    const request = report.requests[0];
+
+    expect(request.canonical_outcome_id).toBe('outcome-7a');
+    expect(request.replay_outcome_ids).toEqual(['outcome-7b']);
+    expect(request.terminal_status).toBe('COMPLETED');
+    expect(request.status).toBe('CONTINUOUS');
+    expect(report.findings.map((entry) => entry.code)).toEqual([
+      'REPLAY_DETECTED',
+    ]);
+  });
+
+  it('rejects a deferred envelope without a continuation reference', () => {
+    const input = structuredClone(
+      findCase('durable_defer_is_not_a_silent_gap').input,
+    );
+    delete input.requests[0].continuation_id;
+
+    expect(() => verifyRequestOutcomeContinuity(input)).toThrowError(
+      ContinuityEnvelopeError,
+    );
+    expect(() => verifyRequestOutcomeContinuity(input)).toThrowError(
+      /continuation_id is required for DEFERRED state/,
+    );
+  });
+
+  it('rejects request and outcome records that occur after as_of', () => {
+    const futureRequest = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    futureRequest.requests[0].occurred_at = '2026-08-27T12:01:00Z';
+    futureRequest.requests[0].deadline_at = '2026-08-27T12:30:00Z';
+
+    expect(() => verifyRequestOutcomeContinuity(futureRequest)).toThrowError(
+      /requests\[0\]\.occurred_at cannot be after as_of/,
+    );
+
+    const futureOutcome = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    futureOutcome.outcomes[0].occurred_at = '2026-08-27T12:01:00Z';
+
+    expect(() => verifyRequestOutcomeContinuity(futureOutcome)).toThrowError(
+      /outcomes\[0\]\.occurred_at cannot be after as_of/,
+    );
+  });
+
+  it('rejects one outcome_id assigned to different logical requests', () => {
+    const input = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    input.requests.push({
+      ...input.requests[0],
+      request_id: 'req-1-other',
+      trace_id: 'trace-1-other',
+      attempt_id: 'attempt-1-other',
+    });
+    input.outcomes.push({
+      ...input.outcomes[0],
+      request_id: 'req-1-other',
+      trace_id: 'trace-1-other',
+      attempt_id: 'attempt-1-other',
+    });
+
+    expect(() => verifyRequestOutcomeContinuity(input)).toThrowError(
+      /outcome_id outcome-1 cannot belong to multiple requests/,
+    );
+  });
+
+  it('does not choose an arbitrary canonical outcome during a conflict', () => {
+    const report = verifyRequestOutcomeContinuity(
+      findCase('two_canonical_outcomes_conflict').input,
+    );
+
+    expect(report.requests[0].status).toBe('BROKEN');
+    expect(report.requests[0].canonical_outcome_id).toBeNull();
+    expect(report.requests[0].terminal_status).toBeNull();
+  });
+
+  it('rejects timestamps without an explicit UTC offset', () => {
+    const input = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    input.requests[0].occurred_at = '2026-08-27T10:00:00';
+
+    expect(() => verifyRequestOutcomeContinuity(input)).toThrowError(
+      /ISO-8601 instant with an explicit UTC offset/,
+    );
+  });
+
+  it('rejects identifiers with leading or trailing whitespace', () => {
+    const requestInput = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    requestInput.requests[0].request_id = ' req-1';
+
+    expect(() => verifyRequestOutcomeContinuity(requestInput)).toThrowError(
+      /request_id must not contain leading or trailing whitespace/,
+    );
+
+    const outcomeInput = structuredClone(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+    outcomeInput.outcomes[0].outcome_id = 'outcome-1 ';
+
+    expect(() => verifyRequestOutcomeContinuity(outcomeInput)).toThrowError(
+      /outcome_id must not contain leading or trailing whitespace/,
+    );
+  });
+
+  it('does not depend on localeCompare for deterministic ordering', () => {
+    const report = (() => {
+      const originalLocaleCompare = String.prototype.localeCompare;
+      String.prototype.localeCompare = () => {
+        throw new Error(
+          'localeCompare must not be used by continuity verification',
+        );
+      };
+      try {
+        return verifyRequestOutcomeContinuity(
+          findCase('explicit_replay_keeps_one_canonical_outcome').input,
+        );
+      } finally {
+        String.prototype.localeCompare = originalLocaleCompare;
+      }
+    })();
+
+    expect(report.overall_status).toBe('CONTINUOUS');
+    expect(report.findings.map((entry) => entry.code)).toEqual([
+      'REPLAY_DETECTED',
+    ]);
+  });
+
+  it('deduplicates repeated orphan delivery by outcome_id', () => {
+    const input = structuredClone(
+      findCase('outcome_without_request_is_orphaned').input,
+    );
+    input.outcomes.push(structuredClone(input.outcomes[0]));
+
+    const report = verifyRequestOutcomeContinuity(input);
+
+    expect(report.orphan_outcome_ids).toEqual(['outcome-5']);
+    expect(report.findings.map((entry) => entry.code)).toEqual([
+      'BROKEN_ORPHAN_RESPONSE',
+    ]);
+  });
+
+  it('uses the latest declared retry deadline as the operative deadline', () => {
+    const report = verifyRequestOutcomeContinuity(
+      findCase('latest_retry_deadline_remains_pending').input,
+    );
+
+    expect(report.requests[0].status).toBe('PENDING');
+    expect(report.requests[0].effective_deadline_at).toBe(
+      '2026-08-27T13:00:00Z',
+    );
+    expect(report.findings).toEqual([]);
+  });
+
+  it('keeps the external-effect and exactly-once claims out of scope', () => {
+    const report = verifyRequestOutcomeContinuity(
+      findCase('request_with_terminal_outcome_is_continuous').input,
+    );
+
+    expect(report.claim_boundary).toContain('does not prove authorization');
+    expect(report.claim_boundary).toContain('external side effects');
+    expect(report.claim_boundary).toContain('exactly-once execution');
+  });
+});

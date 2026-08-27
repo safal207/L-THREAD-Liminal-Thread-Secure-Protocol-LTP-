@@ -1,0 +1,647 @@
+{
+  "schema_version": 1,
+  "profile": "org.ltp.request-outcome-continuity-fixtures.v0.1",
+  "cases": [
+    {
+      "case_id": "request_with_terminal_outcome_is_continuous",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-1",
+            "trace_id": "trace-1",
+            "attempt_id": "attempt-1",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING",
+            "deadline_at": "2026-08-27T11:00:00Z",
+            "payload_digest": "sha256:payload-1"
+          }
+        ],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-1",
+            "request_id": "req-1",
+            "trace_id": "trace-1",
+            "attempt_id": "attempt-1",
+            "occurred_at": "2026-08-27T10:01:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-1"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "CONTINUOUS",
+        "request_statuses": [
+          "CONTINUOUS"
+        ],
+        "finding_codes": [],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          "outcome-1"
+        ]
+      }
+    },
+    {
+      "case_id": "request_within_deadline_remains_pending",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-2",
+            "trace_id": "trace-2",
+            "attempt_id": "attempt-2",
+            "occurred_at": "2026-08-27T11:50:00Z",
+            "state": "PENDING",
+            "deadline_at": "2026-08-27T12:30:00Z"
+          }
+        ],
+        "outcomes": []
+      },
+      "expected": {
+        "overall_status": "PENDING",
+        "request_statuses": [
+          "PENDING"
+        ],
+        "finding_codes": [],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null
+        ]
+      }
+    },
+    {
+      "case_id": "durable_defer_is_not_a_silent_gap",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-3",
+            "trace_id": "trace-3",
+            "attempt_id": "attempt-3",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "DEFERRED",
+            "deadline_at": "2026-08-27T11:00:00Z",
+            "continuation_id": "continuation-3"
+          }
+        ],
+        "outcomes": []
+      },
+      "expected": {
+        "overall_status": "DEFERRED",
+        "request_statuses": [
+          "DEFERRED"
+        ],
+        "finding_codes": [],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null
+        ]
+      }
+    },
+    {
+      "case_id": "expired_request_without_outcome_breaks_continuity",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-4",
+            "trace_id": "trace-4",
+            "attempt_id": "attempt-4",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING",
+            "deadline_at": "2026-08-27T11:00:00Z"
+          }
+        ],
+        "outcomes": []
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_MISSING_OUTCOME"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null
+        ]
+      }
+    },
+    {
+      "case_id": "outcome_without_request_is_orphaned",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-5",
+            "request_id": "req-missing",
+            "trace_id": "trace-5",
+            "attempt_id": "attempt-5",
+            "occurred_at": "2026-08-27T10:01:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-5"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [],
+        "finding_codes": [
+          "BROKEN_ORPHAN_RESPONSE"
+        ],
+        "orphan_outcome_ids": [
+          "outcome-5"
+        ],
+        "canonical_outcome_ids": []
+      }
+    },
+    {
+      "case_id": "two_canonical_outcomes_conflict",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-6",
+            "trace_id": "trace-6",
+            "attempt_id": "attempt-6",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING"
+          }
+        ],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-6a",
+            "request_id": "req-6",
+            "trace_id": "trace-6",
+            "attempt_id": "attempt-6",
+            "occurred_at": "2026-08-27T10:01:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-6a"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-6b",
+            "request_id": "req-6",
+            "trace_id": "trace-6",
+            "attempt_id": "attempt-6",
+            "occurred_at": "2026-08-27T10:02:00Z",
+            "terminal_status": "FAILED",
+            "result_digest": "sha256:result-6b"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_CONFLICTING_OUTCOMES"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null
+        ]
+      }
+    },
+    {
+      "case_id": "explicit_replay_keeps_one_canonical_outcome",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-7",
+            "trace_id": "trace-7",
+            "attempt_id": "attempt-7",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING"
+          }
+        ],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-7a",
+            "request_id": "req-7",
+            "trace_id": "trace-7",
+            "attempt_id": "attempt-7",
+            "occurred_at": "2026-08-27T10:01:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-7"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-7b",
+            "request_id": "req-7",
+            "trace_id": "trace-7",
+            "attempt_id": "attempt-7",
+            "occurred_at": "2026-08-27T10:02:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-7",
+            "replay_of_outcome_id": "outcome-7a"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "CONTINUOUS",
+        "request_statuses": [
+          "CONTINUOUS"
+        ],
+        "finding_codes": [
+          "REPLAY_DETECTED"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          "outcome-7a"
+        ],
+        "replay_outcome_ids": [
+          [
+            "outcome-7b"
+          ]
+        ]
+      }
+    },
+    {
+      "case_id": "restart_retry_preserves_logical_request_identity",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-8",
+            "trace_id": "trace-8",
+            "attempt_id": "attempt-8a",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING",
+            "metadata": {
+              "runtime": "before-restart"
+            }
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-8",
+            "trace_id": "trace-8",
+            "attempt_id": "attempt-8b",
+            "occurred_at": "2026-08-27T10:05:00Z",
+            "state": "PENDING",
+            "retry_of_attempt_id": "attempt-8a",
+            "metadata": {
+              "runtime": "after-restart"
+            }
+          }
+        ],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-8",
+            "request_id": "req-8",
+            "trace_id": "trace-8",
+            "attempt_id": "attempt-8b",
+            "occurred_at": "2026-08-27T10:06:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-8"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "CONTINUOUS",
+        "request_statuses": [
+          "CONTINUOUS"
+        ],
+        "finding_codes": [],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          "outcome-8"
+        ],
+        "attempt_ids": [
+          [
+            "attempt-8a",
+            "attempt-8b"
+          ]
+        ]
+      }
+    },
+    {
+      "case_id": "unlinked_second_attempt_breaks_recovery_chain",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-9",
+            "trace_id": "trace-9",
+            "attempt_id": "attempt-9a",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-9",
+            "trace_id": "trace-9",
+            "attempt_id": "attempt-9b",
+            "occurred_at": "2026-08-27T10:05:00Z",
+            "state": "PENDING"
+          }
+        ],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-9",
+            "request_id": "req-9",
+            "trace_id": "trace-9",
+            "attempt_id": "attempt-9b",
+            "occurred_at": "2026-08-27T10:06:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-9"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_RETRY_GAP"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          "outcome-9"
+        ]
+      }
+    },
+    {
+      "case_id": "outcome_before_attempt_breaks_time_order",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-10",
+            "trace_id": "trace-10",
+            "attempt_id": "attempt-10",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING"
+          }
+        ],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-10",
+            "request_id": "req-10",
+            "trace_id": "trace-10",
+            "attempt_id": "attempt-10",
+            "occurred_at": "2026-08-27T09:59:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-10"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_TIME_REVERSAL"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          "outcome-10"
+        ]
+      }
+    },
+    {
+      "case_id": "unknown_parent_breaks_causal_chain",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-11",
+            "trace_id": "trace-11",
+            "attempt_id": "attempt-11",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING",
+            "parent_request_id": "req-unknown-parent"
+          }
+        ],
+        "outcomes": []
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_PARENT_GAP"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null
+        ]
+      }
+    },
+    {
+      "case_id": "parent_after_child_breaks_causal_time_order",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-parent-12",
+            "trace_id": "trace-parent-12",
+            "attempt_id": "attempt-parent-12",
+            "occurred_at": "2026-08-27T10:05:00Z",
+            "state": "PENDING"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-child-12",
+            "trace_id": "trace-child-12",
+            "attempt_id": "attempt-child-12",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING",
+            "parent_request_id": "req-parent-12"
+          }
+        ],
+        "outcomes": []
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN",
+          "PENDING"
+        ],
+        "finding_codes": [
+          "BROKEN_TIME_REVERSAL"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null,
+          null
+        ]
+      }
+    },
+    {
+      "case_id": "replay_before_canonical_breaks_time_order",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-13",
+            "trace_id": "trace-13",
+            "attempt_id": "attempt-13",
+            "occurred_at": "2026-08-27T09:59:00Z",
+            "state": "PENDING"
+          }
+        ],
+        "outcomes": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-13a",
+            "request_id": "req-13",
+            "trace_id": "trace-13",
+            "attempt_id": "attempt-13",
+            "occurred_at": "2026-08-27T10:01:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-13"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.outcome-envelope.v0.1",
+            "record_type": "OUTCOME",
+            "outcome_id": "outcome-13b",
+            "request_id": "req-13",
+            "trace_id": "trace-13",
+            "attempt_id": "attempt-13",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "terminal_status": "COMPLETED",
+            "result_digest": "sha256:result-13",
+            "replay_of_outcome_id": "outcome-13a"
+          }
+        ]
+      },
+      "expected": {
+        "overall_status": "BROKEN",
+        "request_statuses": [
+          "BROKEN"
+        ],
+        "finding_codes": [
+          "BROKEN_TIME_REVERSAL"
+        ],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          "outcome-13a"
+        ]
+      }
+    },
+    {
+      "case_id": "latest_retry_deadline_remains_pending",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-14",
+            "trace_id": "trace-14",
+            "attempt_id": "attempt-14a",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING",
+            "deadline_at": "2026-08-27T11:00:00Z"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-14",
+            "trace_id": "trace-14",
+            "attempt_id": "attempt-14b",
+            "occurred_at": "2026-08-27T11:30:00Z",
+            "state": "PENDING",
+            "deadline_at": "2026-08-27T13:00:00Z",
+            "retry_of_attempt_id": "attempt-14a"
+          }
+        ],
+        "outcomes": []
+      },
+      "expected": {
+        "overall_status": "PENDING",
+        "request_statuses": [
+          "PENDING"
+        ],
+        "finding_codes": [],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null
+        ],
+        "effective_deadline_at": [
+          "2026-08-27T13:00:00Z"
+        ]
+      }
+    }
+  ]
+}
