@@ -109,6 +109,43 @@ describe('request/outcome continuity CLI', () => {
     );
   });
 
+  it('rejects missing, empty, and duplicate path options', () => {
+    const missing = captureIo();
+    expect(
+      runContinuityCli(
+        ['--input', '--out', 'report.json'],
+        missing.io,
+      ),
+    ).toBe(1);
+    expect(missing.stderr.join('')).toContain('--input requires a value');
+
+    const empty = captureIo();
+    expect(runContinuityCli(['input.json', '--out='], empty.io)).toBe(1);
+    expect(empty.stderr.join('')).toContain('--out requires a value');
+
+    const duplicateInput = captureIo();
+    expect(
+      runContinuityCli(
+        ['--input=first.json', '--input=second.json'],
+        duplicateInput.io,
+      ),
+    ).toBe(1);
+    expect(duplicateInput.stderr.join('')).toContain(
+      'multiple input paths provided',
+    );
+
+    const duplicateOutput = captureIo();
+    expect(
+      runContinuityCli(
+        ['input.json', '--out=first.json', '--out=second.json'],
+        duplicateOutput.io,
+      ),
+    ).toBe(1);
+    expect(duplicateOutput.stderr.join('')).toContain(
+      '--out may be provided only once',
+    );
+  });
+
   it('compiles the four schemas and validates verifier output', () => {
     const input = fixtureInput(
       'request_with_terminal_outcome_is_continuous',
@@ -190,7 +227,21 @@ describe('request/outcome continuity CLI', () => {
       runContinuityCli([inputPath, '--out', inputPath], refused.io),
     ).toBe(1);
     expect(refused.stderr.join('')).toContain(
-      'output path must differ from the input path',
+      'output path must refer to a different file',
+    );
+    expect(fs.readFileSync(inputPath, 'utf8')).toBe(inputBefore);
+
+    const hardLinkPath = path.join(directory, 'input-hard-link.json');
+    fs.linkSync(inputPath, hardLinkPath);
+    const hardLinkRefused = captureIo();
+    expect(
+      runContinuityCli(
+        [inputPath, '--out', hardLinkPath],
+        hardLinkRefused.io,
+      ),
+    ).toBe(1);
+    expect(hardLinkRefused.stderr.join('')).toContain(
+      'output path must refer to a different file',
     );
     expect(fs.readFileSync(inputPath, 'utf8')).toBe(inputBefore);
   });
