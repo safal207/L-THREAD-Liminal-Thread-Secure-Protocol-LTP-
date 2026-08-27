@@ -118,16 +118,39 @@ function text(value: unknown, label: string): string {
   return value.trim();
 }
 
-function optionalText(value: unknown, label: string): string | null {
-  return value === undefined || value === null ? null : text(value, label);
+function identifier(value: unknown, label: string): string {
+  const normalized = text(value, label);
+  if (normalized !== value) {
+    throw new ContinuityEnvelopeError(
+      `${label} must not contain leading or trailing whitespace`,
+    );
+  }
+  return normalized;
 }
 
+function optionalIdentifier(value: unknown, label: string): string | null {
+  return value === undefined || value === null ? null : identifier(value, label);
+}
+
+const ISO_INSTANT =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+
 function timestamp(value: unknown, label: string): number {
-  const parsed = Date.parse(text(value, label));
+  const raw = text(value, label);
+  if (raw !== value || !ISO_INSTANT.test(raw)) {
+    throw new ContinuityEnvelopeError(
+      `${label} must be an ISO-8601 instant with an explicit UTC offset`,
+    );
+  }
+  const parsed = Date.parse(raw);
   if (!Number.isFinite(parsed)) {
     throw new ContinuityEnvelopeError(`${label} must be a valid timestamp`);
   }
   return parsed;
+}
+
+function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function canonical(value: unknown): unknown {
@@ -135,7 +158,7 @@ function canonical(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonical);
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>)
-      .sort(([left], [right]) => left.localeCompare(right))
+      .sort(([left], [right]) => compareText(left, right))
       .map(([key, item]) => [key, canonical(item)]),
   );
 }
@@ -146,18 +169,22 @@ function finding(
   recordIds: string[],
   detail: string,
 ): ContinuityFinding {
-  return { code, request_id: requestId, record_ids: [...recordIds].sort(), detail };
+  return {
+    code,
+    request_id: requestId,
+    record_ids: [...recordIds].sort(compareText),
+    detail,
+  };
 }
 
 function sortFindings(entries: ContinuityFinding[]): ContinuityFinding[] {
   return [...entries].sort((left, right) =>
-    [left.code, left.request_id ?? '', left.record_ids.join('\0')]
-      .join('\0')
-      .localeCompare(
-        [right.code, right.request_id ?? '', right.record_ids.join('\0')].join(
-          '\0',
-        ),
+    compareText(
+      [left.code, left.request_id ?? '', left.record_ids.join('\0')].join('\0'),
+      [right.code, right.request_id ?? '', right.record_ids.join('\0')].join(
+        '\0',
       ),
+    ),
   );
 }
 
@@ -179,36 +206,44 @@ function validateRequest(request: RequestEnvelope, index: number): {
   if (request.record_type !== 'REQUEST') {
     throw new ContinuityEnvelopeError(`${label}.record_type must be REQUEST`);
   }
-  const requestId = text(request.request_id, `${label}.request_id`);
-  const attemptId = text(request.attempt_id, `${label}.attempt_id`);
-  text(request.trace_id, `${label}.trace_id`);
+  const requestId = identifier(request.request_id, `${label}.request_id`);
+  const attemptId = identifier(request.attempt_id, `${label}.attempt_id`);
+  identifier(request.trace_id, `${label}.trace_id`);
   if (!REQUEST_STATES.has(request.state)) {
     throw new ContinuityEnvelopeError(`${label}.state is not supported`);
   }
   const occurredAt = timestamp(request.occurred_at, `${label}.occurred_at`);
-  const deadline = optionalText(request.deadline_at, `${label}.deadline_at`);
-  const deadlineAt = deadline ? timestamp(deadline, `${label}.deadline_at`) : null;
+  const deadlineAt =
+    request.deadline_at === undefined || request.deadline_at === null
+      ? null
+      : timestamp(request.deadline_at, `${label}.deadline_at`);
   if (deadlineAt !== null && deadlineAt < occurredAt) {
     throw new ContinuityEnvelopeError(`${label}.deadline_at cannot precede occurred_at`);
   }
-  const retryOf = optionalText(
+  const retryOf = optionalIdentifier(
     request.retry_of_attempt_id,
     `${label}.retry_of_attempt_id`,
   );
   if (retryOf === attemptId) {
     throw new ContinuityEnvelopeError(`${label}.retry_of_attempt_id cannot reference itself`);
   }
-  const parent = optionalText(request.parent_request_id, `${label}.parent_request_id`);
+  const parent = optionalIdentifier(
+    request.parent_request_id,
+    `${label}.parent_request_id`,
+  );
   if (parent === requestId) {
     throw new ContinuityEnvelopeError(`${label}.parent_request_id cannot reference itself`);
   }
-  const continuation = optionalText(request.continuation_id, `${label}.continuation_id`);
+  const continuation = optionalIdentifier(
+    request.continuation_id,
+    `${label}.continuation_id`,
+  );
   if (request.state === 'DEFERRED' && !continuation) {
     throw new ContinuityEnvelopeError(
       `${label}.continuation_id is required for DEFERRED state`,
     );
   }
-  optionalText(request.payload_digest, `${label}.payload_digest`);
+  optionalIdentifier(request.payload_digest, `${label}.payload_digest`);
   return { occurredAt, deadlineAt };
 }
 
@@ -223,14 +258,14 @@ function validateOutcome(outcome: OutcomeEnvelope, index: number): number {
   if (outcome.record_type !== 'OUTCOME') {
     throw new ContinuityEnvelopeError(`${label}.record_type must be OUTCOME`);
   }
-  const outcomeId = text(outcome.outcome_id, `${label}.outcome_id`);
-  text(outcome.request_id, `${label}.request_id`);
-  text(outcome.trace_id, `${label}.trace_id`);
-  text(outcome.attempt_id, `${label}.attempt_id`);
+  const outcomeId = identifier(outcome.outcome_id, `${label}.outcome_id`);
+  identifier(outcome.request_id, `${label}.request_id`);
+  identifier(outcome.trace_id, `${label}.trace_id`);
+  identifier(outcome.attempt_id, `${label}.attempt_id`);
   if (!TERMINAL_STATUSES.has(outcome.terminal_status)) {
     throw new ContinuityEnvelopeError(`${label}.terminal_status is not supported`);
   }
-  const replayOf = optionalText(
+  const replayOf = optionalIdentifier(
     outcome.replay_of_outcome_id,
     `${label}.replay_of_outcome_id`,
   );
@@ -239,7 +274,7 @@ function validateOutcome(outcome: OutcomeEnvelope, index: number): number {
       `${label}.replay_of_outcome_id cannot reference itself`,
     );
   }
-  optionalText(outcome.result_digest, `${label}.result_digest`);
+  optionalIdentifier(outcome.result_digest, `${label}.result_digest`);
   return timestamp(outcome.occurred_at, `${label}.occurred_at`);
 }
 
@@ -262,7 +297,7 @@ export function verifyRequestOutcomeContinuity(
     throw new ContinuityEnvelopeError('input must be an object');
   }
   const asOf = text(input.as_of, 'as_of');
-  const asOfTime = timestamp(asOf, 'as_of');
+  const asOfTime = timestamp(input.as_of, 'as_of');
   if (!Array.isArray(input.requests) || !Array.isArray(input.outcomes)) {
     throw new ContinuityEnvelopeError('requests and outcomes must be arrays');
   }
@@ -321,8 +356,13 @@ export function verifyRequestOutcomeContinuity(
   const requestIds = new Set(requestsById.keys());
   const findings: ContinuityFinding[] = [];
   const orphanOutcomeIds: string[] = [];
+  const seenOrphanOutcomeIds = new Set<string>();
   for (const outcome of input.outcomes) {
-    if (!requestIds.has(outcome.request_id)) {
+    if (
+      !requestIds.has(outcome.request_id) &&
+      !seenOrphanOutcomeIds.has(outcome.outcome_id)
+    ) {
+      seenOrphanOutcomeIds.add(outcome.outcome_id);
       orphanOutcomeIds.push(outcome.outcome_id);
       findings.push(
         finding(
@@ -336,11 +376,11 @@ export function verifyRequestOutcomeContinuity(
   }
 
   const requestResults: RequestContinuityResult[] = [];
-  for (const requestId of [...requestIds].sort()) {
+  for (const requestId of [...requestIds].sort(compareText)) {
     const attempts = [...(requestsById.get(requestId) ?? [])].sort(
       (left, right) =>
         (requestTime.get(left) ?? 0) - (requestTime.get(right) ?? 0) ||
-        left.attempt_id.localeCompare(right.attempt_id),
+        compareText(left.attempt_id, right.attempt_id),
     );
     const local: ContinuityFinding[] = [];
     const attemptById = new Map(attempts.map((item) => [item.attempt_id, item]));
@@ -441,7 +481,7 @@ export function verifyRequestOutcomeContinuity(
 
     const uniqueOutcomes: OutcomeEnvelope[] = [];
     const replayIds = new Set<string>();
-    for (const outcomeId of [...byOutcomeId.keys()].sort()) {
+    for (const outcomeId of [...byOutcomeId.keys()].sort(compareText)) {
       const copies = byOutcomeId.get(outcomeId) ?? [];
       const first = copies[0];
       uniqueOutcomes.push(first);
@@ -471,7 +511,7 @@ export function verifyRequestOutcomeContinuity(
 
     const canonicalOutcomes = uniqueOutcomes
       .filter((item) => !item.replay_of_outcome_id)
-      .sort((left, right) => left.outcome_id.localeCompare(right.outcome_id));
+      .sort((left, right) => compareText(left.outcome_id, right.outcome_id));
     const canonicalOutcome =
       canonicalOutcomes.length === 1 ? canonicalOutcomes[0] : null;
     if (uniqueOutcomes.length > 0 && canonicalOutcomes.length === 0) {
@@ -581,9 +621,8 @@ export function verifyRequestOutcomeContinuity(
       .filter(
         (item): item is { text: string; time: number } =>
           item.text !== null && item.time !== null && item.time !== undefined,
-      )
-      .sort((left, right) => left.time - right.time);
-    const deadline = deadlines[0] ?? null;
+      );
+    const deadline = deadlines.length > 0 ? deadlines[deadlines.length - 1] : null;
     const latestAttempt = attempts[attempts.length - 1];
     if (
       uniqueOutcomes.length === 0 &&
@@ -617,7 +656,7 @@ export function verifyRequestOutcomeContinuity(
       effective_deadline_at: deadline?.text ?? null,
       canonical_outcome_id: canonicalOutcome?.outcome_id ?? null,
       terminal_status: canonicalOutcome?.terminal_status ?? null,
-      replay_outcome_ids: [...replayIds].sort(),
+      replay_outcome_ids: [...replayIds].sort(compareText),
       findings: requestFindings,
     });
     findings.push(...requestFindings);
@@ -644,7 +683,7 @@ export function verifyRequestOutcomeContinuity(
     as_of: asOf,
     overall_status: overallStatus,
     requests: requestResults,
-    orphan_outcome_ids: [...orphanOutcomeIds].sort(),
+    orphan_outcome_ids: [...orphanOutcomeIds].sort(compareText),
     findings: sortedFindings,
     verifier,
     claim_boundary: CLAIM_BOUNDARY,
