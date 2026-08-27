@@ -35,9 +35,11 @@ pnpm -w ltp:continuity -- path/to/input.json --out artifacts/continuity.json
 Useful options:
 
 ```text
---compact       emit compact JSON
---allow-broken  return exit code 0 after emitting a BROKEN report
---schema-dir    override the schema directory
+--out <path>         write the report to a file instead of stdout
+--compact            emit compact JSON
+--allow-broken       return exit code 0 after emitting a BROKEN report
+--schema-dir <path>  override the schema directory
+-h, --help           print usage
 ```
 
 Exit codes:
@@ -48,9 +50,10 @@ Exit codes:
 | `1` | Usage, I/O, JSON parsing, schema validation, or semantic validation failed. |
 | `2` | Verification completed and the continuity verdict is `BROKEN`. |
 
-The CLI validates the input before running the semantic verifier, validates the
-generated report before emitting it, and refuses to overwrite the input
-evidence file.
+The CLI rejects duplicate JSON object names before schema validation, including
+names that become equal only after escape decoding. It validates the generated
+report before emission and refuses to overwrite the input evidence through the
+same path, a symbolic-link alias, or a hard-link alias.
 
 ## Input shape
 
