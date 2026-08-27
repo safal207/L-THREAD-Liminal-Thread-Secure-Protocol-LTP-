@@ -20,7 +20,7 @@
   ],
   "devDependencies": {
     "@types/node": "^25.9.1",
-    "@types/pdfkit": "^0.17.4",
+    "@types/pdfkit": "^0.17.6",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3"
   },
