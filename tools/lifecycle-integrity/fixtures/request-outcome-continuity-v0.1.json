@@ -596,6 +596,52 @@
           "outcome-13a"
         ]
       }
+    },
+    {
+      "case_id": "latest_retry_deadline_remains_pending",
+      "input": {
+        "as_of": "2026-08-27T12:00:00Z",
+        "requests": [
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-14",
+            "trace_id": "trace-14",
+            "attempt_id": "attempt-14a",
+            "occurred_at": "2026-08-27T10:00:00Z",
+            "state": "PENDING",
+            "deadline_at": "2026-08-27T11:00:00Z"
+          },
+          {
+            "schema_version": 1,
+            "profile": "org.ltp.request-envelope.v0.1",
+            "record_type": "REQUEST",
+            "request_id": "req-14",
+            "trace_id": "trace-14",
+            "attempt_id": "attempt-14b",
+            "occurred_at": "2026-08-27T11:30:00Z",
+            "state": "PENDING",
+            "deadline_at": "2026-08-27T13:00:00Z",
+            "retry_of_attempt_id": "attempt-14a"
+          }
+        ],
+        "outcomes": []
+      },
+      "expected": {
+        "overall_status": "PENDING",
+        "request_statuses": [
+          "PENDING"
+        ],
+        "finding_codes": [],
+        "orphan_outcome_ids": [],
+        "canonical_outcome_ids": [
+          null
+        ],
+        "effective_deadline_at": [
+          "2026-08-27T13:00:00Z"
+        ]
+      }
     }
   ]
 }
