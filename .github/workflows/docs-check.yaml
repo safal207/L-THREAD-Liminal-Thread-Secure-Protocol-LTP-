@@ -55,7 +55,7 @@ jobs:
 
       - name: Check Relative Links
         if: steps.changed_markdown.outputs.any_changed == 'true'
-        uses: lycheeverse/lychee-action@v1.5.0
+        uses: lycheeverse/lychee-action@v2.8.0
         with:
           args: --no-progress --offline ${{ steps.changed_markdown.outputs.all_changed_files }}
           fail: true
