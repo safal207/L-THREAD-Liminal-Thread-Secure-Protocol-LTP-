@@ -428,10 +428,10 @@ function inspectAuditSignatures(
   const algs = Array.from(new Set(entriesWithSig.map((entry) => entry.alg).filter((alg): alg is string => Boolean(alg))));
 
   if (!present) {
-    return { present: false, valid: null, verification: 'absent', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: 0 };
+    return { present: false, valid: null, verification: 'absent', key_ids: keyIds, algorithm: algs.join(',') || undefined };
   }
   if (!trustedKeys) {
-    return { present: true, valid: null, verification: 'unchecked', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: 0 };
+    return { present: true, valid: null, verification: 'unchecked', key_ids: keyIds, algorithm: algs.join(',') || undefined };
   }
 
   for (let i = 0; i < entries.length; i++) {
