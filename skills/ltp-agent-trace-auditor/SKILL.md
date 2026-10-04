@@ -24,6 +24,10 @@ Use it when the user asks to:
 
 Do not use it for ordinary code review, generic log summarization, or choosing the best action for an agent unless trace admissibility is the explicit question.
 
+## Current inspector limitations
+
+The inspector currently reports `replay_determinism=unchecked`, `signatures.valid=null` and `identity_authentication=unchecked`. A profile without observed violations returns `INCOMPLETE`, not PASS, and `regulator_ready=false`. Treat these results as INCONCLUSIVE whenever those assurances are required. Playback output and a valid hash chain do not independently verify execution, signer identity or factual correctness. `identity_binding=ok` checks declared consistency only. Never upgrade INCOMPLETE using the legacy verdict guidance below.
+
 ## Operating contract
 
 Always follow these rules:
@@ -94,7 +98,7 @@ Do not infer success from human-readable output alone when JSON output is availa
 
 ### 4. Replay the path
 
-Use deterministic replay when the question concerns trajectory or causality:
+Use recorded playback to view a trajectory; it cannot establish replay determinism or causality:
 
 ```bash
 pnpm -w ltp:inspect -- replay --input <trace.jsonl>

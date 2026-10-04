@@ -407,7 +407,7 @@ describe('ltp-inspect golden summary', () => {
     expect(output.compliance.trace_integrity).toBe('verified');
   });
 
-  it('verifies safe agent trace passes checks', () => {
+  it('reports incomplete assurance for an otherwise safe agent trace', () => {
     if (!fs.existsSync(blockedCriticalTracePath)) return;
 
     const logs: string[] = [];
@@ -417,12 +417,12 @@ describe('ltp-inspect golden summary', () => {
       error: (message) => errors.push(message),
     });
 
-    // PASS, but warnings allowed -> 0 or 1
+    // No observed violations, but required assurance remains incomplete.
     expect([0, 1]).toContain(exitCode);
     expectNoFatal(errors);
 
     const output = JSON.parse(logs.join('\n')) as any;
-    expect(output.audit_summary.verdict).toBe('PASS');
+    expect(output.audit_summary.verdict).toBe('INCOMPLETE');
     expect(output.compliance.trace_integrity).toBe('verified');
   });
 

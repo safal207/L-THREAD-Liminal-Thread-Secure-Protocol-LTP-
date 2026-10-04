@@ -10,8 +10,8 @@ This profile validates that an AI Agent trace adheres to the "Action Boundary" s
 
 ### 1. Core Integrity
 *   **trace_integrity**: Must be `verified` (SHA-256 hash chain valid).
-*   **identity_binding**: Must be `ok` (Consistent Identity).
-*   **replay_determinism**: Must be `ok` (Trace is consistent with replay logic).
+*   **identity_binding**: Must be `ok` (consistent declared identity and continuity tokens; not authentication).
+*   **replay_determinism**: Required for a complete assurance verdict. Currently `unchecked`: the inspector does not recompute transitions.
 
 ### 2. Action Boundary Violations
 The inspector scans `route_response` frames for Critical Actions.
@@ -29,12 +29,12 @@ The inspector scans `route_response` frames for Critical Actions.
     "profile": "agents",
     "trace_integrity": "verified",
     "identity_binding": "ok",
-    "replay_determinism": "ok"
+    "replay_determinism": "unchecked"
   },
   "audit_summary": {
-    "verdict": "PASS | FAIL",
+    "verdict": "PASS | FAIL | INCOMPLETE",
     "risk_level": "LOW | MEDIUM | HIGH",
-    "regulator_ready": true | false,
+    "regulator_ready": false,
     "failed_checks": [
       "AGENTS.CRIT.WEB_DIRECT",
       ...
@@ -61,5 +61,6 @@ The inspector scans `route_response` frames for Critical Actions.
 
 ## Failure Conditions
 
-*   **PASS:** No Critical Violations AND Trace Integrity is Verified.
-*   **FAIL:** Any Critical Violation OR Trace Integrity Broken.
+*   **INCOMPLETE (exit 1):** Observed checks pass, but replay, signature verification, identity authentication and regulatory readiness are unchecked. This is the best current assurance outcome; it is not PASS.
+*   **FAIL (exit 2):** Any policy, integrity, identity-consistency or requested strict contract/continuity violation. JSON, human and exported reports use the same finalized result.
+*   `regulator_ready` is always false; this tool does not implement regulatory approval.

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
+import crypto, { type KeyObject } from 'node:crypto';
 import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
 import { CRITICAL_ACTIONS, AGENT_RULES, RECOVERY_ACTIONS } from './critical_actions';
 
@@ -70,6 +70,7 @@ type ParsedArgs = {
   outputFile?: string;
   traceFile?: string;
   configFile?: string;
+  trustedKeysFile?: string;
   replay?: boolean;
 };
 
@@ -103,6 +104,8 @@ function requireInlineValue(token: string, flag: string): string {
 }
 
 function parseArgs(argv: string[]): ParsedArgs {
+  // pnpm forwards a literal separator to package scripts.
+  if (argv[0] === '--') argv = argv.slice(1);
   const commands: Command[] = ['trace', 'replay', 'explain', 'help'];
   let positionalCommand: Command | undefined;
   let explicitHelp = false;
@@ -146,6 +149,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     outputFile: undefined,
     traceFile: undefined,
     configFile: undefined,
+    trustedKeysFile: undefined,
     replay: false,
   };
 
@@ -244,6 +248,11 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.configFile = requireInlineValue(token, '--config');
     } else if (token === '--config') {
       options.configFile = requireValue(argv, i, '--config');
+      i += 1;
+    } else if (token.startsWith('--trusted-keys=')) {
+      options.trustedKeysFile = requireInlineValue(token, '--trusted-keys');
+    } else if (token === '--trusted-keys') {
+      options.trustedKeysFile = requireValue(argv, i, '--trusted-keys');
       i += 1;
     } else if (token === '--replay') {
       options.replay = true;
@@ -349,18 +358,112 @@ function verifyTraceIntegrity(entries: TraceEntry[]): { valid: boolean; firstVio
   return { valid: true };
 }
 
-function verifyReplayDeterminism(entries: TraceEntry[]): { valid: boolean; error?: string; at?: number } {
-  const integrity = verifyTraceIntegrity(entries);
-  if (!integrity.valid) return { valid: false, error: 'Trace integrity broken', at: integrity.firstViolation };
+type TrustedKeyring = Map<string, KeyObject>;
 
-  // Basic state machine check
-  let hasOrientation = false;
-  for (let i = 0; i < entries.length; i++) {
-    const frame = entries[i].frame;
-    if (frame.type === 'orientation') hasOrientation = true;
+function loadTrustedKeyring(file?: string): TrustedKeyring | undefined {
+  if (!file) return undefined;
+  const resolved = path.resolve(file);
+  if (!fs.existsSync(resolved)) throw new CliError(`Trusted keyring not found: ${resolved}`, 2);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(resolved, 'utf-8'));
+  } catch (err) {
+    throw new CliError(`Invalid trusted keyring JSON: ${(err as Error).message}`, 2);
   }
 
-  return { valid: true };
+  const keys = (parsed as any)?.keys;
+  if (!Array.isArray(keys) || keys.length === 0) {
+    throw new CliError('Trusted keyring must contain a non-empty keys array', 2);
+  }
+
+  const ring: TrustedKeyring = new Map();
+  for (const [index, entry] of keys.entries()) {
+    const keyId = entry?.key_id;
+    const alg = String(entry?.alg ?? '').toLowerCase();
+    const pem = entry?.public_key_pem;
+    if (typeof keyId !== 'string' || !keyId.trim()) {
+      throw new CliError(`Trusted key #${index} is missing key_id`, 2);
+    }
+    if (ring.has(keyId)) throw new CliError(`Duplicate trusted key_id: ${keyId}`, 2);
+    if (alg !== 'ed25519') throw new CliError(`Unsupported trusted-key algorithm for ${keyId}: ${entry?.alg}`, 2);
+    if (typeof pem !== 'string' || !pem.includes('BEGIN PUBLIC KEY')) {
+      throw new CliError(`Trusted key ${keyId} must provide public_key_pem`, 2);
+    }
+    try {
+      const publicKey = crypto.createPublicKey(pem);
+      if (publicKey.asymmetricKeyType !== 'ed25519') {
+        throw new Error(`expected ed25519, got ${publicKey.asymmetricKeyType ?? 'unknown'}`);
+      }
+      ring.set(keyId, publicKey);
+    } catch (err) {
+      throw new CliError(`Invalid Ed25519 public key for ${keyId}: ${(err as Error).message}`, 2);
+    }
+  }
+  return ring;
+}
+
+function decodeEd25519Signature(value: string): Buffer | undefined {
+  const signature = value.trim();
+  if (/^[0-9a-fA-F]{128}$/.test(signature)) return Buffer.from(signature, 'hex');
+
+  try {
+    const compact = signature.replace(/\s+/g, '');
+    const decoded = Buffer.from(compact, 'base64');
+    const roundTrip = decoded.toString('base64').replace(/=+$/, '');
+    if (decoded.length === 64 && roundTrip === compact.replace(/=+$/, '')) return decoded;
+  } catch {
+    // handled below
+  }
+  return undefined;
+}
+
+function inspectAuditSignatures(
+  entries: TraceEntry[],
+  trustedKeys?: TrustedKeyring,
+): NonNullable<ComplianceReport['signatures']> {
+  const entriesWithSig = entries.filter((entry) => typeof entry.signature === 'string' && entry.signature.length > 0);
+  const present = entriesWithSig.length > 0;
+  const keyIds = Array.from(new Set(entriesWithSig.map((entry) => entry.key_id).filter((key): key is string => Boolean(key))));
+  const algs = Array.from(new Set(entriesWithSig.map((entry) => entry.alg).filter((alg): alg is string => Boolean(alg))));
+
+  if (!present) {
+    return { present: false, valid: null, verification: 'absent', key_ids: keyIds, algorithm: algs.join(',') || undefined };
+  }
+  if (!trustedKeys) {
+    return { present: true, valid: null, verification: 'unchecked', key_ids: keyIds, algorithm: algs.join(',') || undefined };
+  }
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const alg = String(entry.alg ?? '').toLowerCase();
+    if (!entry.signature) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: 'missing signature' };
+    }
+    if (!entry.key_id) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: 'missing key_id' };
+    }
+    if (alg !== 'ed25519') {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: `unsupported algorithm: ${entry.alg ?? 'missing'}` };
+    }
+    const publicKey = trustedKeys.get(entry.key_id);
+    if (!publicKey) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: `untrusted key_id: ${entry.key_id}` };
+    }
+    if (!/^[0-9a-fA-F]{64}$/.test(entry.hash)) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: 'entry hash is not 32-byte hex' };
+    }
+    const signature = decodeEd25519Signature(entry.signature);
+    if (!signature) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: 'signature is not 64-byte hex/base64' };
+    }
+    const verified = crypto.verify(null, Buffer.from(entry.hash, 'hex'), publicKey, signature);
+    if (!verified) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i + 1, failure_index: i, failure_reason: 'Ed25519 verification failed' };
+    }
+  }
+
+  return { present: true, valid: true, verification: 'verified', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: entries.length };
 }
 
 function normalizeConstraintsValue(
@@ -735,6 +838,13 @@ function constraintListFrom(raw: unknown): string[] {
   );
 }
 
+function declaredIdentities(frames: LtpFrame[]): string[] {
+  return frames.flatMap((frame) => [frame.identity, frame.payload?.identity]).flatMap((value) => {
+    const id = typeof value === 'string' ? value : value?.id;
+    return typeof id === 'string' && id.trim() ? [id] : [];
+  });
+}
+
 function extractIdentity(frames: LtpFrame[]): string {
   for (let i = frames.length - 1; i >= 0; i -= 1) {
     const frame = frames[i] as Record<string, unknown>;
@@ -797,6 +907,7 @@ function summarize(
   format: InspectSummary['input']['format'],
   complianceArg?: string,
   replayCheck?: boolean,
+  trustedKeys?: TrustedKeyring,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
   const complianceProfile = complianceArg;
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
@@ -832,22 +943,15 @@ function summarize(
         ? (integrity.valid ? 'verified' : 'broken')
         : 'unchecked';
 
-    const identityStatus = identity !== 'unknown' ? 'ok' : 'violated';
-    const determinism = verifyReplayDeterminism(entries);
+    // Consistency of declarations is not authentication of their source.
+    const identities = declaredIdentities(frames);
+    const identityStatus = (identities.length > 0 || Boolean(continuity.token))
+      && new Set(identities).size <= 1
+      && continuity.preserved ? 'ok' : 'violated';
 
     let signatureInfo: ComplianceReport['signatures'] | undefined;
     if (input.type === 'audit_log') {
-        const entriesWithSig = entries.filter(e => e.signature);
-        const present = entriesWithSig.length > 0;
-        const keyIds = Array.from(new Set(entriesWithSig.map(e => e.key_id).filter(k => !!k) as string[]));
-        const algs = Array.from(new Set(entriesWithSig.map(e => e.alg).filter(a => !!a) as string[]));
-
-        signatureInfo = {
-            present,
-            valid: present,
-            key_ids: keyIds,
-            algorithm: algs.length ? algs.join(',') : undefined
-        };
+      signatureInfo = inspectAuditSignatures(entries, trustedKeys);
     }
 
     compliance = {
@@ -855,11 +959,12 @@ function summarize(
       trace_integrity: traceIntegrity as any,
       first_violation_index: integrity.firstViolation,
       identity_binding: identityStatus,
+      identity_authentication: 'unchecked',
       continuity: {
         breaks: continuity.breaks,
       },
-      replay_determinism: determinism.valid ? 'ok' : 'failed',
-      determinism_details: determinism.error,
+      replay_determinism: 'unchecked',
+      determinism_details: 'Recorded playback only; execution transitions are not recomputed.',
       protocol: 'LTP/0.1',
       node: 'ltp-rust-node@0.1.0',
       signatures: signatureInfo
@@ -899,7 +1004,7 @@ function summarize(
             evidence: 'Identity binding check failed'
         });
     }
-    if (compliance.replay_determinism !== 'ok') {
+    if (compliance.replay_determinism === 'failed') {
         failedChecks.push('replay_determinism');
          violations.push({
             rule_id: 'CORE.DETERMINISM',
@@ -908,6 +1013,17 @@ function summarize(
             source: 'system',
             action: 'verify_replay',
             evidence: compliance.determinism_details ?? 'Replay determinism check failed'
+        });
+    }
+    if (compliance.signatures?.verification === 'failed') {
+        failedChecks.push('signature_verification');
+        violations.push({
+            rule_id: 'CORE.SIGNATURE',
+            severity: 'CRITICAL',
+            frame_index: compliance.signatures.failure_index ?? -1,
+            source: 'system',
+            action: 'verify_signature',
+            evidence: compliance.signatures.failure_reason ?? 'Ed25519 signature verification failed'
         });
     }
 
@@ -961,12 +1077,17 @@ function summarize(
         violationsCountBySeverity[v.severity] = (violationsCountBySeverity[v.severity] || 0) + 1;
     });
 
-    const verdict = failedChecks.length === 0 ? 'PASS' : 'FAIL';
+    const verdict = failedChecks.length === 0 ? 'INCOMPLETE' : 'FAIL';
     let riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' = 'LOW';
     if (failedChecks.includes('trace_integrity') || violationsCountBySeverity['CRITICAL'] > 0) {
         riskLevel = 'HIGH';
     } else if (failedChecks.length > 0) {
         riskLevel = 'MEDIUM';
+    }
+
+    const uncheckedChecks = ['replay_determinism', 'identity_authentication', 'regulatory_readiness'];
+    if (!compliance.signatures || ['unchecked', 'absent'].includes(compliance.signatures.verification)) {
+      uncheckedChecks.splice(1, 0, 'signature_verification');
     }
 
     auditSummary = {
@@ -975,7 +1096,8 @@ function summarize(
         failed_checks: failedChecks,
         violations: violations,
         violations_count_by_severity: violationsCountBySeverity,
-        regulator_ready: verdict === 'PASS'
+        unchecked_checks: uncheckedChecks,
+        regulator_ready: false
     };
   }
 
@@ -1063,6 +1185,7 @@ function exportPdf(summary: InspectSummary, outputPath: string): void {
         doc.fillColor(verdictColor).fontSize(14).text(`Verdict: ${summary.audit_summary.verdict}`);
         doc.fillColor('black').fontSize(12).text(`Risk Level: ${summary.audit_summary.risk_level}`);
         doc.text(`Regulator Ready: ${summary.audit_summary.regulator_ready}`);
+        doc.text(`Unchecked: ${summary.audit_summary.unchecked_checks.join(', ')}`);
 
         if (summary.audit_summary.violations && summary.audit_summary.violations.length > 0) {
             doc.moveDown();
@@ -1086,15 +1209,19 @@ function exportPdf(summary: InspectSummary, outputPath: string): void {
     if (summary.compliance) {
         doc.fontSize(12).text(`Profile: ${summary.compliance.profile}`);
         doc.text(`Trace Integrity: ${summary.compliance.trace_integrity}`);
-        doc.text(`Identity Binding: ${summary.compliance.identity_binding}`);
+        doc.text(`Identity Binding (declared consistency): ${summary.compliance.identity_binding}`);
+        doc.text(`Identity Authentication: ${summary.compliance.identity_authentication}`);
         doc.text(`Replay Determinism: ${summary.compliance.replay_determinism}`);
 
         if (summary.compliance.signatures) {
              doc.moveDown();
              doc.text('Signatures:');
              doc.text(`  Present: ${summary.compliance.signatures.present}`);
+             doc.text(`  Verification: ${summary.compliance.signatures.verification}`);
+             doc.text(`  Valid: ${summary.compliance.signatures.valid ?? 'unchecked'}`);
              doc.text(`  Key IDs: ${summary.compliance.signatures.key_ids.join(', ') || 'None'}`);
              doc.text(`  Algorithm: ${summary.compliance.signatures.algorithm || 'N/A'}`);
+             if (summary.compliance.signatures.failure_reason) doc.text(`  Failure: ${summary.compliance.signatures.failure_reason}`);
         }
     } else {
         doc.fontSize(12).text('No compliance profile active.');
@@ -1142,10 +1269,14 @@ export function formatHuman(summary: InspectSummary, options: { includeBanner?: 
     lines.push('COMPLIANCE REPORT');
     lines.push(`profile: ${summary.compliance.profile}`);
     lines.push(`trace_integrity: ${summary.compliance.trace_integrity} ${summary.compliance.first_violation_index !== undefined ? `(fail @ ${summary.compliance.first_violation_index})` : ''}`);
-    lines.push(`identity_binding: ${summary.compliance.identity_binding}`);
+    lines.push(`identity_binding: ${summary.compliance.identity_binding} (declared consistency only)`);
+    lines.push(`identity_authentication: ${summary.compliance.identity_authentication}`);
     lines.push(`replay_determinism: ${summary.compliance.replay_determinism}`);
     if (summary.compliance.signatures?.present) {
-        lines.push(`signatures: verified (keys: ${summary.compliance.signatures.key_ids.join(', ')})`);
+        const sig = summary.compliance.signatures;
+        const validity = sig.valid === null ? 'unchecked' : String(sig.valid);
+        lines.push(`signatures: ${sig.verification} valid=${validity} (declared keys: ${sig.key_ids.join(', ')})`);
+        if (sig.failure_reason) lines.push(`signature_failure: ${sig.failure_reason}`);
     }
   }
 
@@ -1156,6 +1287,7 @@ export function formatHuman(summary: InspectSummary, options: { includeBanner?: 
     lines.push(`VERDICT: ${verdict}`);
     lines.push(`risk_level: ${summary.audit_summary.risk_level}`);
     lines.push(`regulator_ready: ${summary.audit_summary.regulator_ready}`);
+    lines.push(`unchecked_checks: ${summary.audit_summary.unchecked_checks.join(', ')}`);
 
     if (summary.audit_summary.violations && summary.audit_summary.violations.length > 0) {
         lines.push('');
@@ -1219,7 +1351,9 @@ export function formatHuman(summary: InspectSummary, options: { includeBanner?: 
 
 export function runInspect(file: string): InspectSummary {
   const { frames, entries, format, inputPath, inputSource, type, hash_root } = loadFrames(file);
-  return summarize(frames, entries, { path: inputPath, source: inputSource, type, hash_root }, format, undefined, false).summary;
+  const result = summarize(frames, entries, { path: inputPath, source: inputSource, type, hash_root }, format, undefined, false);
+  finalizeInspection(result, false);
+  return result.summary;
 }
 
 type InspectionResult = {
@@ -1228,6 +1362,45 @@ type InspectionResult = {
   violations: string[];
   normalizations: string[];
 };
+
+// Finalize before any JSON, human, or export rendering. The CLI consumes this
+// same violation list; a report must never hide an error behind PASS.
+function finalizeInspection(result: InspectionResult, strict: boolean): void {
+  const { summary, violations, warnings, normalizations } = result;
+  if (strict) violations.push(...normalizations.map((note) =>
+    `non-canonical input (normalization would be required): ${note}`));
+  const compliance = summary.compliance;
+  if (compliance) {
+    if (compliance.trace_integrity !== 'verified') {
+      violations.push(`TRACE INTEGRITY ERROR: ${compliance.trace_integrity} (must be 'verified')`);
+    }
+    if (compliance.identity_binding === 'violated') violations.push('IDENTITY BINDING VIOLATED');
+    if (compliance.replay_determinism === 'failed') violations.push('REPLAY DETERMINISM FAILED');
+    if (compliance.signatures?.verification === 'failed') {
+      violations.push(`SIGNATURE VERIFICATION FAILED: ${compliance.signatures.failure_reason ?? 'invalid signature'}`);
+    }
+  }
+  if (compliance?.replay_determinism === 'unchecked') {
+    warnings.push('Execution replay is unchecked; recorded playback does not recompute transitions.');
+  }
+  const audit = summary.audit_summary;
+  if (!audit) return;
+  for (const evidence of [...violations]) {
+    audit.violations.push({ rule_id: 'CORE.CONTRACT', severity: 'HIGH', frame_index: -1,
+      source: 'system', action: 'validate_trace', evidence });
+    audit.violations_count_by_severity.HIGH += 1;
+  }
+  if (violations.length) audit.failed_checks.push('contract');
+  if (audit.violations.length) {
+    audit.verdict = 'FAIL';
+    audit.risk_level = audit.violations.some((v) => v.severity === 'CRITICAL') ? 'HIGH' : 'MEDIUM';
+    if (!violations.length) violations.push(`COMPLIANCE VIOLATIONS: ${audit.failed_checks.join(', ')}`);
+  } else {
+    audit.verdict = 'INCOMPLETE';
+    warnings.push('Assurance incomplete: replay, signatures, identity authentication and regulatory readiness are unchecked.');
+  }
+  audit.regulator_ready = false;
+}
 
 function canonicalizeSummary(summary: InspectSummary): InspectSummary {
   return JSON.parse(JSON.stringify(summary)) as InspectSummary;
@@ -1245,8 +1418,10 @@ function handleTrace(
   continuityCheck?: boolean,
   profile?: string,
   includeBanner = true,
+  trustedKeysFile?: string,
 ): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
+  const trustedKeys = loadTrustedKeyring(trustedKeysFile);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
     entries,
@@ -1254,6 +1429,7 @@ function handleTrace(
     inputFormat,
     profile ?? compliance,
     replayCheck,
+    trustedKeys,
   );
 
   if (continuityCheck) {
@@ -1332,6 +1508,8 @@ function handleTrace(
       }
   }
 
+  finalizeInspection({ summary, violations, warnings, normalizations }, strict);
+
   if (format === 'json') printJson(summary, pretty, writer);
   else printHuman(summary, writer, { includeBanner });
 
@@ -1346,13 +1524,13 @@ function handleTrace(
 
         if (fmt === 'json') {
             exportJson(summary, outputPath);
-            writer(`Exported JSON to ${outputPath}`);
+            if (format === 'human') writer(`Exported JSON to ${outputPath}`);
         } else if (fmt === 'jsonld') {
             exportJsonLd(summary, outputPath);
-            writer(`Exported JSON-LD to ${outputPath}`);
+            if (format === 'human') writer(`Exported JSON-LD to ${outputPath}`);
         } else if (fmt === 'pdf') {
             exportPdf(summary, outputPath);
-            writer(`Exported PDF to ${outputPath}`);
+            if (format === 'human') writer(`Exported PDF to ${outputPath}`);
         }
      }
   }
@@ -1361,7 +1539,13 @@ function handleTrace(
 }
 
 function handleReplay(file: string, from: string | undefined, writer: Writer): void {
-  const { frames } = loadFrames(file);
+  const { frames, entries, type } = loadFrames(file);
+  const validation = validateTraceFrames(frames);
+  if (validation.violations.length) throw new CliError(`Contract violation: ${validation.violations.join('; ')}`, 2);
+  if (type === 'audit_log' && !verifyTraceIntegrity(entries).valid) {
+    throw new CliError('TRACE INTEGRITY ERROR: broken', 2);
+  }
+  writer(`Recorded playback only; no execution recomputation. Hash-chain: ${type === 'audit_log' ? 'verified' : 'unchecked'}.`);
   const startIndex = from ? frames.findIndex((f) => f.id === from || f.ts === from) : 0;
   const replayFrames = startIndex >= 0 ? frames.slice(startIndex) : frames;
 
@@ -1483,11 +1667,12 @@ function runReplayTrace(traceFile: string, colorEnabled: boolean, writer: Writer
       formatReplay: (steps: Array<Record<string, unknown>>, colorEnabled: boolean) => string;
     };
     const steps = replay.replayTrace(traceFile);
+    writer('Recorded playback only; integrity, signatures and execution determinism are unchecked.');
     const output = replay.formatReplay(steps, colorEnabled);
     writer(output);
     return 0;
-  } catch {
-    return 1;
+  } catch (err) {
+    throw new CliError(`Recorded playback failed: ${(err as Error).message}`, 2);
   }
 }
 
@@ -1495,7 +1680,7 @@ function printHelp(writer: Writer): void {
   writer('ltp:inspect — orientation inspector (no decisions, no model execution).');
   writer('');
   writer('Usage:');
-  writer('  ltp inspect trace --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
+  writer('  ltp inspect trace --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--trusted-keys <keyring.json>] [--replay-check] [--export json|jsonld|pdf]');
   writer('  ltp inspect trace --phase <pre|post|two_phase|audit_only> --trace <trace.jsonl> [--anchors-file <anchors.json>] [--output-file <response.md>] [--config <config.json>]');
   writer('  ltp inspect trace --trace <trace.jsonl> --replay');
   writer('  ltp inspect replay --input <frames.jsonl> [--from <frameId>]');
@@ -1517,7 +1702,7 @@ function printHelp(writer: Writer): void {
   writer('');
   writer('Exit codes:');
   writer('  0 OK — contract produced');
-  writer('  1 warnings only (normalized output or degraded signals)');
+  writer('  1 warnings or INCOMPLETE assurance (required verification is unavailable)');
   writer('  2 error (invalid input, contract violation, or runtime failure)');
 }
 
@@ -1617,35 +1802,11 @@ export function execute(
             args.continuity,
             args.profile,
             !args.quiet,
+            args.trustedKeysFile,
           );
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;
           const hasWarnings = warnings.length > 0 || normalizations.length > 0;
-
-          if (args.strict && hasCanonicalGaps) {
-            contractBreaches.push(
-              ...normalizations.map((note) => `non-canonical input (normalization would be required): ${note}`),
-            );
-          }
-
-          if (summary.compliance) {
-             if (summary.compliance.trace_integrity !== 'verified') {
-                 contractBreaches.push(`TRACE INTEGRITY ERROR: ${summary.compliance.trace_integrity} (must be 'verified')`);
-             }
-             if (summary.compliance.identity_binding === 'violated') {
-                 contractBreaches.push(`IDENTITY BINDING VIOLATED`);
-             }
-             if (summary.compliance.replay_determinism === 'failed') {
-                 contractBreaches.push(`REPLAY DETERMINISM FAILED`);
-             }
-
-             if (summary.audit_summary && summary.audit_summary.violations.length > 0) {
-                 const criticalViolations = summary.audit_summary.violations.filter(v => v.severity === 'CRITICAL');
-                 if (criticalViolations.length > 0) {
-                     contractBreaches.push(`CRITICAL COMPLIANCE VIOLATIONS: ${criticalViolations.map(v => v.rule_id).join(', ')}`);
-                 }
-             }
-          }
 
           const status = contractBreaches.length ? 'error' : hasWarnings ? 'warn' : 'ok';
           const exitCode = contractBreaches.length ? 2 : hasWarnings ? 1 : 0;

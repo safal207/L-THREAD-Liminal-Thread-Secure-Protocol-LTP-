@@ -45,7 +45,11 @@ export function enforceActionBoundary(
   // Match the action exactly; substring matching would over-block benign
   // actions whose name happens to contain a banned one (e.g. `undelete_user`
   // when `delete_user` is banned).
-  if (globallyBanned.some(action => targetState === action)) {
+  // Legacy command-shaped bans allow arguments only at a whitespace boundary.
+  // Symbolic action IDs retain exact matching (e.g. undelete_user is not delete_user).
+  const normalizedTarget = targetState.trim().replace(/\s+/g, ' ');
+  if (globallyBanned.some(action => targetState === action ||
+      (action.includes(' ') && (normalizedTarget === action || normalizedTarget.startsWith(`${action} `))))) {
     return {
       admissible: false,
       reason: `Global Safety Violation: Action '${targetState}' is permanently banned.`,

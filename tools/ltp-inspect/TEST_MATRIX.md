@@ -49,12 +49,12 @@ These are the **must**-tagged cases in `TEST_MATRIX.json`. (The automated suite 
 | C05 | trace | stdin | `--input -` fmt=json --quiet | 0/1 | stdin supported; `orientation.identity=ct-stdin` |
 | C06 | trace | stdin invalid | `--input -` | 2 | `Invalid JSONL line 1` + jq hint |
 | D01 | trace | fixtures/minimal.frames.jsonl | `--compliance fintech` | 2 | `TRACE INTEGRITY ERROR: unchecked` |
-| D02 | trace | fixtures/minimal.audit.trace.jsonl | `--compliance fintech` | 0/1 | `trace_integrity=verified`, verdict PASS |
+| D02 | trace | fixtures/minimal.audit.trace.jsonl | `--compliance fintech` | 1 | `trace_integrity=verified`, verdict INCOMPLETE |
 | D03 | trace | fixtures/bad-integrity.audit.trace.jsonl | `--compliance fintech` | 2 | `trace_integrity=broken`, verdict FAIL |
-| D04 | trace | fixtures/minimal.audit.trace.jsonl | `--profile fintech` | 0/1 | `compliance.profile=fintech`, verdict PASS |
-| D05 | trace | fixtures/minimal.audit.trace.jsonl | `--replay-check` | 0/1 | `replay_determinism=ok` |
+| D04 | trace | fixtures/minimal.audit.trace.jsonl | `--profile fintech` | 1 | `compliance.profile=fintech`, verdict INCOMPLETE |
+| D05 | trace | fixtures/minimal.audit.trace.jsonl | `--replay-check` | 1 | `replay_determinism=unchecked` |
 | D06 | trace | examples/agents/allowed-critical.trace.jsonl | `--compliance agentic` | 2 | verdict FAIL; integrity verified |
-| D07 | trace | examples/agents/blocked-critical.trace.jsonl | `--compliance agentic` | 0/1 | verdict PASS; integrity verified |
+| D07 | trace | examples/agents/blocked-critical.trace.jsonl | `--compliance agentic` | 1 | verdict INCOMPLETE; integrity verified |
 | E01 | trace | fixtures/continuity-outage.trace.jsonl | `--continuity` fmt=human --color=never | 0/1 | includes continuity header + coherence |
 | E02 | trace | fixtures/continuity-outage.trace.jsonl | `--continuity` fmt=json --quiet | 0/1 | `continuity_routing.checked=true` |
 | E03 | trace | fixtures/continuity-failure.trace.jsonl | `--continuity --strict` | 2 | `System Remained Coherent: NO` |

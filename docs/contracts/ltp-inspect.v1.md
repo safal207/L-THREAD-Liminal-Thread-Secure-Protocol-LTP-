@@ -10,6 +10,12 @@
 - **Input surface:** accepts JSONL streams of canonical LTP frames.
 - **Trace validation:** input frames must declare `v`/`version` = `0.1`, use object payloads, and keep branch ids unique and pre-sorted; violations fail with exit code `2`.
 
+## Assurance extension correction
+
+The optional compliance/audit extensions expose missing verification explicitly. Without trusted keys, consumers must handle `audit_summary.verdict=INCOMPLETE` (exit 1) and `signatures.valid=null`; the raw orientation-summary fields retain their v1 shape. `signatures.verification` is `absent` or `unchecked`. With `--trusted-keys`, Ed25519 signatures are verified over the raw 32-byte value represented by `entry.hash`; `verification=verified` / `valid=true` means every audit entry verified against its declared trusted `key_id`, while any missing, malformed, unknown-key, unsupported-algorithm or forged signature yields `verification=failed` / `valid=false`, FAIL and exit 2. `replay_determinism` remains `unchecked` until an independent execution reducer exists. `identity_binding=ok` means consistent explicit declarations or continuity tokens, not authentication; `identity_authentication=unchecked` makes that limit explicit.
+
+`unchecked_checks` lists assurance gaps. `regulator_ready` is false: this tool has no regulatory approval policy. All contract, identity, integrity and requested strict continuity failures are aggregated before JSON, human or export rendering and produce FAIL/exit 2. Existing profile consumers that accepted PASS or a truthy signature field must migrate; the previous reports overstated what was checked.
+
 ## Field stability
 
 | Path | Type | Meaning | Stability |
