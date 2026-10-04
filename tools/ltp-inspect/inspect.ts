@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
+import crypto, { type KeyObject } from 'node:crypto';
 import { BranchInsight, ComplianceReport, DriftSnapshot, InspectSummary, LtpFrame, TraceEntry, ComplianceViolation } from './types';
 import { CRITICAL_ACTIONS, AGENT_RULES, RECOVERY_ACTIONS } from './critical_actions';
 
@@ -70,6 +70,7 @@ type ParsedArgs = {
   outputFile?: string;
   traceFile?: string;
   configFile?: string;
+  trustedKeysFile?: string;
   replay?: boolean;
 };
 
@@ -148,6 +149,7 @@ function parseArgs(argv: string[]): ParsedArgs {
     outputFile: undefined,
     traceFile: undefined,
     configFile: undefined,
+    trustedKeysFile: undefined,
     replay: false,
   };
 
@@ -246,6 +248,11 @@ function parseArgs(argv: string[]): ParsedArgs {
       options.configFile = requireInlineValue(token, '--config');
     } else if (token === '--config') {
       options.configFile = requireValue(argv, i, '--config');
+      i += 1;
+    } else if (token.startsWith('--trusted-keys=')) {
+      options.trustedKeysFile = requireInlineValue(token, '--trusted-keys');
+    } else if (token === '--trusted-keys') {
+      options.trustedKeysFile = requireValue(argv, i, '--trusted-keys');
       i += 1;
     } else if (token === '--replay') {
       options.replay = true;
@@ -349,6 +356,114 @@ function verifyTraceIntegrity(entries: TraceEntry[]): { valid: boolean; firstVio
   }
 
   return { valid: true };
+}
+
+type TrustedKeyring = Map<string, KeyObject>;
+
+function loadTrustedKeyring(file?: string): TrustedKeyring | undefined {
+  if (!file) return undefined;
+  const resolved = path.resolve(file);
+  if (!fs.existsSync(resolved)) throw new CliError(`Trusted keyring not found: ${resolved}`, 2);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(resolved, 'utf-8'));
+  } catch (err) {
+    throw new CliError(`Invalid trusted keyring JSON: ${(err as Error).message}`, 2);
+  }
+
+  const keys = (parsed as any)?.keys;
+  if (!Array.isArray(keys) || keys.length === 0) {
+    throw new CliError('Trusted keyring must contain a non-empty keys array', 2);
+  }
+
+  const ring: TrustedKeyring = new Map();
+  for (const [index, entry] of keys.entries()) {
+    const keyId = entry?.key_id;
+    const alg = String(entry?.alg ?? '').toLowerCase();
+    const pem = entry?.public_key_pem;
+    if (typeof keyId !== 'string' || !keyId.trim()) {
+      throw new CliError(`Trusted key #${index} is missing key_id`, 2);
+    }
+    if (ring.has(keyId)) throw new CliError(`Duplicate trusted key_id: ${keyId}`, 2);
+    if (alg !== 'ed25519') throw new CliError(`Unsupported trusted-key algorithm for ${keyId}: ${entry?.alg}`, 2);
+    if (typeof pem !== 'string' || !pem.includes('BEGIN PUBLIC KEY')) {
+      throw new CliError(`Trusted key ${keyId} must provide public_key_pem`, 2);
+    }
+    try {
+      const publicKey = crypto.createPublicKey(pem);
+      if (publicKey.asymmetricKeyType !== 'ed25519') {
+        throw new Error(`expected ed25519, got ${publicKey.asymmetricKeyType ?? 'unknown'}`);
+      }
+      ring.set(keyId, publicKey);
+    } catch (err) {
+      throw new CliError(`Invalid Ed25519 public key for ${keyId}: ${(err as Error).message}`, 2);
+    }
+  }
+  return ring;
+}
+
+function decodeEd25519Signature(value: string): Buffer | undefined {
+  const signature = value.trim();
+  if (/^[0-9a-fA-F]{128}$/.test(signature)) return Buffer.from(signature, 'hex');
+
+  try {
+    const compact = signature.replace(/\s+/g, '');
+    const decoded = Buffer.from(compact, 'base64');
+    const roundTrip = decoded.toString('base64').replace(/=+$/, '');
+    if (decoded.length === 64 && roundTrip === compact.replace(/=+$/, '')) return decoded;
+  } catch {
+    // handled below
+  }
+  return undefined;
+}
+
+function inspectAuditSignatures(
+  entries: TraceEntry[],
+  trustedKeys?: TrustedKeyring,
+): NonNullable<ComplianceReport['signatures']> {
+  const entriesWithSig = entries.filter((entry) => typeof entry.signature === 'string' && entry.signature.length > 0);
+  const present = entriesWithSig.length > 0;
+  const keyIds = Array.from(new Set(entriesWithSig.map((entry) => entry.key_id).filter((key): key is string => Boolean(key))));
+  const algs = Array.from(new Set(entriesWithSig.map((entry) => entry.alg).filter((alg): alg is string => Boolean(alg))));
+
+  if (!present) {
+    return { present: false, valid: null, verification: 'absent', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: 0 };
+  }
+  if (!trustedKeys) {
+    return { present: true, valid: null, verification: 'unchecked', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: 0 };
+  }
+
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const alg = String(entry.alg ?? '').toLowerCase();
+    if (!entry.signature) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: 'missing signature' };
+    }
+    if (!entry.key_id) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: 'missing key_id' };
+    }
+    if (alg !== 'ed25519') {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: `unsupported algorithm: ${entry.alg ?? 'missing'}` };
+    }
+    const publicKey = trustedKeys.get(entry.key_id);
+    if (!publicKey) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: `untrusted key_id: ${entry.key_id}` };
+    }
+    if (!/^[0-9a-fA-F]{64}$/.test(entry.hash)) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: 'entry hash is not 32-byte hex' };
+    }
+    const signature = decodeEd25519Signature(entry.signature);
+    if (!signature) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i, failure_index: i, failure_reason: 'signature is not 64-byte hex/base64' };
+    }
+    const verified = crypto.verify(null, Buffer.from(entry.hash, 'hex'), publicKey, signature);
+    if (!verified) {
+      return { present: true, valid: false, verification: 'failed', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: i + 1, failure_index: i, failure_reason: 'Ed25519 verification failed' };
+    }
+  }
+
+  return { present: true, valid: true, verification: 'verified', key_ids: keyIds, algorithm: algs.join(',') || undefined, checked_entries: entries.length };
 }
 
 function normalizeConstraintsValue(
@@ -792,6 +907,7 @@ function summarize(
   format: InspectSummary['input']['format'],
   complianceArg?: string,
   replayCheck?: boolean,
+  trustedKeys?: TrustedKeyring,
 ): { summary: InspectSummary; violations: string[]; warnings: string[]; normalizations: string[] } {
   const complianceProfile = complianceArg;
   const { frames: normalizedFrames, normalizations: constraintNormalizations, violations: constraintViolations } =
@@ -835,18 +951,7 @@ function summarize(
 
     let signatureInfo: ComplianceReport['signatures'] | undefined;
     if (input.type === 'audit_log') {
-        const entriesWithSig = entries.filter(e => e.signature);
-        const present = entriesWithSig.length > 0;
-        const keyIds = Array.from(new Set(entriesWithSig.map(e => e.key_id).filter(k => !!k) as string[]));
-        const algs = Array.from(new Set(entriesWithSig.map(e => e.alg).filter(a => !!a) as string[]));
-
-        signatureInfo = {
-            present,
-            valid: null,
-            verification: present ? 'unchecked' : 'absent',
-            key_ids: keyIds,
-            algorithm: algs.length ? algs.join(',') : undefined
-        };
+      signatureInfo = inspectAuditSignatures(entries, trustedKeys);
     }
 
     compliance = {
@@ -910,6 +1015,17 @@ function summarize(
             evidence: compliance.determinism_details ?? 'Replay determinism check failed'
         });
     }
+    if (compliance.signatures?.verification === 'failed') {
+        failedChecks.push('signature_verification');
+        violations.push({
+            rule_id: 'CORE.SIGNATURE',
+            severity: 'CRITICAL',
+            frame_index: compliance.signatures.failure_index ?? -1,
+            source: 'system',
+            action: 'verify_signature',
+            evidence: compliance.signatures.failure_reason ?? 'Ed25519 signature verification failed'
+        });
+    }
 
     if (complianceProfile === 'agentic' || complianceProfile === 'agents') {
         frames.forEach((frame, index) => {
@@ -969,13 +1085,18 @@ function summarize(
         riskLevel = 'MEDIUM';
     }
 
+    const uncheckedChecks = ['replay_determinism', 'identity_authentication', 'regulatory_readiness'];
+    if (!compliance.signatures || ['unchecked', 'absent'].includes(compliance.signatures.verification)) {
+      uncheckedChecks.splice(1, 0, 'signature_verification');
+    }
+
     auditSummary = {
         verdict,
         risk_level: riskLevel,
         failed_checks: failedChecks,
         violations: violations,
         violations_count_by_severity: violationsCountBySeverity,
-        unchecked_checks: ['replay_determinism', 'signature_verification', 'identity_authentication', 'regulatory_readiness'],
+        unchecked_checks: uncheckedChecks,
         regulator_ready: false
     };
   }
@@ -1097,8 +1218,10 @@ function exportPdf(summary: InspectSummary, outputPath: string): void {
              doc.text('Signatures:');
              doc.text(`  Present: ${summary.compliance.signatures.present}`);
              doc.text(`  Verification: ${summary.compliance.signatures.verification}`);
+             doc.text(`  Valid: ${summary.compliance.signatures.valid ?? 'unchecked'}`);
              doc.text(`  Key IDs: ${summary.compliance.signatures.key_ids.join(', ') || 'None'}`);
              doc.text(`  Algorithm: ${summary.compliance.signatures.algorithm || 'N/A'}`);
+             if (summary.compliance.signatures.failure_reason) doc.text(`  Failure: ${summary.compliance.signatures.failure_reason}`);
         }
     } else {
         doc.fontSize(12).text('No compliance profile active.');
@@ -1150,7 +1273,10 @@ export function formatHuman(summary: InspectSummary, options: { includeBanner?: 
     lines.push(`identity_authentication: ${summary.compliance.identity_authentication}`);
     lines.push(`replay_determinism: ${summary.compliance.replay_determinism}`);
     if (summary.compliance.signatures?.present) {
-        lines.push(`signatures: unchecked (declared keys: ${summary.compliance.signatures.key_ids.join(', ')})`);
+        const sig = summary.compliance.signatures;
+        const validity = sig.valid === null ? 'unchecked' : String(sig.valid);
+        lines.push(`signatures: ${sig.verification} valid=${validity} (declared keys: ${sig.key_ids.join(', ')})`);
+        if (sig.failure_reason) lines.push(`signature_failure: ${sig.failure_reason}`);
     }
   }
 
@@ -1250,6 +1376,9 @@ function finalizeInspection(result: InspectionResult, strict: boolean): void {
     }
     if (compliance.identity_binding === 'violated') violations.push('IDENTITY BINDING VIOLATED');
     if (compliance.replay_determinism === 'failed') violations.push('REPLAY DETERMINISM FAILED');
+    if (compliance.signatures?.verification === 'failed') {
+      violations.push(`SIGNATURE VERIFICATION FAILED: ${compliance.signatures.failure_reason ?? 'invalid signature'}`);
+    }
   }
   if (compliance?.replay_determinism === 'unchecked') {
     warnings.push('Execution replay is unchecked; recorded playback does not recompute transitions.');
@@ -1289,8 +1418,10 @@ function handleTrace(
   continuityCheck?: boolean,
   profile?: string,
   includeBanner = true,
+  trustedKeysFile?: string,
 ): InspectionResult {
   const { frames, entries, format: inputFormat, inputPath, inputSource, type, hash_root } = loadFrames(file);
+  const trustedKeys = loadTrustedKeyring(trustedKeysFile);
   const { summary, violations, warnings, normalizations } = summarize(
     frames,
     entries,
@@ -1298,6 +1429,7 @@ function handleTrace(
     inputFormat,
     profile ?? compliance,
     replayCheck,
+    trustedKeys,
   );
 
   if (continuityCheck) {
@@ -1548,7 +1680,7 @@ function printHelp(writer: Writer): void {
   writer('ltp:inspect — orientation inspector (no decisions, no model execution).');
   writer('');
   writer('Usage:');
-  writer('  ltp inspect trace --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--replay-check] [--export json|jsonld|pdf]');
+  writer('  ltp inspect trace --input <frames.jsonl> [--strict] [--format json|human] [--pretty] [--color auto|always|never] [--quiet] [--verbose] [--output <file>] [--compliance fintech] [--trusted-keys <keyring.json>] [--replay-check] [--export json|jsonld|pdf]');
   writer('  ltp inspect trace --phase <pre|post|two_phase|audit_only> --trace <trace.jsonl> [--anchors-file <anchors.json>] [--output-file <response.md>] [--config <config.json>]');
   writer('  ltp inspect trace --trace <trace.jsonl> --replay');
   writer('  ltp inspect replay --input <frames.jsonl> [--from <frameId>]');
@@ -1670,6 +1802,7 @@ export function execute(
             args.continuity,
             args.profile,
             !args.quiet,
+            args.trustedKeysFile,
           );
           const contractBreaches = [...violations];
           const hasCanonicalGaps = normalizations.length > 0;

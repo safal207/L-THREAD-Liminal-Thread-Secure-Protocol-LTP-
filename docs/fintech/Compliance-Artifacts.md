@@ -43,9 +43,17 @@ Every exported artifact includes the **Hash Root** of the original trace. This c
 
 ## Digital Signatures
 
-If the trace contains cryptographic signatures (`signature` field in trace entries), the export tool verifies:
-1. Presence of signatures.
-2. Consistency of the hash chain covered by signatures.
-3. List of Key IDs used.
+If the trace contains cryptographic signatures (`signature` field in trace entries), the export tool always reports their presence, algorithms, key IDs, and hash-chain status.
 
-*Note: Full cryptographic verification of signatures requires access to the corresponding public keys, which are managed outside the trace file itself (see Key Rotation).*
+Full Ed25519 verification is opt-in because trust keys are external to the trace:
+
+```bash
+ltp inspect trace --input trace.jsonl \
+  --compliance fintech \
+  --trusted-keys trusted-keys.json \
+  --export json
+```
+
+With trusted keys supplied, each audit entry is verified over the raw 32-byte digest represented by its `entry.hash`. Missing, malformed, unknown-key, unsupported-algorithm or forged signatures fail the inspection. Without a keyring, signature validity remains `null` / `unchecked`.
+
+*Note: The inspector consumes an explicit local trust keyring. It does not discover keys, provide PKI, or evaluate revocation time; see Key Rotation for the lifecycle boundary.*

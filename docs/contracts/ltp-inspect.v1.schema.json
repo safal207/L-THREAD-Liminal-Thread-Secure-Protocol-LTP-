@@ -103,9 +103,22 @@
             },
             "verification": {
               "enum": [
+                "verified",
+                "failed",
                 "unchecked",
                 "absent"
               ]
+            },
+            "checked_entries": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failure_index": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "failure_reason": {
+              "type": "string"
             }
           }
         }

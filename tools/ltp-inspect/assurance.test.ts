@@ -49,7 +49,7 @@ function run(file: string, extra: string[] = []) {
 }
 
 describe('inspection assurance boundaries', () => {
-  it.each([undefined, 'NOT-A-VALID-ED25519-SIGNATURE'])('never certifies signature %s', (sig) => {
+  it.each([undefined, 'NOT-A-VALID-ED25519-SIGNATURE'])('never certifies signature %s without trusted keys', (sig) => {
     const { report, exit } = run(fixture(frames(), sig));
     expect(exit).toBe(1);
     expect(report.compliance.trace_integrity).toBe('verified');
@@ -57,8 +57,59 @@ describe('inspection assurance boundaries', () => {
     expect(report.compliance.identity_authentication).toBe('unchecked');
     expect(report.compliance.replay_determinism).toBe('unchecked');
     expect(report.audit_summary).toMatchObject({ verdict: 'INCOMPLETE', regulator_ready: false });
-    expect(formatHuman(report)).not.toContain('signatures: verified');
+    expect(formatHuman(report)).not.toContain('signatures: verified valid=true');
     expect(formatHuman(report)).toContain('VERDICT: INCOMPLETE');
+  });
+  it('verifies trusted Ed25519 signatures over the raw 32-byte entry hash', () => {
+    const file = fixture();
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+    const entries = fs.readFileSync(file, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    for (const entry of entries) {
+      entry.key_id = 'trusted-test';
+      entry.alg = 'ed25519';
+      entry.signature = crypto.sign(null, Buffer.from(entry.hash, 'hex'), privateKey).toString('base64');
+    }
+    fs.writeFileSync(file, entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
+    const keyring = path.join(path.dirname(file), 'trusted-keys.json');
+    fs.writeFileSync(keyring, JSON.stringify({ keys: [{
+      key_id: 'trusted-test',
+      alg: 'ed25519',
+      public_key_pem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+    }] }));
+    const { report, exit } = run(file, ['--trusted-keys', keyring]);
+    expect(exit).toBe(1);
+    expect(report.compliance.signatures).toMatchObject({ valid: true, verification: 'verified', checked_entries: 3 });
+    expect(report.audit_summary.verdict).toBe('INCOMPLETE');
+    expect(report.audit_summary.unchecked_checks).not.toContain('signature_verification');
+  });
+  it('fails a forged Ed25519 signature when a trusted keyring is supplied', () => {
+    const file = fixture();
+    const { publicKey, privateKey } = crypto.generateKeyPairSync('ed25519');
+    const entries = fs.readFileSync(file, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    for (const entry of entries) {
+      entry.key_id = 'trusted-test';
+      entry.alg = 'ed25519';
+      entry.signature = crypto.sign(null, Buffer.from(entry.hash, 'hex'), privateKey).toString('base64');
+    }
+    entries[1].signature = Buffer.alloc(64, 7).toString('base64');
+    fs.writeFileSync(file, entries.map((entry) => JSON.stringify(entry)).join('\n') + '\n');
+    const keyring = path.join(path.dirname(file), 'trusted-keys.json');
+    fs.writeFileSync(keyring, JSON.stringify({ keys: [{
+      key_id: 'trusted-test',
+      alg: 'ed25519',
+      public_key_pem: publicKey.export({ type: 'spki', format: 'pem' }).toString(),
+    }] }));
+    const { report, exit, stderr } = run(file, ['--trusted-keys', keyring]);
+    expect(exit).toBe(2);
+    expect(stderr).toContain('SIGNATURE VERIFICATION FAILED');
+    expect(report.compliance.signatures).toMatchObject({
+      valid: false,
+      verification: 'failed',
+      failure_index: 1,
+      failure_reason: 'Ed25519 verification failed',
+    });
+    expect(report.audit_summary.verdict).toBe('FAIL');
+    expect(report.audit_summary.failed_checks).toContain('signature_verification');
   });
   it('does not treat a payload record ID as authenticated identity', () => {
     const input = frames();

@@ -74,9 +74,12 @@ export type ComplianceReport = {
   signatures?: {
     present: boolean;
     valid: boolean | null; // null means cryptographic verification was not performed
-    verification: 'unchecked' | 'absent';
+    verification: 'verified' | 'failed' | 'unchecked' | 'absent';
     key_ids: string[];
     algorithm?: string;
+    checked_entries?: number;
+    failure_index?: number;
+    failure_reason?: string;
   };
 };
 

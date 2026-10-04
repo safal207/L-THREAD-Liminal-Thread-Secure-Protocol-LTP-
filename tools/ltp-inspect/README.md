@@ -8,9 +8,9 @@ Inspector emits a versioned, deterministic state summary suitable for CI, audits
 
 ## Assurance boundaries
 
-Hash-chain integrity, declared identity consistency, recorded playback and cryptographic verification are separate checks. The inspector does not authenticate trace signers or independently recompute agent transitions. `identity_binding=ok` describes consistent declarations, not trusted identity.
+Hash-chain integrity, declared identity consistency, recorded playback and cryptographic verification are separate checks. The inspector does not authenticate trace identities or independently recompute agent transitions. `identity_binding=ok` describes consistent declarations, not trusted identity.
 
-`signatures.valid=null` means no cryptographic verification was performed; `verification` is `absent` or `unchecked`. `replay_determinism=unchecked` is not successful replay verification. Profiles return `INCOMPLETE` (exit 1) when their observed checks pass but required assurance is unavailable, and `FAIL` (exit 2) on violations. `unchecked_checks` lists the gaps; `regulator_ready` remains false. Consumers must handle INCOMPLETE and nullable signature validity explicitly; do not coerce them to PASS.
+By default, `signatures.valid=null` means no cryptographic verification was performed; `verification` is `absent` or `unchecked`. Supply `--trusted-keys <keyring.json>` to verify Ed25519 signatures. In that mode each audit entry must be signed by a trusted `key_id`; signatures are checked over the raw 32-byte digest represented by `entry.hash` and may be hex or base64 encoded. A forged, missing, unknown-key, or unsupported-algorithm signature produces `verification=failed`, `valid=false`, FAIL and exit 2. A fully verified signature set produces `verification=verified`, `valid=true`. `replay_determinism=unchecked` is not successful replay verification. Profiles return `INCOMPLETE` (exit 1) when their observed checks pass but required assurance is unavailable, and `FAIL` (exit 2) on violations. `unchecked_checks` lists the gaps; `regulator_ready` remains false. Consumers must handle INCOMPLETE and nullable signature validity explicitly; do not coerce them to PASS.
 
 `replay --input` validates frame shape and, for audit logs, hash-chain integrity before displaying recorded frames. `trace --trace ... --replay` is a separate recorded-event viewer with strict JSONL parsing; it does not verify integrity or re-execute transitions. Neither command executes represented actions. A replay display completing with exit 0 is not an assurance verdict.
 
@@ -41,6 +41,23 @@ Flags:
 - `--quiet` suppresses banners/RESULT lines (primary report output remains; useful with `--format=json`)
 - `--output <file>` to write the formatted output to disk
 - `--replay` to append trace replay output in `trace --phase ... --trace <file>` mode
+- `--trusted-keys <path>` to enable Ed25519 verification for audit-log entries against an explicit keyring
+
+Trusted keyring format:
+
+```json
+{
+  "keys": [
+    {
+      "key_id": "agent-prod-2026-10",
+      "alg": "ed25519",
+      "public_key_pem": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----\n"
+    }
+  ]
+}
+```
+
+The keyring is an explicit trust input, not identity discovery or PKI. Unknown keys fail closed when verification is requested.
 
 Frames must be JSONL with one frame per line. Existing conformance fixtures work as input.
 
