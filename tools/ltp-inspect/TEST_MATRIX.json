@@ -221,11 +221,11 @@
     {
       "id": "D02",
       "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.audit.trace.jsonl", "--compliance", "fintech", "--format=json", "--quiet"],
-      "expectExit": [0, 1],
+      "expectExit": 1,
       "stdout": {
         "json": {
           "compliance.trace_integrity": "verified",
-          "audit_summary.verdict": "PASS"
+          "audit_summary.verdict": "INCOMPLETE"
         }
       },
       "tags": ["must"]
@@ -246,11 +246,11 @@
     {
       "id": "D04",
       "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.audit.trace.jsonl", "--profile", "fintech", "--format=json", "--quiet"],
-      "expectExit": [0, 1],
+      "expectExit": 1,
       "stdout": {
         "json": {
           "compliance.profile": "fintech",
-          "audit_summary.verdict": "PASS"
+          "audit_summary.verdict": "INCOMPLETE"
         }
       },
       "tags": ["must"]
@@ -258,10 +258,10 @@
     {
       "id": "D05",
       "args": ["trace", "--input", "tools/ltp-inspect/fixtures/minimal.audit.trace.jsonl", "--replay-check", "--format=json", "--quiet"],
-      "expectExit": [0, 1],
+      "expectExit": 1,
       "stdout": {
         "json": {
-          "compliance.replay_determinism": "ok"
+          "compliance.replay_determinism": "unchecked"
         }
       },
       "tags": ["must"]
@@ -281,10 +281,10 @@
     {
       "id": "D07",
       "args": ["trace", "--input", "examples/agents/blocked-critical.trace.jsonl", "--compliance", "agentic", "--format=json", "--quiet"],
-      "expectExit": [0, 1],
+      "expectExit": 1,
       "stdout": {
         "json": {
-          "audit_summary.verdict": "PASS",
+          "audit_summary.verdict": "INCOMPLETE",
           "compliance.trace_integrity": "verified"
         }
       },

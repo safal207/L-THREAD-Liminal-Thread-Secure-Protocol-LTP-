@@ -10,6 +10,12 @@
 - **Input surface:** accepts JSONL streams of canonical LTP frames.
 - **Trace validation:** input frames must declare `v`/`version` = `0.1`, use object payloads, and keep branch ids unique and pre-sorted; violations fail with exit code `2`.
 
+## Assurance extension correction
+
+The optional compliance/audit extensions now expose missing verification explicitly. Consumers of these extensions must handle `audit_summary.verdict=INCOMPLETE` (exit 1) and `signatures.valid=null`; the raw orientation-summary fields retain their v1 shape. `signatures.verification` is `absent` or `unchecked`. `replay_determinism` remains `unchecked` until an independent execution reducer exists. `identity_binding=ok` means consistent explicit declarations or continuity tokens, not authentication; `identity_authentication=unchecked` makes that limit explicit.
+
+`unchecked_checks` lists assurance gaps. `regulator_ready` is false: this tool has no regulatory approval policy. All contract, identity, integrity and requested strict continuity failures are aggregated before JSON, human or export rendering and produce FAIL/exit 2. Existing profile consumers that accepted PASS or a truthy signature field must migrate; the previous reports overstated what was checked.
+
 ## Field stability
 
 | Path | Type | Meaning | Stability |

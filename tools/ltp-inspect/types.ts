@@ -49,19 +49,21 @@ export type ComplianceViolation = {
 };
 
 export type AuditSummary = {
-  verdict: 'PASS' | 'FAIL';
+  verdict: 'PASS' | 'FAIL' | 'INCOMPLETE';
   risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
   failed_checks: string[];
   violations: ComplianceViolation[];
   violations_count_by_severity: Record<string, number>;
   regulator_ready: boolean;
+  unchecked_checks: string[];
 };
 
 export type ComplianceReport = {
   profile: string;
   trace_integrity: 'verified' | 'broken' | 'unchecked';
   first_violation_index?: number;
-  identity_binding: 'ok' | 'violated' | 'unchecked';
+  identity_binding: 'ok' | 'violated' | 'unchecked'; // declared consistency only
+  identity_authentication: 'unchecked';
   continuity: {
     breaks: number;
   };
@@ -71,7 +73,8 @@ export type ComplianceReport = {
   node: string;
   signatures?: {
     present: boolean;
-    valid: boolean; // simplistic check if we can't verify crypto without keys
+    valid: boolean | null; // null means cryptographic verification was not performed
+    verification: 'unchecked' | 'absent';
     key_ids: string[];
     algorithm?: string;
   };

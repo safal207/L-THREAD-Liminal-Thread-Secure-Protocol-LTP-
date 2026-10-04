@@ -49,6 +49,94 @@
         }
       }
     },
+    "compliance": {
+      "type": "object",
+      "required": [
+        "trace_integrity",
+        "identity_binding",
+        "identity_authentication",
+        "replay_determinism"
+      ],
+      "properties": {
+        "trace_integrity": {
+          "enum": [
+            "verified",
+            "broken",
+            "unchecked"
+          ]
+        },
+        "identity_binding": {
+          "enum": [
+            "ok",
+            "violated",
+            "unchecked"
+          ],
+          "description": "Consistency of declared identities/tokens only, not authentication."
+        },
+        "identity_authentication": {
+          "const": "unchecked"
+        },
+        "replay_determinism": {
+          "enum": [
+            "ok",
+            "failed",
+            "unchecked"
+          ],
+          "description": "The current inspector reports unchecked; no execution reducer is run."
+        },
+        "signatures": {
+          "type": "object",
+          "required": [
+            "present",
+            "valid",
+            "verification"
+          ],
+          "properties": {
+            "present": {
+              "type": "boolean"
+            },
+            "valid": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "verification": {
+              "enum": [
+                "unchecked",
+                "absent"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "audit_summary": {
+      "type": "object",
+      "required": [
+        "verdict",
+        "regulator_ready",
+        "unchecked_checks"
+      ],
+      "properties": {
+        "verdict": {
+          "enum": [
+            "PASS",
+            "FAIL",
+            "INCOMPLETE"
+          ]
+        },
+        "regulator_ready": {
+          "const": false
+        },
+        "unchecked_checks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "generated_at": {
       "type": "string",
       "format": "date-time"
@@ -72,6 +160,8 @@
       "additionalProperties": false,
       "required": ["source", "frames", "format"],
       "properties": {
+        "type": { "enum": ["raw", "audit_log"] },
+        "hash_root": { "type": "string" },
         "source": {
           "type": "string",
           "enum": ["stdin", "file"]

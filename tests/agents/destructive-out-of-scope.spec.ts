@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
+import { enforceActionBoundary } from '../../agents/reference-agent/policy';
 import { AgentPipeline } from '../../agents/reference-agent/pipeline';
 import type { AgentEvent, ProposedTransition, ActionResult, VerifiedTransition } from '../../agents/reference-agent/types';
 
@@ -56,5 +57,17 @@ describe('destructive-out-of-scope policy gate', () => {
     expect(result.result).toBe('BLOCKED');
     expect(result.details.reasonCode).toBe('GLOBAL_SAFETY_VIOLATION');
     expect(executor).not.toHaveBeenCalled();
+  });
+});
+
+
+describe('command-shaped bans preserve action boundaries', () => {
+  it.each(['rm -rf /', ' rm   -rf /tmp/example ', 'rm -rf\t/tmp/example'])('blocks arguments in %s', (targetState) => {
+    const proposal: ProposedTransition = { id: 'p', eventId: 'e', targetState, context: 'USER', reason: 'offline test' };
+    expect(enforceActionBoundary(proposal).reasonCode).toBe('GLOBAL_SAFETY_VIOLATION');
+  });
+  it.each(['undelete_user', 'delete_user_backup', 'format_disk_backup', 'rm -rfoo'])('does not substring-match %s', (targetState) => {
+    const proposal: ProposedTransition = { id: 'p', eventId: 'e', targetState, context: 'USER', reason: 'offline test' };
+    expect(enforceActionBoundary(proposal, { globallyBanned: ['delete_user', 'format_disk', 'rm -rf'] }).admissible).toBe(true);
   });
 });

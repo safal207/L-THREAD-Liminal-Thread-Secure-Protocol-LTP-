@@ -5,7 +5,7 @@ Canonical source of truth for Inspector exit codes across docs, README guidance,
 | Code | Meaning | When it triggers |
 | --- | --- | --- |
 | 0 | OK | Contract satisfied with no warnings. |
-| 1 | Warnings only | Canonicalization applied (normalized output), continuity/drift warnings, or other non-fatal notices. |
+| 1 | Warnings or incomplete assurance | Canonicalization applied (normalized output), continuity/drift warnings, other non-fatal notices, or an `INCOMPLETE` profile verdict with unchecked required verification. |
 | 2 | Error | Missing or unsupported `v`/`version`, mixed versions, invalid frame shape, duplicate branches, out-of-range fields, non-canonical input when `--strict` is enabled, IO failure, parse errors, or unexpected runtime exceptions. |
 
 Notes:

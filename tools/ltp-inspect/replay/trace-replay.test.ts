@@ -9,7 +9,6 @@ const SAMPLE_TRACE = [
   '{"id":"t1","status":"admissible","payload":{"text":"Paris is the capital of France."}}',
   '{"id":"t2","status":"admissible","payload":{"text":"France is in Europe."}}',
   '{"id":"t3","status":"drifted","payload":{"text":"Unanchored claim."}}',
-  'INVALID JSON LINE',
   '',
 ].join('\n');
 
@@ -57,8 +56,8 @@ describe('replayTrace', () => {
     });
   });
 
-  it('never throws for missing files', () => {
-    expect(replayTrace('/tmp/does-not-exist/never.jsonl')).toEqual([]);
+  it('rejects missing files', () => {
+    expect(() => replayTrace('/tmp/does-not-exist/never.jsonl')).toThrow();
   });
 });
 
