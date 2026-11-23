@@ -35,7 +35,8 @@ concurrency:
 
 jobs:
   deterministic-fault-contract:
-    runs-on: ubuntu-latest
+    # OTP 25 / Elixir 1.14 require an image with compatible prebuilt OTP binaries.
+    runs-on: ubuntu-22.04
     timeout-minutes: 50
     steps:
       - uses: actions/checkout@v6
